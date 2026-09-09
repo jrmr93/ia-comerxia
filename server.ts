@@ -226,9 +226,65 @@ async function startServer() {
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-  // 1. Health check
-  app.get('/api/health', (req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // 1. Health & Database Connection Status endpoints
+  app.get('/api/db-status', async (req: Request, res: Response) => {
+    try {
+      const status = await getDatabaseRuntimeInfo();
+      res.json({
+        success: true,
+        ...status,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false,
+        connected: false,
+        error: err.message || 'Error al verificar conexión con PostgreSQL',
+      });
+    }
+  });
+
+  app.get('/api/health', async (req: Request, res: Response) => {
+    try {
+      const status = await getDatabaseRuntimeInfo();
+      res.json({
+        status: status.connected ? 'ok' : 'degraded',
+        dbConnected: status.connected,
+        dbInfo: status,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      res.json({
+        status: 'error',
+        dbConnected: false,
+        error: err.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // 1b. Strict SQL Database Guard Middleware: Blocks authentication & database actions if PostgreSQL is disconnected
+  app.use('/api', async (req: Request, res: Response, next: NextFunction) => {
+    if (
+      req.path === '/db-status' ||
+      req.path === '/health' ||
+      req.path.startsWith('/uploads') ||
+      req.path.startsWith('/assets')
+    ) {
+      return next();
+    }
+
+    const dbInfo = await getDatabaseRuntimeInfo();
+    if (!dbInfo.connected) {
+      return res.status(503).json({
+        success: false,
+        dbConnected: false,
+        error: 'Sin conexión a la base de datos PostgreSQL. El servidor web está activo, pero la base de datos SQL no responde.',
+        message: (dbInfo as any).error || 'No se pudo conectar a la base de datos PostgreSQL.',
+        hint: (dbInfo as any).hint || 'Inicie el servicio de PostgreSQL en su sistema y presione "Reintentar Conexión" en la pantalla.',
+      });
+    }
+
+    next();
   });
 
   // 1b. SQL Database User Authentication Endpoints

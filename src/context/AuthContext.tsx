@@ -2,6 +2,13 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AuthUser, OperatorUser, GoogleEmailConfig } from '../types.ts';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
 
+export interface DbStatus {
+  connected: boolean | null;
+  loading: boolean;
+  message?: string;
+  hint?: string;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
@@ -9,6 +16,8 @@ interface AuthContextType {
   hasAdmin: boolean | null;
   isAdmin: boolean;
   isOperator: boolean;
+  dbStatus: DbStatus;
+  checkDbStatus: () => Promise<DbStatus>;
   checkSetupStatus: () => Promise<boolean>;
   setupAdmin: (email: string, password: string, confirmPassword: string, name?: string, username?: string) => Promise<{ success: boolean; error?: string }>;
   login: (emailOrUsername: string, password: string) => Promise<{ success: boolean; error?: string; requiresActivation?: boolean; user?: Partial<AuthUser> }>;
@@ -48,6 +57,8 @@ const AuthContext = createContext<AuthContextType>({
   hasAdmin: null,
   isAdmin: false,
   isOperator: false,
+  dbStatus: { connected: null, loading: true },
+  checkDbStatus: async () => ({ connected: false, loading: false }),
   checkSetupStatus: async () => false,
   setupAdmin: async () => ({ success: false }),
   login: async () => ({ success: false }),
@@ -134,6 +145,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [hasAdmin, setHasAdmin] = useState<boolean | null>(null);
+  const [dbStatus, setDbStatus] = useState<DbStatus>({
+    connected: null,
+    loading: true,
+  });
+
+  const checkDbStatus = async (): Promise<DbStatus> => {
+    setDbStatus((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch('/api/db-status');
+      const { ok, data } = await parseSafeJson(res, 'Error al consultar estado de la base de datos');
+      if (ok && data) {
+        const status: DbStatus = {
+          connected: Boolean(data.connected),
+          loading: false,
+          message: data.error || undefined,
+          hint: data.hint || undefined,
+        };
+        setDbStatus(status);
+        return status;
+      }
+    } catch (e: any) {
+      console.warn('Error checking DB status:', e);
+    }
+    const fallback: DbStatus = {
+      connected: false,
+      loading: false,
+      message: 'No se pudo contactar el servidor de base de datos PostgreSQL.',
+      hint: 'Verifica la conexión de red o la configuración de base de datos en el archivo .env',
+    };
+    setDbStatus(fallback);
+    return fallback;
+  };
 
   const checkSetupStatus = async (): Promise<boolean> => {
     try {
@@ -153,8 +196,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize and verify session on boot / page refresh
   useEffect(() => {
     const initAuth = async () => {
-      // 1. Check if admin user exists in SQL DB
-      await checkSetupStatus();
+      // 1. Check PostgreSQL DB status & admin setup status
+      const currentDb = await checkDbStatus();
+      if (currentDb.connected) {
+        await checkSetupStatus();
+      }
 
       // 2. Restore persistent session if valid and not expired by inactivity (1 hour limit)
       try {
@@ -659,6 +705,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasAdmin,
         isAdmin,
         isOperator,
+        dbStatus,
+        checkDbStatus,
         checkSetupStatus,
         setupAdmin,
         login,

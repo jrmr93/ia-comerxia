@@ -42,6 +42,8 @@ export const AdminLoginScreen: React.FC<AdminLoginScreenProps> = ({
     resendActivation,
     forgotPassword,
     resetPassword,
+    dbStatus,
+    checkDbStatus,
   } = useAuth();
 
   const [mode, setMode] = useState<ScreenMode>('login');
@@ -357,6 +359,39 @@ export const AdminLoginScreen: React.FC<AdminLoginScreenProps> = ({
                 <span>PostgreSQL DB</span>
               </div>
             </div>
+
+            {/* PostgreSQL Disconnected Warning Banner */}
+            {dbStatus.connected === false && (
+              <div className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex flex-col space-y-2 font-medium shadow-2xs">
+                <div className="flex items-start space-x-2.5">
+                  <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <strong className="block text-amber-950 font-bold text-sm">
+                      Base de Datos Desconectada
+                    </strong>
+                    <p className="mt-0.5 text-amber-800 leading-relaxed">
+                      {dbStatus.message || 'No se pudo conectar con la base de datos PostgreSQL. No se permiten inicios de sesión ni cambios mientras la base de datos esté desconectada.'}
+                    </p>
+                    {dbStatus.hint && (
+                      <p className="mt-1 text-[11px] text-amber-700 italic bg-amber-100/60 p-2 rounded-lg border border-amber-200">
+                        💡 {dbStatus.hint}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="pt-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => checkDbStatus()}
+                    disabled={dbStatus.loading}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${dbStatus.loading ? 'animate-spin' : ''}`} />
+                    <span>{dbStatus.loading ? 'Reconectando...' : 'Reintentar Conexión'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Error Message */}
             {errorMessage && (

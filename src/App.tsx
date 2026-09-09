@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 
 function InventoryApp() {
-  const { authFetch, user, isAdmin, isOperator, loading: authLoading } = useAuth();
+  const { authFetch, user, isAdmin, isOperator, loading: authLoading, dbStatus, checkDbStatus } = useAuth();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [messages, setMessages] = useState<TelegramMessage[]>([]);
@@ -1395,6 +1395,25 @@ function InventoryApp() {
       } ${getAppBg()}`}
       style={isCustomerOnly ? { backgroundColor: dynamicThemeColors.c3, color: dynamicThemeColors.c3Text } : undefined}
     >
+      {/* Global PostgreSQL Disconnected Warning Banner */}
+      {dbStatus.connected === false && (
+        <div className="bg-amber-600 text-white px-4 py-2.5 shadow-md flex items-center justify-between text-xs font-bold z-50 sticky top-0">
+          <div className="flex items-center space-x-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-200 animate-ping shrink-0"></span>
+            <span>⚠️ Base de datos PostgreSQL Desconectada. Las funciones de autenticación y edición están suspendidas.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => checkDbStatus()}
+            disabled={dbStatus.loading}
+            className="px-3 py-1 bg-white text-amber-900 rounded-lg hover:bg-amber-100 transition text-[11px] font-black flex items-center space-x-1 cursor-pointer shrink-0 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${dbStatus.loading ? 'animate-spin' : ''}`} />
+            <span>{dbStatus.loading ? 'Reconectando...' : 'Reintentar Conexión'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Modern Vertical Sidebar - Strictly hidden in Customer-Only view */}
       {!isCustomerOnly && (
         <Sidebar

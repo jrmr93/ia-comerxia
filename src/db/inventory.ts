@@ -2785,6 +2785,8 @@ export async function getStoreConfig(userId: number = 1) {
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
       const allowCatalogBrowsing = cfg.allowCatalogBrowsing !== undefined ? cfg.allowCatalogBrowsing : false;
+      const enablePagination = cfg.enablePagination !== undefined ? Boolean(cfg.enablePagination) : false;
+      const itemsPerPage = cfg.itemsPerPage !== undefined ? Number(cfg.itemsPerPage) : 12;
       return {
         ...cfg,
         theme,
@@ -2794,6 +2796,8 @@ export async function getStoreConfig(userId: number = 1) {
         maintenanceTitle,
         maintenanceMessage,
         allowCatalogBrowsing: Boolean(allowCatalogBrowsing),
+        enablePagination,
+        itemsPerPage,
       };
     }
 
@@ -2830,6 +2834,8 @@ export async function getStoreConfig(userId: number = 1) {
     const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
     const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
     const allowCatalogBrowsing = cfg.allowCatalogBrowsing !== undefined ? cfg.allowCatalogBrowsing : false;
+    const enablePagination = cfg.enablePagination !== undefined ? Boolean(cfg.enablePagination) : false;
+    const itemsPerPage = cfg.itemsPerPage !== undefined ? Number(cfg.itemsPerPage) : 12;
     return {
       ...cfg,
       theme,
@@ -2839,6 +2845,8 @@ export async function getStoreConfig(userId: number = 1) {
       maintenanceTitle,
       maintenanceMessage,
       allowCatalogBrowsing: Boolean(allowCatalogBrowsing),
+      enablePagination,
+      itemsPerPage,
     };
   } catch (error) {
     console.warn('Error fetching store config from SQL, fallback to local store:', error);
@@ -2851,6 +2859,8 @@ export async function getStoreConfig(userId: number = 1) {
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
       const allowCatalogBrowsing = cfg.allowCatalogBrowsing !== undefined ? cfg.allowCatalogBrowsing : false;
+      const enablePagination = cfg.enablePagination !== undefined ? Boolean(cfg.enablePagination) : false;
+      const itemsPerPage = cfg.itemsPerPage !== undefined ? Number(cfg.itemsPerPage) : 12;
       return {
         ...cfg,
         theme,
@@ -2860,6 +2870,8 @@ export async function getStoreConfig(userId: number = 1) {
         maintenanceTitle,
         maintenanceMessage,
         allowCatalogBrowsing: Boolean(allowCatalogBrowsing),
+        enablePagination,
+        itemsPerPage,
       };
     }
     return cfg;
@@ -2911,6 +2923,14 @@ export async function updateStoreConfig(
   if (data.showOutOfStock !== undefined || data.show_out_of_stock !== undefined) {
     const rawVal = data.showOutOfStock !== undefined ? data.showOutOfStock : data.show_out_of_stock;
     updatePayload.showOutOfStock = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === '1';
+  }
+  if (data.enablePagination !== undefined || data.enable_pagination !== undefined) {
+    const rawVal = data.enablePagination !== undefined ? data.enablePagination : data.enable_pagination;
+    updatePayload.enablePagination = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === '1';
+  }
+  if (data.itemsPerPage !== undefined || data.items_per_page !== undefined) {
+    const rawVal = data.itemsPerPage !== undefined ? data.itemsPerPage : data.items_per_page;
+    updatePayload.itemsPerPage = Number(rawVal) || 12;
   }
   if (data.instagramUrl !== undefined) updatePayload.instagramUrl = data.instagramUrl ? String(data.instagramUrl).trim() : null;
   if (data.instagram_url !== undefined) updatePayload.instagramUrl = data.instagram_url ? String(data.instagram_url).trim() : null;

@@ -70,18 +70,8 @@ export const getPgConfig = () => {
 };
 
 export const isPostgresConfigured = (): boolean => {
-  return Boolean(
-    (process.env.DATABASE_URL && process.env.DATABASE_URL.trim().length > 0) ||
-    (process.env.POSTGRES_URL && process.env.POSTGRES_URL.trim().length > 0) ||
-    (process.env.PG_URL && process.env.PG_URL.trim().length > 0) ||
-    (process.env.SQL_HOST && process.env.SQL_HOST.trim().length > 0) ||
-    (process.env.POSTGRES_HOST && process.env.POSTGRES_HOST.trim().length > 0) ||
-    (process.env.PGHOST && process.env.PGHOST.trim().length > 0) ||
-    (process.env.DB_HOST && process.env.DB_HOST.trim().length > 0) ||
-    (process.env.SQL_DB_NAME && process.env.SQL_DB_NAME.trim().length > 0) ||
-    (process.env.POSTGRES_DB && process.env.POSTGRES_DB.trim().length > 0) ||
-    (process.env.PGDATABASE && process.env.PGDATABASE.trim().length > 0)
-  );
+  // Always true: Comerxia operates strictly with SQL Database (PostgreSQL)
+  return true;
 };
 
 export const createPool = () => {

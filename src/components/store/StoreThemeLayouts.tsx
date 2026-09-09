@@ -1961,8 +1961,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
 
   const [isScrolled, setIsScrolled] = React.useState(false);
 
-  // Pagination: 20 products per page (Cellular & Desktop)
-  const ITEMS_PER_PAGE = 20;
+  // Pagination: Configured per storeConfig setting
+  const isPaginationEnabled = storeConfig?.enablePagination === true;
+  const ITEMS_PER_PAGE = isPaginationEnabled ? (Number(storeConfig?.itemsPerPage) || 12) : Math.max(1, filteredProducts.length);
   const [currentPage, setCurrentPage] = React.useState(1);
 
   // Reset to page 1 whenever filters or search change
@@ -1970,9 +1971,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     setCurrentPage(1);
   }, [searchQuery, selectedCategory, showOffersOnly, inStockOnly, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+  const totalPages = isPaginationEnabled ? Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)) : 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedProducts = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedProducts = isPaginationEnabled ? filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE) : filteredProducts;
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -2764,8 +2765,8 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             ))}
           </div>
 
-          {/* Pagination Controls (20 Products per Page) */}
-          {totalPages > 1 && (
+          {/* Pagination Controls */}
+          {isPaginationEnabled && totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 pb-2 border-t border-slate-200">
               <div className="text-xs text-slate-500 font-medium order-2 sm:order-1 text-center sm:text-left">
                 Mostrando <span className="font-bold text-slate-800">{startIndex + 1}</span> - <span className="font-bold text-slate-800">{Math.min(startIndex + ITEMS_PER_PAGE, filteredProducts.length)}</span> de <span className="font-bold text-slate-800">{filteredProducts.length}</span> productos

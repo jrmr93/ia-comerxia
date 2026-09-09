@@ -218,6 +218,8 @@ export const storeConfigs = pgTable('store_configs', {
   allowCatalogBrowsing: boolean('allow_catalog_browsing').default(false),
   showStock: boolean('show_stock').default(true),
   showOutOfStock: boolean('show_out_of_stock').default(true),
+  enablePagination: boolean('enable_pagination').default(false),
+  itemsPerPage: integer('items_per_page').default(12),
   instagramUrl: text('instagram_url'),
   websiteUrl: text('website_url'),
   address: text('address'),

@@ -212,6 +212,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   const [currency, setCurrency] = useState('USD');
   const [showStock, setShowStock] = useState(true);
   const [showOutOfStock, setShowOutOfStock] = useState(true);
+  const [enablePagination, setEnablePagination] = useState(false);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(12);
   const [instagramUrl, setInstagramUrl] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [address, setAddress] = useState('');
@@ -366,6 +368,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           if (data.currency) setCurrency(data.currency);
           if (data.showStock !== undefined) setShowStock(Boolean(data.showStock));
           if (data.showOutOfStock !== undefined) setShowOutOfStock(Boolean(data.showOutOfStock));
+          if (data.enablePagination !== undefined) setEnablePagination(Boolean(data.enablePagination));
+          if (data.itemsPerPage !== undefined) setItemsPerPage(Number(data.itemsPerPage) || 12);
           if (data.instagramUrl) setInstagramUrl(data.instagramUrl);
           if (data.websiteUrl) setWebsiteUrl(data.websiteUrl);
           if (data.address) setAddress(data.address);
@@ -656,6 +660,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
         currency: currency.trim() || 'USD',
         showStock,
         showOutOfStock,
+        enablePagination,
+        itemsPerPage: Number(itemsPerPage) || 12,
         instagramUrl: instagramUrl.trim(),
         websiteUrl: websiteUrl.trim(),
         address: address.trim(),
@@ -1220,6 +1226,53 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                   </p>
                 </div>
               </label>
+            </div>
+
+            {/* Paginación de Productos en el Catálogo */}
+            <div className="p-3 bg-sky-50/60 border border-sky-100/80 rounded-xl space-y-2.5">
+              <label className="flex items-start space-x-2.5 cursor-pointer text-xs font-bold text-slate-800">
+                <input
+                  type="checkbox"
+                  id="switch-enable-pagination"
+                  checked={enablePagination}
+                  onChange={(e) => setEnablePagination(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded text-sky-600 focus:ring-sky-500"
+                />
+                <div className="space-y-0.5 flex-1">
+                  <div className="flex items-center space-x-1.5 justify-between">
+                    <span>Activar paginación de productos en el catálogo</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${enablePagination ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-slate-200 text-slate-600'}`}>
+                      {enablePagination ? 'Paginación Activada' : 'Lista Continua'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-normal text-slate-500">
+                    {enablePagination
+                      ? 'El catálogo se dividirá en páginas ordenadas con navegación ("Anterior" / "Siguiente").'
+                      : 'Todos los productos se mostrarán en una sola lista continua.'}
+                  </p>
+                </div>
+              </label>
+
+              {enablePagination && (
+                <div className="pt-2 border-t border-sky-100/80 flex items-center justify-between">
+                  <label htmlFor="items-per-page-select" className="text-[11px] font-bold text-slate-700">
+                    Productos a mostrar por página:
+                  </label>
+                  <select
+                    id="items-per-page-select"
+                    value={itemsPerPage}
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1 font-bold text-slate-800 focus:outline-none focus:border-sky-500 cursor-pointer"
+                  >
+                    <option value={6}>6 productos por página</option>
+                    <option value={12}>12 productos por página</option>
+                    <option value={20}>20 productos por página</option>
+                    <option value={24}>24 productos por página</option>
+                    <option value={36}>36 productos por página</option>
+                    <option value={48}>48 productos por página</option>
+                  </select>
+                </div>
+              )}
             </div>
           </div>
         </div>

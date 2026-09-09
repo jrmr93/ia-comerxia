@@ -553,6 +553,8 @@ export interface StoreConfig {
   paymentLogos?: PaymentMethodPartner[] | string;
   theme?: StoreTheme | string;
   themeColors?: Record<string, string[]> | string;
+  enablePagination?: boolean;
+  itemsPerPage?: number;
   promoPopup?: StorePromoPopupConfig | string | null;
   domain?: string;
 }
