@@ -1472,6 +1472,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   const savedCatalogScrollYRef = useRef<number>(0);
   const lastOpenedProductIdRef = useRef<number | string | null>(null);
   const adminDismissedProductModalRef = useRef<boolean>(false);
+  const hasInitializedUrlProductRef = useRef<boolean>(false);
 
   // Share Notification Feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1665,14 +1666,25 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
       setActiveMediaMode('photo');
     }
 
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      const detailContainer = document.getElementById('store-product-detail-container');
+      if (detailContainer) detailContainer.scrollTop = 0;
+    }
+
     // Only push URL state for customer view!
     // In admin mode, opening the product preview modal must not pollute or change the admin browser URL.
     if (isCustomerView && typeof window !== 'undefined') {
       try {
+        const currentDepth = (window.history.state?.isProductView && typeof window.history.state?.productViewDepth === 'number')
+          ? window.history.state.productViewDepth
+          : 0;
+        const nextDepth = currentDepth + 1;
+
         const url = new URL(window.location.href);
         url.searchParams.set('p', String(item.id));
         window.history.pushState(
-          { isProductView: true, productId: item.id, scrollY: currentScrollY },
+          { isProductView: true, productViewDepth: nextDepth, productId: item.id, scrollY: currentScrollY },
           '',
           url.toString()
         );
@@ -1703,19 +1715,58 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }
   }, []);
 
-  // Back to catalog with popstate or history.back & scroll restoration (Used in Customer View)
+  // Back to catalog with popstate or history.go & scroll restoration (Used in Customer View)
   const handleBackToCatalog = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      if (window.history.state?.isProductView) {
-        window.history.back();
+    if (typeof window !== 'undefined' && isCustomerView) {
+      const isProductState = Boolean(window.history.state?.isProductView);
+      const depth = (isProductState && typeof window.history.state?.productViewDepth === 'number')
+        ? window.history.state.productViewDepth
+        : (isProductState ? 1 : 0);
+
+      if (depth > 0) {
+        setQuickViewProduct(null);
+        try {
+          const url = new URL(window.location.href);
+          let changed = false;
+          if (url.searchParams.has('p')) { url.searchParams.delete('p'); changed = true; }
+          if (url.searchParams.has('producto')) { url.searchParams.delete('producto'); changed = true; }
+          if (url.searchParams.has('product')) { url.searchParams.delete('product'); changed = true; }
+          if (url.searchParams.has('sku')) { url.searchParams.delete('sku'); changed = true; }
+          if (changed) {
+            window.history.replaceState({}, '', url.toString());
+          }
+        } catch {
+          // ignore
+        }
+
+        window.history.go(-depth);
+
+        const restoreY = savedCatalogScrollYRef.current || 0;
+        setTimeout(() => {
+          window.scrollTo({ top: restoreY, behavior: 'instant' });
+          if (lastOpenedProductIdRef.current) {
+            const el = document.getElementById(`product-card-${lastOpenedProductIdRef.current}`);
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              if (rect.top < 0 || rect.bottom > window.innerHeight) {
+                el.scrollIntoView({ block: 'center', behavior: 'instant' });
+              }
+            }
+          }
+        }, 40);
         return;
       }
+
       try {
         const url = new URL(window.location.href);
-        url.searchParams.delete('p');
-        url.searchParams.delete('producto');
-        url.searchParams.delete('product');
-        window.history.replaceState({}, '', url.toString());
+        let changed = false;
+        if (url.searchParams.has('p')) { url.searchParams.delete('p'); changed = true; }
+        if (url.searchParams.has('producto')) { url.searchParams.delete('producto'); changed = true; }
+        if (url.searchParams.has('product')) { url.searchParams.delete('product'); changed = true; }
+        if (url.searchParams.has('sku')) { url.searchParams.delete('sku'); changed = true; }
+        if (changed) {
+          window.history.replaceState({}, '', url.toString());
+        }
       } catch {
         // ignore
       }
@@ -1735,7 +1786,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         }
       }
     }, 40);
-  }, []);
+  }, [isCustomerView]);
 
   // Static Bottom Bar: Home icon handler (Return to catalog or scroll to top)
   const handleBottomBarHome = useCallback(() => {
@@ -1816,27 +1867,45 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     const params = new URLSearchParams(window.location.search);
     const targetId = params.get('producto') || params.get('product') || params.get('p');
     const targetSku = params.get('sku');
+
+    let found: InventoryItem | undefined;
     if (targetId) {
-      const found = products.find((p) => String(p.id) === String(targetId));
-      if (found) {
-        setQuickViewProduct((prev) => {
-          if (prev && String(prev.id) === String(found.id)) {
-            return prev;
-          }
-          setActiveImageIdx(0);
-          return found;
-        });
-      }
+      found = products.find((p) => String(p.id) === String(targetId));
     } else if (targetSku) {
-      const found = products.find((p) => String(p.sku).toLowerCase() === String(targetSku).toLowerCase());
-      if (found) {
-        setQuickViewProduct((prev) => {
-          if (prev && String(prev.id) === String(found.id)) {
-            return prev;
-          }
-          setActiveImageIdx(0);
-          return found;
-        });
+      found = products.find((p) => String(p.sku).toLowerCase() === String(targetSku).toLowerCase());
+    }
+
+    if (found) {
+      setQuickViewProduct((prev) => {
+        if (prev && String(prev.id) === String(found!.id)) {
+          return prev;
+        }
+        setActiveImageIdx(0);
+        return found!;
+      });
+
+      if (isCustomerView && !hasInitializedUrlProductRef.current) {
+        hasInitializedUrlProductRef.current = true;
+        try {
+          const currentUrl = window.location.href;
+          const cleanUrl = new URL(currentUrl);
+          cleanUrl.searchParams.delete('p');
+          cleanUrl.searchParams.delete('producto');
+          cleanUrl.searchParams.delete('product');
+          cleanUrl.searchParams.delete('sku');
+
+          // Establish base catalog history entry without product params
+          window.history.replaceState({}, '', cleanUrl.toString());
+
+          // Push product detail entry with depth: 1
+          window.history.pushState(
+            { isProductView: true, productViewDepth: 1, productId: found.id, scrollY: 0 },
+            '',
+            currentUrl
+          );
+        } catch {
+          // ignore
+        }
       }
     }
   }, [products, isCustomerView]);
@@ -4599,7 +4668,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
       {/* FULL-PAGE PRODUCT DETAIL VIEW (Customer Mode) */}
       {isCustomerView && quickViewProduct && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 animate-fadeIn">
+        <div id="store-product-detail-container" className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 animate-fadeIn">
           <StoreProductDetailPage
             product={quickViewProduct}
             allProducts={products}

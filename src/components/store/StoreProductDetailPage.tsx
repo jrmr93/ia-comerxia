@@ -74,7 +74,8 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
 
-  // Track product ID to only reset state when navigating to a genuinely different product
+  // Container ref to force scroll to top on product change
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const prevProductIdRef = React.useRef<number | string>(product.id);
 
   // Extract all photos
@@ -82,7 +83,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
     return getProductPhotosWithFallback(product);
   }, [product.imageUrl, product.images, product.extractedAttributes]);
 
-  // Reset indices ONLY when the product ID changes (navigating to another product)
+  // Reset indices and scroll to top ONLY when the product ID changes (navigating to another product)
   useEffect(() => {
     if (prevProductIdRef.current !== product.id) {
       prevProductIdRef.current = product.id;
@@ -90,6 +91,17 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
       setQuantity(1);
       // Requirement: Products without photos must show "Producto sin foto" cover first, even if they have a video
       setActiveMediaMode('photo');
+    }
+
+    // Always reset scroll position to top when product changes or page mounts
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      if (containerRef.current) {
+        containerRef.current.scrollTop = 0;
+        if (containerRef.current.parentElement) {
+          containerRef.current.parentElement.scrollTop = 0;
+        }
+      }
     }
   }, [product.id, product.imageUrl, product.images, product.extractedAttributes, product.videoUrl]);
 
@@ -331,7 +343,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-32 animate-in fade-in duration-200">
+    <div ref={containerRef} className="min-h-screen bg-slate-50/50 pb-32 animate-in fade-in duration-200">
       {/* 1. TOP STICKY NAVIGATION BAR */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs px-3 sm:px-6 py-2.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
