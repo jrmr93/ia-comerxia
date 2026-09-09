@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. Base de Datos Local PostgreSQL
+  # ==========================================
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: comerxia-postgres-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SQL_USER:-postgres}
+      POSTGRES_PASSWORD: ${SQL_PASSWORD:-comerxia_secret_pass}
+      POSTGRES_DB: ${SQL_DB_NAME:-comerxia_db}
+    ports:
+      - "${SQL_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SQL_USER:-postgres} -d ${SQL_DB_NAME:-comerxia_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ==========================================
+  # 2. Servidor y App Web Comerxia
+  # ==========================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: comerxia-app
+    restart: unless-stopped
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Conexión a la base de datos PostgreSQL local en el contenedor
+      SQL_HOST: postgres-db
+      SQL_PORT: 5432
+      SQL_USER: ${SQL_USER:-postgres}
+      SQL_PASSWORD: ${SQL_PASSWORD:-comerxia_secret_pass}
+      SQL_DB_NAME: ${SQL_DB_NAME:-comerxia_db}
+      DATABASE_URL: postgresql://${SQL_USER:-postgres}:${SQL_PASSWORD:-comerxia_secret_pass}@postgres-db:5432/${SQL_DB_NAME:-comerxia_db}
+      
+      # Claves y configuraciones de la aplicación
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      JWT_SECRET: ${JWT_SECRET:-comerxia_jwt_super_secret_local_key_2026}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    volumes:
+      - app_data:/app/data
+
+  # ==========================================
+  # 3. (Opcional) Cloudflare Zero Trust Tunnel
+  # Conecta admin.lotengoo.com y www.lotengoo.com a tu servidor de forma segura
+  # ==========================================
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: comerxia-cloudflared
+  #   restart: unless-stopped
+  #   command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+  #   depends_on:
+  #     - app
+
+volumes:
+  postgres_data:
+    driver: local
+  app_data:
+    driver: local

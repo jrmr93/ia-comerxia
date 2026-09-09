@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ia-comerxia</title>
+    <meta name="description" content="Sistema automatizado para procesar fotos y descripciones de proveedores en Telegram y crear inventario en base de datos SQL." />
+    <meta property="og:title" content="ia-comerxia" />
+    <meta property="og:description" content="Sistema automatizado para procesar fotos y descripciones de proveedores en Telegram y crear inventario en base de datos SQL." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function() {
+        // Trap unhandled cross-origin or sandbox errors to avoid breaking iframe previews
+        window.addEventListener('error', function(e) {
+          if (e && (e.message === 'Script error.' || !e.message)) {
+            console.warn('Silenced cross-origin Script error:', e);
+            e.preventDefault();
+          }
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+          console.warn('Captured unhandled promise rejection:', e.reason);
+        });
+
+        // Safe storage shim for restrictive iframe sandboxes
+        var localMemory = {};
+        var sessionMemory = {};
+
+        function makeShim(store) {
+          return {
+            getItem: function(k) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; },
+            setItem: function(k, v) { store[k] = String(v); },
+            removeItem: function(k) { delete store[k]; },
+            clear: function() { for (var k in store) delete store[k]; },
+            key: function(i) { return Object.keys(store)[i] || null; },
+            get length() { return Object.keys(store).length; }
+          };
+        }
+
+        try {
+          var testK = '__chk_storage__';
+          window.localStorage.setItem(testK, '1');
+          window.localStorage.removeItem(testK);
+        } catch (err) {
+          try {
+            Object.defineProperty(window, 'localStorage', {
+              value: makeShim(localMemory),
+              configurable: true,
+              writable: true
+            });
+          } catch (defineErr) {}
+        }
+
+        try {
+          var testS = '__chk_sess_storage__';
+          window.sessionStorage.setItem(testS, '1');
+          window.sessionStorage.removeItem(testS);
+        } catch (err) {
+          try {
+            Object.defineProperty(window, 'sessionStorage', {
+              value: makeShim(sessionMemory),
+              configurable: true,
+              writable: true
+            });
+          } catch (defineErr) {}
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" crossorigin="anonymous" src="/src/main.tsx"></script>
+  </body>
+</html>
+
