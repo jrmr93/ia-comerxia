@@ -167,6 +167,7 @@ export const customerOrders = pgTable('customer_orders', {
   trackingCarrier: text('tracking_carrier'),
   trackingNotes: text('tracking_notes'),
   fulfillmentStatus: text('fulfillment_status').default('in_stock'), // 'in_stock', 'awaiting_procurement', 'supplier_pending', 'supplier_ordered', 'supplier_received', 'ready_for_dispatch', 'delivered'
+  deliveryType: text('delivery_type').default('shipping'),
   linkedPurchaseId: integer('linked_purchase_id'),
   linkedPurchaseNumber: text('linked_purchase_number'),
   returns: text('returns').default('[]'),

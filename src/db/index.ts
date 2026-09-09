@@ -232,6 +232,8 @@ export async function ensureTablesCreated() {
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
           bot_token TEXT,
+          bot_username TEXT,
+          bot_first_name TEXT,
           webhook_secret TEXT,
           supplier_name TEXT DEFAULT 'Proveedor Telegram',
           supplier_username TEXT,
@@ -250,6 +252,8 @@ export async function ensureTablesCreated() {
 
       await client.query(`
         ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS bot_token TEXT;
+        ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS bot_username TEXT;
+        ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS bot_first_name TEXT;
         ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS webhook_secret TEXT;
         ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS supplier_name TEXT DEFAULT 'Proveedor Telegram';
         ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS supplier_username TEXT;
@@ -365,6 +369,7 @@ export async function ensureTablesCreated() {
           tracking_carrier TEXT,
           tracking_notes TEXT,
           fulfillment_status TEXT DEFAULT 'in_stock',
+          delivery_type TEXT DEFAULT 'shipping',
           linked_purchase_id INTEGER,
           linked_purchase_number TEXT,
           returns TEXT DEFAULT '[]',
@@ -386,6 +391,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS tracking_carrier TEXT;
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS tracking_notes TEXT;
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS fulfillment_status TEXT DEFAULT 'in_stock';
+        ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS delivery_type TEXT DEFAULT 'shipping';
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS linked_purchase_id INTEGER;
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS linked_purchase_number TEXT;
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS returns TEXT DEFAULT '[]';
@@ -591,6 +597,7 @@ export async function ensureTablesCreated() {
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
           api_key TEXT,
+          account_email TEXT,
           model_name TEXT DEFAULT 'gemini-3.7-flash',
           temperature NUMERIC(3, 2) DEFAULT 0.20,
           is_active BOOLEAN DEFAULT TRUE,
@@ -601,6 +608,7 @@ export async function ensureTablesCreated() {
 
       await client.query(`
         ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS api_key TEXT;
+        ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS account_email TEXT;
         ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS model_name TEXT DEFAULT 'gemini-3.7-flash';
         ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS temperature NUMERIC(3, 2) DEFAULT 0.20;
         ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;

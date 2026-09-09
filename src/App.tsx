@@ -1444,8 +1444,8 @@ function InventoryApp() {
             setActiveTab('store');
             setStoreSubTab('catalog');
           }}
-          onOpenBotConfig={() => setIsConfigOpen(true)}
-          onOpenAiConfig={() => setIsGoogleAiModalOpen(true)}
+          onOpenBotConfig={() => handleOpenDeploymentTab('telegram')}
+          onOpenAiConfig={() => handleOpenDeploymentTab('ai')}
           botActive={config ? (config.isActive !== false && Boolean(config.botToken)) : false}
           botHasToken={Boolean(config?.botToken)}
           botUsername={config?.botUsername || null}
@@ -1741,14 +1741,14 @@ function InventoryApp() {
         isOpen={isConfigOpen}
         onClose={() => setIsConfigOpen(false)}
         config={config}
-        onConfigSaved={fetchData}
+        onConfigSaved={() => fetchData(true)}
       />
 
       {/* 2.1 Google Gemini AI Configuration */}
       <GoogleAiConfigModal
         isOpen={isGoogleAiModalOpen}
         onClose={() => setIsGoogleAiModalOpen(false)}
-        onConfigSaved={fetchData}
+        onConfigSaved={() => fetchData(true)}
       />
 
       {/* 3. Product Detail Modal */}
@@ -1780,7 +1780,7 @@ function InventoryApp() {
           setIsFormOpen(false);
           setEditingItem(null);
         }}
-        onSaved={fetchData}
+        onSaved={() => fetchData(true)}
         editingItem={editingItem}
         defaultTelegramTaxPercent={config?.taxPercent ?? 15}
       />
@@ -1794,9 +1794,9 @@ function InventoryApp() {
         messages={messages}
         orders={orders}
         config={config}
-        onConfigSaved={fetchData}
+        onConfigSaved={() => fetchData(true)}
         storeConfig={storeConfig}
-        onStoreConfigSaved={fetchData}
+        onStoreConfigSaved={() => fetchData(true)}
       />
 
       {/* 6. Delete Confirmation Modal */}

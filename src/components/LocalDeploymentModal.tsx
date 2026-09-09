@@ -127,9 +127,15 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
   const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
   const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState<boolean>(false);
 
-  // Fetch db info and domain config on open
+  // Ref to track modal open state transitions
+  const prevIsOpenRef = React.useRef(false);
+
+  // Fetch db info and domain config ONLY when modal transitions from closed to open
   useEffect(() => {
-    if (isOpen) {
+    const becameOpen = isOpen && !prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
+
+    if (becameOpen) {
       if (initialTab) {
         setActiveTab(initialTab);
       }

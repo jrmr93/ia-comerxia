@@ -300,22 +300,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               </div>
             </div>
 
-            {/* Telegram Bot Status Indicator (Passive badge, non-clickable) */}
+            {/* Telegram Bot Status Indicator (Clickable to open configuration) */}
             <div
               id="top-header-bot-indicator"
+              onClick={onOpenBotConfig}
               title={
                 botHasToken
                   ? botActive
-                    ? `Bot de Telegram: Activo • Nombre: ${botDisplayHandle}`
-                    : `Bot de Telegram: En pausa • Nombre: ${botDisplayHandle}`
-                  : 'Bot de Telegram: Inactivo (Sin token configurado)'
+                    ? `Bot de Telegram: Activo • Nombre: ${botDisplayHandle} (Clic para configurar)`
+                    : `Bot de Telegram: En pausa • Nombre: ${botDisplayHandle} (Clic para configurar)`
+                  : 'Bot de Telegram: Inactivo (Clic para configurar Token)'
               }
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs select-none cursor-default shadow-2xs transition shrink-0 whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs select-none cursor-pointer hover:scale-[1.02] active:scale-95 shadow-2xs transition shrink-0 whitespace-nowrap ${
                 botHasToken
                   ? botActive
-                    ? 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
-                    : 'bg-amber-50/90 border-amber-200 text-amber-900'
-                  : 'bg-slate-50 border-slate-200 text-slate-600'
+                    ? 'bg-emerald-50/90 hover:bg-emerald-100 border-emerald-200 text-emerald-900'
+                    : 'bg-amber-50/90 hover:bg-amber-100 border-amber-200 text-amber-900'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
               }`}
             >
               <Bot
@@ -357,22 +358,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               </div>
             </div>
 
-            {/* Google Gemini AI Status Indicator (Passive badge, non-clickable) */}
+            {/* Google Gemini AI Status Indicator (Clickable to open configuration) */}
             <div
               id="top-header-ai-indicator"
+              onClick={onOpenAiConfig}
               title={
                 aiHasKey
                   ? aiActive
-                    ? `Google Gemini IA: Activa • Cuenta: ${aiAccountDisplay}`
-                    : `Google Gemini IA: En pausa • Cuenta: ${aiAccountDisplay}`
-                  : 'Google Gemini IA: Inactiva (Sin API Key configurada)'
+                    ? `Google Gemini IA: Activa • Cuenta: ${aiAccountDisplay} (Clic para configurar)`
+                    : `Google Gemini IA: En pausa • Cuenta: ${aiAccountDisplay} (Clic para configurar)`
+                  : 'Google Gemini IA: Inactiva (Clic para configurar API Key)'
               }
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs select-none cursor-default shadow-2xs transition shrink-0 whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs select-none cursor-pointer hover:scale-[1.02] active:scale-95 shadow-2xs transition shrink-0 whitespace-nowrap ${
                 aiHasKey
                   ? aiActive
-                    ? 'bg-purple-50/90 border-purple-200 text-purple-900'
-                    : 'bg-amber-50/90 border-amber-200 text-amber-900'
-                  : 'bg-slate-50 border-slate-200 text-slate-600'
+                    ? 'bg-purple-50/90 hover:bg-purple-100 border-purple-200 text-purple-900'
+                    : 'bg-amber-50/90 hover:bg-amber-100 border-amber-200 text-amber-900'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
               }`}
             >
               <Sparkles

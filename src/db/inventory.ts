@@ -2308,13 +2308,28 @@ export async function updateTelegramConfig(
   try {
     const existing = await getTelegramConfig(userId);
 
+    const sqlPayload: Record<string, any> = {
+      updatedAt: new Date(),
+    };
+    if (normalizedData.botToken !== undefined) sqlPayload.botToken = normalizedData.botToken || null;
+    if (normalizedData.botUsername !== undefined) sqlPayload.botUsername = normalizedData.botUsername || null;
+    if (normalizedData.botFirstName !== undefined) sqlPayload.botFirstName = normalizedData.botFirstName || null;
+    if (normalizedData.webhookSecret !== undefined) sqlPayload.webhookSecret = normalizedData.webhookSecret || null;
+    if (normalizedData.supplierName !== undefined) sqlPayload.supplierName = normalizedData.supplierName;
+    if (normalizedData.supplierUsername !== undefined) sqlPayload.supplierUsername = normalizedData.supplierUsername || null;
+    if (normalizedData.autoApprove !== undefined) sqlPayload.autoApprove = Boolean(normalizedData.autoApprove);
+    if (normalizedData.defaultMarginPercent !== undefined) sqlPayload.defaultMarginPercent = Number(normalizedData.defaultMarginPercent);
+    if (normalizedData.currency !== undefined) sqlPayload.currency = normalizedData.currency;
+    if (normalizedData.defaultStockEnabled !== undefined) sqlPayload.defaultStockEnabled = Boolean(normalizedData.defaultStockEnabled);
+    if (normalizedData.defaultStockQuantity !== undefined) sqlPayload.defaultStockQuantity = Number(normalizedData.defaultStockQuantity);
+    if (normalizedData.taxPercent !== undefined) sqlPayload.taxPercent = Number(normalizedData.taxPercent);
+    if (normalizedData.useAi !== undefined) sqlPayload.useAi = Boolean(normalizedData.useAi);
+    if (normalizedData.isActive !== undefined) sqlPayload.isActive = Boolean(normalizedData.isActive);
+
     if (existing && existing.id) {
       const updated = await db
         .update(telegramConfigs)
-        .set({
-          ...normalizedData,
-          updatedAt: new Date(),
-        })
+        .set(sqlPayload)
         .where(eq(telegramConfigs.id, existing.id))
         .returning();
 
@@ -2339,13 +2354,15 @@ export async function updateTelegramConfig(
         userId: targetUserId,
         supplierName: normalizedData.supplierName || 'Proveedor Telegram Principal',
         botToken: normalizedData.botToken || null,
-        defaultMarginPercent: normalizedData.defaultMarginPercent ?? 35,
+        botUsername: normalizedData.botUsername || null,
+        botFirstName: normalizedData.botFirstName || null,
+        defaultMarginPercent: normalizedData.defaultMarginPercent !== undefined ? Number(normalizedData.defaultMarginPercent) : 35,
         currency: normalizedData.currency || 'USD',
-        autoApprove: normalizedData.autoApprove ?? true,
-        defaultStockEnabled: normalizedData.defaultStockEnabled ?? false,
-        defaultStockQuantity: normalizedData.defaultStockQuantity ?? 10,
-        taxPercent: normalizedData.taxPercent ?? 15,
-        useAi: normalizedData.useAi ?? true,
+        autoApprove: normalizedData.autoApprove !== undefined ? Boolean(normalizedData.autoApprove) : true,
+        defaultStockEnabled: normalizedData.defaultStockEnabled !== undefined ? Boolean(normalizedData.defaultStockEnabled) : false,
+        defaultStockQuantity: normalizedData.defaultStockQuantity !== undefined ? Number(normalizedData.defaultStockQuantity) : 10,
+        taxPercent: normalizedData.taxPercent !== undefined ? Number(normalizedData.taxPercent) : 15,
+        useAi: normalizedData.useAi !== undefined ? Boolean(normalizedData.useAi) : true,
         isActive: normalizedData.isActive !== undefined ? Boolean(normalizedData.isActive) : true,
       })
       .returning();
@@ -2399,6 +2416,7 @@ export async function getAiConfig(userId: number = 1) {
       id: state.nextId?.aiConfigs || 1,
       userId,
       apiKey: null,
+      accountEmail: null,
       modelName: 'gemini-3.7-flash',
       temperature: 0.2,
       isActive: true,
@@ -2466,6 +2484,7 @@ export async function getAiConfig(userId: number = 1) {
       id: 1,
       userId: 1,
       apiKey: null,
+      accountEmail: null,
       modelName: 'gemini-3.7-flash',
       temperature: 0.2,
       isActive: true,
@@ -2479,6 +2498,7 @@ export async function updateAiConfig(
   userId: number = 1,
   data: {
     apiKey?: string | null;
+    accountEmail?: string | null;
     modelName?: string;
     temperature?: number;
     isActive?: boolean;
@@ -2510,6 +2530,7 @@ export async function updateAiConfig(
       id: (state.nextId?.aiConfigs ? state.nextId.aiConfigs++ : 1),
       userId,
       apiKey: data.apiKey ?? null,
+      accountEmail: data.accountEmail ?? null,
       modelName: modelToUse,
       temperature: data.temperature ?? 0.2,
       isActive: effectiveIsActive !== undefined ? effectiveIsActive : true,
@@ -2538,6 +2559,7 @@ export async function updateAiConfig(
         .update(aiConfigs)
         .set({
           apiKey: data.apiKey !== undefined ? data.apiKey : existing.apiKey,
+          accountEmail: data.accountEmail !== undefined ? data.accountEmail : existing.accountEmail,
           modelName: modelToUse,
           temperature:
             data.temperature !== undefined
@@ -2573,6 +2595,7 @@ export async function updateAiConfig(
       .values({
         userId: targetUserId,
         apiKey: data.apiKey ?? null,
+        accountEmail: data.accountEmail ?? null,
         modelName: modelToUse,
         temperature: (data.temperature ?? 0.2).toString(),
         isActive: effectiveIsActive !== undefined ? effectiveIsActive : true,
@@ -3690,6 +3713,7 @@ export async function createCustomerOrder(data: {
         trackingNumber: data.trackingNumber || null,
         trackingNotes: data.trackingNotes || null,
         fulfillmentStatus: initialFulfillmentStatus,
+        deliveryType: data.deliveryType || (data.customerAddress && (data.customerAddress.toLowerCase().includes('retiro') || data.customerAddress.toLowerCase().includes('local')) ? 'pickup' : 'shipping'),
       })
       .returning();
 
