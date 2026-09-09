@@ -133,9 +133,8 @@ export const StoreHeader: React.FC<{
             <div
               id="store-logo-boutique"
               onClick={onLogoClick}
-              className={`cursor-pointer select-none transition-all duration-300 ${
-                isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
-              }`}
+              className={`cursor-pointer select-none transition-all duration-300 ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
+                }`}
             >
               {/* Celular / Mobile (Cuadrado 1:1) */}
               <div className="md:hidden">
@@ -223,18 +222,16 @@ export const StoreHeader: React.FC<{
               <div className="flex items-center bg-zinc-900/90 p-1 rounded-xl sm:rounded-2xl border border-amber-500/30 text-xs gap-1">
                 <button
                   onClick={() => setStoreTab('catalog')}
-                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl font-bold transition cursor-pointer flex items-center space-x-1.5 ${
-                    storeTab === 'catalog' ? 'bg-amber-500 text-zinc-950 font-black shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl font-bold transition cursor-pointer flex items-center space-x-1.5 ${storeTab === 'catalog' ? 'bg-amber-500 text-zinc-950 font-black shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
                 >
                   <Package className="w-3.5 h-3.5" />
                   <span>Catálogo ({products.length})</span>
                 </button>
                 <button
                   onClick={() => setStoreTab('orders')}
-                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl font-bold transition cursor-pointer flex items-center space-x-1.5 ${
-                    storeTab === 'orders' ? 'bg-amber-500 text-zinc-950 font-black shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl font-bold transition cursor-pointer flex items-center space-x-1.5 ${storeTab === 'orders' ? 'bg-amber-500 text-zinc-950 font-black shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
                 >
                   <PackageCheck className="w-3.5 h-3.5" />
                   <span>Pedidos ({orders.length})</span>
@@ -273,9 +270,8 @@ export const StoreHeader: React.FC<{
             <div
               id="store-logo-brutalist"
               onClick={onLogoClick}
-              className={`cursor-pointer select-none transition-all ${
-                isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:rotate-2 active:scale-95'
-              }`}
+              className={`cursor-pointer select-none transition-all ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:rotate-2 active:scale-95'
+                }`}
             >
               {/* Celular / Mobile (Cuadrado 1:1) */}
               <div className="md:hidden">
@@ -357,17 +353,15 @@ export const StoreHeader: React.FC<{
               <div className="flex items-center bg-white p-1 border-2 border-black shadow-[2px_2px_0px_#000] text-xs gap-1">
                 <button
                   onClick={() => setStoreTab('catalog')}
-                  className={`px-2.5 sm:px-3 py-1.5 font-black uppercase transition cursor-pointer ${
-                    storeTab === 'catalog' ? 'bg-black text-yellow-300' : 'text-black hover:bg-slate-100'
-                  }`}
+                  className={`px-2.5 sm:px-3 py-1.5 font-black uppercase transition cursor-pointer ${storeTab === 'catalog' ? 'bg-black text-yellow-300' : 'text-black hover:bg-slate-100'
+                    }`}
                 >
                   Catálogo ({products.length})
                 </button>
                 <button
                   onClick={() => setStoreTab('orders')}
-                  className={`px-2.5 sm:px-3 py-1.5 font-black uppercase transition cursor-pointer flex items-center space-x-1 ${
-                    storeTab === 'orders' ? 'bg-black text-yellow-300' : 'text-black hover:bg-slate-100'
-                  }`}
+                  className={`px-2.5 sm:px-3 py-1.5 font-black uppercase transition cursor-pointer flex items-center space-x-1 ${storeTab === 'orders' ? 'bg-black text-yellow-300' : 'text-black hover:bg-slate-100'
+                    }`}
                 >
                   <span>Pedidos ({orders.length})</span>
                   {pendingCount > 0 && <span className="w-2 h-2 rounded-full bg-rose-500" />}
@@ -401,9 +395,8 @@ export const StoreHeader: React.FC<{
             <div
               id="store-logo-cyber"
               onClick={onLogoClick}
-              className={`cursor-pointer select-none transition-all duration-300 ${
-                isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
-              }`}
+              className={`cursor-pointer select-none transition-all duration-300 ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
+                }`}
             >
               {/* Celular / Mobile (Cuadrado 1:1) */}
               <div className="md:hidden">
@@ -488,17 +481,15 @@ export const StoreHeader: React.FC<{
               <div className="flex items-center bg-[#070d18] p-1 border border-cyan-500/50 font-mono text-xs gap-1">
                 <button
                   onClick={() => setStoreTab('catalog')}
-                  className={`px-2.5 sm:px-3 py-1.5 transition cursor-pointer ${
-                    storeTab === 'catalog' ? 'bg-cyan-500 text-black font-bold' : 'text-cyan-400 hover:text-cyan-200'
-                  }`}
+                  className={`px-2.5 sm:px-3 py-1.5 transition cursor-pointer ${storeTab === 'catalog' ? 'bg-cyan-500 text-black font-bold' : 'text-cyan-400 hover:text-cyan-200'
+                    }`}
                 >
                   CATALOG ({products.length})
                 </button>
                 <button
                   onClick={() => setStoreTab('orders')}
-                  className={`px-2.5 sm:px-3 py-1.5 transition cursor-pointer flex items-center space-x-1 ${
-                    storeTab === 'orders' ? 'bg-cyan-500 text-black font-bold' : 'text-cyan-400 hover:text-cyan-200'
-                  }`}
+                  className={`px-2.5 sm:px-3 py-1.5 transition cursor-pointer flex items-center space-x-1 ${storeTab === 'orders' ? 'bg-cyan-500 text-black font-bold' : 'text-cyan-400 hover:text-cyan-200'
+                    }`}
                 >
                   <span>ORDERS ({orders.length})</span>
                   {pendingCount > 0 && <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
@@ -529,9 +520,8 @@ export const StoreHeader: React.FC<{
             <div
               id="store-logo-minimal"
               onClick={onLogoClick}
-              className={`cursor-pointer select-none transition-all duration-300 ${
-                isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
-              }`}
+              className={`cursor-pointer select-none transition-all duration-300 ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
+                }`}
             >
               {/* Celular / Mobile (Cuadrado 1:1) */}
               <div className="md:hidden">
@@ -613,17 +603,15 @@ export const StoreHeader: React.FC<{
               <div className="flex items-center bg-stone-100/80 p-1 rounded-full text-xs gap-1">
                 <button
                   onClick={() => setStoreTab('catalog')}
-                  className={`px-3 py-1.5 rounded-full font-medium transition cursor-pointer ${
-                    storeTab === 'catalog' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
-                  }`}
+                  className={`px-3 py-1.5 rounded-full font-medium transition cursor-pointer ${storeTab === 'catalog' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
+                    }`}
                 >
                   Catálogo ({products.length})
                 </button>
                 <button
                   onClick={() => setStoreTab('orders')}
-                  className={`px-3 py-1.5 rounded-full font-medium transition cursor-pointer flex items-center space-x-1 ${
-                    storeTab === 'orders' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
-                  }`}
+                  className={`px-3 py-1.5 rounded-full font-medium transition cursor-pointer flex items-center space-x-1 ${storeTab === 'orders' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
+                    }`}
                 >
                   <span>Pedidos ({orders.length})</span>
                   {pendingCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
@@ -654,9 +642,8 @@ export const StoreHeader: React.FC<{
           <div
             id="store-logo-interactive"
             onClick={onLogoClick}
-            className={`relative cursor-pointer select-none transition-all duration-300 transform-gpu ${
-              isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
-            }`}
+            className={`relative cursor-pointer select-none transition-all duration-300 transform-gpu ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
+              }`}
             title="Haz clic para ver el logo animado"
           >
             {/* Celular / Mobile (Cuadrado 1:1) */}
@@ -670,9 +657,8 @@ export const StoreHeader: React.FC<{
                   <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="w-full h-full object-contain p-1 rounded-xl" />
                 </div>
               ) : (
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md flex-shrink-0 bg-gradient-to-tr ${
-                  variant === 'fresh' ? 'from-emerald-500 via-teal-500 to-cyan-500 shadow-teal-500/20' : 'from-sky-500 via-indigo-500 to-emerald-500 shadow-sky-500/20'
-                }`}>
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md flex-shrink-0 bg-gradient-to-tr ${variant === 'fresh' ? 'from-emerald-500 via-teal-500 to-cyan-500 shadow-teal-500/20' : 'from-sky-500 via-indigo-500 to-emerald-500 shadow-sky-500/20'
+                  }`}>
                   <Store className="w-5 h-5" />
                 </div>
               )}
@@ -689,9 +675,8 @@ export const StoreHeader: React.FC<{
                   <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain p-1 rounded-xl" />
                 </div>
               ) : (
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md flex-shrink-0 bg-gradient-to-tr ${
-                  variant === 'fresh' ? 'from-emerald-500 via-teal-500 to-cyan-500 shadow-teal-500/20' : 'from-sky-500 via-indigo-500 to-emerald-500 shadow-sky-500/20'
-                }`}>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md flex-shrink-0 bg-gradient-to-tr ${variant === 'fresh' ? 'from-emerald-500 via-teal-500 to-cyan-500 shadow-teal-500/20' : 'from-sky-500 via-indigo-500 to-emerald-500 shadow-sky-500/20'
+                  }`}>
                   <Store className="w-6 h-6" />
                 </div>
               )}
@@ -749,22 +734,20 @@ export const StoreHeader: React.FC<{
             <div className="flex items-center bg-slate-100 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-slate-300 text-xs gap-1 sm:gap-1.5">
               <button
                 onClick={() => setStoreTab('catalog')}
-                className={`px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl font-bold transition cursor-pointer flex items-center space-x-1.5 ${
-                  storeTab === 'catalog' ? 'bg-white text-sky-800 shadow-xs border border-slate-300 font-extrabold' : 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/80'
-                }`}
+                className={`px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl font-bold transition cursor-pointer flex items-center space-x-1.5 ${storeTab === 'catalog' ? 'bg-white text-sky-800 shadow-xs border border-slate-300 font-extrabold' : 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/80'
+                  }`}
               >
                 <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Catálogo ({products.length})</span>
               </button>
               <button
                 onClick={() => setStoreTab('orders')}
-                className={`px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl font-bold transition cursor-pointer flex items-center space-x-1.5 relative ${
-                  storeTab === 'orders'
-                    ? 'bg-sky-600 text-white shadow-xs font-extrabold'
-                    : pendingCount > 0
+                className={`px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl font-bold transition cursor-pointer flex items-center space-x-1.5 relative ${storeTab === 'orders'
+                  ? 'bg-sky-600 text-white shadow-xs font-extrabold'
+                  : pendingCount > 0
                     ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 ring-2 ring-amber-400 shadow-xs font-extrabold'
                     : 'text-slate-700 hover:text-slate-950 hover:bg-slate-200/80'
-                }`}
+                  }`}
               >
                 <div className="relative">
                   <PackageCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -862,9 +845,8 @@ export const BannerTicker: React.FC<{
           href={buildWhatsAppLink(storeConfig.whatsappNumber)}
           target="_blank"
           rel="noreferrer"
-          className={`hover:underline flex items-center space-x-1 flex-shrink-0 ml-2 ${
-            isCustomerView ? 'text-emerald-700 font-bold' : 'text-emerald-400'
-          }`}
+          className={`hover:underline flex items-center space-x-1 flex-shrink-0 ml-2 ${isCustomerView ? 'text-emerald-700 font-bold' : 'text-emerald-400'
+            }`}
         >
           <MessageCircle className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">
@@ -1004,11 +986,10 @@ export const CategorySelector: React.FC<{
         <div className="lg:hidden flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none w-full -mx-1 px-1">
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
-              selectedCategory === 'all'
-                ? 'bg-amber-500 text-zinc-950 font-black shadow-xs'
-                : 'bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-amber-300'
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex-shrink-0 ${selectedCategory === 'all'
+              ? 'bg-amber-500 text-zinc-950 font-black shadow-xs'
+              : 'bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-amber-300'
+              }`}
           >
             Todas ({products.length})
           </button>
@@ -1016,11 +997,10 @@ export const CategorySelector: React.FC<{
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex-shrink-0 flex items-center space-x-1 ${
-                selectedCategory === cat
-                  ? 'bg-amber-500 text-zinc-950 font-black shadow-xs'
-                  : 'bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-amber-300'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex-shrink-0 flex items-center space-x-1 ${selectedCategory === cat
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-xs'
+                : 'bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-amber-300'
+                }`}
             >
               <span>{cat}</span>
               <span className="text-[10px] opacity-70">({categoryCounts[cat] || 0})</span>
@@ -1037,11 +1017,10 @@ export const CategorySelector: React.FC<{
           <div className="space-y-1">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-                selectedCategory === 'all'
-                  ? 'bg-amber-500 text-zinc-950 font-black shadow-sm'
-                  : 'text-zinc-300 hover:bg-zinc-800 hover:text-amber-300'
-              }`}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${selectedCategory === 'all'
+                ? 'bg-amber-500 text-zinc-950 font-black shadow-sm'
+                : 'text-zinc-300 hover:bg-zinc-800 hover:text-amber-300'
+                }`}
             >
               <span>Todas las Piezas</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-800/80 text-zinc-300">
@@ -1052,11 +1031,10 @@ export const CategorySelector: React.FC<{
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-amber-500 text-zinc-950 font-black shadow-sm'
-                    : 'text-zinc-300 hover:bg-zinc-800 hover:text-amber-300'
-                }`}
+                className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${selectedCategory === cat
+                  ? 'bg-amber-500 text-zinc-950 font-black shadow-sm'
+                  : 'text-zinc-300 hover:bg-zinc-800 hover:text-amber-300'
+                  }`}
               >
                 <span className="truncate">{cat}</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-800/80 text-zinc-300">
@@ -1077,11 +1055,10 @@ export const CategorySelector: React.FC<{
         <div className="lg:hidden flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none w-full -mx-1 px-1">
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1.5 border-2 border-black text-xs font-black uppercase whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
-              selectedCategory === 'all'
-                ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#000]'
-                : 'bg-white text-black hover:bg-emerald-200'
-            }`}
+            className={`px-3 py-1.5 border-2 border-black text-xs font-black uppercase whitespace-nowrap transition cursor-pointer flex-shrink-0 ${selectedCategory === 'all'
+              ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#000]'
+              : 'bg-white text-black hover:bg-emerald-200'
+              }`}
           >
             TODO ({products.length})
           </button>
@@ -1089,11 +1066,10 @@ export const CategorySelector: React.FC<{
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 border-2 border-black text-xs font-black uppercase whitespace-nowrap transition cursor-pointer flex-shrink-0 flex items-center space-x-1 ${
-                selectedCategory === cat
-                  ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#000]'
-                  : 'bg-white text-black hover:bg-emerald-200'
-              }`}
+              className={`px-3 py-1.5 border-2 border-black text-xs font-black uppercase whitespace-nowrap transition cursor-pointer flex-shrink-0 flex items-center space-x-1 ${selectedCategory === cat
+                ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#000]'
+                : 'bg-white text-black hover:bg-emerald-200'
+                }`}
             >
               <span>{cat}</span>
               <span className="text-[10px] bg-amber-100 px-1 text-black border border-black font-bold">
@@ -1112,11 +1088,10 @@ export const CategorySelector: React.FC<{
           <div className="flex flex-col gap-1.5">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`px-3 py-2 border-2 border-black text-xs font-black uppercase text-left transition flex items-center justify-between cursor-pointer ${
-                selectedCategory === 'all'
-                  ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#fff]'
-                  : 'bg-white text-black hover:bg-emerald-200'
-              }`}
+              className={`px-3 py-2 border-2 border-black text-xs font-black uppercase text-left transition flex items-center justify-between cursor-pointer ${selectedCategory === 'all'
+                ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#fff]'
+                : 'bg-white text-black hover:bg-emerald-200'
+                }`}
             >
               <span>TODO ({products.length})</span>
               {selectedCategory === 'all' && <span>✓</span>}
@@ -1125,11 +1100,10 @@ export const CategorySelector: React.FC<{
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-2 border-2 border-black text-xs font-black uppercase text-left transition flex items-center justify-between cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#fff]'
-                    : 'bg-white text-black hover:bg-emerald-200'
-                }`}
+                className={`px-3 py-2 border-2 border-black text-xs font-black uppercase text-left transition flex items-center justify-between cursor-pointer ${selectedCategory === cat
+                  ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#fff]'
+                  : 'bg-white text-black hover:bg-emerald-200'
+                  }`}
               >
                 <span className="truncate">{cat}</span>
                 <span className="text-[10px] px-1.5 py-0.2 border border-black bg-amber-100">
@@ -1150,11 +1124,10 @@ export const CategorySelector: React.FC<{
         <div className="lg:hidden flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none w-full font-mono -mx-1 px-1">
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`px-2.5 py-1.5 text-xs whitespace-nowrap border transition cursor-pointer flex-shrink-0 ${
-              selectedCategory === 'all'
-                ? 'bg-cyan-500 text-black font-black border-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
-                : 'border-cyan-900 bg-[#0b1528] text-cyan-400'
-            }`}
+            className={`px-2.5 py-1.5 text-xs whitespace-nowrap border transition cursor-pointer flex-shrink-0 ${selectedCategory === 'all'
+              ? 'bg-cyan-500 text-black font-black border-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
+              : 'border-cyan-900 bg-[#0b1528] text-cyan-400'
+              }`}
           >
             &gt; ALL ({products.length})
           </button>
@@ -1162,11 +1135,10 @@ export const CategorySelector: React.FC<{
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-2.5 py-1.5 text-xs whitespace-nowrap border transition cursor-pointer flex-shrink-0 flex items-center space-x-1 ${
-                selectedCategory === cat
-                  ? 'bg-cyan-500 text-black font-black border-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
-                  : 'border-cyan-900 bg-[#0b1528] text-cyan-400'
-              }`}
+              className={`px-2.5 py-1.5 text-xs whitespace-nowrap border transition cursor-pointer flex-shrink-0 flex items-center space-x-1 ${selectedCategory === cat
+                ? 'bg-cyan-500 text-black font-black border-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
+                : 'border-cyan-900 bg-[#0b1528] text-cyan-400'
+                }`}
             >
               <span>&gt; {cat}</span>
               <span className="text-[10px] opacity-70">[{categoryCounts[cat] || 0}]</span>
@@ -1183,11 +1155,10 @@ export const CategorySelector: React.FC<{
           <div className="space-y-1">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`w-full px-3 py-2 text-xs text-left border transition cursor-pointer flex items-center justify-between ${
-                selectedCategory === 'all'
-                  ? 'bg-cyan-500 text-black font-black border-cyan-300'
-                  : 'border-cyan-900/60 text-cyan-400 hover:bg-cyan-950/60'
-              }`}
+              className={`w-full px-3 py-2 text-xs text-left border transition cursor-pointer flex items-center justify-between ${selectedCategory === 'all'
+                ? 'bg-cyan-500 text-black font-black border-cyan-300'
+                : 'border-cyan-900/60 text-cyan-400 hover:bg-cyan-950/60'
+                }`}
             >
               <span>&gt; ALL_ITEMS</span>
               <span className="text-[10px]">[{products.length}]</span>
@@ -1196,11 +1167,10 @@ export const CategorySelector: React.FC<{
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`w-full px-3 py-2 text-xs text-left border transition cursor-pointer flex items-center justify-between ${
-                  selectedCategory === cat
-                    ? 'bg-cyan-500 text-black font-black border-cyan-300'
-                    : 'border-cyan-900/60 text-cyan-400 hover:bg-cyan-950/60'
-                }`}
+                className={`w-full px-3 py-2 text-xs text-left border transition cursor-pointer flex items-center justify-between ${selectedCategory === cat
+                  ? 'bg-cyan-500 text-black font-black border-cyan-300'
+                  : 'border-cyan-900/60 text-cyan-400 hover:bg-cyan-950/60'
+                  }`}
               >
                 <span className="truncate">&gt; {cat}</span>
                 <span className="text-[10px]">[{categoryCounts[cat] || 0}]</span>
@@ -1217,11 +1187,10 @@ export const CategorySelector: React.FC<{
       <div className="flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-none w-full -mx-1 px-1">
         <button
           onClick={() => setSelectedCategory('all')}
-          className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${
-            selectedCategory === 'all'
-              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
-              : 'bg-white border border-teal-200 text-slate-700 hover:bg-teal-50'
-          }`}
+          className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === 'all'
+            ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
+            : 'bg-white border border-teal-200 text-slate-700 hover:bg-teal-50'
+            }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
           <span>Todos ({products.length})</span>
@@ -1230,11 +1199,10 @@ export const CategorySelector: React.FC<{
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${
-              selectedCategory === cat
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
-                : 'bg-white border border-teal-200 text-slate-700 hover:bg-teal-50'
-            }`}
+            className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === cat
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
+              : 'bg-white border border-teal-200 text-slate-700 hover:bg-teal-50'
+              }`}
           >
             <span>{cat}</span>
             <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10">
@@ -1251,11 +1219,10 @@ export const CategorySelector: React.FC<{
       <div className="flex items-center justify-start sm:justify-center space-x-1.5 sm:space-x-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-none flex-nowrap sm:flex-wrap gap-y-2 w-full -mx-1 px-1">
         <button
           onClick={() => setSelectedCategory('all')}
-          className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-medium transition cursor-pointer whitespace-nowrap flex-shrink-0 ${
-            selectedCategory === 'all'
-              ? 'bg-stone-900 text-stone-50 shadow-xs'
-              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-          }`}
+          className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-medium transition cursor-pointer whitespace-nowrap flex-shrink-0 ${selectedCategory === 'all'
+            ? 'bg-stone-900 text-stone-50 shadow-xs'
+            : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+            }`}
         >
           Todos ({products.length})
         </button>
@@ -1263,11 +1230,10 @@ export const CategorySelector: React.FC<{
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-medium transition cursor-pointer whitespace-nowrap flex-shrink-0 ${
-              selectedCategory === cat
-                ? 'bg-stone-900 text-stone-50 shadow-xs'
-                : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-            }`}
+            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-medium transition cursor-pointer whitespace-nowrap flex-shrink-0 ${selectedCategory === cat
+              ? 'bg-stone-900 text-stone-50 shadow-xs'
+              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+              }`}
           >
             {cat} ({categoryCounts[cat] || 0})
           </button>
@@ -1281,9 +1247,8 @@ export const CategorySelector: React.FC<{
     <div className="flex items-center space-x-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none -mx-1 px-1 md:mx-0 md:px-0">
       <button
         onClick={() => setSelectedCategory('all')}
-        className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
-          selectedCategory === 'all' ? themeStyles.pillActive : themeStyles.pillInactive
-        }`}
+        className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${selectedCategory === 'all' ? themeStyles.pillActive : themeStyles.pillInactive
+          }`}
       >
         Todos ({products.length})
       </button>
@@ -1291,9 +1256,8 @@ export const CategorySelector: React.FC<{
         <button
           key={cat}
           onClick={() => setSelectedCategory(cat)}
-          className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
-            selectedCategory === cat ? themeStyles.pillActive : themeStyles.pillInactive
-          }`}
+          className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${selectedCategory === cat ? themeStyles.pillActive : themeStyles.pillInactive
+            }`}
         >
           {cat}
         </button>
@@ -1332,9 +1296,8 @@ export const ProductCardItem: React.FC<{
   return (
     <div
       id={`product-card-${item.id}`}
-      className={`rounded-2xl overflow-hidden flex flex-col transition-all duration-300 group relative border bg-white border-slate-200/90 hover:border-amber-400 hover:shadow-xl hover:-translate-y-1 ${
-        hasDiscount ? 'ring-1 ring-rose-500/30 shadow-md shadow-rose-500/5' : 'shadow-xs'
-      }`}
+      className={`rounded-2xl overflow-hidden flex flex-col transition-all duration-300 group relative border bg-white border-slate-200/90 hover:border-amber-400 hover:shadow-xl hover:-translate-y-1 ${hasDiscount ? 'ring-1 ring-rose-500/30 shadow-md shadow-rose-500/5' : 'shadow-xs'
+        }`}
     >
       {/* Top Image Preview */}
       <div
@@ -1492,15 +1455,13 @@ export const ProductCardItem: React.FC<{
               <div className="space-y-1 sm:space-y-1.5">
                 <div className="grid grid-cols-2 gap-1.5">
                   {inCart ? (
-                    <div className={`flex items-center justify-between rounded-xl px-1.5 py-1 border ${
-                      activeTheme === 'boutique' ? 'bg-zinc-800 border-amber-500/50 text-zinc-100' : 'bg-amber-50 border-amber-400 text-slate-900'
-                    }`}>
+                    <div className={`flex items-center justify-between rounded-xl px-1.5 py-1 border ${activeTheme === 'boutique' ? 'bg-zinc-800 border-amber-500/50 text-zinc-100' : 'bg-amber-50 border-amber-400 text-slate-900'
+                      }`}>
                       <button
                         type="button"
                         onClick={() => onUpdateCartQty(item.id, inCart.quantity - 1)}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${
-                          activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
-                        }`}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
+                          }`}
                         title="Reducir una unidad"
                       >
                         <Minus className="w-3 h-3 stroke-[2.5]" />
@@ -1511,9 +1472,8 @@ export const ProductCardItem: React.FC<{
                       <button
                         type="button"
                         onClick={() => onUpdateCartQty(item.id, inCart.quantity + 1)}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${
-                          activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
-                        }`}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
+                          }`}
                         title="Aumentar una unidad"
                       >
                         <Plus className="w-3 h-3 stroke-[2.5]" />
@@ -1546,9 +1506,8 @@ export const ProductCardItem: React.FC<{
                 <button
                   type="button"
                   onClick={(e) => onShareProductWhatsApp(item, e)}
-                  className={`w-full min-h-[34px] py-1.5 px-3 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs active:scale-95 ${
-                    activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border-zinc-700' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
-                  }`}
+                  className={`w-full min-h-[34px] py-1.5 px-3 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border-zinc-700' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                    }`}
                   title="Compartir por WhatsApp"
                 >
                   <MessageCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
@@ -1559,9 +1518,8 @@ export const ProductCardItem: React.FC<{
               <div className="grid grid-cols-2 gap-1.5 pt-1">
                 <button
                   onClick={() => onQuickViewProduct(item)}
-                  className={`min-h-[36px] py-1.5 sm:py-2 px-2 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs ${
-                    activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                  }`}
+                  className={`min-h-[36px] py-1.5 sm:py-2 px-2 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs ${activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
                 >
                   <Eye className="w-3.5 h-3.5 text-sky-500" />
                   <span className="truncate">Ver Detalle</span>
@@ -1569,9 +1527,8 @@ export const ProductCardItem: React.FC<{
                 <button
                   type="button"
                   onClick={(e) => onShareProductWhatsApp(item, e)}
-                  className={`min-h-[36px] py-1.5 sm:py-2 px-2 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs ${
-                    activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border-zinc-700' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                  }`}
+                  className={`min-h-[36px] py-1.5 sm:py-2 px-2 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs ${activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border-zinc-700' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                    }`}
                 >
                   <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
                   <span className="truncate">WhatsApp</span>
@@ -1660,9 +1617,8 @@ export const CouriersShowcase: React.FC<{
     <div className={`rounded-3xl p-6 sm:p-7 border shadow-sm space-y-4 ${themeStyles.cardBg}`}>
       <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 ${activeTheme === 'boutique' ? 'border-zinc-800' : 'border-slate-100'}`}>
         <div className="flex items-center space-x-2.5">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shadow-xs ${
-            activeTheme === 'boutique' ? 'bg-zinc-800 text-amber-400 border-zinc-700' : 'bg-sky-50 text-sky-700 border-sky-100'
-          }`}>
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shadow-xs ${activeTheme === 'boutique' ? 'bg-zinc-800 text-amber-400 border-zinc-700' : 'bg-sky-50 text-sky-700 border-sky-100'
+            }`}>
             <Truck className="w-4 h-4" />
           </div>
           <div>
@@ -1685,13 +1641,11 @@ export const CouriersShowcase: React.FC<{
         {activeCouriers.map((courier, i) => (
           <div
             key={courier.id || i}
-            className={`rounded-2xl p-3.5 flex flex-col items-center justify-center text-center transition group shadow-xs border ${
-              activeTheme === 'boutique' ? 'bg-zinc-800/80 hover:bg-zinc-800 border-zinc-700' : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200/80'
-            }`}
+            className={`rounded-2xl p-3.5 flex flex-col items-center justify-center text-center transition group shadow-xs border ${activeTheme === 'boutique' ? 'bg-zinc-800/80 hover:bg-zinc-800 border-zinc-700' : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200/80'
+              }`}
           >
-            <div className={`w-16 h-12 rounded-xl border p-1 flex items-center justify-center mb-2 overflow-hidden shadow-2xs group-hover:scale-105 transition-transform ${
-              activeTheme === 'boutique' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-slate-200/80'
-            }`}>
+            <div className={`w-16 h-12 rounded-xl border p-1 flex items-center justify-center mb-2 overflow-hidden shadow-2xs group-hover:scale-105 transition-transform ${activeTheme === 'boutique' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-slate-200/80'
+              }`}>
               {courier.logoUrl ? (
                 <img src={courier.logoUrl} alt={courier.name} className="w-full h-full object-contain" />
               ) : (
@@ -1795,9 +1749,8 @@ export const PaymentShowcase: React.FC<{
     <div className={`rounded-3xl p-6 sm:p-7 border shadow-sm space-y-4 ${themeStyles.cardBg}`}>
       <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 ${activeTheme === 'boutique' ? 'border-zinc-800' : 'border-slate-100'}`}>
         <div className="flex items-center space-x-2.5">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shadow-xs ${
-            activeTheme === 'boutique' ? 'bg-zinc-800 text-emerald-400 border-zinc-700' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-          }`}>
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shadow-xs ${activeTheme === 'boutique' ? 'bg-zinc-800 text-emerald-400 border-zinc-700' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+            }`}>
             <CreditCard className="w-4 h-4" />
           </div>
           <div>
@@ -1820,13 +1773,11 @@ export const PaymentShowcase: React.FC<{
         {activePayments.map((payment, i) => (
           <div
             key={payment.id || i}
-            className={`rounded-2xl p-3.5 flex items-center space-x-3.5 transition shadow-xs border ${
-              activeTheme === 'boutique' ? 'bg-zinc-800/80 hover:bg-zinc-800 border-zinc-700' : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200/80'
-            }`}
+            className={`rounded-2xl p-3.5 flex items-center space-x-3.5 transition shadow-xs border ${activeTheme === 'boutique' ? 'bg-zinc-800/80 hover:bg-zinc-800 border-zinc-700' : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200/80'
+              }`}
           >
-            <div className={`w-14 h-12 rounded-xl border p-1 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-2xs ${
-              activeTheme === 'boutique' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-slate-200/80'
-            }`}>
+            <div className={`w-14 h-12 rounded-xl border p-1 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-2xs ${activeTheme === 'boutique' ? 'bg-zinc-900 border-zinc-700' : 'bg-white border-slate-200/80'
+              }`}>
               {payment.logoUrl ? (
                 <img src={payment.logoUrl} alt={payment.name} className="w-full h-full object-contain" />
               ) : (
@@ -1861,28 +1812,24 @@ export const StoreFooter: React.FC<{
         <div
           id="store-footer-logo"
           onClick={onLogoClick}
-          className={`cursor-pointer select-none transition-all duration-300 transform-gpu ${
-            isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
-          }`}
+          className={`cursor-pointer select-none transition-all duration-300 transform-gpu ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
+            }`}
         >
           {/* Mobile view */}
           <div className="md:hidden">
             {storeConfig.logoUrl ? (
-              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${
-                activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
+                }`}>
                 <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain rounded-xl" />
               </div>
             ) : storeConfig.logoDesktopUrl ? (
-              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${
-                activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
+                }`}>
                 <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="w-full h-full object-contain rounded-xl" />
               </div>
             ) : (
-              <div className={`w-14 h-14 rounded-2xl text-white flex items-center justify-center flex-shrink-0 shadow-md ${
-                activeTheme === 'boutique' ? 'bg-gradient-to-tr from-amber-600 to-amber-800' : activeTheme === 'fresh' ? 'bg-gradient-to-tr from-emerald-500 to-teal-700' : 'bg-gradient-to-tr from-sky-500 to-indigo-600'
-              }`}>
+              <div className={`w-14 h-14 rounded-2xl text-white flex items-center justify-center flex-shrink-0 shadow-md ${activeTheme === 'boutique' ? 'bg-gradient-to-tr from-amber-600 to-amber-800' : activeTheme === 'fresh' ? 'bg-gradient-to-tr from-emerald-500 to-teal-700' : 'bg-gradient-to-tr from-sky-500 to-indigo-600'
+                }`}>
                 <Store className="w-7 h-7" />
               </div>
             )}
@@ -1891,21 +1838,18 @@ export const StoreFooter: React.FC<{
           {/* Desktop view */}
           <div className="hidden md:block">
             {storeConfig.logoDesktopUrl ? (
-              <div className={`h-16 max-w-[240px] rounded-2xl border px-3 py-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${
-                activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`h-16 max-w-[240px] rounded-2xl border px-3 py-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
+                }`}>
                 <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto max-w-full object-contain" />
               </div>
             ) : storeConfig.logoUrl ? (
-              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${
-                activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
-              }`}>
+              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
+                }`}>
                 <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain rounded-xl" />
               </div>
             ) : (
-              <div className={`w-14 h-14 rounded-2xl text-white flex items-center justify-center flex-shrink-0 shadow-md ${
-                activeTheme === 'boutique' ? 'bg-gradient-to-tr from-amber-600 to-amber-800' : activeTheme === 'fresh' ? 'bg-gradient-to-tr from-emerald-500 to-teal-700' : 'bg-gradient-to-tr from-sky-500 to-indigo-600'
-              }`}>
+              <div className={`w-14 h-14 rounded-2xl text-white flex items-center justify-center flex-shrink-0 shadow-md ${activeTheme === 'boutique' ? 'bg-gradient-to-tr from-amber-600 to-amber-800' : activeTheme === 'fresh' ? 'bg-gradient-to-tr from-emerald-500 to-teal-700' : 'bg-gradient-to-tr from-sky-500 to-indigo-600'
+                }`}>
                 <Store className="w-7 h-7" />
               </div>
             )}
@@ -2095,29 +2039,25 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       {/* ========================================================================= */}
       <div
         id="marketplace-sticky-header"
-        className={`sticky ${
-          isCustomerOnly ? 'top-0' : 'top-16'
-        } z-30 text-slate-900 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b ${
-          isScrolled ? 'border-amber-400/80 shadow-md' : 'border-slate-200/90'
-        } transition-all duration-300`}
+        className={`sticky ${isCustomerOnly ? 'top-0' : 'top-16'
+          } z-30 text-slate-900 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b ${isScrolled ? 'border-amber-400/80 shadow-md' : 'border-slate-200/90'
+          } transition-all duration-300`}
         style={{
-          background: 'linear-gradient(180deg, #f59e0b 0%, #fbbf24 35%, #fef08a 70%, #ffffff 100%)',
+          background: 'linear-gradient(180deg, #f59f0be3 0%, #fae5afff 35%, #fdfbeaff 70%, #ffffffff 100%)',
         }}
       >
         {/* Upper Row: Store Brand + Desktop Mega Search Box + Quick Actions (WhatsApp, Cart) */}
         <div
-          className={`${
-            isScrolled ? 'hidden md:flex' : 'flex'
-          } py-2 sm:py-3 items-center justify-between gap-2 sm:gap-4 border-b border-amber-400/30 transition-all duration-300`}
+          className={`${isScrolled ? 'hidden md:flex' : 'flex'
+            } py-2 sm:py-3 items-center justify-between gap-2 sm:gap-4 border-b border-amber-400/30 transition-all duration-300`}
         >
           {/* Brand & Store Identity (Light, Crisp & Visually Elegant) */}
           <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
             <div
               id="store-marketplace-logo"
               onClick={onLogoClick}
-              className={`cursor-pointer select-none transition-transform ${
-                isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
-              }`}
+              className={`cursor-pointer select-none transition-transform ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
+                }`}
               title="Logo de la tienda"
             >
               {/* Mobile view */}
@@ -2259,17 +2199,15 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs gap-1">
                 <button
                   onClick={() => setStoreTab('catalog')}
-                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer ${
-                    storeTab === 'catalog' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer ${storeTab === 'catalog' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   Catálogo
                 </button>
                 <button
                   onClick={() => setStoreTab('orders')}
-                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${
-                    storeTab === 'orders' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${storeTab === 'orders' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   <span>Pedidos</span>
                   {pendingCount > 0 && <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
@@ -2304,14 +2242,12 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
 
         {/* Mobile Search & Filter Console (Clean, Modern, Stays Sticky on Cellular Scroll) */}
         <div
-          className={`block md:hidden ${
-            isScrolled ? 'py-2 px-0.5' : 'py-2 border-b border-amber-400/20'
-          } transition-all duration-300`}
+          className={`block md:hidden ${isScrolled ? 'py-2 px-0.5' : 'py-2 border-b border-amber-400/20'
+            } transition-all duration-300`}
         >
           <div
-            className={`flex items-center gap-2 ${
-              isScrolled ? 'bg-white/80 backdrop-blur-xs p-1 rounded-2xl shadow-xs border border-amber-400/50 ring-2 ring-amber-400/15' : ''
-            }`}
+            className={`flex items-center gap-2 ${isScrolled ? 'bg-white/80 backdrop-blur-xs p-1 rounded-2xl shadow-xs border border-amber-400/50 ring-2 ring-amber-400/15' : ''
+              }`}
           >
             {/* Search Input Box (Clean Solid White Input contrasting on the Gradient Header Panel) */}
             <div className="flex-1 flex items-center bg-white rounded-xl shadow-xs border border-amber-400 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-400/30 overflow-hidden transition-all">
@@ -2369,11 +2305,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             <button
               type="button"
               onClick={() => setIsMobileFilterOpen(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 border shadow-2xs active:scale-95 flex-shrink-0 ${
-                activeFilterCount > 0
-                  ? 'bg-amber-400 text-slate-950 font-black border-amber-400 shadow-xs'
-                  : 'bg-white/90 hover:bg-white text-slate-800 border-amber-300/60'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 border shadow-2xs active:scale-95 flex-shrink-0 ${activeFilterCount > 0
+                ? 'bg-amber-400 text-slate-950 font-black border-amber-400 shadow-xs'
+                : 'bg-white/90 hover:bg-white text-slate-800 border-amber-300/60'
+                }`}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>Filtros y Categorías</span>
@@ -2388,11 +2323,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             <button
               type="button"
               onClick={() => setShowOffersOnly(!showOffersOnly)}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 border flex-shrink-0 active:scale-95 ${
-                showOffersOnly
-                  ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs font-black'
-                  : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
-              }`}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 border flex-shrink-0 active:scale-95 ${showOffersOnly
+                ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs font-black'
+                : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
+                }`}
               title="Filtrar productos con descuento"
             >
               <Flame className={`w-3.5 h-3.5 ${showOffersOnly ? 'text-rose-600 fill-rose-600' : 'text-rose-500'}`} />
@@ -2419,11 +2353,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               <button
                 type="button"
                 onClick={() => setInStockOnly(!inStockOnly)}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 border flex-shrink-0 active:scale-95 ${
-                  inStockOnly
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs font-black'
-                    : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
-                }`}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 border flex-shrink-0 active:scale-95 ${inStockOnly
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs font-black'
+                  : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
+                  }`}
                 title="Mostrar solo productos con stock disponible"
               >
                 <Check className={`w-3.5 h-3.5 ${inStockOnly ? 'text-emerald-700' : 'text-slate-500'}`} />
@@ -2437,11 +2370,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             {/* Category Chips in the exact same single scrollable row */}
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${
-                selectedCategory === 'all'
-                  ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
-                  : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === 'all'
+                ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
+                : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
+                }`}
             >
               <span>☰ Todos</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedCategory === 'all' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-200 text-slate-600'}`}>
@@ -2456,11 +2388,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${
-                    isSel
-                      ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
-                      : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${isSel
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
+                    : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
+                    }`}
                 >
                   <span>{cat}</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSel ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-200 text-slate-600'}`}>
@@ -2478,11 +2409,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
           <div className="flex items-center space-x-1.5 flex-shrink-0">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black transition whitespace-nowrap cursor-pointer flex items-center space-x-1 ${
-                selectedCategory === 'all'
-                  ? 'bg-amber-400 text-slate-950 shadow-xs border border-amber-400'
-                  : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
-              }`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition whitespace-nowrap cursor-pointer flex items-center space-x-1 ${selectedCategory === 'all'
+                ? 'bg-amber-400 text-slate-950 shadow-xs border border-amber-400'
+                : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
+                }`}
             >
               <span>☰ Todos</span>
               <span className={`text-[10px] px-1 rounded-full ${selectedCategory === 'all' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-200 text-slate-600'}`}>
@@ -2497,11 +2427,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1 ${
-                    isSel
-                      ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
-                      : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1 ${isSel
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
+                    : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
+                    }`}
                 >
                   <span>{cat}</span>
                   <span className={`text-[10px] px-1 rounded-full ${isSel ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-200 text-slate-600'}`}>
@@ -2518,11 +2447,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             <button
               type="button"
               onClick={() => setShowOffersOnly(!showOffersOnly)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer flex items-center space-x-1 border ${
-                showOffersOnly
-                  ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs font-black'
-                  : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
-              }`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer flex items-center space-x-1 border ${showOffersOnly
+                ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs font-black'
+                : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
+                }`}
               title="Filtrar productos con descuento"
             >
               <Flame className={`w-3.5 h-3.5 ${showOffersOnly ? 'text-rose-600 fill-rose-600' : 'text-rose-500'}`} />
@@ -2534,11 +2462,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               <button
                 type="button"
                 onClick={() => setInStockOnly(!inStockOnly)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center space-x-1 border ${
-                  inStockOnly
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs font-black'
-                    : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
-                }`}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center space-x-1 border ${inStockOnly
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs font-black'
+                  : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
+                  }`}
                 title="Mostrar solo productos con stock disponible"
               >
                 <Check className={`w-3.5 h-3.5 ${inStockOnly ? 'text-emerald-700' : 'text-slate-500'}`} />
@@ -2621,11 +2548,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   <button
                     type="button"
                     onClick={() => setSelectedCategory('all')}
-                    className={`p-2.5 rounded-xl border font-bold transition cursor-pointer flex items-center justify-between text-left active:scale-95 ${
-                      selectedCategory === 'all'
-                        ? 'bg-amber-400 text-slate-950 font-black shadow-xs border-amber-400'
-                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
-                    }`}
+                    className={`p-2.5 rounded-xl border font-bold transition cursor-pointer flex items-center justify-between text-left active:scale-95 ${selectedCategory === 'all'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-xs border-amber-400'
+                      : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
+                      }`}
                   >
                     <span className="truncate">Todas las Categorías</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 ${selectedCategory === 'all' ? 'bg-slate-950 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>
@@ -2640,11 +2566,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                         type="button"
                         key={cat}
                         onClick={() => setSelectedCategory(cat)}
-                        className={`p-2.5 rounded-xl border font-bold transition cursor-pointer flex items-center justify-between text-left active:scale-95 ${
-                          isSel
-                            ? 'bg-amber-400 text-slate-950 font-black shadow-xs border-amber-400'
-                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
-                        }`}
+                        className={`p-2.5 rounded-xl border font-bold transition cursor-pointer flex items-center justify-between text-left active:scale-95 ${isSel
+                          ? 'bg-amber-400 text-slate-950 font-black shadow-xs border-amber-400'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
+                          }`}
                       >
                         <span className="truncate">{cat}</span>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1 flex-shrink-0 ${isSel ? 'bg-slate-950 text-amber-300' : 'bg-slate-200 text-slate-700'}`}>
@@ -2665,11 +2590,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   <button
                     type="button"
                     onClick={() => setShowOffersOnly(!showOffersOnly)}
-                    className={`p-2.5 rounded-xl border flex items-center space-x-2.5 transition cursor-pointer text-left active:scale-95 ${
-                      showOffersOnly
-                        ? 'bg-rose-50 border-rose-300 text-rose-800 shadow-xs ring-1 ring-rose-300 font-black'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
+                    className={`p-2.5 rounded-xl border flex items-center space-x-2.5 transition cursor-pointer text-left active:scale-95 ${showOffersOnly
+                      ? 'bg-rose-50 border-rose-300 text-rose-800 shadow-xs ring-1 ring-rose-300 font-black'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
                   >
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${showOffersOnly ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
                       <Flame className="w-4 h-4 fill-current" />
@@ -2684,11 +2608,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                     <button
                       type="button"
                       onClick={() => setInStockOnly(!inStockOnly)}
-                      className={`p-2.5 rounded-xl border flex items-center space-x-2.5 transition cursor-pointer text-left active:scale-95 ${
-                        inStockOnly
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-xs ring-1 ring-emerald-300 font-black'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
+                      className={`p-2.5 rounded-xl border flex items-center space-x-2.5 transition cursor-pointer text-left active:scale-95 ${inStockOnly
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-xs ring-1 ring-emerald-300 font-black'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
                     >
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${inStockOnly ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
                         <Check className="w-4 h-4 stroke-[2.5]" />
@@ -2720,11 +2643,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                         type="button"
                         key={option.id}
                         onClick={() => setSortBy(option.id as any)}
-                        className={`py-2 px-3 rounded-xl border text-left font-bold transition cursor-pointer flex items-center justify-between active:scale-95 ${
-                          isSelected
-                            ? 'bg-amber-400 text-slate-950 border-amber-400 font-black shadow-xs'
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
+                        className={`py-2 px-3 rounded-xl border text-left font-bold transition cursor-pointer flex items-center justify-between active:scale-95 ${isSelected
+                          ? 'bg-amber-400 text-slate-950 border-amber-400 font-black shadow-xs'
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                          }`}
                       >
                         <span className="truncate">{option.label}</span>
                         {isSelected && <Check className="w-3.5 h-3.5 stroke-[3] flex-shrink-0 ml-1" />}
@@ -2854,11 +2776,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   type="button"
                   disabled={currentPage === 1}
                   onClick={() => handlePageChange(currentPage - 1)}
-                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center space-x-1 ${
-                    currentPage === 1
-                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                      : 'bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-slate-300 shadow-2xs cursor-pointer active:scale-95'
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center space-x-1 ${currentPage === 1
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-slate-300 shadow-2xs cursor-pointer active:scale-95'
+                    }`}
                   title="Página anterior"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
@@ -2890,11 +2811,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                         key={pageNum}
                         type="button"
                         onClick={() => handlePageChange(pageNum)}
-                        className={`min-w-8 h-8 px-2 rounded-xl text-xs font-black transition flex items-center justify-center border cursor-pointer active:scale-95 ${
-                          isCurrent
-                            ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-xs font-black'
-                            : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-300'
-                        }`}
+                        className={`min-w-8 h-8 px-2 rounded-xl text-xs font-black transition flex items-center justify-center border cursor-pointer active:scale-95 ${isCurrent
+                          ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-xs font-black'
+                          : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-300'
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -2906,11 +2826,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   type="button"
                   disabled={currentPage === totalPages}
                   onClick={() => handlePageChange(currentPage + 1)}
-                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center space-x-1 ${
-                    currentPage === totalPages
-                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                      : 'bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-slate-300 shadow-2xs cursor-pointer active:scale-95'
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center space-x-1 ${currentPage === totalPages
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-slate-300 shadow-2xs cursor-pointer active:scale-95'
+                    }`}
                   title="Página siguiente"
                 >
                   <span>Siguiente</span>
@@ -3073,11 +2992,10 @@ export const BoutiqueStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ pro
             <div className="flex items-center space-x-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap gap-y-1.5">
               <button
                 onClick={() => setShowOffersOnly(!showOffersOnly)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 border transition cursor-pointer ${
-                  showOffersOnly
-                    ? 'bg-gradient-to-r from-amber-500 to-rose-500 border-amber-400 text-black shadow-xs font-black'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 border transition cursor-pointer ${showOffersOnly
+                  ? 'bg-gradient-to-r from-amber-500 to-rose-500 border-amber-400 text-black shadow-xs font-black'
+                  : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
                 title="Filtrar piezas con descuento exclusivo"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${showOffersOnly ? 'text-black fill-black' : 'text-amber-400'}`} />
@@ -3193,9 +3111,8 @@ export const FreshStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ props 
           <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
             <button
               onClick={() => setShowOffersOnly(!showOffersOnly)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
-                showOffersOnly ? 'bg-rose-500 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${showOffersOnly ? 'bg-rose-500 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
             >
               <Sparkles className={`w-3.5 h-3.5 ${showOffersOnly ? 'text-amber-200 fill-amber-200' : 'text-rose-500'}`} />
               <span>Ofertas</span>
@@ -3328,9 +3245,8 @@ export const BrutalistStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ pr
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <button
                 onClick={() => setShowOffersOnly(!showOffersOnly)}
-                className={`px-3 py-1.5 border-2 border-black text-xs font-black uppercase transition cursor-pointer ${
-                  showOffersOnly ? 'bg-rose-500 text-white shadow-[2px_2px_0px_#000]' : 'bg-white text-black hover:bg-slate-100'
-                }`}
+                className={`px-3 py-1.5 border-2 border-black text-xs font-black uppercase transition cursor-pointer ${showOffersOnly ? 'bg-rose-500 text-white shadow-[2px_2px_0px_#000]' : 'bg-white text-black hover:bg-slate-100'
+                  }`}
               >
                 {showOffersOnly ? '★ OFERTAS' : 'OFERTAS'}
               </button>
@@ -3462,11 +3378,10 @@ export const CyberStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ props 
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <button
                 onClick={() => setShowOffersOnly(!showOffersOnly)}
-                className={`px-2.5 py-1 text-xs border transition cursor-pointer ${
-                  showOffersOnly
-                    ? 'bg-rose-500 text-white font-bold border-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]'
-                    : 'border-cyan-900 text-cyan-400'
-                }`}
+                className={`px-2.5 py-1 text-xs border transition cursor-pointer ${showOffersOnly
+                  ? 'bg-rose-500 text-white font-bold border-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]'
+                  : 'border-cyan-900 text-cyan-400'
+                  }`}
               >
                 {showOffersOnly ? '[*] OFFERS' : '[ ] OFFERS'}
               </button>
@@ -3578,9 +3493,8 @@ export const MinimalStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
         <div className="flex items-center justify-center space-x-3 text-xs pt-1 flex-wrap gap-y-2">
           <button
             onClick={() => setShowOffersOnly(!showOffersOnly)}
-            className={`px-3.5 py-1 rounded-full font-medium transition cursor-pointer ${
-              showOffersOnly ? 'bg-rose-700 text-white shadow-xs' : 'bg-white text-stone-600 shadow-2xs hover:bg-stone-100'
-            }`}
+            className={`px-3.5 py-1 rounded-full font-medium transition cursor-pointer ${showOffersOnly ? 'bg-rose-700 text-white shadow-xs' : 'bg-white text-stone-600 shadow-2xs hover:bg-stone-100'
+              }`}
           >
             Ofertas
           </button>
@@ -3700,13 +3614,12 @@ export const AdminStoreCatalog: React.FC<{ props: StoreLayoutProps }> = ({ props
         </div>
       </div>
 
-      {/* Search, Filter and Sorter Bar (Sticky top bar with Established 3-Tone Vertical Yellow to White Gradient) */}
+      {/* Search, Filter and Sorter Bar (Sticky top bar with 2-Tone Yellow to 2-Tone Black Vertical Gradient) */}
       <div
-        className={`sticky ${
-          props.isCustomerOnly ? 'top-0' : 'top-16'
-        } z-20 border border-amber-400/80 rounded-2xl p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-3.5 transition-all`}
+        className={`sticky ${props.isCustomerOnly ? 'top-0' : 'top-16'
+          } z-20 border border-amber-400/80 rounded-2xl p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-3.5 transition-all`}
         style={{
-          background: 'linear-gradient(180deg, #f59e0b 0%, #fbbf24 35%, #fef08a 70%, #ffffff 100%)',
+          background: 'linear-gradient(180deg, #f59e0b 0%, #fbbf24 35%, #27272a 70%, #09090b 100%)',
         }}
       >
         {/* Search Box (Clean Solid White Input) */}
@@ -3738,17 +3651,15 @@ export const AdminStoreCatalog: React.FC<{ props: StoreLayoutProps }> = ({ props
               <button
                 key={cat}
                 onClick={() => props.setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${
-                  isSelected
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${isSelected
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
+                  }`}
               >
                 <span>{cat}</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    isSelected ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${isSelected ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}
                 >
                   {count}
                 </span>
@@ -3814,219 +3725,215 @@ export const AdminStoreCatalog: React.FC<{ props: StoreLayoutProps }> = ({ props
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {paginatedProducts.map((item) => {
-            const hasStock = item.stock > 0;
-            const photos = getProductPhotos(item);
-            const mainImg = photos[0] || '';
+              const hasStock = item.stock > 0;
+              const photos = getProductPhotos(item);
+              const mainImg = photos[0] || '';
 
-            return (
-              <div
-                key={item.id}
-                id={`product-card-${item.id}`}
-                className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:border-sky-300 transition-all flex flex-col justify-between group"
-              >
-                <div>
-                  {/* Image container */}
-                  <div
-                    onClick={() => props.onQuickViewProduct(item)}
-                    className="relative aspect-square bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border-b border-slate-100"
-                  >
-                    <ProductMediaDisplay
-                      imageUrl={photos[0] || item.imageUrl}
-                      candidateImages={photos}
-                      videoUrl={item.videoUrl}
-                      name={item.name}
-                      className="w-full h-full relative"
-                      imageClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      autoPlayVideo={true}
-                      showPlayBadge={false}
-                      placeholderText="Sin imagen"
-                      fallbackIcon="package"
-                    />
+              return (
+                <div
+                  key={item.id}
+                  id={`product-card-${item.id}`}
+                  className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:border-sky-300 transition-all flex flex-col justify-between group"
+                >
+                  <div>
+                    {/* Image container */}
+                    <div
+                      onClick={() => props.onQuickViewProduct(item)}
+                      className="relative aspect-square bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border-b border-slate-100"
+                    >
+                      <ProductMediaDisplay
+                        imageUrl={photos[0] || item.imageUrl}
+                        candidateImages={photos}
+                        videoUrl={item.videoUrl}
+                        name={item.name}
+                        className="w-full h-full relative"
+                        imageClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        autoPlayVideo={true}
+                        showPlayBadge={false}
+                        placeholderText="Sin imagen"
+                        fallbackIcon="package"
+                      />
 
-                    {/* Stock badge */}
-                    <div className="absolute top-2 left-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold shadow-2xs ${
-                          hasStock
+                      {/* Stock badge */}
+                      <div className="absolute top-2 left-2">
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold shadow-2xs ${hasStock
                             ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                             : 'bg-amber-100 text-amber-900 border border-amber-300'
-                        }`}
+                            }`}
+                        >
+                          {hasStock ? `${item.stock} en stock` : 'Bajo pedido'}
+                        </span>
+                      </div>
+
+                      {item.videoUrl && (
+                        <div className="absolute top-2 right-2">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold shadow-2xs bg-slate-950/90 text-sky-300 border border-sky-400/40 flex items-center space-x-1 backdrop-blur-xs">
+                            <Play className="w-2.5 h-2.5 text-sky-400 fill-current" />
+                            <span>Video</span>
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Category badge */}
+                      {item.category && (
+                        <div className="absolute bottom-2 left-2">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/90 text-slate-800 border border-slate-200 backdrop-blur-xs">
+                            {item.category}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3.5 space-y-1.5">
+                      <h4
+                        onClick={() => props.onQuickViewProduct(item)}
+                        className="text-xs font-bold text-slate-900 hover:text-sky-600 line-clamp-2 cursor-pointer"
+                        title={item.name}
                       >
-                        {hasStock ? `${item.stock} en stock` : 'Bajo pedido'}
-                      </span>
-                    </div>
-
-                    {item.videoUrl && (
-                      <div className="absolute top-2 right-2">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold shadow-2xs bg-slate-950/90 text-sky-300 border border-sky-400/40 flex items-center space-x-1 backdrop-blur-xs">
-                          <Play className="w-2.5 h-2.5 text-sky-400 fill-current" />
-                          <span>Video</span>
+                        {item.name}
+                      </h4>
+                      {item.sku && (
+                        <span className="text-[10px] font-mono text-slate-400 block">
+                          SKU: {item.sku}
+                        </span>
+                      )}
+                      <div className="pt-1 flex items-baseline justify-between">
+                        <span className="text-base font-black text-slate-900">
+                          ${Number(item.salePrice).toFixed(2)}
+                          <span className="text-[10px] font-normal text-slate-500 ml-1">
+                            {props.currency}
+                          </span>
                         </span>
                       </div>
-                    )}
-
-                    {/* Category badge */}
-                    {item.category && (
-                      <div className="absolute bottom-2 left-2">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/90 text-slate-800 border border-slate-200 backdrop-blur-xs">
-                          {item.category}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="p-3.5 space-y-1.5">
-                    <h4
-                      onClick={() => props.onQuickViewProduct(item)}
-                      className="text-xs font-bold text-slate-900 hover:text-sky-600 line-clamp-2 cursor-pointer"
-                      title={item.name}
-                    >
-                      {item.name}
-                    </h4>
-                    {item.sku && (
-                      <span className="text-[10px] font-mono text-slate-400 block">
-                        SKU: {item.sku}
-                      </span>
-                    )}
-                    <div className="pt-1 flex items-baseline justify-between">
-                      <span className="text-base font-black text-slate-900">
-                        ${Number(item.salePrice).toFixed(2)}
-                        <span className="text-[10px] font-normal text-slate-500 ml-1">
-                          {props.currency}
-                        </span>
-                      </span>
                     </div>
                   </div>
+
+                  {/* Actions */}
+                  <div className="p-3.5 pt-0 flex items-center space-x-1.5">
+                    {props.isCustomerView ? (
+                      <button
+                        type="button"
+                        onClick={(e) => props.onDirectBuyProduct(item, e)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-xs active:scale-95"
+                        title="Comprar directo por WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                        <span>Comprar</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => props.onQuickViewProduct(item)}
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-300 transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-2xs"
+                        title="Ver detalle del producto"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-sky-600" />
+                        <span>Ver Ficha</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => props.onShareProductWhatsApp(item, e)}
+                      className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer"
+                      title="Compartir por WhatsApp"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+
+                    {props.isCustomerView && (
+                      <button
+                        type="button"
+                        onClick={() => props.onQuickViewProduct(item)}
+                        className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer"
+                        title="Ver detalle"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
+              );
+            })}
+          </div>
 
-                {/* Actions */}
-                <div className="p-3.5 pt-0 flex items-center space-x-1.5">
-                  {props.isCustomerView ? (
-                    <button
-                      type="button"
-                      onClick={(e) => props.onDirectBuyProduct(item, e)}
-                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-xs active:scale-95"
-                      title="Comprar directo por WhatsApp"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                      <span>Comprar</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => props.onQuickViewProduct(item)}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-300 transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-2xs"
-                      title="Ver detalle del producto"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-sky-600" />
-                      <span>Ver Ficha</span>
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={(e) => props.onShareProductWhatsApp(item, e)}
-                    className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer"
-                    title="Compartir por WhatsApp"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                  </button>
-
-                  {props.isCustomerView && (
-                    <button
-                      type="button"
-                      onClick={() => props.onQuickViewProduct(item)}
-                      className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer"
-                      title="Ver detalle"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 pb-2 border-t border-slate-200">
+              <div className="text-xs text-slate-500 font-medium order-2 sm:order-1 text-center sm:text-left">
+                Mostrando <span className="font-bold text-slate-800">{startIndex + 1}</span> - <span className="font-bold text-slate-800">{Math.min(startIndex + ITEMS_PER_PAGE, props.filteredProducts.length)}</span> de <span className="font-bold text-slate-800">{props.filteredProducts.length}</span> productos
               </div>
-            );
-          })}
-        </div>
 
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 pb-2 border-t border-slate-200">
-            <div className="text-xs text-slate-500 font-medium order-2 sm:order-1 text-center sm:text-left">
-              Mostrando <span className="font-bold text-slate-800">{startIndex + 1}</span> - <span className="font-bold text-slate-800">{Math.min(startIndex + ITEMS_PER_PAGE, props.filteredProducts.length)}</span> de <span className="font-bold text-slate-800">{props.filteredProducts.length}</span> productos
-            </div>
-
-            <div className="flex items-center space-x-1.5 order-1 sm:order-2">
-              <button
-                type="button"
-                disabled={currentPage === 1}
-                onClick={() => handlePageChange(currentPage - 1)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center space-x-1 ${
-                  currentPage === 1
+              <div className="flex items-center space-x-1.5 order-1 sm:order-2">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center space-x-1 ${currentPage === 1
                     ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                     : 'bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-slate-300 shadow-2xs cursor-pointer active:scale-95'
-                }`}
-                title="Página anterior"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Anterior</span>
-              </button>
+                    }`}
+                  title="Página anterior"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Anterior</span>
+                </button>
 
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
-                  if (
-                    totalPages > 6 &&
-                    pageNum !== 1 &&
-                    pageNum !== totalPages &&
-                    Math.abs(pageNum - currentPage) > 1
-                  ) {
-                    if (pageNum === 2 || pageNum === totalPages - 1) {
-                      return (
-                        <span key={pageNum} className="px-1 text-slate-400 text-xs font-bold">
-                          ...
-                        </span>
-                      );
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                    if (
+                      totalPages > 6 &&
+                      pageNum !== 1 &&
+                      pageNum !== totalPages &&
+                      Math.abs(pageNum - currentPage) > 1
+                    ) {
+                      if (pageNum === 2 || pageNum === totalPages - 1) {
+                        return (
+                          <span key={pageNum} className="px-1 text-slate-400 text-xs font-bold">
+                            ...
+                          </span>
+                        );
+                      }
+                      return null;
                     }
-                    return null;
-                  }
 
-                  const isCurrent = pageNum === currentPage;
-                  return (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      onClick={() => handlePageChange(pageNum)}
-                      className={`min-w-8 h-8 px-2 rounded-xl text-xs font-black transition flex items-center justify-center border cursor-pointer active:scale-95 ${
-                        isCurrent
+                    const isCurrent = pageNum === currentPage;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`min-w-8 h-8 px-2 rounded-xl text-xs font-black transition flex items-center justify-center border cursor-pointer active:scale-95 ${isCurrent
                           ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
                           : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-300'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
+                          }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
 
-              <button
-                type="button"
-                disabled={currentPage === totalPages}
-                onClick={() => handlePageChange(currentPage + 1)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center space-x-1 ${
-                  currentPage === totalPages
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center space-x-1 ${currentPage === totalPages
                     ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                     : 'bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-slate-300 shadow-2xs cursor-pointer active:scale-95'
-                }`}
-                title="Página siguiente"
-              >
-                <span>Siguiente</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+                    }`}
+                  title="Página siguiente"
+                >
+                  <span>Siguiente</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </>
+          )}
+        </>
       )}
 
       <StoreFooter props={props} variant="standard" />
