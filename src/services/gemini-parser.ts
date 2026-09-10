@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
+import { getAiConfig } from '../db/inventory.ts';
 import {
   detectTaxStatus,
   calculateTaxAdjustment,
@@ -161,6 +162,261 @@ export async function testGeminiApiKey(
     message: friendlyMsg,
     latencyMs,
   };
+}
+
+/**
+ * Executes a completion request against a local OpenAI-compatible server (LM Studio).
+ */
+export function parseJsonFromModelResponse(text: string): any {
+  if (!text || typeof text !== 'string') return null;
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
+
+  const startIdx = cleaned.indexOf('{');
+  const endIdx = cleaned.lastIndexOf('}');
+  if (startIdx !== -1 && endIdx > startIdx) {
+    const jsonSubstring = cleaned.slice(startIdx, endIdx + 1);
+    try {
+      return JSON.parse(jsonSubstring);
+    } catch {}
+  }
+
+  return null;
+}
+
+export function normalizeLmStudioEndpoint(inputEndpoint?: string | null): {
+  openAiBase: string;
+  lmStudioApiBase: string;
+  raw: string;
+} {
+  let raw = (inputEndpoint || 'http://localhost:1234/v1').trim().replace(/\/+$/, '');
+
+  if (raw.endsWith('/v1')) {
+    const root = raw.slice(0, -3).replace(/\/+$/, '');
+    return {
+      openAiBase: raw,
+      lmStudioApiBase: `${root}/api/v1`,
+      raw: root,
+    };
+  }
+
+  if (raw.endsWith('/api/v1')) {
+    const root = raw.slice(0, -7).replace(/\/+$/, '');
+    return {
+      openAiBase: `${root}/v1`,
+      lmStudioApiBase: raw,
+      raw: root,
+    };
+  }
+
+  return {
+    openAiBase: `${raw}/v1`,
+    lmStudioApiBase: `${raw}/api/v1`,
+    raw,
+  };
+}
+
+/**
+ * Executes a completion request against a local OpenAI-compatible server (LM Studio).
+ */
+export async function callLocalLmStudioAi(
+  prompt: string,
+  imagesBase64?: string[],
+  endpoint: string = 'http://localhost:1234/v1',
+  modelName: string = 'google/gemma-4-12b-qat'
+): Promise<string> {
+  const { openAiBase, lmStudioApiBase } = normalizeLmStudioEndpoint(endpoint);
+  const targetModel = modelName || 'google/gemma-4-12b-qat';
+
+  let userContent: any = prompt;
+  if (Array.isArray(imagesBase64) && imagesBase64.length > 0) {
+    const parts: any[] = [];
+    for (const imgBase64 of imagesBase64) {
+      if (!imgBase64 || typeof imgBase64 !== 'string') continue;
+      const mime = imgBase64.startsWith('data:image/')
+        ? imgBase64.split(';')[0].replace('data:', '')
+        : 'image/jpeg';
+      const cleanData = imgBase64.includes(',') ? imgBase64.split(',')[1] : imgBase64;
+      parts.push({
+        type: 'image_url',
+        image_url: {
+          url: `data:${mime};base64,${cleanData}`,
+        },
+      });
+    }
+    parts.push({ type: 'text', text: prompt });
+    userContent = parts;
+  }
+
+  const messages = [
+    {
+      role: 'system',
+      content: 'Eres un asistente experto en contabilidad y comercio electrónico. Responde ÚNICAMENTE en formato JSON válido estructurado sin explicaciones extra.',
+    },
+    { role: 'user', content: userContent },
+  ];
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+  const candidateUrls = [
+    `${openAiBase}/chat/completions`,
+    `${lmStudioApiBase}/chat`,
+  ];
+
+  let lastError: any = null;
+
+  for (const targetUrl of candidateUrls) {
+    try {
+      let res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: targetModel,
+          messages,
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (res.status === 400 || res.status === 422 || res.status === 404) {
+        // Retry without strict response_format for models that don't support it
+        res = await fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: targetModel,
+            messages,
+            temperature: 0.1,
+          }),
+        });
+      }
+
+      if (res.ok) {
+        clearTimeout(timeoutId);
+        const json = await res.json();
+        const msg = json.choices?.[0]?.message;
+        let contentStr = msg?.content || '';
+        if ((!contentStr || !contentStr.trim()) && msg?.reasoning_content) {
+          contentStr = msg.reasoning_content;
+        }
+        if (!contentStr && json.output?.content) {
+          contentStr = typeof json.output.content === 'string' ? json.output.content : JSON.stringify(json.output.content);
+        }
+        return contentStr || '';
+      }
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+
+  clearTimeout(timeoutId);
+  throw lastError || new Error(`No se pudo obtener respuesta de LM Studio en ${endpoint}`);
+}
+
+/**
+ * Tests connection to local LM Studio AI Server (http://localhost:1234/v1).
+ */
+export async function testLmStudioConnection(
+  endpoint: string = 'http://localhost:1234/v1',
+  modelName: string = 'google/gemma-4-12b-qat'
+): Promise<{
+  success: boolean;
+  model: string;
+  message: string;
+  latencyMs: number;
+  availableModels?: string[];
+}> {
+  const startTime = Date.now();
+  const { openAiBase, lmStudioApiBase } = normalizeLmStudioEndpoint(endpoint);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+    let availableModels: string[] = [];
+    const modelsUrls = [`${openAiBase}/models`, `${lmStudioApiBase}/models`];
+    for (const mUrl of modelsUrls) {
+      try {
+        const modelsRes = await fetch(mUrl, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+        });
+        if (modelsRes.ok) {
+          const data = await modelsRes.json();
+          const list = Array.isArray(data.data) ? data.data : Array.isArray(data.models) ? data.models : [];
+          if (list.length > 0) {
+            availableModels = list.map((m: any) => m.id || m.name || m.key).filter(Boolean);
+            break;
+          }
+        }
+      } catch {}
+    }
+
+    const targetModel = modelName?.trim() || availableModels[0] || 'google/gemma-4-12b-qat';
+
+    const chatUrls = [
+      `${openAiBase}/chat/completions`,
+      `${lmStudioApiBase}/chat`,
+    ];
+
+    for (const cUrl of chatUrls) {
+      try {
+        const testRes = await fetch(cUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: targetModel,
+            messages: [{ role: 'user', content: 'Responde únicamente la palabra CONECTADO sin explicaciones.' }],
+            temperature: 0.1,
+            max_tokens: 60,
+          }),
+        });
+
+        if (testRes.ok) {
+          clearTimeout(timeoutId);
+          const latencyMs = Date.now() - startTime;
+          const testJson = await testRes.json();
+          const msg = testJson.choices?.[0]?.message;
+          const reply = msg?.content || msg?.reasoning_content || testJson.output?.content || 'OK';
+
+          return {
+            success: true,
+            model: targetModel,
+            message: `Conexión exitosa con LM Studio (${targetModel}). Tiempo de respuesta: ${latencyMs}ms.`,
+            latencyMs,
+            availableModels,
+          };
+        }
+      } catch (err: any) {}
+    }
+
+    clearTimeout(timeoutId);
+    const latencyMs = Date.now() - startTime;
+    return {
+      success: false,
+      model: targetModel,
+      message: `Servidor LM Studio no respondió en ${endpoint}. Verifica la URL y puerto (ej. http://192.168.0.24:1234 o http://localhost:1234).`,
+      latencyMs,
+      availableModels,
+    };
+  } catch (err: any) {
+    const latencyMs = Date.now() - startTime;
+    return {
+      success: false,
+      model: modelName || 'local-model',
+      message: `No se pudo conectar con LM Studio en ${endpoint}. Inicia el servidor local en LM Studio.`,
+      latencyMs,
+    };
+  }
 }
 
 export interface CostOption {
@@ -590,13 +846,14 @@ export async function parseSupplierTelegramMessage(
   useAi: boolean = true,
   customApiKey?: string
 ): Promise<ParsedProductResult> {
-  if (!useAi || !hasValidAiApiKey(customApiKey)) {
+  const aiConfig = await getAiConfig(1).catch(() => null);
+  const isLmStudio = aiConfig?.provider === 'lmstudio';
+
+  if (!useAi || (!isLmStudio && !hasValidAiApiKey(customApiKey))) {
     return extractFallbackFromText(caption, defaultMarginPercent, currency, taxPercent);
   }
 
   try {
-    const ai = getAiClient(customApiKey);
-
     const photoList = Array.isArray(photoInput)
       ? photoInput.filter(Boolean)
       : photoInput
@@ -660,13 +917,75 @@ Texto del mensaje recibido del proveedor:
 ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto)'}
 """`;
 
-    const contents: any[] = [];
-
-    // Safely resolve primary images in parallel (up to 2 primary images for ultra-low token payload)
+    // Safely resolve primary images in parallel (up to 2 primary images)
     const imagesToResolve = photoList.slice(0, 2);
     const resolvedImages = await Promise.all(
       imagesToResolve.map((photo) => resolveImageToPart(photo, photoMimeType || 'image/jpeg', 3000))
     );
+
+    // 1. If provider is LM Studio Local, try local completion first
+    if (isLmStudio && aiConfig) {
+      try {
+        const localBase64s = resolvedImages.map((r) => r?.data).filter(Boolean) as string[];
+        const localText = await callLocalLmStudioAi(
+          prompt,
+          localBase64s,
+          aiConfig.localEndpoint || 'http://localhost:1234/v1',
+          aiConfig.localModelName || 'qwen2.5-coder-7b-instruct'
+        );
+        if (localText && localText.trim().length > 10) {
+          const parsed = parseJsonFromModelResponse(localText);
+          if (parsed && typeof parsed === 'object' && (parsed.name || parsed.costPrice || parsed.category)) {
+            // Process cost and tax math for local AI response
+            let finalTaxStatus: 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED' = 'NOT_SPECIFIED';
+            if (parsed.taxStatus === 'PLUS_TAX' || parsed.taxStatus === 'INCLUDED' || parsed.taxStatus === 'NOT_SPECIFIED') {
+              finalTaxStatus = parsed.taxStatus;
+            } else {
+              finalTaxStatus = detectTaxStatus(caption);
+            }
+
+            const taxRate = finalTaxStatus === 'NOT_SPECIFIED' ? 0 : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
+            const margin = Math.max(1, Number(parsed.profitMarginPercent) || defaultMarginPercent || 30);
+            const rawCostVal = Math.max(0.01, Number(parsed.costPrice || parsed.costWithTax || parsed.costWithoutTax) || 15.0);
+
+            const costAdj = calculateTaxAdjustment({
+              costPrice: rawCostVal,
+              taxStatus: finalTaxStatus,
+              taxPercent: taxRate,
+              profitMarginPercent: margin,
+            });
+
+            return {
+              name: parsed.name || 'Producto Nuevo (LM Studio Local)',
+              sku: parsed.sku || `PROD-${Date.now().toString().slice(-6)}`,
+              barcode: typeof parsed.barcode === 'string' && parsed.barcode.trim() ? parsed.barcode.trim() : undefined,
+              category: parsed.category || 'General',
+              costPrice: costAdj.costPrice,
+              costWithoutTax: costAdj.baseCostPrice,
+              costWithTax: costAdj.costPrice,
+              baseCostPrice: costAdj.baseCostPrice,
+              taxStatus: finalTaxStatus,
+              taxPercent: taxRate,
+              costOptions: Array.isArray(parsed.costOptions) && parsed.costOptions.length > 0 ? parsed.costOptions : [{ label: `Costo Principal ($${costAdj.costPrice.toFixed(2)})`, price: costAdj.costPrice }],
+              profitMarginPercent: margin,
+              salePrice: Number(parsed.salePrice) || costAdj.salePrice,
+              stock: Math.max(1, Number(parsed.stock) || 1),
+              description: parsed.description || caption || 'Sin descripción',
+              tags: Array.isArray(parsed.tags) ? parsed.tags : ['local-ia'],
+              attributes: { ...(parsed.attributes || {}), proveedorIA: 'LM Studio Local' },
+              supplierNotes: parsed.supplierNotes || 'Procesado con IA Local (LM Studio)',
+              confidenceScore: Number(parsed.confidenceScore) || 95,
+            };
+          }
+        }
+      } catch (localErr) {
+        console.warn('[LMStudio] Servidor local no respondió, intentando fallback de Google Gemini / Heurístico:', localErr);
+      }
+    }
+
+    // 2. Google Gemini Cloud execution
+    const ai = getAiClient(customApiKey);
+    const contents: any[] = [];
 
     for (const resolved of resolvedImages) {
       if (resolved && resolved.data) {
@@ -681,12 +1000,11 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
 
     contents.push(prompt);
 
-  // Prioritize high-performance, low-cost flash-lite model for structured output
-  const candidateModels = [
-    'gemini-3.5-flash-lite',
-    'gemini-3.6-flash',
-    'gemini-flash-latest',
-  ];
+    const candidateModels = [
+      'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
+      'gemini-flash-latest',
+    ];
 
   for (const modelName of candidateModels) {
     try {
@@ -1177,13 +1495,14 @@ ${shippingBulletPoints}${addressSectionFallback}${websiteSectionFallback}`.trim(
     };
   };
 
-  if (!hasValidAiApiKey()) {
+  const aiConfig = await getAiConfig(1).catch(() => null);
+  const isLmStudio = aiConfig?.provider === 'lmstudio';
+
+  if (!isLmStudio && !hasValidAiApiKey()) {
     return buildFallbackCopies();
   }
 
   try {
-    const ai = getAiClient();
-
     const toneInstructions = {
       persuasive: 'Tono persuasivo, vendedor, enfocado en beneficios, valor y solución al cliente.',
       direct: 'Tono directo, claro, conciso, enfocado en especificaciones, precio y llamada a la acción sin rodeos.',
@@ -1226,7 +1545,7 @@ ${shippingBulletPoints}
 
 REGLAS ESTRICTAS DE FORMATO Y ESTRUCTURA:
 1. ORDEN Y SALTOS DE LÍNEA:
-   - Debe usar saltos de línea claros (doble salto de línea entre secciones) para que sea súper legible, visual y organizado.
+   - Debe usar saltos de línea claros (doble salto de línea entre secciones) para que sea súper legible, visual y organized.
    - Debe incluir iconos/emojis llamativos y adecuados al inicio de cada sección y viñeta.
 2. ESTRUCTURA EXACTA DE LA PUBLICACIÓN UNIVERSAL:
    - Encabezado con el nombre en mayúsculas y emojis (ej: 🔥 NOMBRE 🔥)
@@ -1246,18 +1565,59 @@ ${!showSku ? '⚠️ REGLA CRÍTICA: NO incluyas ninguna mención de SKU ni cód
 
 Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
 
-    const candidateModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-3.6-flash',
-      'gemini-flash-latest',
-    ];
-
-    // Check fast memory cache first
     const cacheKey = `${product.name}_${product.sku || ''}_${priceVal}_${tone}_${showStock}_${showPhone}_${showSku}_${showWebsite}`;
     const cachedEntry = copyCache.get(cacheKey);
     if (cachedEntry && Date.now() - cachedEntry.timestamp < CACHE_TTL_MS) {
       return cachedEntry.data;
     }
+
+    if (isLmStudio && aiConfig) {
+      try {
+        const localText = await callLocalLmStudioAi(
+          prompt,
+          undefined,
+          aiConfig.localEndpoint || 'http://localhost:1234/v1',
+          aiConfig.localModelName || 'qwen2.5-coder-7b-instruct'
+        );
+        if (localText && localText.trim().length > 10) {
+          const cleanLocal = localText.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '').trim();
+          const parsed = JSON.parse(cleanLocal) as MarketingCopyOutput;
+          if (parsed && (parsed.universalDescription || parsed.title)) {
+            let cleanedUniversal = stripTrailingTags(parsed.universalDescription || '');
+            if (showWebsite && websiteUrl && !cleanedUniversal.toLowerCase().includes(websiteUrl.toLowerCase())) {
+              cleanedUniversal = `${cleanedUniversal}\n\n🌐 TIENDA ONLINE / CATÁLOGO:\n• ${websiteUrl}`.trim();
+            }
+            parsed.title = parsed.title?.trim() || product.name.trim();
+            parsed.price = parsed.price?.trim() || `$${priceVal.toFixed(2)}`;
+            parsed.sku = parsed.sku?.trim() || product.sku || '';
+            parsed.tags = Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : [product.category || 'tienda', 'oferta'];
+            parsed.universalDescription = cleanedUniversal;
+            parsed.allInOne = cleanedUniversal;
+            parsed.paymentTitles = paymentTitles;
+            parsed.shippingCompanies = shippingCompanies;
+            parsed.showStock = showStock;
+            parsed.showPhone = showPhone;
+            parsed.showSku = showSku;
+            parsed.showWebsite = showWebsite;
+            parsed.websiteUrl = websiteUrl || undefined;
+            parsed.savedAt = new Date().toISOString();
+
+            copyCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
+            return parsed;
+          }
+        }
+      } catch (localErr) {
+        console.warn('[LMStudio] Fallo al generar marketing copy local, fallback:', localErr);
+      }
+    }
+
+    const ai = getAiClient();
+
+    const candidateModels = [
+      'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
+      'gemini-flash-latest',
+    ];
 
     for (const modelName of candidateModels) {
       try {
@@ -1437,19 +1797,45 @@ REGLAS OBLIGATORIAS DE FORMATO Y EXTENSIÓN:
    - NO uses encabezados markdown llamativos tipo "### Descripción" ni "¡Descubre...!".
 4. Devuelve ÚNICAMENTE el texto final redactado en español listo para colocarse en la ficha del producto.`;
 
-  if (!hasValidAiApiKey()) {
+  const aiConfig = await getAiConfig(1).catch(() => null);
+  const isLmStudio = aiConfig?.provider === 'lmstudio';
+
+  if (!isLmStudio && !hasValidAiApiKey()) {
     return buildFallbackCommercialDescription(name, category, cleanTags, rawTelegramMessage || description);
   }
 
   try {
-    const ai = getAiClient();
-    const contents: any[] = [];
-
-    // Safely attach top 2 images in parallel with strict timeout for ultra-fast response
     const imagesToResolve = photoList.slice(0, 2);
     const resolvedImages = await Promise.all(
       imagesToResolve.map((photo) => resolveImageToPart(photo, 'image/jpeg', 2500))
     );
+
+    if (isLmStudio && aiConfig) {
+      try {
+        const localBase64s = resolvedImages.map((r) => r?.data).filter(Boolean) as string[];
+        const localText = await callLocalLmStudioAi(
+          prompt,
+          localBase64s,
+          aiConfig.localEndpoint || 'http://localhost:1234/v1',
+          aiConfig.localModelName || 'qwen2.5-coder-7b-instruct'
+        );
+        if (localText && localText.trim().length > 20) {
+          const cleanText = localText
+            .replace(/^```[a-z]*\s*/i, '')
+            .replace(/\s*```$/, '')
+            .replace(/^#+\s+/gm, '')
+            .replace(/#\w+/g, '')
+            .trim();
+          descCache.set(descCacheKey, { text: cleanText, timestamp: Date.now() });
+          return cleanText;
+        }
+      } catch (localErr) {
+        console.warn('[LMStudio] Fallo al generar descripción comercial local, fallback:', localErr);
+      }
+    }
+
+    const ai = getAiClient();
+    const contents: any[] = [];
 
     for (const resolved of resolvedImages) {
       if (resolved && resolved.data) {

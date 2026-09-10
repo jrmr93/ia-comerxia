@@ -2469,19 +2469,21 @@ export async function updateTelegramConfig(
 // -------------------------------------------------------------
 
 export async function getAiConfig(userId: number = 1) {
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    if (!state.aiConfigs) {
-      state.aiConfigs = [];
-    }
-    let config = state.aiConfigs.find((c) => c.apiKey && c.apiKey.trim().length > 0);
-    if (config) {
-      return config;
-    }
+  const state = storage.getState();
+  if (!state.aiConfigs) {
+    state.aiConfigs = [];
+  }
 
-    config = state.aiConfigs.find((c) => c.userId === userId);
-    if (config) {
-      return config;
+  let localConfig = state.aiConfigs.find((c) => c.userId === userId) || state.aiConfigs[0];
+
+  if (!isPostgresConfigured()) {
+    if (localConfig) {
+      return {
+        ...localConfig,
+        provider: (localConfig.provider || 'google') as ('google' | 'lmstudio'),
+        localEndpoint: localConfig.localEndpoint || 'http://localhost:1234/v1',
+        localModelName: localConfig.localModelName || 'qwen2.5-coder-7b-instruct',
+      };
     }
 
     const newConfig = {
@@ -2492,6 +2494,9 @@ export async function getAiConfig(userId: number = 1) {
       modelName: 'gemini-3.6-flash',
       temperature: 0.2,
       isActive: true,
+      provider: 'google' as ('google' | 'lmstudio'),
+      localEndpoint: 'http://localhost:1234/v1',
+      localModelName: 'qwen2.5-coder-7b-instruct',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -2501,58 +2506,53 @@ export async function getAiConfig(userId: number = 1) {
   }
 
   try {
-    const configsWithKey = await db
-      .select()
-      .from(aiConfigs)
-      .where(sql`${aiConfigs.apiKey} IS NOT NULL AND ${aiConfigs.apiKey} != ''`)
-      .limit(1);
-
-    if (configsWithKey.length > 0) {
-      return configsWithKey[0];
-    }
-
     const configs = await db
       .select()
       .from(aiConfigs)
       .where(eq(aiConfigs.userId, userId))
       .limit(1);
 
-    if (configs.length > 0) {
-      return configs[0];
-    }
-
-    // Check if any ai_configs row exists
-    const anyConfig = await db.select().from(aiConfigs).limit(1);
-    if (anyConfig.length > 0) {
-      return anyConfig[0];
-    }
-
-    // Resolve a valid user ID
-    let targetUserId = userId || 1;
-    const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-    if (userCheck.length === 0) {
-      const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-      if (anyUser.length > 0) {
-        targetUserId = anyUser[0].id;
+    let sqlRow = configs.length > 0 ? configs[0] : null;
+    if (!sqlRow) {
+      const anyConfig = await db.select().from(aiConfigs).limit(1);
+      if (anyConfig.length > 0) {
+        sqlRow = anyConfig[0];
       }
     }
 
-    const created = await db
-      .insert(aiConfigs)
-      .values({
-        userId: targetUserId,
-        apiKey: null,
-        modelName: 'gemini-3.6-flash',
-        temperature: '0.20',
-        isActive: true,
-      })
-      .returning();
+    if (!sqlRow) {
+      let targetUserId = userId || 1;
+      const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
+      if (userCheck.length === 0) {
+        const anyUser = await db.select({ id: users.id }).from(users).limit(1);
+        if (anyUser.length > 0) {
+          targetUserId = anyUser[0].id;
+        }
+      }
 
-    return created[0];
+      const created = await db
+        .insert(aiConfigs)
+        .values({
+          userId: targetUserId,
+          apiKey: null,
+          modelName: 'gemini-3.6-flash',
+          temperature: '0.20',
+          isActive: true,
+        })
+        .returning();
+
+      sqlRow = created[0];
+    }
+
+    return {
+      ...sqlRow,
+      provider: (localConfig?.provider || 'google') as ('google' | 'lmstudio'),
+      localEndpoint: localConfig?.localEndpoint || 'http://localhost:1234/v1',
+      localModelName: localConfig?.localModelName || 'qwen2.5-coder-7b-instruct',
+    };
   } catch (error) {
     console.warn('Error fetching ai config from SQL, fallback to local store:', error);
-    const state = storage.getState();
-    return (state.aiConfigs && state.aiConfigs[0]) || {
+    return localConfig || {
       id: 1,
       userId: 1,
       apiKey: null,
@@ -2560,6 +2560,9 @@ export async function getAiConfig(userId: number = 1) {
       modelName: 'gemini-3.6-flash',
       temperature: 0.2,
       isActive: true,
+      provider: 'google' as ('google' | 'lmstudio'),
+      localEndpoint: 'http://localhost:1234/v1',
+      localModelName: 'qwen2.5-coder-7b-instruct',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -2575,6 +2578,9 @@ export async function updateAiConfig(
     temperature?: number;
     isActive?: boolean;
     is_active?: boolean;
+    provider?: 'google' | 'lmstudio';
+    localEndpoint?: string | null;
+    localModelName?: string | null;
   }
 ) {
   const state = storage.getState();
@@ -2607,6 +2613,9 @@ export async function updateAiConfig(
       modelName: modelToUse,
       temperature: data.temperature ?? 0.2,
       isActive: effectiveIsActive !== undefined ? effectiveIsActive : true,
+      provider: (data.provider || 'google') as ('google' | 'lmstudio'),
+      localEndpoint: data.localEndpoint || 'http://localhost:1234/v1',
+      localModelName: data.localModelName || 'qwen2.5-coder-7b-instruct',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -2650,7 +2659,12 @@ export async function updateAiConfig(
         .returning();
 
       if (updated.length > 0) {
-        return updated[0];
+        return {
+          ...updated[0],
+          provider: (localConfig.provider || 'google') as ('google' | 'lmstudio'),
+          localEndpoint: localConfig.localEndpoint || 'http://localhost:1234/v1',
+          localModelName: localConfig.localModelName || 'qwen2.5-coder-7b-instruct',
+        };
       }
     }
 

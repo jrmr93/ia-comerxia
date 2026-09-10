@@ -88,6 +88,9 @@ export interface LocalAiConfig {
   modelName: string;
   temperature: number;
   isActive?: boolean | null;
+  provider?: 'google' | 'lmstudio';
+  localEndpoint?: string | null;
+  localModelName?: string | null;
   createdAt: string;
   updatedAt: string;
 }

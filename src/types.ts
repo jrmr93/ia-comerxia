@@ -120,6 +120,9 @@ export interface GoogleAiConfig {
   modelName: string;
   temperature: number;
   isActive?: boolean;
+  provider?: 'google' | 'lmstudio';
+  localEndpoint?: string | null;
+  localModelName?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

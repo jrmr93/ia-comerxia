@@ -113,6 +113,7 @@ import {
   generateProductMarketingCopy,
   generateProductCommercialDescription,
   testGeminiApiKey,
+  testLmStudioConnection,
   setCustomAiApiKey,
   resetAiClient,
   isValidGeminiApiKey,
@@ -1107,6 +1108,9 @@ async function startServer() {
         modelName: activeModel,
         temperature: Number(config.temperature) || 0.2,
         isActive: config.isActive !== false,
+        provider: (config as any).provider || 'google',
+        localEndpoint: (config as any).localEndpoint || 'http://localhost:1234/v1',
+        localModelName: (config as any).localModelName || 'qwen2.5-coder-7b-instruct',
       });
     } catch (error: any) {
       console.error('Failed to get AI config:', error);
@@ -1137,7 +1141,7 @@ async function startServer() {
   app.post('/api/ai/config', optionalAuth, async (req: AuthRequest, res: Response) => {
     try {
       const userId = req.dbUserId || 1;
-      const { apiKey, modelName, temperature, isActive, accountEmail } = req.body;
+      const { apiKey, modelName, temperature, isActive, accountEmail, provider, localEndpoint, localModelName } = req.body;
       let targetModel = modelName || 'gemini-3.6-flash';
       if (
         targetModel.includes('gemini-2.5') ||
@@ -1154,6 +1158,9 @@ async function startServer() {
         modelName: targetModel,
         temperature: temperature !== undefined ? Number(temperature) : 0.2,
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
+        provider: provider !== undefined ? provider : undefined,
+        localEndpoint: localEndpoint !== undefined ? localEndpoint : undefined,
+        localModelName: localModelName !== undefined ? localModelName : undefined,
       } as any);
 
       if (apiKey !== undefined) {
@@ -1181,6 +1188,9 @@ async function startServer() {
         modelName: resModel,
         temperature: Number(updated.temperature) || 0.2,
         isActive: updated.isActive !== false,
+        provider: (updated as any).provider || provider || 'google',
+        localEndpoint: (updated as any).localEndpoint || localEndpoint || 'http://localhost:1234/v1',
+        localModelName: (updated as any).localModelName || localModelName || 'qwen2.5-coder-7b-instruct',
       });
     } catch (error: any) {
       console.error('Failed to update AI config:', error);
@@ -1198,6 +1208,24 @@ async function startServer() {
       res.status(500).json({
         success: false,
         message: error.message || 'Error al validar la clave API de Google AI',
+        latencyMs: 0,
+      });
+    }
+  });
+
+  app.post('/api/ai/test-lmstudio', async (req: Request, res: Response) => {
+    try {
+      const { localEndpoint, localModelName } = req.body;
+      const result = await testLmStudioConnection(
+        localEndpoint || 'http://localhost:1234/v1',
+        localModelName || 'qwen2.5-coder-7b-instruct'
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error testing LM Studio connection:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al conectar con LM Studio local',
         latencyMs: 0,
       });
     }
