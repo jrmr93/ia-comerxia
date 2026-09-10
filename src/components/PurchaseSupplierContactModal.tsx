@@ -22,11 +22,13 @@ import {
   generatePurchasePhotosCollage,
   copyBlobToClipboard,
   copySinglePhotoToClipboard,
+  copyMultipleIndividualPhotosToClipboard,
   groupPurchasePhotosBySupplier,
   SupplierPhotoGroup,
   PurchasePhotoItem,
 } from '../utils/purchasePhotosClipboard.ts';
 import { normalizeEcuadorPhone, buildWhatsAppLink } from '../utils/phone.ts';
+import { downloadMultipleImages } from '../utils/image-drag-copy.ts';
 
 interface PurchaseSupplierContactModalProps {
   isOpen: boolean;
@@ -113,24 +115,53 @@ export const PurchaseSupplierContactModal: React.FC<PurchaseSupplierContactModal
   const activeNorm = normalizeEcuadorPhone(activePhone);
   const activeHasPhone = activeNorm.isValid || activeNorm.whatsappDigits.length >= 8;
 
+  const [isDownloadingBatch, setIsDownloadingBatch] = useState(false);
+
+  const handleDownloadAllIndividualPhotos = async () => {
+    if (!allPhotoItems || allPhotoItems.length === 0) return;
+    const validUrls = allPhotoItems.map((it) => it.imageUrl).filter((url): url is string => Boolean(url && url.trim()));
+    if (validUrls.length === 0) {
+      showToast?.('⚠️ No hay fotos de productos disponibles para descargar.');
+      return;
+    }
+
+    setIsDownloadingBatch(true);
+    try {
+      const count = await downloadMultipleImages(
+        validUrls,
+        `Orden_${purchase?.purchaseNumber || purchase?.id || 'pedido'}`
+      );
+      showToast?.(`✓ ¡${count} fotos descargadas! Agrégalas juntas en WhatsApp desde el ícono de adjuntar 📎 (Fotos y videos).`);
+    } catch (err) {
+      console.error('Error descargando paquete de fotos:', err);
+      showToast?.('⚠️ Ocurrió un error al descargar las fotos.');
+    } finally {
+      setIsDownloadingBatch(false);
+    }
+  };
+
   const handleGenerateAndCopyAllProducts = async (autoCopy = false) => {
     if (!purchase || allPhotoItems.length === 0) return;
     setIsGeneratingAll(true);
     try {
+      const validPhotos = allPhotoItems.filter((it) => Boolean(it.imageUrl));
       const { blob, dataUrl } = await generatePurchasePhotosCollage(
         purchase,
-        allPhotoItems,
+        validPhotos.length > 0 ? validPhotos : allPhotoItems,
         purchase.supplierName || 'Todos'
       );
       setAllProductsPreviewUrl(dataUrl);
       setAllProductsBlob(blob);
+
       if (autoCopy) {
-        await copyBlobToClipboard(blob);
+        const result = await copyMultipleIndividualPhotosToClipboard(validPhotos.length > 0 ? validPhotos : allPhotoItems);
         setCopiedAllSuccess(true);
-        setTimeout(() => setCopiedAllSuccess(false), 3000);
+        showToast?.(`✓ ¡${result.count} fotos copiadas individualmente! Presiona Ctrl+V para pegarlas.`);
+        setTimeout(() => setCopiedAllSuccess(false), 3500);
       }
-    } catch (err) {
-      console.error('Error generando vista previa de todos los productos:', err);
+    } catch (err: any) {
+      console.error('Error generando o copiando fotos de productos:', err);
+      showToast?.(err?.message || 'No se pudieron copiar las fotos al portapapeles.');
     } finally {
       setIsGeneratingAll(false);
     }
@@ -195,9 +226,9 @@ export const PurchaseSupplierContactModal: React.FC<PurchaseSupplierContactModal
       );
 
       setCollagePreviewUrls((prev) => ({ ...prev, [group.supplierName]: dataUrl }));
-      await copyBlobToClipboard(blob);
+      const result = await copyMultipleIndividualPhotosToClipboard(group.photoItems);
       setCopiedSupplierSuccess(group.supplierName);
-      showToast?.(`✓ ¡Portadas de ${group.supplierName} copiadas al portapapeles! Ahora presiona Ctrl+V en WhatsApp.`);
+      showToast?.(`✓ ¡${result.count} fotos de ${group.supplierName} copiadas individualmente al portapapeles! Ahora presiona Ctrl+V en WhatsApp.`);
     } catch (err: any) {
       console.error('Error generating or copying collage:', err);
       showToast?.(
@@ -458,59 +489,76 @@ export const PurchaseSupplierContactModal: React.FC<PurchaseSupplierContactModal
                   </button>
                 </div>
 
-                {/* 2. Copy Image of ALL Products Button */}
+                {/* Opción 2: Imagen Mosaico Consolidada de Fotos Originales (Sin texto ni cantidades) */}
                 <div className="p-4 rounded-2xl bg-indigo-50/80 border border-indigo-200 flex flex-col justify-between space-y-3">
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-indigo-600" />
-                        Imagen de Todos los Productos
+                        Opción 2: Mosaico de Fotos Originales (1 Ctrl+V en WhatsApp)
                       </span>
                       <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
                         {allPhotoItems.length} {allPhotoItems.length === 1 ? 'producto' : 'productos'}
                       </span>
                     </div>
                     <p className="text-[11px] text-indigo-700 mt-2 leading-relaxed">
-                      Genera la imagen organizada con la foto, nombre y cantidad de todos los artículos de la orden para copiar y pegar directamente con <strong>Ctrl + V</strong>.
+                      Une las <strong>fotos originales de cada producto</strong> en una sola imagen limpia de alta resolución (sin texto ni cantidades). Con 1 solo <strong>Ctrl + V</strong> se envía completa en WhatsApp Web.
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleGenerateAndCopyAllProducts(true)}
-                    disabled={isGeneratingAll || allPhotoItems.length === 0}
-                    className={`w-full py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition cursor-pointer active:scale-98 ${
-                      copiedAllSuccess
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
-                    }`}
-                  >
-                    {isGeneratingAll ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Generando Imagen...</span>
-                      </>
-                    ) : copiedAllSuccess ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-200" />
-                        <span>¡Imagen Copiada al Portapapeles!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        <span>Copiar Imagen de Todos los Productos</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateAndCopyAllProducts(true)}
+                      disabled={isGeneratingAll || allPhotoItems.length === 0}
+                      className={`w-full py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition cursor-pointer active:scale-98 ${
+                        copiedAllSuccess
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
+                      }`}
+                    >
+                      {isGeneratingAll ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Generando Mosaico...</span>
+                        </>
+                      ) : copiedAllSuccess ? (
+                        <>
+                          <Check className="w-4 h-4 text-emerald-200" />
+                          <span>¡Mosaico Copiado al Portapapeles!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          <span>Copiar Mosaico de Fotos (1 Ctrl+V)</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadAllIndividualPhotos}
+                      disabled={isDownloadingBatch || allPhotoItems.length === 0}
+                      className="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-indigo-900 border border-indigo-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap shadow-2xs"
+                      title="Descarga todas las fotos individuales a tu equipo"
+                    >
+                      {isDownloadingBatch ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5 text-indigo-600" />
+                      )}
+                      <span>Descargar Paquete (.jpg)</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Vista previa de la imagen copiada de todos los productos */}
               <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5 font-bold text-slate-800">
                     <ImageIcon className="w-4 h-4 text-indigo-600" />
-                    Vista previa de la imagen copiada de todos los productos
+                    Vista previa del Mosaico de Fotos Originales
                   </span>
                   {allProductsPreviewUrl && (
                     <button
@@ -519,13 +567,13 @@ export const PurchaseSupplierContactModal: React.FC<PurchaseSupplierContactModal
                         if (!allProductsPreviewUrl) return;
                         const a = document.createElement('a');
                         a.href = allProductsPreviewUrl;
-                        a.download = `Orden_${purchase.purchaseNumber || purchase.id}_Productos.png`;
+                        a.download = `Orden_${purchase.purchaseNumber || purchase.id}_Fotos.png`;
                         a.click();
                       }}
-                      className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer text-[11px]"
+                      className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer text-[11px] font-bold"
                     >
                       <Download className="w-3 h-3" />
-                      Descargar (.png)
+                      Descargar Mosaico (.png)
                     </button>
                   )}
                 </div>
@@ -533,12 +581,12 @@ export const PurchaseSupplierContactModal: React.FC<PurchaseSupplierContactModal
                   {isGeneratingAll ? (
                     <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-2">
                       <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-                      <span className="text-xs">Generando vista previa...</span>
+                      <span className="text-xs font-medium">Generando vista previa del mosaico de fotos...</span>
                     </div>
                   ) : allProductsPreviewUrl ? (
                     <img
                       src={allProductsPreviewUrl}
-                      alt="Vista previa de todos los productos"
+                      alt="Vista previa del mosaico de fotos originales"
                       className="w-full h-auto object-contain rounded-lg shadow-2xs"
                     />
                   ) : (
@@ -549,15 +597,15 @@ export const PurchaseSupplierContactModal: React.FC<PurchaseSupplierContactModal
                 </div>
               </div>
 
-              {/* Products of THIS Supplier */}
+              {/* Opción 3: Fotos Individuales, Arrastrar y Soltar (Drag & Drop) */}
               <div className="space-y-2.5 pt-1">
-                <div className="flex items-center justify-between">
-                  <h5 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h5 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                     <Package className="w-4 h-4 text-indigo-600" />
-                    Artículos de {activeGroup.supplierName} ({activeGroup.allItems.length})
+                    Opción 3: Fotos Individuales & Arrastrar a WhatsApp
                   </h5>
-                  <span className="text-[11px] text-slate-500">
-                    {activeGroup.photoItems.length} con foto • Puedes copiar fotos individuales
+                  <span className="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 font-bold px-2 py-0.5 rounded-lg flex items-center gap-1">
+                    <span>💡 Tip:</span> Arrastra cualquier foto directamente a WhatsApp Web
                   </span>
                 </div>
 
@@ -568,22 +616,32 @@ export const PurchaseSupplierContactModal: React.FC<PurchaseSupplierContactModal
                       Los artículos de este proveedor no tienen fotos de portada cargadas.
                     </p>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      Agrega fotos a los productos en Inventario para incluirlos en el catálogo gráfico.
+                      Agrega fotos a los productos en Inventario para incluirlos en la lista.
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                     {activeGroup.photoItems.map((item, idx) => (
                       <div
                         key={idx}
-                        className="p-2.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between gap-2.5 transition shadow-2xs"
+                        className="p-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2.5 transition shadow-2xs"
                       >
                         <div className="flex items-center space-x-2.5 min-w-0">
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0 bg-slate-50"
-                          />
+                          <div
+                            className="relative group/thumb cursor-grab active:cursor-grabbing shrink-0"
+                            title="Haz clic sostenido y arrastra la foto al chat de WhatsApp Web"
+                          >
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              draggable="true"
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('text/uri-list', item.imageUrl);
+                                e.dataTransfer.setData('text/plain', item.imageUrl);
+                              }}
+                              className="w-11 h-11 object-cover rounded-lg border border-slate-200 bg-slate-50 shadow-2xs group-hover/thumb:scale-105 transition"
+                            />
+                          </div>
                           <div className="min-w-0">
                             <div className="text-xs font-bold text-slate-900 truncate">
                               {item.name}
@@ -591,23 +649,39 @@ export const PurchaseSupplierContactModal: React.FC<PurchaseSupplierContactModal
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                               <span className="font-bold text-emerald-700">Cant: {item.quantity}</span>
                               {item.sku && <span>• SKU: {item.sku}</span>}
-                              {item.costPrice && <span>• ${Number(item.costPrice).toFixed(2)}</span>}
                             </div>
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleCopySingle(item, idx)}
-                          className="p-1.5 rounded-lg bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 transition shrink-0 cursor-pointer"
-                          title="Copiar solo esta foto al portapapeles"
-                        >
-                          {copiedSingleIndex === idx ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleCopySingle(item, idx)}
+                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 transition cursor-pointer"
+                            title="Copiar foto individual (pegar con Ctrl+V en WhatsApp)"
+                          >
+                            {copiedSingleIndex === idx ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!item.imageUrl) return;
+                              const a = document.createElement('a');
+                              a.href = item.imageUrl;
+                              a.download = `${item.name.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+                              a.click();
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 border border-slate-200 transition cursor-pointer"
+                            title="Descargar esta foto individual"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

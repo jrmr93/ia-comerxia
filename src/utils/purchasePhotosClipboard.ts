@@ -363,15 +363,13 @@ export async function generatePurchasePhotosCollage(
   const rows = Math.ceil(count / cols);
 
   const canvasWidth = cols === 1 ? 680 : cols === 2 ? 920 : cols === 3 ? 1100 : 1260;
-  const padding = 24;
-  const gap = 20;
+  const padding = 20;
+  const gap = 16;
 
   const cardWidth = Math.floor((canvasWidth - padding * 2 - gap * (cols - 1)) / cols);
-  const cardImageHeight = cols === 1 ? 380 : cols === 2 ? 280 : cols === 3 ? 230 : 190;
-  const cardMetaHeight = 84;
-  const cardHeight = cardImageHeight + cardMetaHeight;
+  const cardHeight = cols === 1 ? 450 : cols === 2 ? 380 : cols === 3 ? 320 : 280;
 
-  // No header and no footer: only clean product grid
+  // Pure clean product photos grid (no text, no quantities)
   const canvasHeight = padding * 2 + rows * cardHeight + (rows - 1) * gap;
 
   // Render on retina 2x canvas for super crisp rendering in WhatsApp
@@ -385,120 +383,52 @@ export async function generatePurchasePhotosCollage(
 
   ctx.scale(scale, scale);
 
-  // 1. Overall Background
-  ctx.fillStyle = '#f8fafc';
+  // 1. Overall Background: Clean White
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // 2. Render Product Cards Grid (Starts directly at padding)
-  const curY = padding;
-
+  // 2. Render Product Original Photos Grid
   loadedImages.forEach((entry, idx) => {
     const colIdx = idx % cols;
     const rowIdx = Math.floor(idx / cols);
 
     const cardX = padding + colIdx * (cardWidth + gap);
-    const cardY = curY + rowIdx * (cardHeight + gap);
+    const cardY = padding + rowIdx * (cardHeight + gap);
 
-    // Card background & shadow
+    // Card background
     ctx.save();
-    roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 16);
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(15, 23, 42, 0.06)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
+    roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 14);
+    ctx.fillStyle = '#f8fafc';
     ctx.fill();
-    ctx.restore();
-
-    // Card border
-    ctx.save();
-    roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 16);
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
 
-    // Image container clip (rounded top corners)
+    // Image container clip (rounded corners)
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(cardX + 16, cardY);
-    ctx.arcTo(cardX + cardWidth, cardY, cardX + cardWidth, cardY + cardImageHeight, 16);
-    ctx.lineTo(cardX + cardWidth, cardY + cardImageHeight);
-    ctx.lineTo(cardX, cardY + cardImageHeight);
-    ctx.arcTo(cardX, cardY, cardX + 16, cardY, 16);
-    ctx.closePath();
+    roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 14);
     ctx.clip();
 
     if (entry.img) {
-      // Draw image object-fit: contain on subtle grey background
-      ctx.fillStyle = '#f1f5f9';
-      ctx.fillRect(cardX, cardY, cardWidth, cardImageHeight);
-
       const img = entry.img;
       const hRatio = cardWidth / img.width;
-      const vRatio = cardImageHeight / img.height;
+      const vRatio = cardHeight / img.height;
       const ratio = Math.min(hRatio, vRatio);
 
       const centerShiftX = cardX + (cardWidth - img.width * ratio) / 2;
-      const centerShiftY = cardY + (cardImageHeight - img.height * ratio) / 2;
+      const centerShiftY = cardY + (cardHeight - img.height * ratio) / 2;
 
       ctx.drawImage(img, 0, 0, img.width, img.height, centerShiftX, centerShiftY, img.width * ratio, img.height * ratio);
     } else {
-      // Placeholder
       ctx.fillStyle = '#f1f5f9';
-      ctx.fillRect(cardX, cardY, cardWidth, cardImageHeight);
-      ctx.fillStyle = '#64748b';
+      ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+      ctx.fillStyle = '#94a3b8';
       ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('📷 Foto no disponible', cardX + cardWidth / 2, cardY + cardImageHeight / 2);
-      ctx.textAlign = 'left';
+      ctx.fillText('📷 Foto no disponible', cardX + cardWidth / 2, cardY + cardHeight / 2);
     }
     ctx.restore();
-
-    // Quantity Badge (Top Left of image)
-    const pillX = cardX + 12;
-    const pillY = cardY + 12;
-    const pillH = 26;
-    const qtyPillText = `Cant: ${entry.item.quantity} un.`;
-    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-    const textWidth = ctx.measureText(qtyPillText).width;
-    const pillW = textWidth + 18;
-
-    ctx.save();
-    roundRect(ctx, pillX, pillY, pillW, pillH, 8);
-    ctx.fillStyle = '#059669'; // Emerald-600
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 2;
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(qtyPillText, pillX + 9, pillY + 18);
-    ctx.restore();
-
-    // Meta Section (Below Image) - Strictly Product Name and Quantity, organized & aligned
-    const metaX = cardX + 16;
-    const metaY = cardY + cardImageHeight + 26;
-
-    // Product Title (truncate if needed)
-    ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
-
-    const maxTitleW = cardWidth - 32;
-    let title = entry.item.name || 'Producto';
-    if (ctx.measureText(title).width > maxTitleW) {
-      while (title.length > 3 && ctx.measureText(title + '...').width > maxTitleW) {
-        title = title.slice(0, -1);
-      }
-      title += '...';
-    }
-    ctx.fillText(title, metaX, metaY);
-
-    // Product Quantity
-    const subY = metaY + 24;
-    const qtyText = `Cantidad: ${entry.item.quantity} ${entry.item.quantity === 1 ? 'unidad' : 'unidades'}`;
-    ctx.fillStyle = '#059669'; // Emerald-600
-    ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
-    ctx.fillText(qtyText, metaX, subY);
   });
 
   // Export to Blob and DataURL
@@ -518,17 +448,62 @@ export async function generatePurchasePhotosCollage(
   });
 }
 
+function getAbsoluteUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${origin}${path}`;
+}
+
 /**
- * Copies an image Blob directly into the operating system clipboard
+ * Copies an image Blob directly into the operating system clipboard with Chrome & HTTP fallbacks
  */
 export async function copyBlobToClipboard(blob: Blob): Promise<boolean> {
-  if (!navigator.clipboard || !navigator.clipboard.write) {
-    throw new Error('Tu navegador no soporta el copiado directo de imágenes al portapapeles.');
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.write === 'function' && typeof window.ClipboardItem !== 'undefined') {
+    try {
+      const item = new ClipboardItem({ 'image/png': blob });
+      await navigator.clipboard.write([item]);
+      return true;
+    } catch (err) {
+      console.warn('[Clipboard] Native write failed, trying execCommand fallback:', err);
+    }
   }
 
-  const item = new ClipboardItem({ 'image/png': blob });
-  await navigator.clipboard.write([item]);
-  return true;
+  // Fallback for non-secure HTTP (IP address) in Chrome: execCommand HTML rich text copy
+  try {
+    const blobUrl = URL.createObjectURL(blob);
+    const img = document.createElement('img');
+    img.src = blobUrl;
+
+    const container = document.createElement('div');
+    container.contentEditable = 'true';
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '-9999px';
+    container.style.opacity = '0';
+    container.appendChild(img);
+    document.body.appendChild(container);
+
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    const ok = document.execCommand('copy');
+    if (sel) sel.removeAllRanges();
+    document.body.removeChild(container);
+    URL.revokeObjectURL(blobUrl);
+    if (ok) return true;
+  } catch (err) {
+    console.warn('[Clipboard] execCommand fallback failed:', err);
+  }
+
+  throw new Error('Tu navegador o conexión HTTP restringe el copiado directo al portapapeles. Accede por http://localhost o activa HTTPS.');
 }
 
 /**
@@ -564,6 +539,162 @@ export async function copySinglePhotoToClipboard(
       }
     }, 'image/png');
   });
+}
+
+/**
+ * Helper to construct a Promise<Blob> for Chrome ClipboardItem
+ */
+function convertItemToPngBlobPromise(item: PurchasePhotoItem): Promise<Blob> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const img = await loadImageSafely(item.imageUrl, item.name);
+      const width = Math.max(img.naturalWidth || img.width || 400, 200);
+      const height = Math.max(img.naturalHeight || img.height || 400, 200);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas context failure'));
+        return;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob((blob) => {
+        if (blob && blob.size > 0) resolve(blob);
+        else reject(new Error('Canvas toBlob null'));
+      }, 'image/png');
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/**
+ * Rich HTML selection copy fallback for non-secure HTTP contexts in Chrome
+ */
+function copyPhotoItemsAsHtml(items: PurchasePhotoItem[]): boolean {
+  if (typeof document === 'undefined') return false;
+  try {
+    const container = document.createElement('div');
+    container.contentEditable = 'true';
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '-9999px';
+    container.style.opacity = '0';
+
+    items.forEach((it) => {
+      const p = document.createElement('p');
+      p.style.margin = '4px 0';
+      p.style.fontSize = '12px';
+      p.style.fontWeight = 'bold';
+      p.innerText = `${it.name} (Cant: ${it.quantity})`;
+
+      const img = document.createElement('img');
+      img.src = getAbsoluteUrl(it.imageUrl);
+      img.alt = it.name;
+      img.style.maxWidth = '400px';
+      img.style.display = 'block';
+
+      container.appendChild(p);
+      container.appendChild(img);
+      container.appendChild(document.createElement('br'));
+    });
+
+    document.body.appendChild(container);
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    const ok = document.execCommand('copy');
+    if (sel) sel.removeAllRanges();
+    document.body.removeChild(container);
+    return ok;
+  } catch (err) {
+    console.warn('[Clipboard] copyPhotoItemsAsHtml error:', err);
+    return false;
+  }
+}
+
+/**
+ * Copies multiple product photo items individually to the clipboard queue,
+ * allowing single Ctrl+V paste of separate images in messaging apps like WhatsApp/Telegram.
+ * Supports Chrome user gesture promise requirements and HTTP execCommand fallbacks.
+ */
+export async function copyMultipleIndividualPhotosToClipboard(
+  photoItems: PurchasePhotoItem[]
+): Promise<{ count: number; success: boolean }> {
+  const validItems = (photoItems || []).filter((it) => Boolean(it.imageUrl && it.imageUrl.trim()));
+
+  if (validItems.length === 0) {
+    throw new Error('No hay productos con fotos disponibles para copiar.');
+  }
+
+  // 1. Prepare PNG Blob promises for each valid photo item
+  const blobPromises = validItems.map((item) =>
+    convertItemToPngBlobPromise(item)
+  );
+
+  // 2. Try modern navigator.clipboard.write with Promises (Chrome / Edge in Secure Context)
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.write === 'function' && typeof window.ClipboardItem !== 'undefined') {
+    try {
+      const clipboardItems = blobPromises.map(
+        (promise) => new ClipboardItem({ 'image/png': promise })
+      );
+      await navigator.clipboard.write(clipboardItems);
+      return { count: validItems.length, success: true };
+    } catch (writeErr: any) {
+      console.warn('[Clipboard] Direct Promise write failed, testing resolved blobs fallback:', writeErr);
+
+      // Secondary attempt: resolve blobs first then write
+      try {
+        const resolvedBlobs: Blob[] = [];
+        for (const p of blobPromises) {
+          try {
+            const b = await p;
+            if (b && b.size > 0) resolvedBlobs.push(b);
+          } catch {}
+        }
+
+        if (resolvedBlobs.length > 0) {
+          const items = resolvedBlobs.map((b) => new ClipboardItem({ 'image/png': b }));
+          await navigator.clipboard.write(items);
+          return { count: resolvedBlobs.length, success: true };
+        }
+      } catch (resolvedErr) {
+        console.warn('[Clipboard] Resolved blobs write failed:', resolvedErr);
+      }
+    }
+  }
+
+  // 3. Fallback for non-secure HTTP contexts (IP addresses or HTTP URLs in Chrome):
+  // Use HTML rich selection execCommand ('copy') which Chrome allows on HTTP
+  try {
+    const htmlSuccess = copyPhotoItemsAsHtml(validItems);
+    if (htmlSuccess) {
+      return { count: validItems.length, success: true };
+    }
+  } catch (htmlErr) {
+    console.warn('[Clipboard] HTML execCommand fallback failed:', htmlErr);
+  }
+
+  // 4. Detailed error depending on environment
+  const isSecureContext = typeof window !== 'undefined' && (window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  if (!isSecureContext) {
+    throw new Error(
+      'Para copiar imágenes directamente en Chrome desde una IP local, accede mediante http://localhost:5173 o configura HTTPS.'
+    );
+  }
+
+  throw new Error('No se pudieron copiar las fotos automáticamente al portapapeles.');
 }
 
 /**
