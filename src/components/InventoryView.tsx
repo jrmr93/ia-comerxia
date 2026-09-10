@@ -1309,18 +1309,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <Sparkles className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleReparseWithAi(item)}
-                      disabled={reparsingId === item.id}
-                      title="Re-generar e interpretar datos con Gemini IA (Título, Costos, PVP, Categoría, Atributos)"
-                      className="p-1.5 rounded-lg text-amber-700 hover:text-amber-900 hover:bg-amber-100 transition cursor-pointer disabled:opacity-50"
-                    >
-                      {reparsingId === item.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
-                      ) : (
-                        <BrainCircuit className="w-4 h-4 text-amber-600" />
-                      )}
-                    </button>
-                    <button
                       onClick={() => onSelectItem(item)}
                       title="Ver detalle completo"
                       className="p-1.5 rounded-lg text-slate-600 hover:text-sky-700 hover:bg-sky-100 transition cursor-pointer"
@@ -1590,18 +1578,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             className="p-1.5 rounded-lg text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition cursor-pointer"
                           >
                             <Sparkles className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleReparseWithAi(item)}
-                            disabled={reparsingId === item.id}
-                            title="Re-generar e interpretar datos del producto con Gemini IA"
-                            className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition cursor-pointer disabled:opacity-50"
-                          >
-                            {reparsingId === item.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
-                            ) : (
-                              <BrainCircuit className="w-4 h-4 text-amber-600" />
-                            )}
                           </button>
                           <button
                             onClick={() => onSelectItem(item)}
