@@ -705,7 +705,6 @@ INSTRUCCIONES CRÍTICAS:
               ],
             },
             temperature: 0.1,
-            thinkingConfig: { thinkingBudget: 0 },
           },
         });
 

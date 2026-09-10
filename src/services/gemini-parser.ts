@@ -772,7 +772,6 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
             ],
           },
           temperature: 0.1,
-          thinkingConfig: { thinkingBudget: 0 },
         },
       });
 
@@ -1295,7 +1294,6 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
               required: ['universalDescription', 'title'],
             },
             temperature: 0.2,
-            thinkingConfig: { thinkingBudget: 0 },
           },
         });
 
@@ -1479,7 +1477,6 @@ REGLAS OBLIGATORIAS DE FORMATO Y EXTENSIÓN:
           contents,
           config: {
             temperature: 0.15,
-            thinkingConfig: { thinkingBudget: 0 },
           },
         });
 

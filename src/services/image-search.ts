@@ -168,7 +168,6 @@ Devuelve JSON:
         config: {
           responseMimeType: 'application/json',
           temperature: 0.1,
-          thinkingConfig: { thinkingBudget: 0 },
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -1182,7 +1181,6 @@ Responde SOLO un objeto JSON con este formato exacto:
           config: {
             responseMimeType: 'application/json',
             temperature: 0.4,
-            thinkingConfig: { thinkingBudget: 0 },
           },
         });
 

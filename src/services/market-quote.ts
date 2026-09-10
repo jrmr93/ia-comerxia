@@ -250,7 +250,6 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
         config: {
           tools: [{ googleSearch: {} }],
           temperature: 0.2,
-          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
       6000,
@@ -298,7 +297,6 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
             contents: prompt,
             config: {
               temperature: 0.2,
-              thinkingConfig: { thinkingBudget: 0 },
             },
           }),
           6000,
