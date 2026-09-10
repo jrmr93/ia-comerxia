@@ -224,7 +224,7 @@ export async function searchProductVideos(params: {
   if (hasValidAiApiKey()) {
     try {
       const ai = getAiClient();
-      const candidateModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+      const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
       const prompt = `Analiza este producto y extrae la Marca exacta y el Modelo exacto para búsqueda de videos:
 Producto: ${cleanName}
 Categoría: ${cat}
@@ -244,6 +244,7 @@ Devuelve únicamente JSON:
             contents: prompt,
             config: {
               responseMimeType: 'application/json',
+              thinkingConfig: { thinkingBudget: 0 },
             },
           });
           const text = response.text?.trim();

@@ -648,7 +648,7 @@ INSTRUCCIONES CRÍTICAS:
 
   try {
     const ai = getAiClient();
-    const candidateModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+    const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
 
     for (const modelName of candidateModels) {
       try {
@@ -705,6 +705,7 @@ INSTRUCCIONES CRÍTICAS:
               ],
             },
             temperature: 0.1,
+            thinkingConfig: { thinkingBudget: 0 },
           },
         });
 

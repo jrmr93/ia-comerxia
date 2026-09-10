@@ -662,8 +662,8 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
 
     const contents: any[] = [];
 
-    // Safely resolve primary images in parallel (up to 3 images for ultra-fast intake without bloating payload)
-    const imagesToResolve = photoList.slice(0, 3);
+    // Safely resolve primary images in parallel (up to 2 primary images for ultra-low token payload)
+    const imagesToResolve = photoList.slice(0, 2);
     const resolvedImages = await Promise.all(
       imagesToResolve.map((photo) => resolveImageToPart(photo, photoMimeType || 'image/jpeg', 3000))
     );
@@ -681,10 +681,10 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
 
     contents.push(prompt);
 
-  // Prioritize high-performance, low-latency models with fast structured output
+  // Prioritize high-performance, low-cost flash-lite model for structured output
   const candidateModels = [
-    'gemini-3.6-flash',
     'gemini-3.5-flash-lite',
+    'gemini-3.6-flash',
     'gemini-flash-latest',
   ];
 
@@ -772,6 +772,7 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
             ],
           },
           temperature: 0.1,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       });
 
@@ -1247,8 +1248,8 @@ ${!showSku ? '⚠️ REGLA CRÍTICA: NO incluyas ninguna mención de SKU ni cód
 Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
 
     const candidateModels = [
-      'gemini-3.6-flash',
       'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
       'gemini-flash-latest',
     ];
 
@@ -1294,6 +1295,7 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
               required: ['universalDescription', 'title'],
             },
             temperature: 0.2,
+            thinkingConfig: { thinkingBudget: 0 },
           },
         });
 
@@ -1465,8 +1467,8 @@ REGLAS OBLIGATORIAS DE FORMATO Y EXTENSIÓN:
     contents.push(prompt);
 
     const candidateModels = [
-      'gemini-3.6-flash',
       'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
       'gemini-flash-latest',
     ];
 
@@ -1477,6 +1479,7 @@ REGLAS OBLIGATORIAS DE FORMATO Y EXTENSIÓN:
           contents,
           config: {
             temperature: 0.15,
+            thinkingConfig: { thinkingBudget: 0 },
           },
         });
 

@@ -152,10 +152,10 @@ Devuelve JSON:
     return fallbackProfile;
   }
 
-  // Candidate models (prefer modern Gemini 3.6 Flash model with high availability)
+  // Candidate models (prefer modern Gemini 3.5 Flash Lite for fast low-cost JSON refinement)
   const candidateModels = [
-    'gemini-3.6-flash',
     'gemini-3.5-flash-lite',
+    'gemini-3.6-flash',
     'gemini-flash-latest',
   ];
 
@@ -168,6 +168,7 @@ Devuelve JSON:
         config: {
           responseMimeType: 'application/json',
           temperature: 0.1,
+          thinkingConfig: { thinkingBudget: 0 },
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -741,7 +742,7 @@ export async function generateProductStudioPhotoWithAI(product: {
   if (hasValidAiApiKey()) {
     try {
       const ai = getAiClient();
-      const candidateImageModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+      const candidateImageModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
 
       for (const model of candidateImageModels) {
         try {
@@ -1167,8 +1168,8 @@ Responde SOLO un objeto JSON con este formato exacto:
 }`;
 
     const candidateCopyModels = [
-      'gemini-3.6-flash',
       'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
       'gemini-flash-latest',
     ];
 
@@ -1181,6 +1182,7 @@ Responde SOLO un objeto JSON con este formato exacto:
           config: {
             responseMimeType: 'application/json',
             temperature: 0.4,
+            thinkingConfig: { thinkingBudget: 0 },
           },
         });
 

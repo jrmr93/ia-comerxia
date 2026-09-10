@@ -250,6 +250,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
         config: {
           tools: [{ googleSearch: {} }],
           temperature: 0.2,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
       6000,
@@ -288,7 +289,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
   // 2. Second attempt: If search grounding did not produce a parsed quote (e.g. 429 search quota),
   // consult Gemini without search grounding using models with high rate availability
   if (!parsedQuote) {
-    const directModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+    const directModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
     for (const model of directModels) {
       try {
         const directResponse = await withTimeout(
@@ -297,6 +298,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
             contents: prompt,
             config: {
               temperature: 0.2,
+              thinkingConfig: { thinkingBudget: 0 },
             },
           }),
           6000,
