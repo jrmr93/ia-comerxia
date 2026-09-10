@@ -716,64 +716,68 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
           )}
 
           {/* Account Association */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-xs">
-            <label className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Mail className="w-4 h-4 text-purple-600" />
-              Cuenta de Google asociada
-            </label>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Indica la cuenta de Google / correo electrónico a la que pertenece esta clave API de Gemini. Se mostrará en el encabezado superior para identificar fácilmente la cuenta en uso.
-            </p>
-            <input
-              type="email"
-              value={accountEmail}
-              onChange={(e) => setAccountEmail(e.target.value)}
-              placeholder={user?.email || 'jrmr93@gmail.com'}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-medium focus:outline-none focus:border-purple-500 focus:bg-white transition"
-            />
-          </div>
+          {provider === 'google' && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-xs">
+              <label className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Mail className="w-4 h-4 text-purple-600" />
+                Cuenta de Google asociada
+              </label>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Indica la cuenta de Google / correo electrónico a la que pertenece esta clave API de Gemini. Se mostrará en el encabezado superior para identificar fácilmente la cuenta en uso.
+              </p>
+              <input
+                type="email"
+                value={accountEmail}
+                onChange={(e) => setAccountEmail(e.target.value)}
+                placeholder={user?.email || 'jrmr93@gmail.com'}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-medium focus:outline-none focus:border-purple-500 focus:bg-white transition"
+              />
+            </div>
+          )}
 
           {/* Model & Parameters */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
-              Modelo y Parámetros
-            </h4>
+          {provider === 'google' && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
+                Modelo y Parámetros
+              </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Modelo de Gemini
-                </label>
-                <select
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="gemini-3.6-flash">gemini-3.6-flash (Recomendado - Ultra Rápido & Alta Inteligencia)</option>
-                  <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Ligero & Eficiente)</option>
-                  <option value="gemini-flash-latest">gemini-flash-latest (Última versión Flash)</option>
-                </select>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    Temperatura ({temperature})
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Modelo de Gemini
                   </label>
-                  <span className="text-[10px] text-slate-500">Baja = Mayor precisión</span>
+                  <select
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="gemini-3.6-flash">gemini-3.6-flash (Recomendado - Ultra Rápido & Alta Inteligencia)</option>
+                    <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Ligero & Eficiente)</option>
+                    <option value="gemini-flash-latest">gemini-flash-latest (Última versión Flash)</option>
+                  </select>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={temperature}
-                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                  className="w-full accent-amber-500"
-                />
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-700">
+                      Temperatura ({temperature})
+                    </label>
+                    <span className="text-[10px] text-slate-500">Baja = Mayor precisión</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                    className="w-full accent-amber-500"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Interactive Playground for Testing */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-xs">
@@ -1077,101 +1081,105 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
             </div>
 
             {/* Account Association */}
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-purple-600" />
-                Cuenta de Google asociada a la clave
-              </label>
-              <input
-                type="email"
-                value={accountEmail}
-                onChange={(e) => setAccountEmail(e.target.value)}
-                placeholder={user?.email || 'jrmr93@gmail.com'}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-purple-500 transition"
-              />
-              <p className="text-[11px] text-slate-500">
-                Se muestra en el panel superior para saber qué cuenta de Google es dueña de la API Key.
-              </p>
-            </div>
+            {provider === 'google' && (
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-purple-600" />
+                  Cuenta de Google asociada a la clave
+                </label>
+                <input
+                  type="email"
+                  value={accountEmail}
+                  onChange={(e) => setAccountEmail(e.target.value)}
+                  placeholder={user?.email || 'jrmr93@gmail.com'}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-purple-500 transition"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Se muestra en el panel superior para saber qué cuenta de Google es dueña de la API Key.
+                </p>
+              </div>
+            )}
 
             {/* Model & Parameters Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-              {/* Model selection */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Cpu className="w-3.5 h-3.5 text-sky-600" />
-                  Modelo de Gemini
-                </label>
-                <div className="space-y-1.5">
-                  {[
-                    { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Recomendado)', tag: 'Oficial Google, rápido y de alta precisión' },
-                    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite (Ultra Rápido)', tag: 'Mínima latencia (<1s), ideal para alto volumen' },
-                    { id: 'gemini-flash-latest', name: 'Gemini Flash Latest', tag: 'Última versión estable general de Flash' },
-                  ].map((m) => (
-                    <label
-                      key={m.id}
-                      onClick={() => setModelName(m.id)}
-                      className={`flex items-start gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition ${
-                        modelName === m.id
-                          ? 'bg-amber-50 border-amber-300 text-amber-900'
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100/70'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="geminiModel"
-                        checked={modelName === m.id}
-                        onChange={() => setModelName(m.id)}
-                        className="mt-0.5 text-amber-600 focus:ring-0"
-                      />
-                      <div>
-                        <div className="font-semibold text-slate-900">{m.name}</div>
-                        <div className="text-[11px] text-slate-500">{m.tag}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Temperature & Instructions */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                      <Sliders className="w-3.5 h-3.5 text-purple-600" />
-                      Temperatura (Creatividad / Precisión)
-                    </label>
-                    <span className="text-xs font-mono font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
-                      {temperature}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={temperature}
-                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                    className="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                    <span>0.0 (Estricto / Preciso)</span>
-                    <span className="text-amber-800 font-medium">0.2 (Óptimo)</span>
-                    <span>1.0 (Creativo)</span>
+            {provider === 'google' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                {/* Model selection */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Cpu className="w-3.5 h-3.5 text-sky-600" />
+                    Modelo de Gemini
+                  </label>
+                  <div className="space-y-1.5">
+                    {[
+                      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Recomendado)', tag: 'Oficial Google, rápido y de alta precisión' },
+                      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite (Ultra Rápido)', tag: 'Mínima latencia (<1s), ideal para alto volumen' },
+                      { id: 'gemini-flash-latest', name: 'Gemini Flash Latest', tag: 'Última versión estable general de Flash' },
+                    ].map((m) => (
+                      <label
+                        key={m.id}
+                        onClick={() => setModelName(m.id)}
+                        className={`flex items-start gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition ${
+                          modelName === m.id
+                            ? 'bg-amber-50 border-amber-300 text-amber-900'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100/70'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="geminiModel"
+                          checked={modelName === m.id}
+                          onChange={() => setModelName(m.id)}
+                          className="mt-0.5 text-amber-600 focus:ring-0"
+                        />
+                        <div>
+                          <div className="font-semibold text-slate-900">{m.name}</div>
+                          <div className="text-[11px] text-slate-500">{m.tag}</div>
+                        </div>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded-lg bg-white border border-slate-200 text-[11px] text-slate-600 space-y-1">
-                  <div className="font-semibold text-slate-900 flex items-center gap-1">
-                    <BrainCircuit className="w-3 h-3 text-emerald-600" />
-                    Capacidad Multimodal Activa
+                {/* Temperature & Instructions */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-purple-600" />
+                        Temperatura (Creatividad / Precisión)
+                      </label>
+                      <span className="text-xs font-mono font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                        {temperature}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={temperature}
+                      onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                      className="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                      <span>0.0 (Estricto / Preciso)</span>
+                      <span className="text-amber-800 font-medium">0.2 (Óptimo)</span>
+                      <span>1.0 (Creativo)</span>
+                    </div>
                   </div>
-                  <p className="text-slate-500">
-                    Procesa mensajes de texto y hasta 5 fotos en alta resolución simultáneamente para reconocer marcas, tallas y especificaciones.
-                  </p>
+
+                  <div className="p-2.5 rounded-lg bg-white border border-slate-200 text-[11px] text-slate-600 space-y-1">
+                    <div className="font-semibold text-slate-900 flex items-center gap-1">
+                      <BrainCircuit className="w-3 h-3 text-emerald-600" />
+                      Capacidad Multimodal Activa
+                    </div>
+                    <p className="text-slate-500">
+                      Procesa mensajes de texto y hasta 5 fotos en alta resolución simultáneamente para reconocer marcas, tallas y especificaciones.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Live Playground / Tester */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">

@@ -859,7 +859,7 @@ module.exports = {
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-bold truncate">IA Google (Gemini)</div>
+                      <div className="text-xs font-bold truncate">Inteligencia Artificial (IA)</div>
                       <div className={`text-[10px] hidden sm:block truncate ${activeTab === 'ai' ? 'text-purple-100' : 'text-slate-400'}`}>
                         Extracción inteligente
                       </div>
