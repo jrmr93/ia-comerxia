@@ -50,6 +50,8 @@ export interface TopHeaderProps {
   aiActive?: boolean;
   aiHasKey?: boolean;
   aiAccountEmail?: string | null;
+  aiProvider?: 'google' | 'lmstudio';
+  aiLocalEndpoint?: string | null;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -76,6 +78,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   aiActive = false,
   aiHasKey = false,
   aiAccountEmail = null,
+  aiProvider = 'google',
+  aiLocalEndpoint = 'http://localhost:1234/v1',
 }) => {
   const { user, isAdmin, logout } = useAuth();
 
@@ -300,23 +304,22 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               </div>
             </div>
 
-            {/* Telegram Bot Status Indicator (Clickable to open configuration) */}
+            {/* Telegram Bot Status Indicator (Modo Texto - Solo lectura, no clickeable) */}
             <div
               id="top-header-bot-indicator"
-              onClick={onOpenBotConfig}
               title={
                 botHasToken
                   ? botActive
-                    ? `Bot de Telegram: Activo • Nombre: ${botDisplayHandle} (Clic para configurar)`
-                    : `Bot de Telegram: En pausa • Nombre: ${botDisplayHandle} (Clic para configurar)`
-                  : 'Bot de Telegram: Inactivo (Clic para configurar Token)'
+                    ? `Bot de Telegram: Activo • Nombre: ${botDisplayHandle}`
+                    : `Bot de Telegram: En pausa • Nombre: ${botDisplayHandle}`
+                  : 'Bot de Telegram: Inactivo'
               }
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs select-none cursor-pointer hover:scale-[1.02] active:scale-95 shadow-2xs transition shrink-0 whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs select-none cursor-default shadow-2xs transition shrink-0 whitespace-nowrap ${
                 botHasToken
                   ? botActive
-                    ? 'bg-emerald-50/90 hover:bg-emerald-100 border-emerald-200 text-emerald-900'
-                    : 'bg-amber-50/90 hover:bg-amber-100 border-amber-200 text-amber-900'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                    ? 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
+                    : 'bg-amber-50/90 border-amber-200 text-amber-900'
+                  : 'bg-slate-50 border-slate-200 text-slate-600'
               }`}
             >
               <Bot
@@ -358,63 +361,75 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               </div>
             </div>
 
-            {/* Google Gemini AI Status Indicator (Clickable to open configuration) */}
-            <div
-              id="top-header-ai-indicator"
-              onClick={onOpenAiConfig}
-              title={
-                aiHasKey
-                  ? aiActive
-                    ? `Google Gemini IA: Activa • Cuenta: ${aiAccountDisplay} (Clic para configurar)`
-                    : `Google Gemini IA: En pausa • Cuenta: ${aiAccountDisplay} (Clic para configurar)`
-                  : 'Google Gemini IA: Inactiva (Clic para configurar API Key)'
-              }
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs select-none cursor-pointer hover:scale-[1.02] active:scale-95 shadow-2xs transition shrink-0 whitespace-nowrap ${
-                aiHasKey
-                  ? aiActive
-                    ? 'bg-purple-50/90 hover:bg-purple-100 border-purple-200 text-purple-900'
-                    : 'bg-amber-50/90 hover:bg-amber-100 border-amber-200 text-amber-900'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-              }`}
-            >
-              <Sparkles
-                className={`w-3.5 h-3.5 shrink-0 ${
-                  aiHasKey
-                    ? aiActive
-                      ? 'text-purple-600'
-                      : 'text-amber-600'
-                    : 'text-slate-400'
-                }`}
-              />
-              <span
-                className={`w-2 h-2 rounded-full shrink-0 ${
-                  aiHasKey
-                    ? aiActive
-                      ? 'bg-purple-500 animate-pulse'
-                      : 'bg-amber-500'
-                    : 'bg-slate-400'
-                }`}
-              />
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="font-bold text-[11px] uppercase tracking-wide opacity-75 hidden sm:inline">
-                  IA:
-                </span>
-                <span className="font-semibold text-xs whitespace-nowrap">
-                  {aiHasKey ? (aiActive ? 'Activa' : 'Pausada') : 'Inactiva'}
-                </span>
-                {aiHasKey && (
-                  <>
-                    <span className="opacity-40 text-xs hidden sm:inline">•</span>
-                    <span
-                      className="font-bold text-xs max-w-[100px] sm:max-w-[150px] md:max-w-[190px] truncate"
-                      title={aiAccountDisplay}
-                    >
-                      {aiAccountDisplay}
+            {/* AI Status Indicator (Modo Texto - Solo lectura, no clickeable) */}
+            {(() => {
+              const isLmStudio = aiProvider === 'lmstudio';
+              const aiConfigured = isLmStudio ? Boolean(aiLocalEndpoint) : aiHasKey;
+              const lmStudioConnection = aiLocalEndpoint || 'http://localhost:1234/v1';
+              const aiDetailText = isLmStudio ? lmStudioConnection : aiAccountDisplay;
+              const providerLabel = isLmStudio ? 'IA (LM Studio)' : 'IA (Gemini)';
+              const statusText = aiConfigured
+                ? aiActive
+                  ? 'Activa'
+                  : 'Pausada'
+                : 'Inactiva';
+
+              return (
+                <div
+                  id="top-header-ai-indicator"
+                  title={
+                    isLmStudio
+                      ? `LM Studio (IA Local): ${statusText} • Servidor: ${lmStudioConnection}`
+                      : `Google Gemini IA: ${statusText} • Cuenta: ${aiAccountDisplay}`
+                  }
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs select-none cursor-default shadow-2xs transition shrink-0 whitespace-nowrap ${
+                    aiConfigured
+                      ? aiActive
+                        ? 'bg-purple-50/90 border-purple-200 text-purple-900'
+                        : 'bg-amber-50/90 border-amber-200 text-amber-900'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
+                  }`}
+                >
+                  <Sparkles
+                    className={`w-3.5 h-3.5 shrink-0 ${
+                      aiConfigured
+                        ? aiActive
+                          ? 'text-purple-600'
+                          : 'text-amber-600'
+                        : 'text-slate-400'
+                    }`}
+                  />
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      aiConfigured
+                        ? aiActive
+                          ? 'bg-purple-500 animate-pulse'
+                          : 'bg-amber-500'
+                        : 'bg-slate-400'
+                    }`}
+                  />
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-bold text-[11px] uppercase tracking-wide opacity-75 hidden sm:inline">
+                      {providerLabel}:
                     </span>
-                  </>
-                )}
-              </div>
-            </div>
+                    <span className="font-semibold text-xs whitespace-nowrap">
+                      {statusText}
+                    </span>
+                    {aiConfigured && (
+                      <>
+                        <span className="opacity-40 text-xs hidden sm:inline">•</span>
+                        <span
+                          className="font-bold text-xs max-w-[100px] sm:max-w-[160px] md:max-w-[220px] truncate"
+                          title={aiDetailText}
+                        >
+                          {aiDetailText}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

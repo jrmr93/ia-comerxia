@@ -449,7 +449,7 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-slate-900">
-                      Estado de Inteligencia Artificial (Gemini)
+                      Activar/Desactivar IA
                     </span>
                     <span className={`inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
                       isActive 
@@ -973,7 +973,7 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-slate-900">
-                        Estado de Inteligencia Artificial (Gemini)
+                        Activar/Desactivar IA
                       </span>
                       <span className={`inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
                         isActive 

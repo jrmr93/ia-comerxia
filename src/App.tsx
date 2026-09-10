@@ -602,20 +602,24 @@ function InventoryApp() {
           return;
         }
 
-        const [itemsRes, messagesRes, statsRes, ordersRes, purchasesRes] = await Promise.all([
+        const [itemsRes, messagesRes, statsRes, ordersRes, purchasesRes, configRes, aiRes] = await Promise.all([
           authFetch('/api/inventory').catch(() => null),
           authFetch('/api/messages').catch(() => null),
           authFetch('/api/stats').catch(() => null),
           authFetch('/api/orders').catch(() => null),
           authFetch('/api/purchases').catch(() => null),
+          authFetch('/api/telegram/config').catch(() => null),
+          authFetch('/api/ai/config').catch(() => null),
         ]);
 
-        const [itemsData, messagesData, statsData, ordersData, purchasesData] = await Promise.all([
+        const [itemsData, messagesData, statsData, ordersData, purchasesData, configData, aiData] = await Promise.all([
           itemsRes ? safeJson(itemsRes) : null,
           messagesRes ? safeJson(messagesRes) : null,
           statsRes ? safeJson(statsRes) : null,
           ordersRes ? safeJson(ordersRes) : null,
           purchasesRes ? safeJson(purchasesRes) : null,
+          configRes ? safeJson(configRes) : null,
+          aiRes ? safeJson(aiRes) : null,
         ]);
 
         if (itemsData && Array.isArray(itemsData)) setItems(itemsData);
@@ -623,6 +627,13 @@ function InventoryApp() {
         if (statsData) setServerStats(statsData);
         if (ordersData && Array.isArray(ordersData)) setOrders(ordersData);
         if (purchasesData && Array.isArray(purchasesData)) setPurchases(purchasesData);
+        if (configData) {
+          setConfig(configData);
+          if (configData.botToken) {
+            safeLocalStorage.setItem('cached_tg_bot_token', configData.botToken);
+          }
+        }
+        if (aiData) setAiConfig(aiData);
         return;
       }
 
@@ -1484,9 +1495,21 @@ function InventoryApp() {
           botUsername={config?.botUsername || null}
           botFirstName={config?.botFirstName || null}
           botSupplierName={config?.supplierName || null}
-          aiActive={aiConfig ? (aiConfig.isActive !== false && Boolean(aiConfig.hasKey || aiConfig.apiKey)) : false}
-          aiHasKey={Boolean(aiConfig?.hasKey || aiConfig?.apiKey)}
+          aiActive={
+            aiConfig
+              ? aiConfig.provider === 'lmstudio'
+                ? aiConfig.isActive !== false
+                : (aiConfig.isActive !== false && Boolean(aiConfig.hasKey || aiConfig.apiKey))
+              : false
+          }
+          aiHasKey={
+            aiConfig?.provider === 'lmstudio'
+              ? Boolean(aiConfig?.localEndpoint)
+              : Boolean(aiConfig?.hasKey || aiConfig?.apiKey)
+          }
           aiAccountEmail={aiConfig?.accountEmail || user?.email || 'jrmr93@gmail.com'}
+          aiProvider={aiConfig?.provider || 'google'}
+          aiLocalEndpoint={aiConfig?.localEndpoint || 'http://localhost:1234/v1'}
           storeConfig={storeConfig}
           pendingOrdersCount={orders.filter((o) => o.status === 'pending').length}
           pendingPurchasesCount={purchases.filter((p) => p.status !== 'cancelled' && p.paymentStatus !== 'paid').length}
