@@ -219,8 +219,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const activeShowOffersOnly = showOffersOnly !== undefined ? showOffersOnly : localShowOffersOnly;
   const setActiveShowOffersOnly = setShowOffersOnly || setLocalShowOffersOnly;
 
-  // Extract total offers count
+  // Extract total offers count & archived count
   const offersCount = items.filter((it) => (Number(it.discountPercent) || 0) > 0).length;
+  const archivedCount = items.filter((it) => it.status === 'archived').length;
 
   // Extract available categories from current items
   const categoriesCount: Record<string, number> = {};
@@ -263,6 +264,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         ? true
         : statusFilter === 'offers'
         ? disc > 0
+        : statusFilter === 'available'
+        ? it.status !== 'archived'
+        : statusFilter === 'archived'
+        ? it.status === 'archived'
         : it.status === statusFilter;
     const matchesOffer = !activeShowOffersOnly || disc > 0;
     const matchesSearch =
@@ -733,7 +738,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar touch-pan-x py-1 w-full scroll-smooth pt-2 border-t border-slate-200/80 select-none">
               {/* Filtros de Estado */}
               <span className="text-[11px] text-slate-500 font-bold shrink-0 mr-0.5">Estado:</span>
-              {['all', 'available', 'offers', 'low_stock', 'sold_out'].map((st) => (
+              {['all', 'available', 'offers', 'archived'].map((st) => (
                 <button
                   key={st}
                   onClick={() => {
@@ -762,9 +767,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       ? 'Disponibles'
                       : st === 'offers'
                       ? `En Oferta (${offersCount})`
-                      : st === 'low_stock'
-                      ? 'Stock Bajo'
-                      : 'Agotados'}
+                      : `Desactivados (${archivedCount})`}
                   </span>
                 </button>
               ))}
