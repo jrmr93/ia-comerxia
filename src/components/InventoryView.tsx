@@ -20,6 +20,8 @@ import {
   Lock,
   MessageSquare,
   Minus,
+  BrainCircuit,
+  Loader2,
   Package,
   PackageCheck,
   PackagePlus,
@@ -48,6 +50,7 @@ import { ProductMediaDisplay } from './ProductMediaDisplay.tsx';
 import { parseVideoUrl } from '../utils/video-helper.ts';
 import { checkProductTransactionLink } from '../utils/productIntegrity.ts';
 import { DeactivateConfirmationModal } from './DeactivateConfirmationModal.tsx';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface InventoryViewProps {
   items: InventoryItem[];
@@ -138,6 +141,47 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onMarkProductAsSeen,
   onMarkMessageAsSeen,
 }) => {
+  const { authFetch } = useAuth();
+  const [reparsingId, setReparsingId] = useState<number | null>(null);
+  const [reparseToast, setReparseToast] = useState<string | null>(null);
+
+  const handleReparseWithAi = async (item: InventoryItem) => {
+    if (reparsingId) return;
+    if (
+      !confirm(
+        `¿Deseas volver a procesar "${item.name}" con la IA de Google Gemini?\n\nSe volverán a interpretar el título, descripción, fotos, costos, precio PVP y atributos.`
+      )
+    )
+      return;
+
+    setReparsingId(item.id);
+    setReparseToast(null);
+
+    try {
+      const fetchFn = authFetch || fetch;
+      const res = await fetchFn(`/api/inventory/${item.id}/reparse-ai`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Error al re-generar datos con IA');
+      }
+
+      setReparseToast(`¡"${item.name}" fue actualizado exitosamente con Gemini IA!`);
+      setTimeout(() => setReparseToast(null), 4000);
+
+      if (onManualSync) {
+        onManualSync();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error de conexión al procesar con IA');
+    } finally {
+      setReparsingId(null);
+    }
+  };
+
   const [subTab, setSubTab] = useState<'products' | 'messages'>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -1265,6 +1309,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <Sparkles className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => handleReparseWithAi(item)}
+                      disabled={reparsingId === item.id}
+                      title="Re-generar e interpretar datos con Gemini IA (Título, Costos, PVP, Categoría, Atributos)"
+                      className="p-1.5 rounded-lg text-amber-700 hover:text-amber-900 hover:bg-amber-100 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {reparsingId === item.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                      ) : (
+                        <BrainCircuit className="w-4 h-4 text-amber-600" />
+                      )}
+                    </button>
+                    <button
                       onClick={() => onSelectItem(item)}
                       title="Ver detalle completo"
                       className="p-1.5 rounded-lg text-slate-600 hover:text-sky-700 hover:bg-sky-100 transition cursor-pointer"
@@ -1536,6 +1592,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             <Sparkles className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handleReparseWithAi(item)}
+                            disabled={reparsingId === item.id}
+                            title="Re-generar e interpretar datos del producto con Gemini IA"
+                            className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {reparsingId === item.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                            ) : (
+                              <BrainCircuit className="w-4 h-4 text-amber-600" />
+                            )}
+                          </button>
+                          <button
                             onClick={() => onSelectItem(item)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 transition cursor-pointer"
                             title="Ver detalle"
@@ -1632,6 +1700,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         onConfirm={handleConfirmStatusChange}
         isProcessing={isProcessingStatus}
       />
+
+      {reparseToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl border border-amber-500/50 flex items-center gap-2 animate-bounce">
+          <BrainCircuit className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>{reparseToast}</span>
+        </div>
+      )}
     </div>
   );
 };

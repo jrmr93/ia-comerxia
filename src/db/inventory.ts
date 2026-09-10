@@ -27,6 +27,7 @@ import {
   cleanupUnreferencedMediaList,
   deleteMediaFileIfUnreferenced,
 } from '../services/media-storage.ts';
+import { parseSupplierTelegramMessage } from '../services/gemini-parser.ts';
 
 /**
  * Sanitizes numeric strings to guarantee valid SQL NUMERIC/DECIMAL values (e.g., '12.50')
@@ -1530,6 +1531,89 @@ export async function updateInventoryItem(
     }
     throw error;
   }
+}
+
+/**
+ * Re-parses an existing inventory product with Gemini AI using its raw Telegram message / text and photos.
+ */
+export async function reparseInventoryItemWithAi(id: number, userId: number = 1) {
+  const item = await getInventoryItemById(id);
+  if (!item) {
+    throw new Error(`Producto con ID ${id} no encontrado`);
+  }
+
+  const aiConfig = await getAiConfig(userId).catch(() => null);
+  const tgConfig = await getTelegramConfig(userId).catch(() => null);
+
+  const defaultMargin = tgConfig?.defaultMarginPercent || 30;
+  const currency = tgConfig?.currency || 'USD';
+  const taxPercent = tgConfig?.taxPercent ?? 15;
+
+  let textToParse = item.rawTelegramMessage || item.description || item.name;
+  if (!textToParse || textToParse.trim().length === 0) {
+    textToParse = item.name;
+  }
+
+  let photoList: string[] = [];
+  if (Array.isArray((item as any).images) && (item as any).images.length > 0) {
+    photoList = (item as any).images.filter(Boolean);
+  } else if (item.imageUrl) {
+    photoList = [item.imageUrl];
+  }
+
+  const parsed = await parseSupplierTelegramMessage(
+    textToParse,
+    photoList,
+    'image/jpeg',
+    defaultMargin,
+    currency,
+    taxPercent,
+    true,
+    aiConfig?.apiKey || undefined
+  );
+
+  let existingAttributes: Record<string, any> = {};
+  if (typeof item.extractedAttributes === 'string' && item.extractedAttributes.trim()) {
+    try {
+      existingAttributes = JSON.parse(item.extractedAttributes);
+    } catch {}
+  }
+
+  const mergedAttributes = {
+    ...existingAttributes,
+    ...(parsed.attributes || {}),
+    images: photoList,
+    totalPhotos: photoList.length,
+    videoUrl: item.videoUrl || null,
+    costOptions: parsed.costOptions || [],
+    profitMarginPercent: parsed.profitMarginPercent || defaultMargin,
+    selectedCostPrice: parsed.costPrice,
+  };
+
+  const updatePayload: any = {
+    name: parsed.name && parsed.name !== 'Producto Nuevo Telegram' ? parsed.name : item.name,
+    category: parsed.category || item.category,
+    costPrice: parsed.costPrice,
+    costWithoutTax: parsed.costWithoutTax,
+    costWithTax: parsed.costWithTax,
+    taxStatus: parsed.taxStatus,
+    taxPercent: parsed.taxPercent,
+    salePrice: parsed.salePrice,
+    profitMarginPercent: parsed.profitMarginPercent,
+    description: parsed.description || item.description,
+    tags: JSON.stringify(parsed.tags && parsed.tags.length > 0 ? parsed.tags : (item.tags || [])),
+    extractedAttributes: JSON.stringify(mergedAttributes),
+    barcode: parsed.barcode || (item as any).barcode || undefined,
+    supplierNotes: parsed.supplierNotes || (item as any).supplierNotes || '',
+    confidenceScore: parsed.confidenceScore || 95,
+  };
+
+  if (parsed.sku && parsed.sku !== 'AUTO' && (!item.sku || item.sku.startsWith('AUTO'))) {
+    updatePayload.sku = parsed.sku;
+  }
+
+  const updatedItem = await updateInventoryItem(id, updatePayload);
+  return updatedItem;
 }
 
 /**

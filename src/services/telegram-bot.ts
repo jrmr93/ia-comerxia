@@ -574,7 +574,8 @@ async function processCompleteProduct(
     config.defaultMarginPercent || 30,
     config.currency || 'USD',
     config.taxPercent ?? 15,
-    useAiRecognition
+    useAiRecognition,
+    aiConfig?.apiKey || undefined
   );
 
   // Include photos array, video, cost options and profit margin inside extractedAttributes (all using disk /uploads/ URLs)

@@ -589,14 +589,15 @@ export async function parseSupplierTelegramMessage(
   defaultMarginPercent: number = 30,
   currency: string = 'USD',
   taxPercent: number = 15,
-  useAi: boolean = true
+  useAi: boolean = true,
+  customApiKey?: string
 ): Promise<ParsedProductResult> {
-  if (!useAi || !hasValidAiApiKey()) {
+  if (!useAi || !hasValidAiApiKey(customApiKey)) {
     return extractFallbackFromText(caption, defaultMarginPercent, currency, taxPercent);
   }
 
   try {
-    const ai = getAiClient();
+    const ai = getAiClient(customApiKey);
 
     const photoList = Array.isArray(photoInput)
       ? photoInput.filter(Boolean)

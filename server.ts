@@ -106,6 +106,7 @@ import {
   deleteSupplier,
   syncSuppliersFromPurchasesAndInventory,
   seedTestData,
+  reparseInventoryItemWithAi,
 } from './src/db/inventory.ts';
 import {
   parseSupplierTelegramMessage,
@@ -1220,6 +1221,21 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error testing extraction:', error);
       res.status(500).json({ error: error.message || 'Error durante la extracción de prueba' });
+    }
+  });
+
+  app.post('/api/inventory/:id/reparse-ai', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const itemId = Number(req.params.id);
+      if (!itemId || isNaN(itemId)) {
+        return res.status(400).json({ error: 'ID de producto inválido' });
+      }
+      const userId = req.dbUserId || 1;
+      const updatedItem = await reparseInventoryItemWithAi(itemId, userId);
+      res.json({ success: true, item: updatedItem });
+    } catch (error: any) {
+      console.error('Error re-parsing product with AI:', error);
+      res.status(500).json({ error: error.message || 'Error al re-generar datos con IA' });
     }
   });
 
