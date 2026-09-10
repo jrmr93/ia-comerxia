@@ -187,9 +187,8 @@ export async function quoteProductInEcuadorMarket(params: QuoteMarketParams): Pr
   }
 
   const candidateModels = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
     'gemini-flash-latest',
   ];
 
@@ -246,7 +245,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
   try {
     const searchResponse = await withTimeout(
       ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],
@@ -289,7 +288,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
   // 2. Second attempt: If search grounding did not produce a parsed quote (e.g. 429 search quota),
   // consult Gemini without search grounding using models with high rate availability
   if (!parsedQuote) {
-    const directModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+    const directModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
     for (const model of directModels) {
       try {
         const directResponse = await withTimeout(

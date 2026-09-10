@@ -609,7 +609,7 @@ CREATE TABLE IF NOT EXISTS ai_configs (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   api_key TEXT,
-  model_name TEXT DEFAULT 'gemini-3.7-flash',
+  model_name TEXT DEFAULT 'gemini-3.6-flash',
   temperature NUMERIC(3, 2) DEFAULT 0.20,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW(),

@@ -356,7 +356,7 @@ class StorageManager {
           id: 1,
           userId: 1,
           apiKey: null,
-          modelName: 'gemini-2.5-flash',
+          modelName: 'gemini-3.6-flash',
           temperature: 0.2,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

@@ -1087,13 +1087,14 @@ async function startServer() {
     try {
       const config = await getAiConfig(req.dbUserId || 1);
       const activeKey = config.apiKey || process.env.GEMINI_API_KEY || '';
-      let activeModel = config.modelName || 'gemini-3.7-flash';
+      let activeModel = config.modelName || 'gemini-3.6-flash';
       if (
         activeModel.includes('gemini-2.5') ||
         activeModel.includes('gemini-2.0') ||
-        activeModel.includes('gemini-1.5')
+        activeModel.includes('gemini-1.5') ||
+        activeModel.includes('gemini-3.7')
       ) {
-        activeModel = 'gemini-3.7-flash';
+        activeModel = 'gemini-3.6-flash';
       }
 
       const defaultEmail = (config as any).accountEmail || req.user?.email || 'jrmr93@gmail.com';
@@ -1137,13 +1138,14 @@ async function startServer() {
     try {
       const userId = req.dbUserId || 1;
       const { apiKey, modelName, temperature, isActive, accountEmail } = req.body;
-      let targetModel = modelName || 'gemini-3.7-flash';
+      let targetModel = modelName || 'gemini-3.6-flash';
       if (
         targetModel.includes('gemini-2.5') ||
         targetModel.includes('gemini-2.0') ||
-        targetModel.includes('gemini-1.5')
+        targetModel.includes('gemini-1.5') ||
+        targetModel.includes('gemini-3.7')
       ) {
-        targetModel = 'gemini-3.7-flash';
+        targetModel = 'gemini-3.6-flash';
       }
 
       const updated = await updateAiConfig(userId, {
@@ -1161,13 +1163,14 @@ async function startServer() {
         }
       }
 
-      let resModel = updated.modelName || 'gemini-3.7-flash';
+      let resModel = updated.modelName || 'gemini-3.6-flash';
       if (
         resModel.includes('gemini-2.5') ||
         resModel.includes('gemini-2.0') ||
-        resModel.includes('gemini-1.5')
+        resModel.includes('gemini-1.5') ||
+        resModel.includes('gemini-3.7')
       ) {
-        resModel = 'gemini-3.7-flash';
+        resModel = 'gemini-3.6-flash';
       }
 
       res.json({
@@ -1188,7 +1191,7 @@ async function startServer() {
   app.post('/api/ai/test-key', async (req: Request, res: Response) => {
     try {
       const { apiKey, modelName } = req.body;
-      const result = await testGeminiApiKey(apiKey, modelName || 'gemini-2.5-flash');
+      const result = await testGeminiApiKey(apiKey, modelName || 'gemini-3.6-flash');
       res.json(result);
     } catch (error: any) {
       console.error('Error testing Gemini AI key:', error);

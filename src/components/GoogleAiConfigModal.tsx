@@ -71,7 +71,7 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
   const [apiKey, setApiKey] = useState('');
   const [accountEmail, setAccountEmail] = useState('');
   const [showKey, setShowKey] = useState(false);
-  const [modelName, setModelName] = useState('gemini-2.5-flash');
+  const [modelName, setModelName] = useState('gemini-3.6-flash');
   const [temperature, setTemperature] = useState(0.2);
   const [isActive, setIsActive] = useState<boolean>(true);
   const [togglingActive, setTogglingActive] = useState(false);
@@ -546,10 +546,8 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
                   onChange={(e) => setModelName(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
                 >
-                  <option value="gemini-2.5-flash">gemini-2.5-flash (Recomendado - Ultra Rápido & Alta Inteligencia)</option>
-                  <option value="gemini-2.0-flash">gemini-2.0-flash (Multimodal & Estable)</option>
-                  <option value="gemini-1.5-flash">gemini-1.5-flash (Alta Disponibilidad & Eficiencia)</option>
-                  <option value="gemini-2.5-pro">gemini-2.5-pro (Máximo Razonamiento)</option>
+                  <option value="gemini-3.6-flash">gemini-3.6-flash (Recomendado - Ultra Rápido & Alta Inteligencia)</option>
+                  <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Ligero & Eficiente)</option>
                   <option value="gemini-flash-latest">gemini-flash-latest (Última versión Flash)</option>
                 </select>
               </div>
@@ -903,10 +901,9 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
                 </label>
                 <div className="space-y-1.5">
                   {[
-                    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite (Ultra Rápido)', tag: 'Mínima latencia (<1s), ideal para alto volumen' },
-                    { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash (Recomendado)', tag: 'Avanzado, inteligente y de respuesta veloz' },
+                    { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Recomendado)', tag: 'Oficial Google, rápido y de alta precisión' },
+                    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite (Ultra Rápido)', tag: 'Mínima latencia (<1s), ideal para alto volumen' },
                     { id: 'gemini-flash-latest', name: 'Gemini Flash Latest', tag: 'Última versión estable general de Flash' },
-                    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', tag: 'Máxima capacidad de razonamiento complejo' },
                   ].map((m) => (
                     <label
                       key={m.id}

@@ -63,7 +63,7 @@ export function getAiClient(customKey?: string): GoogleGenAI {
  */
 export async function testGeminiApiKey(
   apiKey?: string,
-  modelName: string = 'gemini-2.5-flash'
+  modelName: string = 'gemini-3.6-flash'
 ): Promise<{
   success: boolean;
   model: string;
@@ -77,22 +77,20 @@ export async function testGeminiApiKey(
   if (!keyToTest) {
     return {
       success: false,
-      model: modelName || 'gemini-2.5-flash',
+      model: modelName || 'gemini-3.6-flash',
       message: 'No se ingresó ninguna API Key para validar.',
       latencyMs: 0,
     };
   }
 
-  const activeModel = modelName?.trim() || 'gemini-2.5-flash';
+  const activeModel = modelName?.trim() || 'gemini-3.6-flash';
 
   const modelsToTry = Array.from(
     new Set([
       activeModel,
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
       'gemini-flash-latest',
-      'gemini-2.5-pro',
     ].filter(Boolean))
   );
 
@@ -685,9 +683,8 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
 
   // Prioritize high-performance, low-latency models with fast structured output
   const candidateModels = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
     'gemini-flash-latest',
   ];
 
@@ -1250,9 +1247,8 @@ ${!showSku ? '⚠️ REGLA CRÍTICA: NO incluyas ninguna mención de SKU ni cód
 Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
 
     const candidateModels = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
       'gemini-flash-latest',
     ];
 
@@ -1469,9 +1465,8 @@ REGLAS OBLIGATORIAS DE FORMATO Y EXTENSIÓN:
     contents.push(prompt);
 
     const candidateModels = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
       'gemini-flash-latest',
     ];
 

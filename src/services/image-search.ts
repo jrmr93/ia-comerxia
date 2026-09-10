@@ -152,11 +152,10 @@ Devuelve JSON:
     return fallbackProfile;
   }
 
-  // Candidate models (prefer modern Gemini 3.x Flash models with high availability and low latency)
+  // Candidate models (prefer modern Gemini 3.6 Flash model with high availability)
   const candidateModels = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
     'gemini-flash-latest',
   ];
 
@@ -742,7 +741,7 @@ export async function generateProductStudioPhotoWithAI(product: {
   if (hasValidAiApiKey()) {
     try {
       const ai = getAiClient();
-      const candidateImageModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+      const candidateImageModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
 
       for (const model of candidateImageModels) {
         try {
@@ -1168,9 +1167,8 @@ Responde SOLO un objeto JSON con este formato exacto:
 }`;
 
     const candidateCopyModels = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
       'gemini-flash-latest',
     ];
 

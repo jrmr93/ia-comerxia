@@ -2489,7 +2489,7 @@ export async function getAiConfig(userId: number = 1) {
       userId,
       apiKey: null,
       accountEmail: null,
-      modelName: 'gemini-2.5-flash',
+      modelName: 'gemini-3.6-flash',
       temperature: 0.2,
       isActive: true,
       createdAt: new Date().toISOString(),
@@ -2542,7 +2542,7 @@ export async function getAiConfig(userId: number = 1) {
       .values({
         userId: targetUserId,
         apiKey: null,
-        modelName: 'gemini-3.7-flash',
+        modelName: 'gemini-3.6-flash',
         temperature: '0.20',
         isActive: true,
       })
@@ -2557,7 +2557,7 @@ export async function getAiConfig(userId: number = 1) {
       userId: 1,
       apiKey: null,
       accountEmail: null,
-      modelName: 'gemini-3.7-flash',
+      modelName: 'gemini-3.6-flash',
       temperature: 0.2,
       isActive: true,
       createdAt: new Date().toISOString(),
@@ -2580,13 +2580,14 @@ export async function updateAiConfig(
   const state = storage.getState();
   if (!state.aiConfigs) state.aiConfigs = [];
 
-  let modelToUse = data.modelName || 'gemini-3.7-flash';
+  let modelToUse = data.modelName || 'gemini-3.6-flash';
   if (
     modelToUse.includes('gemini-2.5') ||
     modelToUse.includes('gemini-2.0') ||
-    modelToUse.includes('gemini-1.5')
+    modelToUse.includes('gemini-1.5') ||
+    modelToUse.includes('gemini-3.7')
   ) {
-    modelToUse = 'gemini-3.7-flash';
+    modelToUse = 'gemini-3.6-flash';
   }
 
   const effectiveIsActive =
