@@ -156,6 +156,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         safeLocalStorage.setItem('comerxia_inventory_subtab', subTab);
       } catch {}
     }
+    setSearchQuery('');
+    setSelectedCategory('all');
+    setSelectedSupplier('all');
+    if (setStatusFilter) setStatusFilter('all');
+    if (setShowOffersOnly) setShowOffersOnly(false);
   }, [subTab]);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
     if (typeof window !== 'undefined') {

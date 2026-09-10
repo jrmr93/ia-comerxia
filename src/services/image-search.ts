@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { getAiClient, hasValidAiApiKey } from './gemini-parser.ts';
+import { persistImageLocally } from './media-storage.ts';
 
 export interface WebImageResult {
   url: string;
@@ -721,6 +722,24 @@ export async function generateProductStudioPhotoWithAI(product: {
 
   const promptText = `Commercial product photography of ${cleanName}, category ${cat || 'Product'}, ${stylePrompt}, crisp focus, ultra realistic, no watermark, no text`;
 
+  const finalizeResult = async (rawUrl: string, title: string, tag: string) => {
+    let localUrl = rawUrl;
+    if (rawUrl) {
+      try {
+        const persisted = await persistImageLocally(rawUrl);
+        if (persisted) localUrl = persisted;
+      } catch (err) {
+        console.warn('Could not persist studio photo locally:', err);
+      }
+    }
+    return {
+      success: true,
+      imageUrl: localUrl,
+      title,
+      tag,
+    };
+  };
+
   // 1. Try Gemini Native AI Image Generation
   if (hasValidAiApiKey()) {
     try {
@@ -741,12 +760,11 @@ export async function generateProductStudioPhotoWithAI(product: {
               if (part.inlineData && part.inlineData.data) {
                 const mime = part.inlineData.mimeType || 'image/png';
                 const base64Url = `data:${mime};base64,${part.inlineData.data}`;
-                return {
-                  success: true,
-                  imageUrl: base64Url,
-                  title: `${cleanName} - Foto de Estudio IA (${style})`,
-                  tag: 'Generada con IA (Gemini Studio)',
-                };
+                return await finalizeResult(
+                  base64Url,
+                  `${cleanName} - Foto de Estudio IA (${style})`,
+                  'Generada con IA (Gemini Studio)'
+                );
               }
             }
           }
@@ -764,12 +782,11 @@ export async function generateProductStudioPhotoWithAI(product: {
     const seed = Math.floor(Math.random() * 999999);
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?width=800&height=800&nologo=true&seed=${seed}&model=flux`;
     
-    return {
-      success: true,
-      imageUrl: pollinationsUrl,
-      title: `${cleanName} - Foto de Estudio IA (${style})`,
-      tag: 'Generada con IA (Flux Studio)',
-    };
+    return await finalizeResult(
+      pollinationsUrl,
+      `${cleanName} - Foto de Estudio IA (${style})`,
+      'Generada con IA (Flux Studio)'
+    );
   } catch (pollinationsErr) {
     console.warn('Pollinations generator fallback:', pollinationsErr);
   }
@@ -778,12 +795,11 @@ export async function generateProductStudioPhotoWithAI(product: {
   try {
     const webCandidates = await fetchDuckDuckGoImages(`${cleanName} ${cat} packshot fondo blanco`, 4);
     if (webCandidates.length > 0 && webCandidates[0]?.url) {
-      return {
-        success: true,
-        imageUrl: webCandidates[0].url,
-        title: `${cleanName} - Foto de Estudio Oficial`,
-        tag: 'Estudio Oficial (Web)',
-      };
+      return await finalizeResult(
+        webCandidates[0].url,
+        `${cleanName} - Foto de Estudio Oficial`,
+        'Estudio Oficial (Web)'
+      );
     }
   } catch (searchErr) {
     console.warn('Packshot web search fallback:', searchErr);
@@ -792,12 +808,11 @@ export async function generateProductStudioPhotoWithAI(product: {
   // 4. Dynamic Unsplash search based on exact product name
   const safeQuery = encodeURIComponent(cleanName.slice(0, 30));
   const fallbackUrl = `https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80&sig=${Math.floor(Math.random() * 10000)}&q=${safeQuery}`;
-  return {
-    success: true,
-    imageUrl: fallbackUrl,
-    title: `${cleanName} - Foto de Estudio Profesional`,
-    tag: 'Estudio Profesional',
-  };
+  return await finalizeResult(
+    fallbackUrl,
+    `${cleanName} - Foto de Estudio Profesional`,
+    'Estudio Profesional'
+  );
 }
 
 export interface PromoCandidateImage {

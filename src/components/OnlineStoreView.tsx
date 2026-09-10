@@ -821,12 +821,20 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }
   }, [isCustomerOnly, storeTab]);
 
-  // Sync with currentSubTab prop if provided
+  // Sync with currentSubTab prop if provided and reset filters on tab switch
   useEffect(() => {
     if (currentSubTab && currentSubTab !== storeTab && !isCustomerOnly) {
       setStoreTab(currentSubTab);
     }
-  }, [currentSubTab, isCustomerOnly]);
+    setSearchQuery('');
+    setSelectedCategory('all');
+    setInStockOnly(false);
+    setShowOffersOnly(false);
+    if (!filterOrderNumber) {
+      setOrderSearchQuery('');
+      setOrderStatusFilter('all');
+    }
+  }, [currentSubTab, isCustomerOnly, storeTab]);
 
   // Handler to switch subtab and notify parent
   const handleSwitchTab = (tab: 'catalog' | 'orders' | 'settings') => {
@@ -918,6 +926,47 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
       } catch {}
     }
   }, [orderViewMode]);
+
+  // Scroll direction detection for orders search container
+  const [orderScrollDirection, setOrderScrollDirection] = useState<'top' | 'up' | 'down'>('top');
+  const lastOrderScrollYRef = useRef(0);
+
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      const scrollY =
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const lastY = lastOrderScrollYRef.current;
+          if (scrollY <= 50) {
+            setOrderScrollDirection('top');
+          } else if (scrollY > lastY + 6 && scrollY > 75) {
+            setOrderScrollDirection('down');
+          } else if (scrollY < lastY - 6) {
+            setOrderScrollDirection('up');
+          }
+          lastOrderScrollYRef.current = scrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   // Sincronizar filtro exclusivo cuando se presiona "Ver Venta" desde el módulo de Compras
   React.useEffect(() => {
@@ -2076,13 +2125,29 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
   // Filtered Orders (Period + Status Filter + Search Filter)
   const filteredOrders = useMemo(() => {
-    return periodOrders.filter((ord) => {
+    // Si viene filterOrderNumber, buscamos en la totalidad de pedidos (orders), ignorando el rango de fechas (periodOrders)
+    const sourceOrders = filterOrderNumber && String(filterOrderNumber).trim() !== '' ? orders : periodOrders;
+
+    return sourceOrders.filter((ord) => {
       // Filtrado exclusivo cuando se navega con "Ver Venta" desde Compras
       if (filterOrderNumber && String(filterOrderNumber).trim() !== '') {
-        const target = String(filterOrderNumber).trim().toLowerCase();
+        const rawTarget = String(filterOrderNumber).trim().toLowerCase();
+        const targetClean = rawTarget.replace(/^#/, '').replace(/^ped-/, '').replace(/^0+/, '');
         const ordNumber = (ord.orderNumber || '').trim().toLowerCase();
+        const ordNumberClean = ordNumber.replace(/^#/, '').replace(/^ped-/, '').replace(/^0+/, '');
         const ordId = String(ord.id || '').trim().toLowerCase();
-        return ordNumber === target || ordId === target;
+        const ordIdClean = ordId.replace(/^0+/, '');
+
+        return (
+          ordNumber === rawTarget ||
+          ordId === rawTarget ||
+          (Boolean(targetClean) && (
+            ordNumberClean === targetClean ||
+            ordIdClean === targetClean ||
+            ordNumberClean.includes(targetClean) ||
+            ordIdClean.includes(targetClean)
+          ))
+        );
       }
 
       // Status Filter
@@ -2092,7 +2157,9 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
       // Search Filter
       if (orderSearchQuery.trim()) {
         const q = orderSearchQuery.toLowerCase().trim();
-        const matchNum = (ord.orderNumber || '').toLowerCase().includes(q);
+        const cleanQ = q.replace(/^#/, '').replace(/^ped-/, '');
+        const matchNum = (ord.orderNumber || '').toLowerCase().includes(q) || (Boolean(cleanQ) && (ord.orderNumber || '').toLowerCase().includes(cleanQ));
+        const matchId = String(ord.id || '').toLowerCase() === q || (Boolean(cleanQ) && String(ord.id || '').toLowerCase() === cleanQ);
         const matchName = (ord.customerName || '').toLowerCase().includes(q);
         const matchPhone = (ord.customerPhone || '').toLowerCase().includes(q);
         const matchAddress = (ord.customerAddress || '').toLowerCase().includes(q);
@@ -2105,11 +2172,11 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               (it.sku || it.item?.sku || '').toLowerCase().includes(q)
           );
         }
-        return matchNum || matchName || matchPhone || matchAddress || matchCi || matchItem;
+        return matchNum || matchId || matchName || matchPhone || matchAddress || matchCi || matchItem;
       }
       return true;
     });
-  }, [periodOrders, orderStatusFilter, orderSearchQuery, filterOrderNumber]);
+  }, [orders, periodOrders, orderStatusFilter, orderSearchQuery, filterOrderNumber]);
 
   // Order Counts within selected period
   const orderCounts = useMemo(() => {
@@ -4341,7 +4408,13 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
           {/* Orders Filter, Search Bar & View Mode Switcher (Dos Barras Horizontales Estáticas) */}
           <div
             id="orders-search-container"
-            className="sticky top-16 z-20 bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2.5 sm:p-3 space-y-2 shadow-sm transition-all max-w-full"
+            className={`sticky ${
+              orderScrollDirection === 'down'
+                ? '-translate-y-full opacity-0 pointer-events-none'
+                : orderScrollDirection === 'up'
+                ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
+                : `${isCustomerOnly ? 'top-0' : 'top-16'} z-20 translate-y-0 opacity-100`
+            } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2.5 sm:p-3 space-y-2 shadow-sm transition-all duration-300 transform max-w-full`}
           >
             {/* Barra 1: Búsqueda y Selector de Vista */}
             <div className="flex items-center gap-1.5 sm:gap-2 w-full">

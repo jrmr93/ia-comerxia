@@ -721,30 +721,22 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header bar with Save Button & Status */}
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-        <div className="space-y-1">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
-              <Store className="w-4 h-4" />
+    <div className="flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pr-1 pb-4">
+        {/* Header bar */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                <Store className="w-4 h-4" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Ajustes Generales de la Tienda Online</h3>
             </div>
-            <h3 className="text-base font-bold text-slate-900">Ajustes Generales de la Tienda Online</h3>
+            <p className="text-xs text-slate-500">
+              Personaliza el catálogo, marca, medios de pago de Ecuador, logística de envío y temas visuales.
+            </p>
           </div>
-          <p className="text-xs text-slate-500">
-            Personaliza el catálogo, marca, medios de pago de Ecuador, logística de envío y temas visuales.
-          </p>
         </div>
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-sky-500/20 transition cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50 flex-shrink-0 active:scale-95"
-        >
-          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          <span>{saving ? 'Guardando...' : 'Guardar Ajustes de Tienda'}</span>
-        </button>
-      </div>
 
       {feedback && (
         <div
@@ -2574,6 +2566,42 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           onClose={() => setShowPromoTestModal(false)}
         />
       )}
+      </div>
+
+      {/* Footer Fijo en la parte inferior para Guardar Ajustes */}
+      <div className="shrink-0 pt-3 pb-2 px-3 sm:px-4 bg-white border-t border-slate-200 sticky bottom-0 z-20 flex items-center justify-between gap-3 shadow-md rounded-b-xl">
+        <div className="flex items-center space-x-2 min-w-0">
+          {feedback ? (
+            <div
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center space-x-2 truncate ${
+                feedback.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                  : 'bg-rose-50 text-rose-900 border-rose-300'
+              }`}
+            >
+              {feedback.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <X className="w-4 h-4 text-rose-600 shrink-0" />
+              )}
+              <span className="truncate">{feedback.message}</span>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-500 font-medium truncate hidden sm:inline">
+              Configura tus preferencias de la tienda y haz clic en Guardar.
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-sky-500/20 transition cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0 active:scale-95"
+        >
+          {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <span>{saving ? 'Guardando...' : 'Guardar Ajustes de Tienda'}</span>
+        </button>
+      </div>
     </div>
   );
 };

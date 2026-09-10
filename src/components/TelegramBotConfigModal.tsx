@@ -332,37 +332,28 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
 
   if (embedded) {
     return (
-      <div className="space-y-5">
-        {/* Header banner */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
-              <Bot className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                Configuración del Bot de Telegram
-                <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <Radio className="w-2.5 h-2.5 mr-1 animate-pulse text-emerald-600" />
-                  Tiempo Real
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500">
-                Vincula tu bot de Telegram para recibir fotos, descripciones y precios de proveedores automáticamente.
-              </p>
+      <div className="flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-5 pr-1 pb-4">
+          {/* Header banner */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  Configuración del Bot de Telegram
+                  <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <Radio className="w-2.5 h-2.5 mr-1 animate-pulse text-emerald-600" />
+                    Tiempo Real
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Vincula tu bot de Telegram para recibir fotos, descripciones y precios de proveedores automáticamente.
+                </p>
+              </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleSaveConfig}
-            disabled={saving}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-sky-500/20 transition cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50 flex-shrink-0 active:scale-95"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span>{saving ? 'Guardando...' : 'Guardar y Activar Token'}</span>
-          </button>
-        </div>
 
         {/* Instructions Box */}
         <div className="p-4 rounded-xl bg-sky-50/60 border border-sky-200 text-xs text-slate-700 space-y-2.5">
@@ -638,6 +629,37 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
             </div>
           )}
         </form>
+        </div>
+
+        {/* Footer Fijo en la parte inferior */}
+        <div className="shrink-0 pt-3 pb-2 px-3 sm:px-4 bg-white border-t border-slate-200 sticky bottom-0 z-20 flex items-center justify-between gap-3 shadow-md rounded-b-xl">
+          <div className="flex items-center space-x-2 min-w-0">
+            {savedSuccess ? (
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 truncate">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ¡Token y ajustes guardados!
+              </span>
+            ) : error ? (
+              <span className="text-xs font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 flex items-center gap-1.5 truncate">
+                <X className="w-4 h-4 text-rose-600 shrink-0" />
+                {error}
+              </span>
+            ) : (
+              <span className="text-xs text-slate-500 font-medium truncate hidden sm:inline">
+                Guarda los cambios de token y parámetros del Bot de Telegram.
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveConfig}
+            disabled={saving}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-sky-500/20 transition cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0 active:scale-95"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{saving ? 'Guardando...' : 'Guardar y Activar Token'}</span>
+          </button>
+        </div>
       </div>
     );
   }

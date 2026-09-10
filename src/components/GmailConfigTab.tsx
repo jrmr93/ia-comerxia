@@ -138,7 +138,8 @@ export const GmailConfigTab: React.FC<GmailConfigTabProps> = ({ onSaved }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 pb-4">
       {/* Header Banner */}
       <div className="flex items-center justify-between">
         <div>
@@ -445,6 +446,46 @@ export const GmailConfigTab: React.FC<GmailConfigTabProps> = ({ onSaved }) => {
             )}
           </button>
         </form>
+      </div>
+      </div>
+
+      {/* Footer Fijo en la parte inferior para Guardar */}
+      <div className="shrink-0 pt-3 pb-2 px-3 sm:px-4 bg-white border-t border-slate-200 sticky bottom-0 z-20 flex items-center justify-between gap-3 shadow-md rounded-b-xl">
+        <div className="flex items-center space-x-2 min-w-0">
+          {success ? (
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 truncate">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              {success}
+            </span>
+          ) : error ? (
+            <span className="text-xs font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 flex items-center gap-1.5 truncate">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              {error}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-500 font-medium truncate hidden sm:inline">
+              Guarda tus credenciales de Gmail SMTP y activa el envío de correos.
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition flex items-center space-x-2 shadow-sm disabled:opacity-50 cursor-pointer shrink-0 active:scale-95"
+        >
+          {isSaving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Guardando...</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Guardar Configuración de Correo Gmail</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

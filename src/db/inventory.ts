@@ -785,6 +785,12 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
     const item = await getInventoryItemById(id);
     if (!item) return null;
 
+    let effectiveCoverUrl = coverImageUrl;
+    if (effectiveCoverUrl && typeof effectiveCoverUrl === 'string') {
+      const persisted = await persistImageLocally(effectiveCoverUrl);
+      if (persisted) effectiveCoverUrl = persisted;
+    }
+
     let parsedAttr: Record<string, any> = {};
     if (item.extractedAttributes) {
       try {
@@ -798,10 +804,10 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
       ? [item.imageUrl]
       : [];
 
-    if (!currentImages.includes(coverImageUrl)) {
-      currentImages.unshift(coverImageUrl);
+    if (!currentImages.includes(effectiveCoverUrl)) {
+      currentImages.unshift(effectiveCoverUrl);
     } else {
-      currentImages = [coverImageUrl, ...currentImages.filter((i) => i !== coverImageUrl)];
+      currentImages = [effectiveCoverUrl, ...currentImages.filter((i) => i !== effectiveCoverUrl)];
     }
 
     parsedAttr.images = currentImages;
@@ -814,7 +820,7 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
         const result = await db
           .update(inventoryItems)
           .set({
-            imageUrl: coverImageUrl,
+            imageUrl: effectiveCoverUrl,
             extractedAttributes: JSON.stringify(parsedAttr),
             updatedAt: new Date(),
           })
@@ -832,7 +838,7 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
     const state = storage.getState();
     const idx = state.inventoryItems.findIndex((it) => it.id === id);
     if (idx !== -1) {
-      state.inventoryItems[idx].imageUrl = coverImageUrl;
+      state.inventoryItems[idx].imageUrl = effectiveCoverUrl;
       state.inventoryItems[idx].extractedAttributes = JSON.stringify(parsedAttr);
       state.inventoryItems[idx].updatedAt = new Date().toISOString();
       storage.save();

@@ -155,12 +155,16 @@ function InventoryApp() {
   // Handler to commute to store catalog or orders directly from Navbar or anywhere
   const [filterOrderNumber, setFilterOrderNumber] = useState<string | null>(null);
 
-  const handleSelectStoreSubTab = (subTab: 'catalog' | 'orders' | 'settings') => {
+  const handleSelectStoreSubTab = (subTab: 'catalog' | 'orders' | 'settings', resetFilter: boolean = true) => {
+    setSearchQuery('');
+    if (resetFilter) {
+      setFilterOrderNumber(null);
+    }
     setStoreSubTab(subTab);
     if (subTab === 'orders') {
-      setActiveTab('orders');
+      handleTabChange('orders', resetFilter);
     } else {
-      setActiveTab('store');
+      handleTabChange('store', resetFilter);
     }
     setIsCustomerOnly(false);
     try {
@@ -170,10 +174,11 @@ function InventoryApp() {
   };
 
   const handleGoToStoreOrders = (orderNumberOrId?: string | number) => {
-    if (orderNumberOrId !== undefined && orderNumberOrId !== null && String(orderNumberOrId).trim() !== '') {
+    const isFilterPassed = orderNumberOrId !== undefined && orderNumberOrId !== null && String(orderNumberOrId).trim() !== '';
+    if (isFilterPassed) {
       setFilterOrderNumber(String(orderNumberOrId).trim());
     }
-    handleSelectStoreSubTab('orders');
+    handleSelectStoreSubTab('orders', !isFilterPassed);
   };
 
   // Persist activeTab whenever it changes
@@ -287,7 +292,16 @@ function InventoryApp() {
 
   // Handler for switching tabs: when entering inventory, capture unseen items into highlightedTelegramIds,
   // and mark them in seenProductIds so NEXT time inventory is opened, the badges are cleared.
-  const handleTabChange = (tab: 'customers' | 'suppliers' | 'store' | 'inventory' | 'purchases' | 'orders' | 'analytics' | 'payments') => {
+  const handleTabChange = (
+    tab: 'customers' | 'suppliers' | 'store' | 'inventory' | 'analytics' | 'purchases' | 'orders' | 'payments',
+    resetFilter: boolean = true
+  ) => {
+    setSearchQuery('');
+    if (resetFilter) {
+      setFilterOrderNumber(null);
+      setFilterPurchaseOrderNumber(null);
+    }
+
     if (tab === 'inventory') {
       // Find all Telegram items that haven't been seen in previous sessions
       const newlyArrivedTelegramIds = items
@@ -1308,7 +1322,7 @@ function InventoryApp() {
         setFilterPurchaseOrderNumber(found.purchaseNumber);
       }
     }
-    setActiveTab('purchases');
+    handleTabChange('purchases', false);
   };
 
   // 1. Loading splash screen while verifying SQL authentication session
@@ -1507,6 +1521,7 @@ function InventoryApp() {
         ) : isCustomerOnly || activeTab === 'store' || activeTab === 'orders' ? (
           /* Online Storefront / Sales Orders View */
           <OnlineStoreView
+            key={`store_${activeTab}_${storeSubTab}`}
             products={items}
             orders={orders}
             storeConfig={storeConfig}
@@ -1539,6 +1554,7 @@ function InventoryApp() {
         ) : activeTab === 'purchases' ? (
           /* Purchases & Supplier Orders Module */
           <PurchasesView
+            key={`purchases_${activeTab}`}
             purchases={purchases}
             inventoryItems={items}
             orders={orders}
@@ -1567,6 +1583,7 @@ function InventoryApp() {
         ) : activeTab === 'customers' ? (
           /* Customers CRM View */
           <CustomersView
+            key={`customers_${activeTab}`}
             authFetch={authFetch}
             showToast={(msg) => {
               setSyncFeedback(msg);
@@ -1579,6 +1596,7 @@ function InventoryApp() {
         ) : activeTab === 'suppliers' ? (
           /* Suppliers ERP Directory & Purchasing Terms View */
           <SuppliersView
+            key={`suppliers_${activeTab}`}
             authFetch={authFetch}
             showToast={(msg) => {
               setSyncFeedback(msg);
@@ -1594,6 +1612,7 @@ function InventoryApp() {
         ) : activeTab === 'analytics' ? (
           /* Store & Product Analytics Dashboard */
           <AnalyticsDashboard
+            key={`analytics_${activeTab}`}
             products={items}
             currency={config?.currency || 'USD'}
             authFetch={authFetch}
@@ -1607,6 +1626,7 @@ function InventoryApp() {
         ) : activeTab === 'payments' ? (
           /* ERP Payments & Treasury Management Module */
           <PaymentsView
+            key={`payments_${activeTab}`}
             currency={config?.currency || 'USD'}
             authFetch={authFetch}
             showToast={(msg) => {
@@ -1625,6 +1645,7 @@ function InventoryApp() {
         ) : (
           /* Inventory Items & Telegram Messages View */
           <InventoryView
+            key={`inventory_${activeTab}`}
             items={items}
             messages={messages}
             storeConfig={storeConfig}

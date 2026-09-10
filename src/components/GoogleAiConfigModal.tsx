@@ -328,36 +328,27 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
 
   if (embedded) {
     return (
-      <div className="space-y-5">
-        {/* Header bar with Save Button */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                Configuración de Google Gemini AI
-                <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                  Google AI Studio
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500">
-                Extracción inteligente de productos, fotos, costos múltiples y categorías mediante IA.
-              </p>
+      <div className="flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-5 pr-1 pb-4">
+          {/* Header bar */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  Configuración de Google Gemini AI
+                  <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                    Google AI Studio
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Extracción inteligente de productos, fotos, costos múltiples y categorías mediante IA.
+                </p>
+              </div>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleSaveConfig}
-            disabled={saving}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50 flex-shrink-0 active:scale-95"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin text-slate-950" /> : <Save className="w-4 h-4 text-slate-950" />}
-            <span>{saving ? 'Guardando...' : 'Guardar Configuración IA'}</span>
-          </button>
-        </div>
 
         {/* Info Banner */}
         <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200/80 text-xs text-slate-700 space-y-2.5">
@@ -661,6 +652,37 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
             </div>
           )}
         </form>
+        </div>
+
+        {/* Footer Fijo en la parte inferior */}
+        <div className="shrink-0 pt-3 pb-2 px-3 sm:px-4 bg-white border-t border-slate-200 sticky bottom-0 z-20 flex items-center justify-between gap-3 shadow-md rounded-b-xl">
+          <div className="flex items-center space-x-2 min-w-0">
+            {savedSuccess ? (
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 truncate">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ¡Ajustes de IA guardados con éxito!
+              </span>
+            ) : error ? (
+              <span className="text-xs font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 flex items-center gap-1.5 truncate">
+                <X className="w-4 h-4 text-rose-600 shrink-0" />
+                {error}
+              </span>
+            ) : (
+              <span className="text-xs text-slate-500 font-medium truncate hidden sm:inline">
+                Guarda la API Key de Google Gemini y el modelo deseado.
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSaveConfig()}
+            disabled={saving}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50 shrink-0 active:scale-95"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin text-slate-950" /> : <Save className="w-4 h-4 text-slate-950" />}
+            <span>{saving ? 'Guardando...' : 'Guardar Configuración IA'}</span>
+          </button>
+        </div>
       </div>
     );
   }

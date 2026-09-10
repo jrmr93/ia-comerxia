@@ -1985,6 +1985,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     }
   };
 
+  const [scrollDirection, setScrollDirection] = React.useState<'top' | 'up' | 'down'>('top');
+  const lastScrollYRef = React.useRef(0);
+
   React.useEffect(() => {
     let ticking = false;
 
@@ -1997,11 +2000,20 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
 
       if (!ticking) {
         window.requestAnimationFrame(() => {
+          const lastY = lastScrollYRef.current;
+          if (scrollY <= 50) {
+            setScrollDirection('top');
+            setIsScrolled(false);
+          } else if (scrollY > lastY + 6 && scrollY > 75) {
+            setScrollDirection('down');
+            setIsScrolled(true);
+          } else if (scrollY < lastY - 6) {
+            setScrollDirection('up');
+            setIsScrolled(true);
+          }
+          lastScrollYRef.current = scrollY;
+
           setIsScrolled((prev) => {
-            // Hysteresis deadband:
-            // Scroll down past 90px to transition into compact search bar mode.
-            // Scroll back up near the top (< 25px) to restore the full upper panel.
-            // This 65px buffer completely prevents rapid flickering/oscillation on mobile.
             if (!prev && scrollY > 90) {
               return true;
             } else if (prev && scrollY < 25) {
@@ -2040,9 +2052,15 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       {/* ========================================================================= */}
       <div
         id="marketplace-sticky-header"
-        className={`sticky ${isCustomerOnly ? 'top-0' : 'top-16'
-          } z-30 text-slate-900 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b ${isScrolled ? 'border-amber-400/80 shadow-md' : 'border-slate-200/90'
-          } transition-all duration-300`}
+        className={`sticky ${
+          scrollDirection === 'down'
+            ? '-translate-y-full opacity-0 pointer-events-none'
+            : scrollDirection === 'up'
+            ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-amber-400/30'
+            : `${isCustomerOnly ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
+        } text-slate-900 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b ${
+          isScrolled ? 'border-amber-400/80 shadow-md' : 'border-slate-200/90'
+        } transition-all duration-300 transform`}
         style={{
           background: 'linear-gradient(180deg, #f59f0be3 0%, #fae5afff 35%, #fdfbeaff 70%, #ffffffff 100%)',
         }}
