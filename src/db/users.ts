@@ -173,7 +173,7 @@ export async function createInitialAdmin(data: {
         id: 1,
         userId: 1,
         apiKey: null,
-        modelName: 'gemini-3.7-flash',
+        modelName: 'gemini-2.5-flash',
         temperature: 0.2,
         createdAt: now,
         updatedAt: now,
@@ -330,7 +330,7 @@ export async function createInitialAdmin(data: {
         await db.insert(aiConfigs).values({
           userId: createdUser.id,
           apiKey: null,
-          modelName: 'gemini-3.7-flash',
+          modelName: 'gemini-2.5-flash',
           temperature: '0.20',
         }).catch(() => {});
       }
@@ -420,7 +420,7 @@ export async function createInitialAdmin(data: {
         id: 1,
         userId: 1,
         apiKey: null,
-        modelName: 'gemini-3.7-flash',
+        modelName: 'gemini-2.5-flash',
         temperature: 0.2,
         createdAt: now,
         updatedAt: now,

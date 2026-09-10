@@ -197,7 +197,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
       id: 1,
       userId: userId || 1,
       apiKey: process.env.GEMINI_API_KEY.trim(),
-      modelName: 'gemini-3.7-flash',
+      modelName: 'gemini-2.5-flash',
       temperature: '0.20',
     };
   }
@@ -554,7 +554,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  id SERIAL PRIMARY KEY,\n`;
   sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
   sql += `  api_key TEXT,\n`;
-  sql += `  model_name TEXT DEFAULT 'gemini-3.7-flash',\n`;
+  sql += `  model_name TEXT DEFAULT 'gemini-2.5-flash',\n`;
   sql += `  temperature NUMERIC(3, 2) DEFAULT 0.20,\n`;
   sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
   sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
@@ -713,7 +713,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.aiConfigs.length > 0) {
     sql += `-- Datos: ai_configs\n`;
     for (const aic of data.aiConfigs) {
-      sql += `INSERT INTO ai_configs (id, user_id, api_key, model_name, temperature) VALUES (${aic.id || 1}, ${aic.userId || 1}, ${escapeSqlString(aic.apiKey)}, ${escapeSqlString(aic.modelName || 'gemini-3.7-flash')}, ${aic.temperature || 0.20}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, model_name = EXCLUDED.model_name, temperature = EXCLUDED.temperature;\n`;
+      sql += `INSERT INTO ai_configs (id, user_id, api_key, model_name, temperature) VALUES (${aic.id || 1}, ${aic.userId || 1}, ${escapeSqlString(aic.apiKey)}, ${escapeSqlString(aic.modelName || 'gemini-2.5-flash')}, ${aic.temperature || 0.20}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, model_name = EXCLUDED.model_name, temperature = EXCLUDED.temperature;\n`;
     }
     sql += `\n`;
   }
@@ -1780,7 +1780,7 @@ export async function restoreCompleteJsonDump(
           const aiValues: any = {
             userId: validUserId,
             apiKey: aic.apiKey || null,
-            modelName: aic.modelName || 'gemini-3.7-flash',
+            modelName: aic.modelName || 'gemini-2.5-flash',
             temperature: String(aic.temperature || '0.20'),
             updatedAt: new Date(),
           };

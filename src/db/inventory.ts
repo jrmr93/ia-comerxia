@@ -2392,29 +2392,11 @@ export async function getAiConfig(userId: number = 1) {
     }
     let config = state.aiConfigs.find((c) => c.apiKey && c.apiKey.trim().length > 0);
     if (config) {
-      if (
-        config.modelName &&
-        (config.modelName.includes('gemini-2.5') ||
-          config.modelName.includes('gemini-2.0') ||
-          config.modelName.includes('gemini-1.5'))
-      ) {
-        config.modelName = 'gemini-3.7-flash';
-        storage.save();
-      }
       return config;
     }
 
     config = state.aiConfigs.find((c) => c.userId === userId);
     if (config) {
-      if (
-        config.modelName &&
-        (config.modelName.includes('gemini-2.5') ||
-          config.modelName.includes('gemini-2.0') ||
-          config.modelName.includes('gemini-1.5'))
-      ) {
-        config.modelName = 'gemini-3.7-flash';
-        storage.save();
-      }
       return config;
     }
 
@@ -2423,7 +2405,7 @@ export async function getAiConfig(userId: number = 1) {
       userId,
       apiKey: null,
       accountEmail: null,
-      modelName: 'gemini-3.7-flash',
+      modelName: 'gemini-2.5-flash',
       temperature: 0.2,
       isActive: true,
       createdAt: new Date().toISOString(),

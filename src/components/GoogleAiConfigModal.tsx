@@ -71,7 +71,7 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
   const [apiKey, setApiKey] = useState('');
   const [accountEmail, setAccountEmail] = useState('');
   const [showKey, setShowKey] = useState(false);
-  const [modelName, setModelName] = useState('gemini-3.7-flash');
+  const [modelName, setModelName] = useState('gemini-2.5-flash');
   const [temperature, setTemperature] = useState(0.2);
   const [isActive, setIsActive] = useState<boolean>(true);
   const [togglingActive, setTogglingActive] = useState(false);
@@ -121,16 +121,7 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
           setApiKey(data.apiKey);
         }
         if (data.modelName) {
-          // Normalize legacy model names to gemini-3.7-flash
-          if (
-            data.modelName.includes('gemini-2.5') ||
-            data.modelName.includes('gemini-2.0') ||
-            data.modelName.includes('gemini-1.5')
-          ) {
-            setModelName('gemini-3.7-flash');
-          } else {
-            setModelName(data.modelName);
-          }
+          setModelName(data.modelName);
         }
         if (typeof data.temperature === 'number') {
           setTemperature(data.temperature);
@@ -555,10 +546,11 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
                   onChange={(e) => setModelName(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
                 >
-                  <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (Ultra Rápido & Baja Latencia)</option>
-                  <option value="gemini-3.7-flash">gemini-3.7-flash (Recomendado - Alta Inteligencia & Rapidez)</option>
-                  <option value="gemini-flash-latest">gemini-flash-latest (Versión Estable Flash)</option>
-                  <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (Máximo Razonamiento)</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash (Recomendado - Ultra Rápido & Alta Inteligencia)</option>
+                  <option value="gemini-2.0-flash">gemini-2.0-flash (Multimodal & Estable)</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash (Alta Disponibilidad & Eficiencia)</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro (Máximo Razonamiento)</option>
+                  <option value="gemini-flash-latest">gemini-flash-latest (Última versión Flash)</option>
                 </select>
               </div>
 

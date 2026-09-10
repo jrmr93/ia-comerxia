@@ -154,9 +154,10 @@ Devuelve JSON:
 
   // Candidate models (prefer modern Gemini 3.x Flash models with high availability and low latency)
   const candidateModels = [
-    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
     'gemini-flash-latest',
-    'gemini-3.1-flash-lite',
   ];
 
   for (const model of candidateModels) {
@@ -744,7 +745,7 @@ export async function generateProductStudioPhotoWithAI(product: {
   if (hasValidAiApiKey()) {
     try {
       const ai = getAiClient();
-      const candidateImageModels = ['gemini-3.1-flash-lite-image', 'gemini-3.1-flash-image'];
+      const candidateImageModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
 
       for (const model of candidateImageModels) {
         try {
@@ -1170,9 +1171,10 @@ Responde SOLO un objeto JSON con este formato exacto:
 }`;
 
     const candidateCopyModels = [
-      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
       'gemini-flash-latest',
-      'gemini-3.1-flash-lite',
     ];
 
     let copyParsedSuccessfully = false;

@@ -119,6 +119,8 @@ export interface LocalStoreConfig {
   theme?: string | null;
   themeColors?: string | null;
   promoPopup?: string | null;
+  enablePagination?: boolean | null;
+  itemsPerPage?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -354,7 +356,7 @@ class StorageManager {
           id: 1,
           userId: 1,
           apiKey: null,
-          modelName: 'gemini-3.7-flash',
+          modelName: 'gemini-2.5-flash',
           temperature: 0.2,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

@@ -1187,7 +1187,7 @@ async function startServer() {
   app.post('/api/ai/test-key', async (req: Request, res: Response) => {
     try {
       const { apiKey, modelName } = req.body;
-      const result = await testGeminiApiKey(apiKey, modelName || 'gemini-3.7-flash');
+      const result = await testGeminiApiKey(apiKey, modelName || 'gemini-2.5-flash');
       res.json(result);
     } catch (error: any) {
       console.error('Error testing Gemini AI key:', error);

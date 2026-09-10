@@ -47,22 +47,12 @@ export function getAiClient(customKey?: string): GoogleGenAI {
   if (customKey && customKey.trim()) {
     return new GoogleGenAI({
       apiKey: keyToUse,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
     });
   }
 
   if (!aiInstance) {
     aiInstance = new GoogleGenAI({
       apiKey: keyToUse,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
     });
   }
   return aiInstance;
@@ -73,7 +63,7 @@ export function getAiClient(customKey?: string): GoogleGenAI {
  */
 export async function testGeminiApiKey(
   apiKey?: string,
-  modelName: string = 'gemini-3.1-flash-lite'
+  modelName: string = 'gemini-2.5-flash'
 ): Promise<{
   success: boolean;
   model: string;
@@ -87,51 +77,36 @@ export async function testGeminiApiKey(
   if (!keyToTest) {
     return {
       success: false,
-      model: modelName || 'gemini-3.1-flash-lite',
+      model: modelName || 'gemini-2.5-flash',
       message: 'No se ingresó ninguna API Key para validar.',
       latencyMs: 0,
     };
   }
 
-  // Normalize legacy or deprecated model names to fastest ultra-responsive model
-  let activeModel = modelName || 'gemini-3.1-flash-lite';
-  if (
-    activeModel.includes('gemini-2.5') ||
-    activeModel.includes('gemini-2.0') ||
-    activeModel.includes('gemini-1.5') ||
-    activeModel.includes('gemini-3.6')
-  ) {
-    activeModel = 'gemini-3.1-flash-lite';
-  }
+  const activeModel = modelName?.trim() || 'gemini-2.5-flash';
 
-  let modelsToTry = [
-    activeModel,
-    'gemini-3.8-flash',
-    'gemini-flash-latest',
-    'gemini-3.1-flash-lite',
-  ];
-  modelsToTry = Array.from(new Set(modelsToTry.filter(Boolean)));
+  const modelsToTry = Array.from(
+    new Set([
+      activeModel,
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-flash-latest',
+      'gemini-2.5-pro',
+    ].filter(Boolean))
+  );
+
   let lastError: any = null;
 
   for (const currentModel of modelsToTry) {
     try {
-      const testAi = new GoogleGenAI({
-        apiKey: keyToTest,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      });
+      const testAi = new GoogleGenAI({ apiKey: keyToTest });
 
       const response = await testAi.models.generateContent({
         model: currentModel,
-        contents: 'Responde estrictamente en una sola palabra: "CONECTADO"',
+        contents: 'Responde strictly en una sola palabra: "CONECTADO"',
         config: {
           temperature: 0.1,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.LOW,
-          },
         },
       });
 
@@ -148,28 +123,18 @@ export async function testGeminiApiKey(
     } catch (err: any) {
       lastError = err;
       const errMsg = err?.message || err?.toString() || '';
-      // If error is authentication error, don't keep trying other models
+      // If error is authentication error, stop trying other models
       if (
         errMsg.includes('401') ||
         errMsg.includes('UNAUTHENTICATED') ||
         errMsg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
-        errMsg.includes('API_KEY_INVALID')
+        errMsg.includes('API_KEY_INVALID') ||
+        errMsg.includes('API key not valid')
       ) {
         break;
       }
-      // If error is model not found, busy or unavailable, try next candidate model
-      if (
-        errMsg.includes('404') ||
-        errMsg.includes('NOT_FOUND') ||
-        errMsg.includes('503') ||
-        errMsg.includes('high demand') ||
-        errMsg.includes('429') ||
-        errMsg.includes('no longer available') ||
-        errMsg.includes('Thinking level')
-      ) {
-        continue;
-      }
-      break;
+      // If error is model not found or temporary error, try next candidate model
+      continue;
     }
   }
 
@@ -181,7 +146,8 @@ export async function testGeminiApiKey(
     errMsg.includes('API_KEY_INVALID') ||
     errMsg.includes('UNAUTHENTICATED') ||
     errMsg.includes('401') ||
-    errMsg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED')
+    errMsg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
+    errMsg.includes('API key not valid')
   ) {
     friendlyMsg =
       'Clave de API no autorizada o inválida. Asegúrate de ingresar una clave API válida creada en Google AI Studio (aistudio.google.com).';
@@ -718,9 +684,10 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
 
   // Prioritize high-performance, low-latency models with fast structured output
   const candidateModels = [
-    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
     'gemini-flash-latest',
-    'gemini-3.1-flash-lite',
   ];
 
   for (const modelName of candidateModels) {
@@ -1285,9 +1252,10 @@ ${!showSku ? '⚠️ REGLA CRÍTICA: NO incluyas ninguna mención de SKU ni cód
 Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
 
     const candidateModels = [
-      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
       'gemini-flash-latest',
-      'gemini-3.1-flash-lite',
     ];
 
     // Check fast memory cache first
@@ -1506,9 +1474,10 @@ REGLAS OBLIGATORIAS DE FORMATO Y EXTENSIÓN:
     contents.push(prompt);
 
     const candidateModels = [
-      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
       'gemini-flash-latest',
-      'gemini-3.1-flash-lite',
     ];
 
     for (const modelName of candidateModels) {
