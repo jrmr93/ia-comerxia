@@ -657,9 +657,6 @@ INSTRUCCIONES CRÍTICAS:
           contents: [prompt],
           config: {
             responseMimeType: 'application/json',
-            thinkingConfig: {
-              thinkingLevel: ThinkingLevel.LOW,
-            },
             responseSchema: {
               type: Type.OBJECT,
               properties: {

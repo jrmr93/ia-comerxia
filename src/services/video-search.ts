@@ -244,9 +244,6 @@ Devuelve únicamente JSON:
             contents: prompt,
             config: {
               responseMimeType: 'application/json',
-              thinkingConfig: {
-                thinkingLevel: ThinkingLevel.LOW,
-              },
             },
           });
           const text = response.text?.trim();

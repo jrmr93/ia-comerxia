@@ -169,9 +169,6 @@ Devuelve JSON:
         config: {
           responseMimeType: 'application/json',
           temperature: 0.1,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.LOW,
-          },
           responseSchema: {
             type: Type.OBJECT,
             properties: {

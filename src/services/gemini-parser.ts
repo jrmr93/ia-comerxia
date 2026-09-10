@@ -697,9 +697,6 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         contents,
         config: {
           responseMimeType: 'application/json',
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.LOW,
-          },
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -1272,9 +1269,6 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
-            thinkingConfig: {
-              thinkingLevel: ThinkingLevel.LOW,
-            },
             responseSchema: {
               type: Type.OBJECT,
               properties: {
@@ -1487,9 +1481,6 @@ REGLAS OBLIGATORIAS DE FORMATO Y EXTENSIÓN:
           contents,
           config: {
             temperature: 0.15,
-            thinkingConfig: {
-              thinkingLevel: ThinkingLevel.LOW,
-            },
           },
         });
 
