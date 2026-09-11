@@ -2031,10 +2031,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <div className="p-3 bg-white rounded-xl border border-rose-200 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div className="flex items-center space-x-2">
                       <span className="text-slate-500 font-medium">PVP Normal:</span>
-                      <span className="line-through text-slate-400 font-mono font-medium">${saleNum.toFixed(2)}</span>
+                      <span className="line-through text-slate-400 font-mono font-medium">${pvpNum.toFixed(2)}</span>
                       <span className="text-slate-400">→</span>
                       <span className="text-rose-950 font-bold">Precio Oferta:</span>
-                      <span className="font-black text-rose-600 text-sm font-mono">${effectiveSalePrice.toFixed(2)}</span>
+                      <span className="font-black text-rose-600 text-sm font-mono">${effectivePvp.toFixed(2)}</span>
                     </div>
 
                     {isLoss ? (
@@ -2050,7 +2050,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     ) : (
                       <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-800 font-mono bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300">
                         <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Ganancia tras oferta: +${effectiveUnitProfit.toFixed(2)}/u</span>
+                        <span>Ganancia tras oferta: +${effectiveUnitProfit.toFixed(2)}/u ({effectiveMarginPercent.toFixed(1)}%)</span>
                       </span>
                     )}
                   </div>
