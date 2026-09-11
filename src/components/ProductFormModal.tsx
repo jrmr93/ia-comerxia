@@ -400,12 +400,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCostOptions([]);
       }
 
-      // Calculate initial margin
+      // Calculate initial margin based on net cost without IVA
+      const costWithoutNum = parseFloat(initialCostWithout) || 0;
       if (parsedAttr.profitMarginPercent !== undefined) {
         setMarginPercent(Number(parsedAttr.profitMarginPercent));
-      } else if (costNum > 0 && saleNum > costNum) {
+      } else if (costWithoutNum > 0 && saleNum > 0) {
         const baseSale = itemApplySaleTax && itemSaleTaxPercent > 0 ? saleNum / (1 + itemSaleTaxPercent / 100) : saleNum;
-        setMarginPercent(Math.round(((baseSale - costNum) / costNum) * 100));
+        const util = baseSale - costWithoutNum;
+        setMarginPercent(Math.round((util / costWithoutNum) * 100));
       } else {
         setMarginPercent(30);
       }
@@ -448,18 +450,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setTaxRate(defaultTax);
       setApplySaleTax(false);
       setSaleTaxPercent(defaultTax);
-      setCostWithoutTax('8.70');
-      setCostWithTax('10.00');
-      setCostPrice('10.00');
+      setCostWithoutTax('100.00');
+      setCostWithTax('115.00');
+      setCostPrice('115.00');
       setMarginPercent(30);
-      setSalePrice('13.00');
+      setSalePrice('130.00');
       setDiscountPercent(0);
       setCostOptions([
         {
-          label: 'Costo Mayorista ($10.00)',
-          price: 10.0,
-          costWithoutTax: 8.7,
-          costWithTax: 10.0,
+          label: 'Costo Mayorista ($115.00)',
+          price: 115.0,
+          costWithoutTax: 100.0,
+          costWithTax: 115.0,
           taxRate: defaultTax,
         },
       ]);
@@ -493,18 +495,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const activeRate = checked ? (purchaseTaxPercent > 0 ? purchaseTaxPercent : (defaultTelegramTaxPercent ?? telegramTaxPercent ?? 15)) : 0;
     setTaxRate(activeRate);
 
-    const currentCost = parseFloat(costWithTax || costPrice) || 0;
-    if (currentCost > 0) {
-      if (checked) {
-        const without = (currentCost / (1 + activeRate / 100)).toFixed(2);
-        setCostWithoutTax(without);
-        setCostWithTax(currentCost.toFixed(2));
-        setCostPrice(currentCost.toFixed(2));
-      } else {
-        setCostWithoutTax(currentCost.toFixed(2));
-        setCostWithTax(currentCost.toFixed(2));
-        setCostPrice(currentCost.toFixed(2));
-      }
+    const costWithout = parseFloat(costWithoutTax) || 0;
+    if (costWithout > 0) {
+      const newCostWith = checked ? costWithout * (1 + activeRate / 100) : costWithout;
+      setCostWithTax(newCostWith.toFixed(2));
+      setCostPrice(newCostWith.toFixed(2));
+
+      // Recalculate sale price keeping margin based on net cost without tax
+      const saleSinIVA = costWithout * (1 + marginPercent / 100);
+      const newSalePrice = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
+      setSalePrice(newSalePrice.toFixed(2));
     }
   };
 
@@ -514,10 +514,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setPurchaseTaxPercent(clamped);
     if (hasPurchaseTax) {
       setTaxRate(clamped);
-      const currentCost = parseFloat(costWithTax || costPrice) || 0;
-      if (currentCost > 0) {
-        const without = (currentCost / (1 + clamped / 100)).toFixed(2);
-        setCostWithoutTax(without);
+      const costWithout = parseFloat(costWithoutTax) || 0;
+      if (costWithout > 0) {
+        const newCostWith = costWithout * (1 + clamped / 100);
+        setCostWithTax(newCostWith.toFixed(2));
+        setCostPrice(newCostWith.toFixed(2));
       }
     }
   };
@@ -525,17 +526,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Toggle applySaleTax check and recalculate sale price
   const handleToggleApplySaleTax = (checked: boolean) => {
     setApplySaleTax(checked);
-    const cost = parseFloat(costWithTax || costPrice) || 0;
-    if (cost > 0) {
-      const baseSale = cost * (1 + marginPercent / 100);
-      const newSalePrice = checked ? baseSale * (1 + saleTaxPercent / 100) : baseSale;
+    const costWithout = parseFloat(costWithoutTax) || 0;
+    if (costWithout > 0) {
+      const saleSinIVA = costWithout * (1 + marginPercent / 100);
+      const newSalePrice = checked && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
       setSalePrice(newSalePrice.toFixed(2));
     } else {
       const currentSale = parseFloat(salePrice) || 0;
       if (currentSale > 0) {
-        if (checked) {
+        if (checked && saleTaxPercent > 0) {
           setSalePrice((currentSale * (1 + saleTaxPercent / 100)).toFixed(2));
-        } else {
+        } else if (!checked && saleTaxPercent > 0) {
           setSalePrice((currentSale / (1 + saleTaxPercent / 100)).toFixed(2));
         }
       }
@@ -546,22 +547,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleSaleTaxPercentChange = (newPercent: number) => {
     setSaleTaxPercent(newPercent);
     if (applySaleTax) {
-      const cost = parseFloat(costWithTax || costPrice) || 0;
-      if (cost > 0) {
-        const baseSale = cost * (1 + marginPercent / 100);
-        const newSalePrice = baseSale * (1 + newPercent / 100);
+      const costWithout = parseFloat(costWithoutTax) || 0;
+      if (costWithout > 0) {
+        const saleSinIVA = costWithout * (1 + marginPercent / 100);
+        const newSalePrice = saleSinIVA * (1 + newPercent / 100);
         setSalePrice(newSalePrice.toFixed(2));
       }
     }
   };
 
-  // Recalculate sale price when margin changes
+  // Recalculate sale price when margin changes (applied on costWithoutTax)
   const handleMarginChange = (newMargin: number) => {
     setMarginPercent(newMargin);
-    const cost = parseFloat(costWithTax || costPrice) || 0;
-    if (cost > 0) {
-      const baseSale = cost * (1 + newMargin / 100);
-      const finalSale = applySaleTax ? baseSale * (1 + saleTaxPercent / 100) : baseSale;
+    const costWithout = parseFloat(costWithoutTax) || 0;
+    if (costWithout > 0) {
+      const saleSinIVA = costWithout * (1 + newMargin / 100);
+      const finalSale = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
       setSalePrice(finalSale.toFixed(2));
     }
   };
@@ -570,10 +571,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleSalePriceChange = (newVal: string) => {
     setSalePrice(newVal);
     const num = parseFloat(newVal);
-    const cost = parseFloat(costWithTax || costPrice) || 0;
-    if (!isNaN(num) && cost > 0) {
-      const baseSale = applySaleTax && saleTaxPercent > 0 ? num / (1 + saleTaxPercent / 100) : num;
-      const calculatedMargin = Math.round(((baseSale - cost) / cost) * 100);
+    const costWithout = parseFloat(costWithoutTax) || 0;
+    if (!isNaN(num) && costWithout > 0) {
+      const saleSinIVA = applySaleTax && saleTaxPercent > 0 ? num / (1 + saleTaxPercent / 100) : num;
+      const util = saleSinIVA - costWithout;
+      const calculatedMargin = Math.round((util / costWithout) * 100);
       if (calculatedMargin >= -100 && calculatedMargin <= 1000) {
         setMarginPercent(calculatedMargin);
       }
@@ -583,17 +585,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Recalculate when Cost Without Tax changes
   const handleCostWithoutTaxChange = (newVal: string) => {
     setCostWithoutTax(newVal);
-    const num = parseFloat(newVal);
-    if (!isNaN(num) && num >= 0) {
+    const numWithout = parseFloat(newVal);
+    if (!isNaN(numWithout) && numWithout >= 0) {
       const activeTax = hasPurchaseTax ? purchaseTaxPercent : 0;
-      const withTax = (num * (1 + activeTax / 100)).toFixed(2);
+      const withTax = (numWithout * (1 + activeTax / 100)).toFixed(2);
       setCostWithTax(withTax);
       setCostPrice(withTax);
-      if (marginPercent > 0) {
-        const baseSale = parseFloat(withTax) * (1 + marginPercent / 100);
-        const finalSale = applySaleTax ? baseSale * (1 + saleTaxPercent / 100) : baseSale;
-        setSalePrice(finalSale.toFixed(2));
-      }
+      const saleSinIVA = numWithout * (1 + marginPercent / 100);
+      const finalSale = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
+      setSalePrice(finalSale.toFixed(2));
     }
   };
 
@@ -601,16 +601,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleCostWithTaxChange = (newVal: string) => {
     setCostWithTax(newVal);
     setCostPrice(newVal);
-    const num = parseFloat(newVal);
-    if (!isNaN(num) && num >= 0) {
+    const numWith = parseFloat(newVal);
+    if (!isNaN(numWith) && numWith >= 0) {
       const activeTax = hasPurchaseTax ? purchaseTaxPercent : 0;
-      const withoutTax = (num / (1 + activeTax / 100)).toFixed(2);
-      setCostWithoutTax(withoutTax);
-      if (marginPercent > 0) {
-        const baseSale = num * (1 + marginPercent / 100);
-        const finalSale = applySaleTax ? baseSale * (1 + saleTaxPercent / 100) : baseSale;
-        setSalePrice(finalSale.toFixed(2));
-      }
+      const numWithout = activeTax > 0 ? numWith / (1 + activeTax / 100) : numWith;
+      setCostWithoutTax(numWithout.toFixed(2));
+      const saleSinIVA = numWithout * (1 + marginPercent / 100);
+      const finalSale = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
+      setSalePrice(finalSale.toFixed(2));
     }
   };
 
@@ -618,23 +616,27 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleSelectCostOption = (opt: CostOption) => {
     const optPrice = opt.price;
     const activeTax = hasPurchaseTax ? purchaseTaxPercent : 0;
-    const optWithout =
-      typeof opt.costWithoutTax === 'number'
-        ? opt.costWithoutTax.toFixed(2)
-        : (optPrice / (1 + activeTax / 100)).toFixed(2);
-    const optWith =
-      typeof opt.costWithTax === 'number'
-        ? opt.costWithTax.toFixed(2)
-        : optPrice.toFixed(2);
+    let optWithout: number;
+    let optWith: number;
 
-    setCostWithoutTax(optWithout);
-    setCostWithTax(optWith);
-    setCostPrice(optWith);
-    if (marginPercent > 0) {
-      const baseSale = parseFloat(optWith) * (1 + marginPercent / 100);
-      const finalSale = applySaleTax ? baseSale * (1 + saleTaxPercent / 100) : baseSale;
-      setSalePrice(finalSale.toFixed(2));
+    if (typeof opt.costWithoutTax === 'number') {
+      optWithout = opt.costWithoutTax;
+      optWith = typeof opt.costWithTax === 'number' ? opt.costWithTax : optWithout * (1 + activeTax / 100);
+    } else if (typeof opt.costWithTax === 'number') {
+      optWith = opt.costWithTax;
+      optWithout = activeTax > 0 ? optWith / (1 + activeTax / 100) : optWith;
+    } else {
+      optWith = optPrice;
+      optWithout = activeTax > 0 ? optPrice / (1 + activeTax / 100) : optPrice;
     }
+
+    setCostWithoutTax(optWithout.toFixed(2));
+    setCostWithTax(optWith.toFixed(2));
+    setCostPrice(optWith.toFixed(2));
+
+    const saleSinIVA = optWithout * (1 + marginPercent / 100);
+    const finalSale = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
+    setSalePrice(finalSale.toFixed(2));
   };
 
   // Cotizar en tiempo real en Ecuador con Google Search Grounding y Gemini
@@ -820,27 +822,39 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  const costNum = parseFloat(costWithTax || costPrice) || 0;
-  const saleNum = parseFloat(salePrice) || 0;
-  const baseSaleBeforeTax = applySaleTax && saleTaxPercent > 0
-    ? saleNum / (1 + saleTaxPercent / 100)
-    : saleNum;
-  const saleTaxAmount = applySaleTax && saleTaxPercent > 0
-    ? saleNum - baseSaleBeforeTax
+  const costWithoutNum = parseFloat(costWithoutTax) || 0;
+  const activePurchaseTax = hasPurchaseTax ? purchaseTaxPercent : 0;
+  const purchaseTaxAmount = costWithoutNum * (activePurchaseTax / 100);
+  const costTotalPaidToSupplier = costWithoutNum + purchaseTaxAmount;
+
+  const pvpNum = parseFloat(salePrice) || 0;
+  const activeSaleTax = applySaleTax ? saleTaxPercent : 0;
+  const salePriceWithoutTax = activeSaleTax > 0
+    ? pvpNum / (1 + activeSaleTax / 100)
+    : pvpNum;
+  const saleTaxAmount = activeSaleTax > 0
+    ? pvpNum - salePriceWithoutTax
     : 0;
-  const unitProfit = baseSaleBeforeTax - costNum;
+
+  // Real profit calculation: when purchase tax is tax credit, cost for profit is costWithoutNum
+  const unitProfit = salePriceWithoutTax - costWithoutNum;
+  const calculatedMarginPercent = costWithoutNum > 0 ? (unitProfit / costWithoutNum) * 100 : 0;
+
+  // Breakdown for Tax / Tributary
+  const ivaCreditoCompra = purchaseTaxAmount;
+  const ivaDebitoVenta = saleTaxAmount;
+  const ivaNetoPorPagar = ivaDebitoVenta - ivaCreditoCompra;
+
+  // Store discount calculations
   const discountNum = Math.max(0, Math.min(100, Number(discountPercent) || 0));
-  const effectiveSalePrice = discountNum > 0 ? saleNum * (1 - discountNum / 100) : saleNum;
-  const effectiveBaseSale = applySaleTax && saleTaxPercent > 0
-    ? effectiveSalePrice / (1 + saleTaxPercent / 100)
-    : effectiveSalePrice;
-  const effectiveSaleTaxAmount = applySaleTax && saleTaxPercent > 0
-    ? effectiveSalePrice - effectiveBaseSale
-    : 0;
-  const effectiveUnitProfit = effectiveBaseSale - costNum;
-  const effectiveMarginPercent = costNum > 0 ? (effectiveUnitProfit / costNum) * 100 : 0;
+  const effectivePvp = discountNum > 0 ? pvpNum * (1 - discountNum / 100) : pvpNum;
+  const effectiveSalePriceWithoutTax = activeSaleTax > 0
+    ? effectivePvp / (1 + activeSaleTax / 100)
+    : effectivePvp;
+  const effectiveUnitProfit = effectiveSalePriceWithoutTax - costWithoutNum;
+  const effectiveMarginPercent = costWithoutNum > 0 ? (effectiveUnitProfit / costWithoutNum) * 100 : 0;
   const isLoss = effectiveUnitProfit < -0.001;
-  const isBreakEven = Math.abs(effectiveUnitProfit) <= 0.001 && costNum > 0;
+  const isBreakEven = Math.abs(effectiveUnitProfit) <= 0.001 && costWithoutNum > 0;
 
   // Extract all available photos for the item (merging cover + extraImages)
   const allAvailablePhotos: string[] = [];
@@ -1206,7 +1220,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <DollarSign className="w-3.5 h-3.5 text-amber-700" />
                       <span>Costo Sin IVA ($)</span>
                     </label>
-                    <span className="text-[10px] text-slate-500 font-medium">Base neta compra</span>
+                    <span className="text-[10px] text-emerald-700 font-black">Base para Margen y Utilidad</span>
                   </div>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">$</span>
@@ -1228,7 +1242,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <DollarSign className="w-3.5 h-3.5 text-amber-700" />
                       <span>Costo Con IVA ($)</span>
                     </label>
-                    <span className="text-[10px] text-amber-800 font-black">Base para el Margen</span>
+                    <span className="text-[10px] text-amber-800 font-bold">Total Pagado al Proveedor</span>
                   </div>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-600 text-sm font-bold">$</span>
@@ -1683,7 +1697,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
 
               {/* ========================================================================= */}
-              {/* RESALTADO VISUAL: GANANCIA CALCULADA POR UNIDAD VENDIDA (SHOWPIECE)        */}
+              {/* RESALTADO VISUAL: UTILIDAD REAL Y DESGLOSE CONTABLE (11 PUNTOS CLAVE)      */}
               {/* ========================================================================= */}
               <div
                 className={`rounded-2xl p-4 transition-all border-2 shadow-sm ${
@@ -1717,7 +1731,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">
-                          Utilidad por Venta
+                          Utilidad Real por Venta
                         </span>
                         {isLoss ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-600 text-white">
@@ -1730,7 +1744,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         ) : (
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1 shadow-2xs">
                             <Sparkles className="w-3 h-3 text-emerald-600" />
-                            <span>Margen Positivo</span>
+                            <span>Margen Positivo ({calculatedMarginPercent.toFixed(0)}%)</span>
                           </span>
                         )}
                       </div>
@@ -1779,30 +1793,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           ? `${effectiveMarginPercent.toFixed(1)}% margen`
                           : isBreakEven
                           ? '0% margen'
-                          : `+${effectiveMarginPercent.toFixed(1)}% margen sobre costo`}
+                          : `+${effectiveMarginPercent.toFixed(1)}% margen sobre costo neto`}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Desglose Matemático Claro */}
+                {/* Desglose Matemático Coherente */}
                 <div className="mt-3 pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-1.5 flex-wrap font-mono font-medium text-slate-700">
-                    <span className="text-slate-500 font-sans font-semibold text-[11px]">Cálculo:</span>
+                    <span className="text-slate-500 font-sans font-semibold text-[11px]">Fórmula:</span>
                     <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900 shadow-2xs">
-                      PVP {discountNum > 0 ? `Oferta ($${effectiveSalePrice.toFixed(2)})` : `($${saleNum.toFixed(2)})`}
+                      Venta Sin IVA (${effectiveSalePriceWithoutTax.toFixed(2)})
                     </span>
-                    {applySaleTax && (
-                      <>
-                        <span className="text-amber-700 font-bold">-</span>
-                        <span className="bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300 font-bold text-amber-900 shadow-2xs" title="IVA de venta transferido al cliente">
-                          IVA Venta (${effectiveSaleTaxAmount.toFixed(2)})
-                        </span>
-                      </>
-                    )}
                     <span className="text-slate-400 font-bold">-</span>
-                    <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900 shadow-2xs">
-                      Costo IVA (${costNum.toFixed(2)})
+                    <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900 shadow-2xs" title="Costo Neto de compra sin IVA (crédito tributario)">
+                      Costo Neto Sin IVA (${costWithoutNum.toFixed(2)})
                     </span>
                     <span className="text-slate-400 font-bold">=</span>
                     <span
@@ -1820,13 +1826,146 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                   {applySaleTax ? (
                     <span className="text-[11px] font-medium text-amber-950 bg-amber-100/70 px-2 py-0.5 rounded-md border border-amber-200">
-                      💡 El cliente asume el IVA (+${effectiveSaleTaxAmount.toFixed(2)}); tu utilidad neta es +${effectiveUnitProfit.toFixed(2)} / u.
+                      💡 PVP con IVA: ${pvpNum.toFixed(2)} (IVA Venta: +${saleTaxAmount.toFixed(2)} asumido por cliente).
                     </span>
                   ) : discountNum > 0 ? (
                     <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                      🔥 Oferta -{discountNum}% aplicada (PVP regular: ${saleNum.toFixed(2)} → Ganancia normal: +${unitProfit.toFixed(2)}/u)
+                      🔥 Oferta -{discountNum}% aplicada (PVP regular: ${pvpNum.toFixed(2)} → Ganancia normal: +${unitProfit.toFixed(2)}/u)
                     </span>
                   ) : null}
+                </div>
+              </div>
+
+              {/* ========================================================================= */}
+              {/* DESGLOSE CONTABLE & COMERCIAL COMPLETO (11 PUNTOS CLAVE OBLIGATORIOS)       */}
+              {/* ========================================================================= */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-indigo-950 text-white border border-indigo-700/40 shadow-lg space-y-3.5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300">
+                      <Receipt className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-white">
+                        Desglose Contable, Fiscal y de Utilidad Real (11 Puntos)
+                      </h4>
+                      <p className="text-[10px] text-slate-300">
+                        Separación clara de IVA crédito, IVA débito, costos y ganancia neta.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                    Lógica Fiscal Correcta
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                  {/* 1. Costo Neto (Sin IVA) */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">1. Costo Neto (Sin IVA)</span>
+                    <span className="text-base font-black font-mono text-slate-100">${costWithoutNum.toFixed(2)}</span>
+                    <span className="text-[9px] text-slate-400">Base para margen y utilidad</span>
+                  </div>
+
+                  {/* 2. IVA Pagado en Compra */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">2. IVA Compra ({activePurchaseTax}%)</span>
+                    <span className="text-base font-black font-mono text-sky-300">${purchaseTaxAmount.toFixed(2)}</span>
+                    <span className="text-[9px] text-sky-200/70">Crédito tributario a favor</span>
+                  </div>
+
+                  {/* 3. Costo Total Proveedor */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">3. Total al Proveedor</span>
+                    <span className="text-base font-black font-mono text-amber-300">${costTotalPaidToSupplier.toFixed(2)}</span>
+                    <span className="text-[9px] text-amber-200/70">Desembolso total de compra</span>
+                  </div>
+
+                  {/* 4. Margen de Ganancia */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">4. Margen Ganancia</span>
+                    <span className="text-base font-black font-mono text-teal-300">+{marginPercent}%</span>
+                    <span className="text-[9px] text-teal-200/70">Sobre costo neto sin IVA</span>
+                  </div>
+
+                  {/* 5. Precio Venta Sin IVA */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">5. Precio Venta Sin IVA</span>
+                    <span className="text-base font-black font-mono text-emerald-300">${salePriceWithoutTax.toFixed(2)}</span>
+                    <span className="text-[9px] text-emerald-200/70">Costo Neto + Utilidad</span>
+                  </div>
+
+                  {/* 6. IVA de Venta */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">6. IVA Venta ({activeSaleTax}%)</span>
+                    <span className="text-base font-black font-mono text-amber-300">${saleTaxAmount.toFixed(2)}</span>
+                    <span className="text-[9px] text-amber-200/70">Débito fiscal cobrado al cliente</span>
+                  </div>
+
+                  {/* 7. Precio Final / PVP */}
+                  <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex flex-col justify-between">
+                    <span className="text-[10px] text-emerald-300 font-bold uppercase">7. PVP Final (Con IVA)</span>
+                    <span className="text-lg font-black font-mono text-emerald-400">${pvpNum.toFixed(2)}</span>
+                    <span className="text-[9px] text-emerald-200/80">Precio final al consumidor</span>
+                  </div>
+
+                  {/* 8. IVA Crédito (Compra) */}
+                  <div className="p-2.5 rounded-xl bg-sky-950/40 border border-sky-500/40 flex flex-col justify-between">
+                    <span className="text-[10px] text-sky-300 font-bold uppercase">8. IVA Crédito (Compra)</span>
+                    <span className="text-base font-black font-mono text-sky-300">${ivaCreditoCompra.toFixed(2)}</span>
+                    <span className="text-[9px] text-sky-200/80">A tu favor (Deducible)</span>
+                  </div>
+
+                  {/* 9. IVA Débito (Venta) */}
+                  <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex flex-col justify-between">
+                    <span className="text-[10px] text-amber-300 font-bold uppercase">9. IVA Débito (Venta)</span>
+                    <span className="text-base font-black font-mono text-amber-300">${ivaDebitoVenta.toFixed(2)}</span>
+                    <span className="text-[9px] text-amber-200/80">Generado en la venta</span>
+                  </div>
+                </div>
+
+                {/* Fila Inferior Destacada: 10. IVA Neto por Pagar & 11. Utilidad Real */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/10">
+                  {/* 10. IVA Neto por Pagar */}
+                  <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-400/40 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">
+                        10. IVA Neto a Declarar / Pagar
+                      </span>
+                      <span className="text-[11px] text-slate-300">
+                        (Débito ${ivaDebitoVenta.toFixed(2)} - Crédito ${ivaCreditoCompra.toFixed(2)})
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-lg font-black font-mono ${ivaNetoPorPagar >= 0 ? 'text-indigo-300' : 'text-emerald-400'}`}>
+                        ${Math.abs(ivaNetoPorPagar).toFixed(2)}
+                      </span>
+                      <span className="text-[9px] text-slate-300 block font-bold">
+                        {ivaNetoPorPagar >= 0 ? 'Por Pagar al Fisco' : 'Crédito a Favor'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 11. Utilidad Real del Producto */}
+                  <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-950/90 to-teal-900/90 border-2 border-emerald-400 flex items-center justify-between shadow-md">
+                    <div>
+                      <span className="text-[10px] font-black text-emerald-300 uppercase tracking-wider block flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>11. Utilidad Real del Producto</span>
+                      </span>
+                      <span className="text-[11px] text-emerald-100 font-medium">
+                        Venta sin IVA (${salePriceWithoutTax.toFixed(2)}) - Costo sin IVA (${costWithoutNum.toFixed(2)})
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xl font-black font-mono text-emerald-400">
+                        ${unitProfit.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-200 block font-mono">
+                        Margen {calculatedMarginPercent.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

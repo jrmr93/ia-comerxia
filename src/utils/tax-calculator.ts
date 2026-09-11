@@ -127,7 +127,8 @@ export function calculateTaxAdjustment(params: {
     taxAmount = 0;
   }
 
-  const salePrice = Math.round(finalCost * (1 + effectiveMargin / 100) * 100) / 100;
+  // Margin is applied on baseCostPrice (cost without tax) when tax is a tax credit
+  const salePrice = Math.round(baseCostPrice * (1 + effectiveMargin / 100) * 100) / 100;
 
   return {
     taxStatus,

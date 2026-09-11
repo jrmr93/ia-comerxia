@@ -1056,8 +1056,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         const margin =
                           parsedAttr.profitMarginPercent !== undefined
                             ? Number(parsedAttr.profitMarginPercent)
-                            : costWith > 0
-                            ? Math.round(((sale - costWith) / costWith) * 100)
+                            : costWithout > 0
+                            ? Math.round(((sale - costWithout) / costWithout) * 100)
                             : 30;
 
                         const applySaleTax =
@@ -1073,7 +1073,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             ? Number(parsedAttr.saleTaxPercent)
                             : itemTaxRate;
                         const baseSaleBeforeTax = applySaleTax && saleTaxPercent > 0 ? sale / (1 + saleTaxPercent / 100) : sale;
-                        const unitProfit = baseSaleBeforeTax - costWith;
+                        const unitProfit = baseSaleBeforeTax - costWithout;
 
                         if (!showCosts) {
                           return (

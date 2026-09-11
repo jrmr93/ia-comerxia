@@ -903,8 +903,8 @@ REGLAS CRÍTICAS DE RECONOCIMIENTO Y PREVENCIÓN DE ERRORES DE PRECIOS:
 9. "profitMarginPercent": Porcentaje de margen de ganancia comercial. Usa ${defaultMarginPercent} por defecto.
 10. "salePrice": Precio de venta al público (PVP):
     - Si el mensaje menciona precio de venta sugerido (PVP / MSRP / "vender a"), úsalo como salePrice.
-    - Si no se menciona PVP, calcúlalo aplicando profitMarginPercent sobre costWithTax (salePrice = costWithTax * (1 + profitMarginPercent/100)).
-    - NUNCA pongas un salePrice menor que el costWithTax.
+    - Si no se menciona PVP, calcúlalo aplicando profitMarginPercent sobre el costo neto sin IVA (salePrice = costWithoutTax * (1 + profitMarginPercent/100)).
+    - NUNCA pongas un salePrice menor que el costWithoutTax.
 11. "stock": Cantidad de unidades disponibles mencionadas (ej. "llegaron 30 unidades", "lote de 15"). Si no especifica, pon 1.
 12. "description": Redacta una descripción atractiva, estructurada con viñetas sobre características, materiales, usos y ventajas.
 13. "tags": Lista de 3 a 7 etiquetas de búsqueda (ej. ["zapatillas", "running", "deportes", "nike", "calzado"]).
