@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   CheckSquare,
   Database,
+  DollarSign,
   Edit,
   Eye,
   Film,
@@ -20,6 +21,7 @@ import {
   Lock,
   MessageSquare,
   Minus,
+  Percent,
   BrainCircuit,
   Loader2,
   Package,
@@ -51,6 +53,70 @@ import { parseVideoUrl } from '../utils/video-helper.ts';
 import { checkProductTransactionLink } from '../utils/productIntegrity.ts';
 import { DeactivateConfirmationModal } from './DeactivateConfirmationModal.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
+
+export function calculateItemFinancials(item: InventoryItem) {
+  const salePriceNum = parseFloat(String(item.salePrice || '0')) || 0;
+  const discountPercent = Math.max(0, Math.min(100, Number(item.discountPercent) || 0));
+  const hasDiscount = discountPercent > 0;
+  const effectivePVP = hasDiscount ? salePriceNum * (1 - discountPercent / 100) : salePriceNum;
+
+  const taxRate = item.saleTaxPercent !== undefined && item.saleTaxPercent !== null && !isNaN(Number(item.saleTaxPercent))
+    ? Number(item.saleTaxPercent)
+    : (item.taxRate !== undefined && item.taxRate !== null && !isNaN(Number(item.taxRate))
+      ? Number(item.taxRate)
+      : 15.0);
+
+  let costWithoutTax = item.costWithoutTax !== undefined && item.costWithoutTax !== null && !isNaN(Number(item.costWithoutTax))
+    ? Number(item.costWithoutTax)
+    : 0;
+  let costWithTax = item.costWithTax !== undefined && item.costWithTax !== null && !isNaN(Number(item.costWithTax))
+    ? Number(item.costWithTax)
+    : 0;
+  const costPriceNum = parseFloat(String(item.costPrice || '0')) || 0;
+
+  if (!costWithoutTax && !costWithTax) {
+    costWithTax = costPriceNum;
+    costWithoutTax = taxRate > 0 ? costWithTax / (1 + taxRate / 100) : costWithTax;
+  } else if (!costWithoutTax) {
+    costWithoutTax = taxRate > 0 ? costWithTax / (1 + taxRate / 100) : costWithTax;
+  } else if (!costWithTax) {
+    costWithTax = item.hasPurchaseTax !== false ? costWithoutTax * (1 + taxRate / 100) : costWithoutTax;
+  }
+
+  const applySaleTax = item.applySaleTax !== undefined ? Boolean(item.applySaleTax) : false;
+
+  let salePriceWithoutTax = 0;
+  let salePriceWithTax = 0;
+
+  if (applySaleTax) {
+    salePriceWithTax = effectivePVP;
+    salePriceWithoutTax = taxRate > 0 ? effectivePVP / (1 + taxRate / 100) : effectivePVP;
+  } else {
+    salePriceWithoutTax = effectivePVP;
+    salePriceWithTax = taxRate > 0 ? effectivePVP * (1 + taxRate / 100) : effectivePVP;
+  }
+
+  const unitProfit = salePriceWithoutTax - costWithoutTax;
+  const marginPercent = costWithoutTax > 0 ? (unitProfit / costWithoutTax) * 100 : 0;
+  const isLoss = unitProfit < -0.001;
+  const isBreakEven = Math.abs(unitProfit) <= 0.001;
+
+  return {
+    pvpNum: salePriceNum,
+    discountPercent,
+    hasDiscount,
+    effectivePVP,
+    taxRate,
+    costWithoutTax,
+    costWithTax,
+    salePriceWithoutTax,
+    salePriceWithTax,
+    unitProfit,
+    marginPercent,
+    isLoss,
+    isBreakEven,
+  };
+}
 
 interface InventoryViewProps {
   items: InventoryItem[];
@@ -295,6 +361,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const totalReservedStock = items.reduce((sum, it) => sum + (it.reservedStock || 0), 0);
   const totalIncomingStock = items.reduce((sum, it) => sum + (it.incomingStock || 0), 0);
 
+  // Counts by status/stock state
+  const inStockCount = items.filter(
+    (it) => (it.availableStock !== undefined ? it.availableStock : (it.stock || 0)) > 0
+  ).length;
+  const inTransitCount = items.filter((it) => (it.incomingStock || 0) > 0).length;
+  const reservedCount = items.filter((it) => (it.reservedStock || 0) > 0).length;
+
   // Filter items
   const filteredItems = items.filter((it) => {
     const matchesCategory =
@@ -310,6 +383,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         ? disc > 0
         : statusFilter === 'available'
         ? it.status !== 'archived'
+        : statusFilter === 'in_stock'
+        ? (it.availableStock !== undefined ? it.availableStock : (it.stock || 0)) > 0
+        : statusFilter === 'in_transit'
+        ? (it.incomingStock || 0) > 0
+        : statusFilter === 'reserved'
+        ? (it.reservedStock || 0) > 0
         : statusFilter === 'archived'
         ? it.status === 'archived'
         : it.status === statusFilter;
@@ -580,7 +659,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           {/* Enhanced Stock Status Breakdown Panel (Requirement #3) */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             {/* Físico Total en Bodega */}
-            <div className="p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-blue-700 text-white shadow-md shadow-sky-500/15 border border-sky-400/40 relative overflow-hidden group">
+            <button
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === 'in_stock' ? 'all' : 'in_stock')}
+              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-blue-700 text-white shadow-md shadow-sky-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${
+                statusFilter === 'in_stock' ? 'ring-4 ring-sky-300 border-white shadow-lg font-black' : 'border-sky-400/40 hover:brightness-105'
+              }`}
+              title="Filtrar por productos con stock en almacén"
+            >
               <div className="absolute right-0 top-0 translate-x-3 -translate-y-2 opacity-15 pointer-events-none group-hover:scale-110 transition duration-300">
                 <Boxes className="w-16 h-16 sm:w-20 sm:h-20" />
               </div>
@@ -598,10 +684,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </p>
                 </div>
               </div>
-            </div>
+            </button>
 
             {/* Disponible para Venta */}
-            <div className="p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/15 border border-emerald-400/40 relative overflow-hidden group">
+            <button
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === 'in_stock' ? 'all' : 'in_stock')}
+              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${
+                statusFilter === 'in_stock' ? 'ring-4 ring-emerald-300 border-white shadow-lg font-black' : 'border-emerald-400/40 hover:brightness-105'
+              }`}
+              title="Filtrar por productos con stock en almacén listo para venta"
+            >
               <div className="absolute right-0 top-0 translate-x-3 -translate-y-2 opacity-15 pointer-events-none group-hover:scale-110 transition duration-300">
                 <PackageCheck className="w-16 h-16 sm:w-20 sm:h-20" />
               </div>
@@ -612,17 +705,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center space-x-1 sm:space-x-1.5">
                     <p className="text-[10px] font-black text-emerald-100 uppercase tracking-wider truncate">Disponible</p>
-                    <span className="hidden xs:inline-block text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-900/50 text-emerald-200 font-bold border border-emerald-300/30 shrink-0">Listo</span>
+                    <span className="hidden xs:inline-block text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-900/50 text-emerald-200 font-bold border border-emerald-300/30 shrink-0">
+                      {inStockCount} prods.
+                    </span>
                   </div>
                   <p className="text-lg sm:text-2xl font-black text-white font-mono leading-tight mt-0.5 truncate">
                     {totalAvailableStock} <span className="text-xs font-bold text-emerald-200">u.</span>
                   </p>
                 </div>
               </div>
-            </div>
+            </button>
 
             {/* Reservado en Pedidos */}
-            <div className="p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 text-white shadow-md shadow-amber-500/15 border border-amber-400/40 relative overflow-hidden group">
+            <button
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === 'reserved' ? 'all' : 'reserved')}
+              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 text-white shadow-md shadow-amber-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${
+                statusFilter === 'reserved' ? 'ring-4 ring-amber-300 border-white shadow-lg font-black' : 'border-amber-400/40 hover:brightness-105'
+              }`}
+              title="Filtrar por productos con stock reservado en pedidos confirmados"
+            >
               <div className="absolute right-0 top-0 translate-x-3 -translate-y-2 opacity-15 pointer-events-none group-hover:scale-110 transition duration-300">
                 <Lock className="w-16 h-16 sm:w-20 sm:h-20" />
               </div>
@@ -633,17 +735,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center space-x-1 sm:space-x-1.5">
                     <p className="text-[10px] font-black text-amber-100 uppercase tracking-wider truncate">Reservado</p>
-                    <span className="hidden xs:inline-block text-[9px] px-1.5 py-0.2 rounded-full bg-amber-900/50 text-amber-200 font-bold border border-amber-300/30 shrink-0">Pedidos</span>
+                    <span className="hidden xs:inline-block text-[9px] px-1.5 py-0.2 rounded-full bg-amber-900/50 text-amber-200 font-bold border border-amber-300/30 shrink-0">
+                      {reservedCount} prods.
+                    </span>
                   </div>
                   <p className="text-lg sm:text-2xl font-black text-white font-mono leading-tight mt-0.5 truncate">
                     {totalReservedStock} <span className="text-xs font-bold text-amber-200">u.</span>
                   </p>
                 </div>
               </div>
-            </div>
+            </button>
 
             {/* Por Recibir (En Tránsito) */}
-            <div className="p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 text-white shadow-md shadow-indigo-500/15 border border-indigo-400/40 relative overflow-hidden group">
+            <button
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === 'in_transit' ? 'all' : 'in_transit')}
+              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 text-white shadow-md shadow-indigo-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${
+                statusFilter === 'in_transit' ? 'ring-4 ring-indigo-300 border-white shadow-lg font-black' : 'border-indigo-400/40 hover:brightness-105'
+              }`}
+              title="Filtrar por productos en tránsito / por recibir de compras a proveedor"
+            >
               <div className="absolute right-0 top-0 translate-x-3 -translate-y-2 opacity-15 pointer-events-none group-hover:scale-110 transition duration-300">
                 <Truck className="w-16 h-16 sm:w-20 sm:h-20" />
               </div>
@@ -654,14 +765,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center space-x-1 sm:space-x-1.5">
                     <p className="text-[10px] font-black text-indigo-100 uppercase tracking-wider truncate">Tránsito</p>
-                    <span className="hidden xs:inline-block text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-900/50 text-indigo-200 font-bold border border-indigo-300/30 shrink-0">Por recibir</span>
+                    <span className="hidden xs:inline-block text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-900/50 text-indigo-200 font-bold border border-indigo-300/30 shrink-0">
+                      {inTransitCount} prods.
+                    </span>
                   </div>
                   <p className="text-lg sm:text-2xl font-black text-white font-mono leading-tight mt-0.5 truncate">
                     +{totalIncomingStock} <span className="text-xs font-bold text-indigo-200">u.</span>
                   </p>
                 </div>
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Controls Bar: Search (Barra 1) & Filtros (Barra 2) */}
@@ -782,39 +895,58 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar touch-pan-x py-1 w-full scroll-smooth pt-2 border-t border-slate-200/80 select-none">
               {/* Filtros de Estado */}
               <span className="text-[11px] text-slate-500 font-bold shrink-0 mr-0.5">Estado:</span>
-              {['all', 'available', 'offers', 'archived'].map((st) => (
-                <button
-                  key={st}
-                  onClick={() => {
-                    setStatusFilter(st);
-                    if (st === 'offers') {
-                      setActiveShowOffersOnly(true);
-                    } else if (activeShowOffersOnly && st !== 'offers') {
-                      setActiveShowOffersOnly(false);
-                    }
-                  }}
-                  className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap ${
-                    statusFilter === st || (st === 'offers' && activeShowOffersOnly)
-                      ? st === 'offers'
-                        ? 'bg-rose-600 text-white shadow-xs font-black'
-                        : 'bg-slate-900 text-white shadow-xs'
-                      : st === 'offers'
-                      ? 'text-rose-700 bg-rose-50/70 hover:bg-rose-100/70 border border-rose-200 font-black'
-                      : 'text-slate-700 bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200'
-                  }`}
-                >
-                  {st === 'offers' && <Sparkles className="w-3 h-3 text-rose-400 fill-current shrink-0" />}
-                  <span>
-                    {st === 'all'
-                      ? 'Todos'
-                      : st === 'available'
-                      ? 'Disponibles'
-                      : st === 'offers'
-                      ? `En Oferta (${offersCount})`
-                      : `Desactivados (${archivedCount})`}
-                  </span>
-                </button>
-              ))}
+              {[
+                { id: 'all', label: 'Todos', count: items.length },
+                { id: 'in_stock', label: 'En Stock', count: inStockCount },
+                { id: 'in_transit', label: 'En Tránsito', count: inTransitCount },
+                { id: 'reserved', label: 'Reservados', count: reservedCount },
+                { id: 'offers', label: 'En Oferta', count: offersCount },
+                { id: 'archived', label: 'Desactivados', count: archivedCount },
+              ].map((st) => {
+                const isSelected = statusFilter === st.id || (st.id === 'offers' && activeShowOffersOnly);
+                return (
+                  <button
+                    key={st.id}
+                    onClick={() => {
+                      setStatusFilter(st.id);
+                      if (st.id === 'offers') {
+                        setActiveShowOffersOnly(true);
+                      } else if (activeShowOffersOnly && st.id !== 'offers') {
+                        setActiveShowOffersOnly(false);
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap ${
+                      isSelected
+                        ? st.id === 'offers'
+                          ? 'bg-rose-600 text-white shadow-xs font-black'
+                          : st.id === 'in_stock'
+                          ? 'bg-emerald-700 text-white shadow-xs font-black'
+                          : st.id === 'in_transit'
+                          ? 'bg-indigo-700 text-white shadow-xs font-black'
+                          : st.id === 'reserved'
+                          ? 'bg-amber-600 text-white shadow-xs font-black'
+                          : 'bg-slate-900 text-white shadow-xs'
+                        : st.id === 'offers'
+                        ? 'text-rose-700 bg-rose-50/70 hover:bg-rose-100/70 border border-rose-200 font-black'
+                        : st.id === 'in_stock'
+                        ? 'text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200'
+                        : st.id === 'in_transit'
+                        ? 'text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-200'
+                        : st.id === 'reserved'
+                        ? 'text-amber-800 bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200'
+                        : 'text-slate-700 bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200'
+                    }`}
+                  >
+                    {st.id === 'offers' && <Sparkles className="w-3 h-3 text-rose-400 fill-current shrink-0" />}
+                    {st.id === 'in_stock' && <PackageCheck className="w-3 h-3 text-emerald-500 shrink-0" />}
+                    {st.id === 'in_transit' && <Truck className="w-3 h-3 text-indigo-500 shrink-0" />}
+                    {st.id === 'reserved' && <Lock className="w-3 h-3 text-amber-500 shrink-0" />}
+                    <span>
+                      {st.label} ({st.count})
+                    </span>
+                  </button>
+                );
+              })}
 
               {/* Separador */}
               <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
@@ -1221,40 +1353,98 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       </p>
                     )}
 
-                    {/* Pricing Block (Cost is confidential and only in Edit modal) */}
-                    <div className="pt-2.5 border-t border-slate-200 space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                        <div>
-                          <span className="text-[10px] text-slate-500 block font-bold uppercase tracking-wider">
-                            {Math.max(0, Math.min(100, Number(item.discountPercent) || 0)) > 0 ? 'Precio Oferta' : 'Precio PVP'}
-                          </span>
-                          {Math.max(0, Math.min(100, Number(item.discountPercent) || 0)) > 0 ? (
-                            <div className="flex items-baseline space-x-1.5 mt-0.5">
-                              <span className="font-black text-rose-600 text-base font-mono">
-                                ${(sale * (1 - (Number(item.discountPercent) || 0) / 100)).toFixed(2)}
+                    {/* Panel Financiero Completo (PVP, Costo, Costo c/IVA, Venta s/IVA, Venta c/IVA, Utilidad y Descuento) */}
+                    {(() => {
+                      const fin = calculateItemFinancials(item);
+                      return (
+                        <div className="pt-2.5 border-t border-slate-200 space-y-2 text-xs">
+                          {/* 1. Fila de Precio PVP & Descuento */}
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] text-slate-500 block font-black uppercase tracking-wider">
+                                {fin.hasDiscount ? 'Precio Oferta PVP' : 'Precio PVP'}
                               </span>
-                              <span className="text-xs line-through text-slate-400 font-mono font-medium">
-                                ${sale.toFixed(2)}
+                              {fin.hasDiscount ? (
+                                <div className="flex items-baseline space-x-1.5 mt-0.5">
+                                  <span className="font-black text-rose-600 text-base font-mono">
+                                    ${fin.effectivePVP.toFixed(2)}
+                                  </span>
+                                  <span className="text-xs line-through text-slate-400 font-mono font-medium">
+                                    ${fin.pvpNum.toFixed(2)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="font-black text-emerald-700 text-base font-mono mt-0.5 block">
+                                  ${fin.pvpNum.toFixed(2)} {currency}
+                                </span>
+                              )}
+                            </div>
+
+                            {fin.hasDiscount ? (
+                              <span className="px-2 py-1 rounded-lg text-[10px] font-black bg-rose-600 text-white shadow-2xs animate-pulse">
+                                🔥 -{fin.discountPercent}%
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Activo
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 2. Grid de Costo, Venta y Utilidad (6 Datos Solicitados) */}
+                          <div className="grid grid-cols-2 gap-1.5 text-[11px] font-mono">
+                            {/* Costo Sin IVA */}
+                            <div className="p-1.5 rounded-lg bg-amber-50/80 border border-amber-200 flex flex-col justify-between">
+                              <span className="text-[9px] font-bold text-amber-900 uppercase tracking-tight">Costo Sin IVA</span>
+                              <span className="font-black text-amber-950 text-xs">${fin.costWithoutTax.toFixed(2)}</span>
+                            </div>
+
+                            {/* Costo Con IVA */}
+                            <div className="p-1.5 rounded-lg bg-amber-100/70 border border-amber-300 flex flex-col justify-between">
+                              <span className="text-[9px] font-bold text-amber-900 uppercase tracking-tight">Costo Con IVA</span>
+                              <span className="font-black text-amber-950 text-xs">${fin.costWithTax.toFixed(2)}</span>
+                            </div>
+
+                            {/* Venta Sin IVA */}
+                            <div className="p-1.5 rounded-lg bg-sky-50/80 border border-sky-200 flex flex-col justify-between">
+                              <span className="text-[9px] font-bold text-sky-900 uppercase tracking-tight">Venta Sin IVA</span>
+                              <span className="font-black text-sky-950 text-xs">${fin.salePriceWithoutTax.toFixed(2)}</span>
+                            </div>
+
+                            {/* Venta Con IVA */}
+                            <div className="p-1.5 rounded-lg bg-sky-100/70 border border-sky-300 flex flex-col justify-between">
+                              <span className="text-[9px] font-bold text-sky-900 uppercase tracking-tight">Venta Con IVA</span>
+                              <span className="font-black text-sky-950 text-xs">${fin.salePriceWithTax.toFixed(2)}</span>
+                            </div>
+                          </div>
+
+                          {/* 3. Utilidad Real y Margen */}
+                          <div
+                            className={`p-2 rounded-xl border flex items-center justify-between gap-1.5 ${
+                              fin.isLoss
+                                ? 'bg-rose-50 border-rose-300 text-rose-950'
+                                : fin.isBreakEven
+                                ? 'bg-amber-50 border-amber-300 text-amber-950'
+                                : 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                            }`}
+                            title={`Utilidad unitaria: Venta sin IVA ($${fin.salePriceWithoutTax.toFixed(2)}) - Costo sin IVA ($${fin.costWithoutTax.toFixed(2)})`}
+                          >
+                            <div className="flex items-center space-x-1 font-bold text-[10px] uppercase">
+                              <TrendingUp className={`w-3.5 h-3.5 ${fin.isLoss ? 'text-rose-600 rotate-180' : 'text-emerald-600'}`} />
+                              <span>Utilidad:</span>
+                            </div>
+                            <div className="text-right font-mono">
+                              <span className={`font-black text-xs block ${fin.isLoss ? 'text-rose-700' : 'text-emerald-800'}`}>
+                                {fin.isLoss ? `-$${Math.abs(fin.unitProfit).toFixed(2)}` : `+$${fin.unitProfit.toFixed(2)}`}
+                              </span>
+                              <span className="text-[9px] text-slate-500 font-bold block">
+                                ({fin.marginPercent > 0 ? '+' : ''}{fin.marginPercent.toFixed(1)}% marg.)
                               </span>
                             </div>
-                          ) : (
-                            <span className="font-black text-emerald-700 text-base font-mono mt-0.5 block">
-                              ${sale.toFixed(2)} {currency}
-                            </span>
-                          )}
+                          </div>
                         </div>
-
-                        {Math.max(0, Math.min(100, Number(item.discountPercent) || 0)) > 0 ? (
-                          <span className="px-2 py-1 rounded-lg text-[10px] font-black bg-rose-600 text-white shadow-2xs animate-pulse">
-                            🔥 -{item.discountPercent}%
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            Activo
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1382,7 +1572,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="p-3.5">Proveedor</th>
                   <th className="p-3.5">SKU</th>
                   <th className="p-3.5">Categoría</th>
-                  <th className="p-3.5">Precio Venta (PVP)</th>
+                  <th className="p-3.5">PVP, Costos y Utilidad</th>
                   <th className="p-3.5">Stock</th>
                   <th className="p-3.5">Estado</th>
                   <th className="p-3.5 text-right">Acciones</th>
@@ -1505,26 +1695,79 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <td className="p-3.5 text-slate-700">{item.category}</td>
                       <td className="p-3.5">
                         {(() => {
-                          const disc = Math.max(0, Math.min(100, Number(item.discountPercent) || 0));
-                          if (disc > 0) {
-                            const effSale = sale * (1 - disc / 100);
-                            return (
-                              <div>
-                                <div className="flex items-baseline space-x-1">
-                                  <span className="font-black text-rose-600 font-mono text-sm">
-                                    ${effSale.toFixed(2)}
+                          const fin = calculateItemFinancials(item);
+                          return (
+                            <div className="font-mono text-xs space-y-1.5 min-w-[195px]">
+                              {/* PVP & Oferta */}
+                              <div className="flex items-center justify-between gap-1">
+                                <div>
+                                  <span className="text-[9px] font-bold text-slate-600 block uppercase tracking-tight font-sans">
+                                    {fin.hasDiscount ? 'PVP Oferta' : 'PVP Regular'}
                                   </span>
-                                  <span className="text-[10px] line-through text-slate-400 font-mono">
-                                    ${sale.toFixed(2)}
-                                  </span>
+                                  {fin.hasDiscount ? (
+                                    <div className="flex items-baseline space-x-1">
+                                      <span className="font-black text-rose-600 text-sm">
+                                        ${fin.effectivePVP.toFixed(2)}
+                                      </span>
+                                      <span className="text-[10px] line-through text-slate-400 font-medium">
+                                        ${fin.pvpNum.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="font-black text-emerald-800 text-sm block">
+                                      ${fin.effectivePVP.toFixed(2)}
+                                    </span>
+                                  )}
                                 </div>
-                                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 border border-rose-200">
-                                  -{disc}% OFF
+
+                                {fin.hasDiscount && (
+                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-2xs">
+                                    🔥 -{fin.discountPercent}%
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Costos: Sin IVA vs Con IVA */}
+                              <div className="text-[10px] bg-amber-50/80 p-1.5 rounded-lg border border-amber-200/80 space-y-0.5">
+                                <div className="flex justify-between gap-1">
+                                  <span className="text-amber-900 font-sans font-bold">Costo s/IVA:</span>
+                                  <span className="font-black text-amber-950">${fin.costWithoutTax.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between gap-1">
+                                  <span className="text-amber-900 font-sans font-bold">Costo c/IVA:</span>
+                                  <span className="font-black text-amber-950">${fin.costWithTax.toFixed(2)}</span>
+                                </div>
+                              </div>
+
+                              {/* Ventas: Sin IVA vs Con IVA */}
+                              <div className="text-[10px] bg-sky-50/80 p-1.5 rounded-lg border border-sky-200/80 space-y-0.5">
+                                <div className="flex justify-between gap-1">
+                                  <span className="text-sky-900 font-sans font-bold">Venta s/IVA:</span>
+                                  <span className="font-black text-sky-950">${fin.salePriceWithoutTax.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between gap-1">
+                                  <span className="text-sky-900 font-sans font-bold">Venta c/IVA:</span>
+                                  <span className="font-black text-sky-950">${fin.salePriceWithTax.toFixed(2)}</span>
+                                </div>
+                              </div>
+
+                              {/* Utilidad Real */}
+                              <div
+                                className={`text-[10px] font-bold p-1.5 rounded-lg border flex items-center justify-between ${
+                                  fin.isLoss
+                                    ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                    : fin.isBreakEven
+                                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                }`}
+                              >
+                                <span className="font-sans">Utilidad:</span>
+                                <span>
+                                  {fin.isLoss ? `-$${Math.abs(fin.unitProfit).toFixed(2)}` : `+$${fin.unitProfit.toFixed(2)}`} ({fin.marginPercent > 0 ? '+' : ''}{fin.marginPercent.toFixed(0)}%)
                                 </span>
                               </div>
-                            );
-                          }
-                          return <span className="font-bold text-emerald-700 font-mono">${sale.toFixed(2)}</span>;
+                            </div>
+                          );
                         })()}
                       </td>
                       <td className="p-3.5">
