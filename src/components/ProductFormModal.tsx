@@ -860,6 +860,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Aliases for full JSX backward compatibility
   const salePriceWithoutTax = publishedPriceSinIVA;
   const pvpNum = pvpListaNum;
+  const effectivePvp = totalClientePaid;
   const effectiveUnitProfit = unitProfit;
   const effectiveMarginPercent = calculatedMarginPercent;
   const effectiveSalePriceWithoutTax = baseImponibleAfterDiscount;
