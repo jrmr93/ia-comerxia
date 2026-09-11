@@ -489,6 +489,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setTimeout(() => setCopiedTelegram(false), 2000);
   };
 
+  // Helper to compute published list PVP so that after discount, net base equals costWithout + targetProfit
+  const computePublishedPvp = (
+    costWithout: number,
+    margin: number,
+    discount: number,
+    hasSaleTax: boolean,
+    saleTaxPct: number
+  ): number => {
+    const targetProfit = costWithout * (margin / 100);
+    const netRequiredAfterDiscount = costWithout + targetProfit;
+    const discRate = Math.max(0, Math.min(99, discount)) / 100;
+    const publishedSinIVA = discRate > 0 && discRate < 1 ? netRequiredAfterDiscount / (1 - discRate) : netRequiredAfterDiscount;
+    const activeSaleTax = hasSaleTax ? saleTaxPct : 0;
+    return activeSaleTax > 0 ? publishedSinIVA * (1 + activeSaleTax / 100) : publishedSinIVA;
+  };
+
   // Toggle hasPurchaseTax check and recalculate purchase costs
   const handleToggleHasPurchaseTax = (checked: boolean) => {
     setHasPurchaseTax(checked);
@@ -501,10 +517,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCostWithTax(newCostWith.toFixed(2));
       setCostPrice(newCostWith.toFixed(2));
 
-      // Recalculate sale price keeping margin based on net cost without tax
-      const saleSinIVA = costWithout * (1 + marginPercent / 100);
-      const newSalePrice = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
-      setSalePrice(newSalePrice.toFixed(2));
+      const newPvp = computePublishedPvp(costWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
+      setSalePrice(newPvp.toFixed(2));
     }
   };
 
@@ -528,18 +542,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setApplySaleTax(checked);
     const costWithout = parseFloat(costWithoutTax) || 0;
     if (costWithout > 0) {
-      const saleSinIVA = costWithout * (1 + marginPercent / 100);
-      const newSalePrice = checked && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
-      setSalePrice(newSalePrice.toFixed(2));
-    } else {
-      const currentSale = parseFloat(salePrice) || 0;
-      if (currentSale > 0) {
-        if (checked && saleTaxPercent > 0) {
-          setSalePrice((currentSale * (1 + saleTaxPercent / 100)).toFixed(2));
-        } else if (!checked && saleTaxPercent > 0) {
-          setSalePrice((currentSale / (1 + saleTaxPercent / 100)).toFixed(2));
-        }
-      }
+      const newPvp = computePublishedPvp(costWithout, marginPercent, discountPercent, checked, saleTaxPercent);
+      setSalePrice(newPvp.toFixed(2));
     }
   };
 
@@ -549,21 +553,29 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (applySaleTax) {
       const costWithout = parseFloat(costWithoutTax) || 0;
       if (costWithout > 0) {
-        const saleSinIVA = costWithout * (1 + marginPercent / 100);
-        const newSalePrice = saleSinIVA * (1 + newPercent / 100);
-        setSalePrice(newSalePrice.toFixed(2));
+        const newPvp = computePublishedPvp(costWithout, marginPercent, discountPercent, true, newPercent);
+        setSalePrice(newPvp.toFixed(2));
       }
     }
   };
 
-  // Recalculate sale price when margin changes (applied on costWithoutTax)
+  // Recalculate sale price when margin changes
   const handleMarginChange = (newMargin: number) => {
     setMarginPercent(newMargin);
     const costWithout = parseFloat(costWithoutTax) || 0;
     if (costWithout > 0) {
-      const saleSinIVA = costWithout * (1 + newMargin / 100);
-      const finalSale = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
-      setSalePrice(finalSale.toFixed(2));
+      const newPvp = computePublishedPvp(costWithout, newMargin, discountPercent, applySaleTax, saleTaxPercent);
+      setSalePrice(newPvp.toFixed(2));
+    }
+  };
+
+  // Recalculate sale price when discount changes
+  const handleDiscountChange = (newDiscount: number) => {
+    setDiscountPercent(newDiscount);
+    const costWithout = parseFloat(costWithoutTax) || 0;
+    if (costWithout > 0) {
+      const newPvp = computePublishedPvp(costWithout, marginPercent, newDiscount, applySaleTax, saleTaxPercent);
+      setSalePrice(newPvp.toFixed(2));
     }
   };
 
@@ -573,8 +585,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const num = parseFloat(newVal);
     const costWithout = parseFloat(costWithoutTax) || 0;
     if (!isNaN(num) && costWithout > 0) {
-      const saleSinIVA = applySaleTax && saleTaxPercent > 0 ? num / (1 + saleTaxPercent / 100) : num;
-      const util = saleSinIVA - costWithout;
+      const publishedSinIVA = applySaleTax && saleTaxPercent > 0 ? num / (1 + saleTaxPercent / 100) : num;
+      const discRate = Math.max(0, Math.min(99, discountPercent)) / 100;
+      const netBaseAfterDiscount = publishedSinIVA * (1 - discRate);
+      const util = netBaseAfterDiscount - costWithout;
       const calculatedMargin = Math.round((util / costWithout) * 100);
       if (calculatedMargin >= -100 && calculatedMargin <= 1000) {
         setMarginPercent(calculatedMargin);
@@ -591,9 +605,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const withTax = (numWithout * (1 + activeTax / 100)).toFixed(2);
       setCostWithTax(withTax);
       setCostPrice(withTax);
-      const saleSinIVA = numWithout * (1 + marginPercent / 100);
-      const finalSale = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
-      setSalePrice(finalSale.toFixed(2));
+      const newPvp = computePublishedPvp(numWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
+      setSalePrice(newPvp.toFixed(2));
     }
   };
 
@@ -606,9 +619,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const activeTax = hasPurchaseTax ? purchaseTaxPercent : 0;
       const numWithout = activeTax > 0 ? numWith / (1 + activeTax / 100) : numWith;
       setCostWithoutTax(numWithout.toFixed(2));
-      const saleSinIVA = numWithout * (1 + marginPercent / 100);
-      const finalSale = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
-      setSalePrice(finalSale.toFixed(2));
+      const newPvp = computePublishedPvp(numWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
+      setSalePrice(newPvp.toFixed(2));
     }
   };
 
@@ -634,9 +646,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setCostWithTax(optWith.toFixed(2));
     setCostPrice(optWith.toFixed(2));
 
-    const saleSinIVA = optWithout * (1 + marginPercent / 100);
-    const finalSale = applySaleTax && saleTaxPercent > 0 ? saleSinIVA * (1 + saleTaxPercent / 100) : saleSinIVA;
-    setSalePrice(finalSale.toFixed(2));
+    const newPvp = computePublishedPvp(optWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
+    setSalePrice(newPvp.toFixed(2));
   };
 
   // Cotizar en tiempo real en Ecuador con Google Search Grounding y Gemini
@@ -827,34 +838,39 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const purchaseTaxAmount = costWithoutNum * (activePurchaseTax / 100);
   const costTotalPaidToSupplier = costWithoutNum + purchaseTaxAmount;
 
-  const pvpNum = parseFloat(salePrice) || 0;
+  const pvpListaNum = parseFloat(salePrice) || 0;
   const activeSaleTax = applySaleTax ? saleTaxPercent : 0;
-  const salePriceWithoutTax = activeSaleTax > 0
-    ? pvpNum / (1 + activeSaleTax / 100)
-    : pvpNum;
+  const publishedPriceSinIVA = activeSaleTax > 0
+    ? pvpListaNum / (1 + activeSaleTax / 100)
+    : pvpListaNum;
+
+  const discountNum = Math.max(0, Math.min(99, Number(discountPercent) || 0));
+  const discountRate = discountNum / 100;
+  const discountAmountSinIVA = publishedPriceSinIVA * discountRate;
+  const baseImponibleAfterDiscount = publishedPriceSinIVA - discountAmountSinIVA;
+
   const saleTaxAmount = activeSaleTax > 0
-    ? pvpNum - salePriceWithoutTax
+    ? baseImponibleAfterDiscount * (activeSaleTax / 100)
     : 0;
 
-  // Real profit calculation: when purchase tax is tax credit, cost for profit is costWithoutNum
-  const unitProfit = salePriceWithoutTax - costWithoutNum;
+  const totalClientePaid = baseImponibleAfterDiscount + saleTaxAmount;
+  const unitProfit = baseImponibleAfterDiscount - costWithoutNum;
   const calculatedMarginPercent = costWithoutNum > 0 ? (unitProfit / costWithoutNum) * 100 : 0;
+
+  // Aliases for full JSX backward compatibility
+  const salePriceWithoutTax = publishedPriceSinIVA;
+  const pvpNum = pvpListaNum;
+  const effectiveUnitProfit = unitProfit;
+  const effectiveMarginPercent = calculatedMarginPercent;
+  const effectiveSalePriceWithoutTax = baseImponibleAfterDiscount;
 
   // Breakdown for Tax / Tributary
   const ivaCreditoCompra = purchaseTaxAmount;
   const ivaDebitoVenta = saleTaxAmount;
   const ivaNetoPorPagar = ivaDebitoVenta - ivaCreditoCompra;
 
-  // Store discount calculations
-  const discountNum = Math.max(0, Math.min(100, Number(discountPercent) || 0));
-  const effectivePvp = discountNum > 0 ? pvpNum * (1 - discountNum / 100) : pvpNum;
-  const effectiveSalePriceWithoutTax = activeSaleTax > 0
-    ? effectivePvp / (1 + activeSaleTax / 100)
-    : effectivePvp;
-  const effectiveUnitProfit = effectiveSalePriceWithoutTax - costWithoutNum;
-  const effectiveMarginPercent = costWithoutNum > 0 ? (effectiveUnitProfit / costWithoutNum) * 100 : 0;
-  const isLoss = effectiveUnitProfit < -0.001;
-  const isBreakEven = Math.abs(effectiveUnitProfit) <= 0.001 && costWithoutNum > 0;
+  const isLoss = unitProfit < -0.001;
+  const isBreakEven = Math.abs(unitProfit) <= 0.001 && costWithoutNum > 0;
 
   // Extract all available photos for the item (merging cover + extraImages)
   const allAvailablePhotos: string[] = [];
@@ -1998,8 +2014,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     step="1"
                     value={discountPercent}
                     onChange={(e) => {
-                      const val = Math.max(0, Math.min(100, Number(e.target.value) || 0));
-                      setDiscountPercent(val);
+                      const val = Math.max(0, Math.min(99, Number(e.target.value) || 0));
+                      handleDiscountChange(val);
                     }}
                     placeholder="0"
                     className="w-24 bg-white border border-rose-300 rounded-xl px-3 py-2 text-sm text-rose-950 font-bold focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono transition shadow-2xs"
@@ -2012,7 +2028,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <button
                       key={d}
                       type="button"
-                      onClick={() => setDiscountPercent(d)}
+                      onClick={() => handleDiscountChange(d)}
                       className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg border transition cursor-pointer flex-shrink-0 ${
                         discountNum === d
                           ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
