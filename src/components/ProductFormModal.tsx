@@ -1687,10 +1687,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                     {/* Desglose aritmético en tiempo real */}
                     <div className="flex items-center space-x-2 text-[11px] font-mono bg-white/90 px-2.5 py-1 rounded-lg border border-amber-200 text-slate-700 shadow-2xs">
-                      <span>Base: <strong>${baseSaleBeforeTax.toFixed(2)}</strong></span>
-                      <span className="text-amber-700 font-bold">+ IVA ({saleTaxPercent}%): <strong>${saleTaxAmount.toFixed(2)}</strong></span>
+                      <span>Base Sin IVA: <strong>${salePriceWithoutTax.toFixed(2)}</strong></span>
+                      <span className="text-amber-700 font-bold">+ IVA Venta ({saleTaxPercent}%): <strong>${saleTaxAmount.toFixed(2)}</strong></span>
                       <span className="text-slate-400">=</span>
-                      <span className="text-emerald-800 font-black">PVP: ${saleNum.toFixed(2)}</span>
+                      <span className="text-emerald-800 font-black">PVP: ${pvpNum.toFixed(2)}</span>
                     </div>
                   </div>
                 )}
