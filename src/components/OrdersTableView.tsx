@@ -61,7 +61,7 @@ export const getOrderRowStyles = (status?: string) => {
         orderNumberColor: 'text-amber-950 font-black',
         statusDot: 'bg-amber-500 ring-2 ring-amber-300/60',
         badgeColor: 'bg-amber-100 text-amber-950 border-amber-300 font-black',
-        label: 'Pendiente de Pago',
+        label: 'Pre-Factura (Pendiente)',
       };
     case 'confirmed':
       return {
@@ -69,7 +69,7 @@ export const getOrderRowStyles = (status?: string) => {
         orderNumberColor: 'text-purple-950 font-black',
         statusDot: 'bg-purple-500 ring-2 ring-purple-300/60',
         badgeColor: 'bg-purple-100 text-purple-950 border-purple-300 font-bold',
-        label: 'Confirmado',
+        label: 'Factura (Confirmada)',
       };
     case 'shipped':
       return {
@@ -77,7 +77,7 @@ export const getOrderRowStyles = (status?: string) => {
         orderNumberColor: 'text-sky-950 font-black',
         statusDot: 'bg-sky-500 ring-2 ring-sky-300/60',
         badgeColor: 'bg-sky-100 text-sky-950 border-sky-300 font-bold',
-        label: 'En Tránsito',
+        label: 'Factura (En Tránsito)',
       };
     case 'delivered':
       return {
@@ -85,7 +85,7 @@ export const getOrderRowStyles = (status?: string) => {
         orderNumberColor: 'text-emerald-950 font-black',
         statusDot: 'bg-emerald-500 ring-2 ring-emerald-300/60',
         badgeColor: 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold',
-        label: 'Entregado',
+        label: 'Factura (Entregada)',
       };
     case 'cancelled':
       return {
@@ -93,7 +93,7 @@ export const getOrderRowStyles = (status?: string) => {
         orderNumberColor: 'text-rose-950 font-bold',
         statusDot: 'bg-rose-500 ring-2 ring-rose-300/60',
         badgeColor: 'bg-rose-100 text-rose-950 border-rose-200 font-bold',
-        label: 'Cancelado',
+        label: 'Anulada / Cancelada',
       };
     default:
       return {
@@ -101,7 +101,7 @@ export const getOrderRowStyles = (status?: string) => {
         orderNumberColor: 'text-slate-900 font-bold',
         statusDot: 'bg-slate-400',
         badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
-        label: status || 'Pedido',
+        label: status || 'Pre-Factura',
       };
   }
 };

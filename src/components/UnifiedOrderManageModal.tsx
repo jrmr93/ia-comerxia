@@ -585,6 +585,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
       const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
       const unitSale = Number(it.salePrice || 0);
+      const itemTaxPercent = (it as any).saleTaxPercent !== undefined
+        ? Number((it as any).saleTaxPercent)
+        : (match?.saleTaxPercent !== undefined ? Number(match.saleTaxPercent) : (match?.taxRate !== undefined ? Number(match.taxRate) : 15));
+
       return calculateLineItem({
         id: it.id,
         name: it.name,
@@ -593,14 +597,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         unitSalePrice: unitSale,
         discount: Number(it.discount || 0),
         quantity: Number(it.quantity || 1),
-        applySaleTax,
-        saleTaxPercent,
+        applySaleTax: itemTaxPercent > 0,
+        saleTaxPercent: itemTaxPercent,
       });
     });
 
     const fee = deliveryType === 'pickup' ? 0 : Math.max(0, Number(shippingCost) || 0);
-    return calculateInvoiceTotals(calculatedItems, { shippingFee: fee, applySaleTax, defaultTaxPercent: saleTaxPercent });
-  }, [items, products, applySaleTax, saleTaxPercent, deliveryType, shippingCost]);
+    return calculateInvoiceTotals(calculatedItems, { shippingFee: fee });
+  }, [items, products, deliveryType, shippingCost]);
 
   const productsSubtotal = invoiceTotals.subtotalNoTax;
   const totalDiscountAmount = invoiceTotals.totalDiscount;
@@ -1231,14 +1235,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                  <span>{isCreateMode ? 'Creación de Pedido / Factura Proforma' : 'Gestión y Confirmación de Factura / Pedido'}</span>
+                  <span>{isCreateMode ? 'Creación de Pre-Factura (Desglose Fiscal Ecuador)' : (isConfirmed ? 'Factura Comercial (SRI Ecuador)' : 'Gestión de Pre-Factura de Venta')}</span>
                   <span className="px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[9px] font-mono font-bold">
                     SRI ECUADOR
                   </span>
                 </h3>
                 {isCreateMode ? (
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 text-[10px] font-bold uppercase tracking-wider">
-                    Nuevo Pedido
+                    Nueva Pre-Factura
                   </span>
                 ) : (
                   <span className="text-xs font-mono font-bold text-slate-300">
@@ -1259,7 +1263,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                         : 'bg-amber-500/30 text-amber-200 border-amber-400/40'
                     }`}
                   >
-                    {isConfirmed ? 'Confirmado' : isShipped ? 'Despachado' : isDelivered ? 'Entregado' : isCancelled ? 'Cancelado' : 'Pendiente'}
+                    {isConfirmed ? 'Factura Emitida' : isShipped ? 'Factura (En Tránsito)' : isDelivered ? 'Factura (Entregada)' : isCancelled ? 'Anulada' : 'Pre-Factura (Pendiente)'}
                   </span>
                 )}
               </div>
@@ -1276,10 +1280,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               disabled={items.length === 0}
               onClick={() => directPrintOrder({ order: currentOrderForTicket, storeConfig, currency, showToast })}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition cursor-pointer border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-              title="Imprimir ticket del pedido"
+              title="Imprimir ticket de venta"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir Pedido</span>
+              <span>{isConfirmed ? 'Imprimir Factura' : 'Imprimir Pre-Factura'}</span>
             </button>
             <button
               type="button"
@@ -2200,38 +2204,16 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     Desglose Fiscal Factura / Proforma Ecuador (SRI)
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label htmlFor="modal-apply-sale-tax" className="text-[11px] font-bold text-slate-300 cursor-pointer">
-                    Incrementar IVA {saleTaxPercent}%:
-                  </label>
-                  <input
-                    type="checkbox"
-                    id="modal-apply-sale-tax"
-                    checked={applySaleTax}
-                    onChange={(e) => setApplySaleTax(e.target.checked)}
-                    className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-700 bg-slate-800 cursor-pointer"
-                  />
-                  {applySaleTax && (
-                    <div className="flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded border border-slate-700 ml-1">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={saleTaxPercent}
-                        onChange={(e) => setSaleTaxPercent(Math.max(0, Number(e.target.value) || 0))}
-                        className="w-10 h-5 rounded bg-slate-900 border border-slate-600 text-center font-mono font-bold text-[11px] text-purple-300 focus:outline-none"
-                      />
-                      <span className="text-[11px] font-bold text-purple-300">%</span>
-                    </div>
-                  )}
-                </div>
+                <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/30 text-[10px] font-mono font-bold">
+                  Cálculo Tributario Automático por Producto
+                </span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
                 {/* Columna Izquierda: Información de Tarifas e Impuestos */}
                 <div className="space-y-1.5 bg-slate-800/60 p-3 rounded-lg border border-slate-800">
                   <div className="flex justify-between text-slate-300">
-                    <span>SUBTOTAL {saleTaxPercent}% (GRAVA IVA):</span>
+                    <span>SUBTOTAL GRAVA IVA:</span>
                     <span className="font-bold text-white">${invoiceTotals.subtotalTaxable15.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
@@ -2253,7 +2235,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     </div>
                   )}
                   <div className="flex justify-between text-amber-300">
-                    <span>IVA {saleTaxPercent}% (VENTA):</span>
+                    <span>IVA VENTA:</span>
                     <span className="font-bold">+${salesTaxAmount.toFixed(2)}</span>
                   </div>
                   {deliveryType === 'shipping' && (
@@ -2484,14 +2466,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             </div>
           </div>
           <div className="text-right sm:border-l sm:border-slate-700 sm:pl-6">
-            <span className="text-[10px] text-slate-400 font-semibold block uppercase">Total Pedido / PVP</span>
+            <span className="text-[10px] text-slate-400 font-semibold block uppercase">{isConfirmed ? 'Total Factura / PVP' : 'Total Pre-Factura / PVP'}</span>
             <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
               ${totalOrderAmount.toFixed(2)} <span className="text-sm font-bold text-slate-300">{currency}</span>
             </span>
           </div>
         </div>
 
-        {/* ================= MODAL FOOTER & ACTIONS (CANCELAR, GUARDAR, CONFIRMAR, NOTIFICAR AL CLIENTE LA PROFORMA ACTUAL) ================= */}
+        {/* ================= MODAL FOOTER & ACTIONS (CANCELAR, GUARDAR PRE-FACTURA, EMITIR FACTURA, NOTIFICAR POR WHATSAPP) ================= */}
         <div className="px-5 sm:px-6 py-3.5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-xs">
           {/* Botón: Cancelar */}
           <button
@@ -2507,46 +2489,46 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             {isLockedFromEdit ? (
               <div className="px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold flex items-center gap-2 shadow-2xs">
                 <Lock className="w-4 h-4 text-slate-500" />
-                <span>Pedido Confirmado (Inmutable - No modificable)</span>
+                <span>Factura Comercial (Confirmada e Inmutable)</span>
               </div>
             ) : (
               <>
-                {/* Botón: Guardar */}
+                {/* Botón: Guardar Pre-Factura */}
                 <button
                   type="button"
                   disabled={isSaving || isConfirming || items.length === 0 || !customerPhone.trim()}
                   onClick={() => handleSaveOrder(false, false)}
                   className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs"
-                  title="Guarda los datos y cambios del pedido sin alterar el estado actual"
+                  title="Guarda la pre-factura sin emitir la factura comercial"
                 >
                   <Check className="w-4 h-4 text-emerald-400" />
-                  <span>{isSaving ? 'Guardando...' : 'Guardar'}</span>
+                  <span>{isSaving ? 'Guardando...' : 'Guardar Pre-Factura'}</span>
                 </button>
 
-                {/* Botón: Confirmar */}
+                {/* Botón: Emitir y Confirmar Factura */}
                 <button
                   type="button"
                   disabled={isSaving || isConfirming || items.length === 0 || !customerPhone.trim()}
                   onClick={() => handleConfirmOrder(false)}
                   className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm ring-2 ring-emerald-200"
-                  title="Valida el pago y confirma el pedido en el sistema"
+                  title="Valida la pre-factura y emite la factura comercial confirmada"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{isConfirming ? 'Confirmando...' : 'Confirmar'}</span>
+                  <span>{isConfirming ? 'Emitiendo Factura...' : '✓ Emitir y Confirmar Factura'}</span>
                 </button>
               </>
             )}
 
-            {/* Botón: Notificar al cliente la proforma actual */}
+            {/* Botón: Notificar al cliente la pre-factura actual */}
             <button
               type="button"
               disabled={isSaving || isConfirming || items.length === 0 || !customerPhone.trim()}
               onClick={handleNotifyClientProforma}
               className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black transition flex items-center justify-center space-x-2 cursor-pointer shadow-sm ring-2 ring-teal-200"
-              title="Guarda el pedido y envía la proforma con el desglose actual por WhatsApp"
+              title="Guarda y envía la pre-factura con el desglose actual por WhatsApp"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Notificar al cliente la proforma actual</span>
+              <span>Notificar Pre-Factura por WhatsApp</span>
             </button>
           </div>
         </div>

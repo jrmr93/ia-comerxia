@@ -127,7 +127,7 @@ export const OrdersCardsView: React.FC<OrdersCardsViewProps> = ({
           statusBadge = (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-black bg-amber-100 text-amber-950 border border-amber-300">
               <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-              <span>Pendiente de Pago</span>
+              <span>Pre-Factura (Pendiente)</span>
             </span>
           );
         } else if (ord.status === 'confirmed') {
@@ -135,7 +135,7 @@ export const OrdersCardsView: React.FC<OrdersCardsViewProps> = ({
           statusBadge = (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-100 text-purple-950 border border-purple-300">
               <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" />
-              <span>{isPickup ? 'Listo para Retiro' : 'Confirmado'}</span>
+              <span>{isPickup ? 'Factura (Listo para Retiro)' : 'Factura (Confirmada)'}</span>
             </span>
           );
         } else if (ord.status === 'shipped') {
@@ -143,7 +143,7 @@ export const OrdersCardsView: React.FC<OrdersCardsViewProps> = ({
           statusBadge = (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold bg-sky-100 text-sky-950 border border-sky-300">
               <Truck className="w-3.5 h-3.5 text-sky-600" />
-              <span>En Tránsito / Despachado</span>
+              <span>Factura (En Tránsito)</span>
             </span>
           );
         } else if (ord.status === 'delivered') {
@@ -151,7 +151,7 @@ export const OrdersCardsView: React.FC<OrdersCardsViewProps> = ({
           statusBadge = (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-300">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Entregado</span>
+              <span>Factura (Entregada)</span>
             </span>
           );
         } else if (ord.status === 'cancelled') {
@@ -159,7 +159,7 @@ export const OrdersCardsView: React.FC<OrdersCardsViewProps> = ({
           statusBadge = (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold bg-rose-100 text-rose-950 border border-rose-200">
               <XCircle className="w-3.5 h-3.5 text-rose-600" />
-              <span>Cancelado</span>
+              <span>Anulada / Cancelada</span>
             </span>
           );
         }

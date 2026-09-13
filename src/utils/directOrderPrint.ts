@@ -114,7 +114,8 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
   let notesStr = '';
 
   if (isSale && order) {
-    documentTitle = 'PEDIDO DE VENTA';
+    const isConfirmedOrder = order.status === 'confirmed' || order.status === 'shipped' || order.status === 'delivered';
+    documentTitle = isConfirmedOrder ? 'FACTURA DE VENTA' : 'PRE-FACTURA DE VENTA';
     orderNumberStr = String(order.orderNumber || order.id || '');
     orderDateStr = new Date(order.createdAt).toLocaleDateString('es-EC', {
       year: 'numeric',
@@ -129,14 +130,14 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
 
     orderStatusBadge =
       order.status === 'delivered'
-        ? 'ENTREGADO'
+        ? 'FACTURA ENTREGADA'
         : order.status === 'shipped'
-        ? 'EN TRÁNSITO'
+        ? 'FACTURA EN TRÁNSITO'
         : order.status === 'confirmed'
-        ? 'CONFIRMADO'
+        ? 'FACTURA CONFIRMADA'
         : order.status === 'cancelled'
-        ? 'CANCELADO'
-        : 'PENDIENTE DE PAGO';
+        ? 'ANULADA / CANCELADA'
+        : 'PRE-FACTURA PENDIENTE';
     notesStr = order.notes || '';
   } else if (isPurchase && purchase) {
     documentTitle = 'ORDEN DE COMPRA';
@@ -674,7 +675,7 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
                 : ''
             }
             <tr class="grand-total-row">
-              <td class="totals-label" style="font-size: 11px; color: #0f172a;">TOTAL ${isSale ? 'DEL PEDIDO' : 'DE LA COMPRA'}:</td>
+              <td class="totals-label" style="font-size: 11px; color: #0f172a;">TOTAL ${isSale ? (order?.status === 'confirmed' || order?.status === 'shipped' || order?.status === 'delivered' ? 'DE LA FACTURA' : 'DE LA PRE-FACTURA') : 'DE LA COMPRA'}:</td>
               <td class="totals-val" style="font-size: 12.5px; color: #0284c7;">${currencySymbol}${finalTotal.toFixed(2)}</td>
             </tr>
           </table>
@@ -977,7 +978,8 @@ export async function directPrintOrder(params: DirectOrderPrintParams): Promise<
   cleanUpLegacyPrintArtifacts();
 
   if (showToast) {
-    showToast(`🖨️ Abriendo gestor de impresión para ${isSale ? 'Pedido de Venta' : 'Orden de Compra'} #${docNum}...`);
+    const isConfirmedOrder = order && (order.status === 'confirmed' || order.status === 'shipped' || order.status === 'delivered');
+    showToast(`🖨️ Abriendo gestor de impresión para ${isSale ? (isConfirmedOrder ? 'Factura Comercial' : 'Pre-Factura') : 'Orden de Compra'} #${docNum}...`);
   }
 
   let isInsideIframe = false;

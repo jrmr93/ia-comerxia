@@ -1103,50 +1103,28 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               {/* ========================================================================= */}
               {/* CONFIGURACIÓN DE IVA EN COMPRA (CHECK & PORCENTAJE)                       */}
               {/* ========================================================================= */}
-              <div
-                className={`p-3.5 rounded-2xl border transition-all ${
-                  hasPurchaseTax
-                    ? 'bg-sky-50/80 border-sky-300 shadow-2xs'
-                    : 'bg-slate-50/80 border-slate-200'
-                }`}
-              >
+              {/* ========================================================================= */}
+              {/* CONFIGURACIÓN DE IVA EN COMPRA (TASA DIRECTA DE NATURALEZA DE PRODUCTO)    */}
+              {/* ========================================================================= */}
+              <div className="p-3.5 rounded-2xl border bg-sky-50/80 border-sky-300 shadow-2xs space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  {/* Toggle / Checkbox */}
-                  <label className="flex items-start sm:items-center space-x-3 cursor-pointer select-none">
-                    <div className="relative flex items-center pt-0.5 sm:pt-0">
-                      <input
-                        type="checkbox"
-                        checked={hasPurchaseTax}
-                        onChange={(e) => handleToggleHasPurchaseTax(e.target.checked)}
-                        className="w-5 h-5 rounded-md text-sky-600 border-slate-300 focus:ring-sky-500 cursor-pointer accent-sky-600 transition"
-                      />
+                  <div>
+                    <div className="flex items-center space-x-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <ShoppingBag className="w-3.5 h-3.5 text-sky-700" />
+                        <span>Tarifa IVA en Compra (Proveedor)</span>
+                      </span>
+                      <span className="text-[10px] font-black text-sky-900 bg-sky-100/90 border border-sky-300 px-2 py-0.5 rounded-full font-mono">
+                        {purchaseTaxPercent > 0 ? `+${purchaseTaxPercent}% IVA` : '0% Exento'}
+                      </span>
                     </div>
-                    <div>
-                      <div className="flex items-center space-x-2 flex-wrap">
-                        <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                          <ShoppingBag className="w-3.5 h-3.5 text-sky-700" />
-                          <span>Tiene IVA en Compra</span>
-                        </span>
-                        {hasPurchaseTax ? (
-                          <span className="text-[10px] font-black text-sky-900 bg-sky-100/90 border border-sky-300 px-2 py-0.5 rounded-full font-mono">
-                            +{purchaseTaxPercent}% Activo
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-full">
-                            0% IVA (Costo Neto Leído)
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
-                        {hasPurchaseTax
-                          ? 'El proveedor cobra IVA en la compra. Se desglosa el Costo Sin IVA y Con IVA según la tasa.'
-                          : 'Sin IVA en compra (tasa 0% o exento). El costo del producto es exactamente el valor de adquisición neto.'}
-                      </p>
-                    </div>
-                  </label>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      Configura la tarifa del impuesto que aplica el proveedor en la adquisición (0%, 5%, 8%, 15% o personalizada).
+                    </p>
+                  </div>
 
                   {/* Campo de porcentaje de IVA para Compra */}
-                  <div className="flex items-center space-x-2 pl-8 sm:pl-0 shrink-0">
+                  <div className="flex items-center space-x-2 shrink-0">
                     <div className="flex flex-col items-start sm:items-end">
                       <div className="flex items-center space-x-1.5">
                         <span className="text-[11px] font-bold text-slate-700">Tasa IVA Compra:</span>
@@ -1156,78 +1134,44 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             min="0"
                             max="100"
                             step="0.5"
-                            disabled={!hasPurchaseTax}
                             value={purchaseTaxPercent}
                             onChange={(e) => handlePurchaseTaxPercentChange(Math.max(0, Number(e.target.value)))}
-                            className={`w-full border rounded-xl pl-2.5 pr-6 py-1.5 text-xs font-mono font-black transition text-center ${
-                              hasPurchaseTax
-                                ? 'bg-white border-sky-400 text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 shadow-2xs'
-                                : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'
-                            }`}
+                            className="w-full border rounded-xl pl-2.5 pr-6 py-1.5 text-xs font-mono font-black transition text-center bg-white border-sky-400 text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 shadow-2xs"
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                         </div>
                       </div>
-                      {/* Botón rápido para restaurar por defecto de Telegram */}
-                      <button
-                        type="button"
-                        onClick={() => handlePurchaseTaxPercentChange(telegramTaxPercent)}
-                        title={`Restablecer al IVA por defecto configurado en Telegram (${telegramTaxPercent}%)`}
-                        className="text-[10px] text-sky-800 hover:text-sky-950 hover:underline mt-1 font-medium inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Defecto Telegram:</span>
-                        <span className="font-mono font-bold bg-sky-200/70 px-1 py-0.2 rounded text-sky-950">
-                          {telegramTaxPercent}%
-                        </span>
-                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Presets rápidos de tasas de IVA y desglose dinámico cuando está activo */}
-                {hasPurchaseTax && (
-                  <div className="mt-3 pt-2.5 border-t border-sky-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                    {/* Botones de tasas rápidas */}
-                    <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                      <span className="text-[10px] font-bold text-sky-900 uppercase tracking-wider">Tasas Rápidas:</span>
-                      {[0, 5, 8, 12, 15].map((rate) => (
-                        <button
-                          key={rate}
-                          type="button"
-                          onClick={() => handlePurchaseTaxPercentChange(rate)}
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition cursor-pointer ${
-                            purchaseTaxPercent === rate
-                              ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
-                              : 'bg-white text-slate-700 border-sky-200 hover:bg-sky-100 hover:text-sky-950'
-                          }`}
-                        >
-                          {rate === 0 ? '0% Exento' : `${rate}%`}
-                        </button>
-                      ))}
-                      {telegramTaxPercent !== 15 && telegramTaxPercent !== 12 && telegramTaxPercent !== 8 && telegramTaxPercent !== 5 && telegramTaxPercent !== 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handlePurchaseTaxPercentChange(telegramTaxPercent)}
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition cursor-pointer ${
-                            purchaseTaxPercent === telegramTaxPercent
-                              ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
-                              : 'bg-white text-slate-700 border-sky-200 hover:bg-sky-100'
-                          }`}
-                        >
-                          Telegram ({telegramTaxPercent}%)
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Desglose aritmético en tiempo real */}
-                    <div className="flex items-center space-x-2 text-[11px] font-mono bg-white/90 px-2.5 py-1 rounded-lg border border-sky-200 text-slate-700 shadow-2xs">
-                      <span>Base Compra: <strong>${(parseFloat(costWithoutTax) || 0).toFixed(2)}</strong></span>
-                      <span className="text-sky-700 font-bold">+ IVA ({purchaseTaxPercent}%): <strong>${Math.max(0, (parseFloat(costWithTax || costPrice) || 0) - (parseFloat(costWithoutTax) || 0)).toFixed(2)}</strong></span>
-                      <span className="text-slate-400">=</span>
-                      <span className="text-slate-900 font-black">Costo Total: ${(parseFloat(costWithTax || costPrice) || 0).toFixed(2)}</span>
-                    </div>
+                {/* Presets rápidos de tasas de IVA y desglose dinámico */}
+                <div className="pt-2 border-t border-sky-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    <span className="text-[10px] font-bold text-sky-900 uppercase tracking-wider">Tarifas SRI:</span>
+                    {[0, 5, 8, 12, 15].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => handlePurchaseTaxPercentChange(rate)}
+                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition cursor-pointer ${
+                          purchaseTaxPercent === rate
+                            ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-sky-200 hover:bg-sky-100 hover:text-sky-950'
+                        }`}
+                      >
+                        {rate === 0 ? '0% Exento' : `${rate}%`}
+                      </button>
+                    ))}
                   </div>
-                )}
+
+                  <div className="flex items-center space-x-2 text-[11px] font-mono bg-white/90 px-2.5 py-1 rounded-lg border border-sky-200 text-slate-700 shadow-2xs">
+                    <span>Base Compra: <strong>${(parseFloat(costWithoutTax) || 0).toFixed(2)}</strong></span>
+                    <span className="text-sky-700 font-bold">+ IVA ({purchaseTaxPercent}%): <strong>${Math.max(0, (parseFloat(costWithTax || costPrice) || 0) - (parseFloat(costWithoutTax) || 0)).toFixed(2)}</strong></span>
+                    <span className="text-slate-400">=</span>
+                    <span className="text-slate-900 font-black">Costo Total: ${(parseFloat(costWithTax || costPrice) || 0).toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
 
               {/* Fila 1: Costos de Adquisición (Sin IVA y Con IVA) */}
@@ -1585,52 +1529,27 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               )}
 
               {/* ========================================================================= */}
-              {/* CONFIGURACIÓN DE IVA PARA VENTA AL PÚBLICO (CHECK & PORCENTAJE)            */}
+              {/* CONFIGURACIÓN DE IVA PARA VENTA AL PÚBLICO (TASA DIRECTA DE NATURALEZA)    */}
               {/* ========================================================================= */}
-              <div
-                className={`p-3.5 rounded-2xl border transition-all ${
-                  applySaleTax
-                    ? 'bg-amber-50/80 border-amber-300 shadow-2xs'
-                    : 'bg-slate-50/80 border-slate-200'
-                }`}
-              >
+              <div className="p-3.5 rounded-2xl border bg-amber-50/80 border-amber-300 shadow-2xs space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  {/* Toggle / Checkbox */}
-                  <label className="flex items-start sm:items-center space-x-3 cursor-pointer select-none">
-                    <div className="relative flex items-center pt-0.5 sm:pt-0">
-                      <input
-                        type="checkbox"
-                        checked={applySaleTax}
-                        onChange={(e) => handleToggleApplySaleTax(e.target.checked)}
-                        className="w-5 h-5 rounded-md text-amber-600 border-slate-300 focus:ring-amber-500 cursor-pointer accent-amber-600 transition"
-                      />
+                  <div>
+                    <div className="flex items-center space-x-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <Receipt className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Tarifa IVA en Venta al Público</span>
+                      </span>
+                      <span className="text-[10px] font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-full font-mono">
+                        {saleTaxPercent > 0 ? `+${saleTaxPercent}% IVA` : '0% Exento'}
+                      </span>
                     </div>
-                    <div>
-                      <div className="flex items-center space-x-2 flex-wrap">
-                        <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                          <Receipt className="w-3.5 h-3.5 text-amber-700" />
-                          <span>Incrementar IVA para la Venta</span>
-                        </span>
-                        {applySaleTax ? (
-                          <span className="text-[10px] font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-full font-mono">
-                            +{saleTaxPercent}% Activo
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-full">
-                            Desactivado
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
-                        {applySaleTax
-                          ? 'El PVP incrementa con el IVA de venta para que el cliente final asuma el impuesto.'
-                          : 'Venta directa sin incremento de IVA (producto con IVA ya incluido, exento o neto).'}
-                      </p>
-                    </div>
-                  </label>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      Define la tarifa del IVA registrada para la facturación al público de este producto (0%, 5%, 8%, 15% o personalizada).
+                    </p>
+                  </div>
 
                   {/* Campo de porcentaje de IVA para Venta */}
-                  <div className="flex items-center space-x-2 pl-8 sm:pl-0 shrink-0">
+                  <div className="flex items-center space-x-2 shrink-0">
                     <div className="flex flex-col items-start sm:items-end">
                       <div className="flex items-center space-x-1.5">
                         <span className="text-[11px] font-bold text-slate-700">Tasa IVA Venta:</span>
@@ -1640,78 +1559,44 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             min="0"
                             max="100"
                             step="0.5"
-                            disabled={!applySaleTax}
                             value={saleTaxPercent}
                             onChange={(e) => handleSaleTaxPercentChange(Math.max(0, Number(e.target.value)))}
-                            className={`w-full border rounded-xl pl-2.5 pr-6 py-1.5 text-xs font-mono font-black transition text-center ${
-                              applySaleTax
-                                ? 'bg-white border-amber-400 text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-2xs'
-                                : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'
-                            }`}
+                            className="w-full border rounded-xl pl-2.5 pr-6 py-1.5 text-xs font-mono font-black transition text-center bg-white border-amber-400 text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-2xs"
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                         </div>
                       </div>
-                      {/* Botón rápido para restaurar por defecto de Telegram */}
-                      <button
-                        type="button"
-                        onClick={() => handleSaleTaxPercentChange(telegramTaxPercent)}
-                        title={`Restablecer al IVA por defecto configurado en Telegram (${telegramTaxPercent}%)`}
-                        className="text-[10px] text-amber-800 hover:text-amber-950 hover:underline mt-1 font-medium inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Defecto Telegram:</span>
-                        <span className="font-mono font-bold bg-amber-200/70 px-1 py-0.2 rounded text-amber-950">
-                          {telegramTaxPercent}%
-                        </span>
-                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Presets rápidos de tasas de IVA y desglose dinámico cuando está activo */}
-                {applySaleTax && (
-                  <div className="mt-3 pt-2.5 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                    {/* Botones de tasas rápidas */}
-                    <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                      <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider">Tasas Rápidas:</span>
-                      {[0, 5, 8, 12, 15].map((rate) => (
-                        <button
-                          key={rate}
-                          type="button"
-                          onClick={() => handleSaleTaxPercentChange(rate)}
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition cursor-pointer ${
-                            saleTaxPercent === rate
-                              ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                              : 'bg-white text-slate-700 border-amber-200 hover:bg-amber-100 hover:text-amber-950'
-                          }`}
-                        >
-                          {rate === 0 ? '0% Exento' : `${rate}%`}
-                        </button>
-                      ))}
-                      {telegramTaxPercent !== 15 && telegramTaxPercent !== 12 && telegramTaxPercent !== 8 && telegramTaxPercent !== 5 && telegramTaxPercent !== 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleSaleTaxPercentChange(telegramTaxPercent)}
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition cursor-pointer ${
-                            saleTaxPercent === telegramTaxPercent
-                              ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                              : 'bg-white text-slate-700 border-amber-200 hover:bg-amber-100'
-                          }`}
-                        >
-                          Telegram ({telegramTaxPercent}%)
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Desglose aritmético en tiempo real */}
-                    <div className="flex items-center space-x-2 text-[11px] font-mono bg-white/90 px-2.5 py-1 rounded-lg border border-amber-200 text-slate-700 shadow-2xs">
-                      <span>Base Sin IVA: <strong>${salePriceWithoutTax.toFixed(2)}</strong></span>
-                      <span className="text-amber-700 font-bold">+ IVA Venta ({saleTaxPercent}%): <strong>${saleTaxAmount.toFixed(2)}</strong></span>
-                      <span className="text-slate-400">=</span>
-                      <span className="text-emerald-800 font-black">PVP: ${pvpNum.toFixed(2)}</span>
-                    </div>
+                {/* Presets rápidos de tasas de IVA y desglose dinámico */}
+                <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider">Tarifas SRI:</span>
+                    {[0, 5, 8, 12, 15].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => handleSaleTaxPercentChange(rate)}
+                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition cursor-pointer ${
+                          saleTaxPercent === rate
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-amber-200 hover:bg-amber-100 hover:text-amber-950'
+                        }`}
+                      >
+                        {rate === 0 ? '0% Exento' : `${rate}%`}
+                      </button>
+                    ))}
                   </div>
-                )}
+
+                  <div className="flex items-center space-x-2 text-[11px] font-mono bg-white/90 px-2.5 py-1 rounded-lg border border-amber-200 text-slate-700 shadow-2xs">
+                    <span>Base Sin IVA: <strong>${salePriceWithoutTax.toFixed(2)}</strong></span>
+                    <span className="text-amber-700 font-bold">+ IVA Venta ({saleTaxPercent}%): <strong>${saleTaxAmount.toFixed(2)}</strong></span>
+                    <span className="text-slate-400">=</span>
+                    <span className="text-emerald-800 font-black">PVP: ${pvpNum.toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
 
               {/* ========================================================================= */}

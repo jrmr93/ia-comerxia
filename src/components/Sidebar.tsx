@@ -116,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'tab-sales',
-          label: 'Ventas (Pedidos)',
+          label: 'Ventas (Pre-Facturas / Facturas)',
           shortLabel: 'Ventas',
           icon: PackageCheck,
           isActive: activeTab === 'orders' || (activeTab === 'store' && storeSubTab === 'orders'),

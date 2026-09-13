@@ -4356,14 +4356,14 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                   <PackageCheck className="w-4 h-4" />
                 </div>
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  Gestión de Pedidos Recibidos
+                  Gestión de Ventas (Pre-Facturas y Facturas)
                   <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
-                    {orders.length} pedidos
+                    {orders.length} ventas
                   </span>
                 </h2>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Monitorea tus ventas por fecha, confirma comprobantes de pago y coordina el despacho de compras.
+                Registra pre-facturas, confirma la emisión de facturas comerciales, gestiona cobros y despacho.
               </p>
             </div>
 
@@ -4392,7 +4392,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 className="inline-flex items-center px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-xs transition cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 mr-1.5" />
-                <span>+ Crear Pedido Manual</span>
+                <span>+ Nueva Pre-Factura</span>
               </button>
 
               <button
@@ -4502,7 +4502,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 }`}
               >
                 <Clock className={`w-3 h-3 ${orderCounts.pending > 0 ? 'text-amber-600 animate-pulse' : ''}`} />
-                <span>Pendientes</span>
+                <span>Pre-Facturas (Pendientes)</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${orderStatusFilter === 'pending' ? 'bg-amber-900 text-white' : 'bg-amber-200/90 text-amber-950'}`}>
                   {orderCounts.pending}
                 </span>
@@ -4517,7 +4517,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 }`}
               >
                 <Receipt className="w-3 h-3" />
-                <span>Confirmados</span>
+                <span>Facturas (Confirmadas)</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${orderStatusFilter === 'confirmed' ? 'bg-purple-950 text-white' : 'bg-purple-100 text-purple-800'}`}>
                   {orderCounts.confirmed}
                 </span>
@@ -4532,7 +4532,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 }`}
               >
                 <Truck className="w-3 h-3" />
-                <span>Enviados</span>
+                <span>Facturas (En Tránsito)</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${orderStatusFilter === 'shipped' ? 'bg-blue-950 text-white' : 'bg-blue-100 text-blue-800'}`}>
                   {orderCounts.shipped}
                 </span>
@@ -4547,7 +4547,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 }`}
               >
                 <BadgeCheck className="w-3 h-3" />
-                <span>Entregados</span>
+                <span>Facturas (Entregadas)</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${orderStatusFilter === 'delivered' ? 'bg-emerald-950 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
                   {orderCounts.delivered}
                 </span>
@@ -4562,7 +4562,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 }`}
               >
                 <X className="w-3 h-3" />
-                <span>Cancelados</span>
+                <span>Anuladas / Canceladas</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${orderStatusFilter === 'cancelled' ? 'bg-rose-950 text-white' : 'bg-rose-100 text-rose-800'}`}>
                   {orderCounts.cancelled}
                 </span>
