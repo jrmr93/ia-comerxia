@@ -1035,14 +1035,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                       {(() => {
                         const itemTaxRate = Number(currentItem.taxRate) || 15;
-                        const costWithout =
+                        const costWithout = Math.round((
                           currentItem.costWithoutTax !== undefined && currentItem.costWithoutTax !== null
                             ? Number(currentItem.costWithoutTax)
-                            : cost / (1 + itemTaxRate / 100);
-                        const costWith =
+                            : cost / (1 + itemTaxRate / 100)
+                        ) * 100) / 100;
+                        const costWith = Math.round((
                           currentItem.costWithTax !== undefined && currentItem.costWithTax !== null
                             ? Number(currentItem.costWithTax)
-                            : cost;
+                            : cost
+                        ) * 100) / 100;
 
                         let parsedAttr: Record<string, any> = {};
                         if (currentItem.extractedAttributes) {
@@ -1072,8 +1074,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             : parsedAttr.saleTaxPercent !== undefined && !isNaN(Number(parsedAttr.saleTaxPercent))
                             ? Number(parsedAttr.saleTaxPercent)
                             : itemTaxRate;
-                        const baseSaleBeforeTax = applySaleTax && saleTaxPercent > 0 ? sale / (1 + saleTaxPercent / 100) : sale;
-                        const unitProfit = baseSaleBeforeTax - costWithout;
+                        const baseSaleBeforeTax = Math.round((applySaleTax && saleTaxPercent > 0 ? sale / (1 + saleTaxPercent / 100) : sale) * 100) / 100;
+                        const unitProfit = Math.round((baseSaleBeforeTax - costWithout) * 100) / 100;
 
                         if (!showCosts) {
                           return (

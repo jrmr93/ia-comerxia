@@ -460,12 +460,16 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
 
     const subItem = it.item && typeof it.item === 'object' ? it.item : {};
 
+    let netUnit = 0;
     if (isSale) {
       unit = Number(it.salePrice ?? subItem.salePrice ?? it.unitPrice ?? it.price ?? subItem.price ?? 0);
+      const discount = Number(it.discount ?? subItem.discount ?? 0);
+      netUnit = Math.max(0, unit - discount);
       sku = it.sku || subItem.sku || (it.inventoryItemId ? `SKU-${it.inventoryItemId}` : it.id ? `SKU-${it.id}` : `PRD-${index + 1}`);
       name = it.name || subItem.name || it.productName || it.title || 'Producto';
     } else {
       unit = Number(it.costPrice ?? subItem.costPrice ?? it.unitCost ?? it.cost ?? it.price ?? 0);
+      netUnit = unit;
       sku = it.sku || subItem.sku || (it.inventoryItemId ? `SKU-${it.inventoryItemId}` : it.barcode || `CMP-${index + 1}`);
       name = it.name || subItem.name || it.productName || it.title || 'Producto adq.';
     }
@@ -475,7 +479,7 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
       name,
       quantity: qty,
       unitPrice: unit,
-      totalPrice: Number((qty * unit).toFixed(2)),
+      totalPrice: Number((qty * netUnit).toFixed(2)),
     };
   });
 

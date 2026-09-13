@@ -110,20 +110,20 @@ export function calculateTaxAdjustment(params: {
 
   if (taxStatus === 'PLUS_TAX') {
     // Content specifies WITHOUT tax (+ IVA / más IVA / sin IVA)
-    baseCostPrice = rawCost;
+    baseCostPrice = Math.round(rawCost * 100) / 100;
     taxAmount = Math.round(rawCost * (effectiveTax / 100) * 100) / 100;
     finalCost = Math.round((baseCostPrice + taxAmount) * 100) / 100;
   } else if (taxStatus === 'INCLUDED') {
     // Content specifies WITH tax (con IVA / IVA incluido)
-    finalCost = rawCost;
+    finalCost = Math.round(rawCost * 100) / 100;
     baseCostPrice = Math.round((finalCost / (1 + effectiveTax / 100)) * 100) / 100;
     taxAmount = Math.round((finalCost - baseCostPrice) * 100) / 100;
   } else {
     // NOT_SPECIFIED: Content did NOT specify whether it has or doesn't have IVA.
     // User requirement: Assume VAT percentage is 0% and the product cost is the one read.
     effectiveTax = 0;
-    finalCost = rawCost;
-    baseCostPrice = rawCost;
+    finalCost = Math.round(rawCost * 100) / 100;
+    baseCostPrice = finalCost;
     taxAmount = 0;
   }
 
@@ -157,16 +157,16 @@ export function adjustCostOptionsForTax(
     let cleanLabel = opt.label;
 
     if (taxStatus === 'PLUS_TAX') {
-      optWithout = opt.price;
+      optWithout = Math.round(opt.price * 100) / 100;
       optWith = Math.round(opt.price * (1 + effTax / 100) * 100) / 100;
       if (!cleanLabel.includes('IVA')) cleanLabel = `${cleanLabel} (+${effTax}% IVA)`;
     } else if (taxStatus === 'INCLUDED') {
-      optWith = opt.price;
+      optWith = Math.round(opt.price * 100) / 100;
       optWithout = Math.round((opt.price / (1 + effTax / 100)) * 100) / 100;
     } else {
       // NOT_SPECIFIED: 0% IVA, cost is exactly what was read
-      optWith = opt.price;
-      optWithout = opt.price;
+      optWith = Math.round(opt.price * 100) / 100;
+      optWithout = optWith;
     }
 
     return {
@@ -178,3 +178,7 @@ export function adjustCostOptionsForTax(
     };
   });
 }
+
+// Re-export SRI Ecuador Tax Engine primitives
+export * from './ecuadorTaxCalculator.ts';
+

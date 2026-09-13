@@ -229,8 +229,13 @@ export interface CustomerOrderItem {
   inventoryItemId?: number;
   name: string;
   sku: string;
-  salePrice: string;
-  costPrice?: string;
+  salePrice: string | number;
+  discount?: string | number;
+  discountPercent?: number;
+  costPrice?: string | number;
+  marginPercent?: number;
+  applySaleTax?: boolean;
+  saleTaxPercent?: number;
   quantity: number;
   deliveredQuantity?: number;
   pendingQuantity?: number;
@@ -281,6 +286,10 @@ export interface CustomerOrder {
   customerCi?: string | null;
   ci?: string | null;
   items: CustomerOrderItem[];
+  subtotalAmount?: string | number;
+  taxAmount?: string | number;
+  applySaleTax?: boolean;
+  saleTaxPercent?: number;
   totalAmount: string;
   paymentMethod: string;
   status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -340,6 +349,8 @@ export interface PurchaseItem {
   costPrice: string | number;
   salePrice?: string | number;
   quantity: number;
+  taxPercent?: number;
+  discount?: number;
   receivedQuantity?: number;
   pendingQuantity?: number;
   returnedQuantity?: number;

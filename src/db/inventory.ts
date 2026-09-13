@@ -4959,10 +4959,38 @@ export async function updateCustomerOrder(
 
           totalAllDeficitUnits += missingQty;
 
-          // Determinar costo unitario
-          const itemCostPrice = invItem
-            ? Number(invItem.costPrice || (Number(invItem.salePrice || 0) * 0.7) || 0)
-            : Number(oItem.costPrice || (Number(oItem.salePrice || 0) * 0.7) || 0);
+          // Determinar costo unitario sin IVA para la Orden de Compra
+          let itemCostPrice = 0;
+          if (invItem) {
+            if (
+              invItem.costWithoutTax !== undefined &&
+              invItem.costWithoutTax !== null &&
+              String(invItem.costWithoutTax).trim() !== '' &&
+              !isNaN(Number(invItem.costWithoutTax))
+            ) {
+              itemCostPrice = Number(invItem.costWithoutTax);
+            } else if (
+              (invItem as any).baseCostPrice !== undefined &&
+              (invItem as any).baseCostPrice !== null &&
+              String((invItem as any).baseCostPrice).trim() !== '' &&
+              !isNaN(Number((invItem as any).baseCostPrice))
+            ) {
+              itemCostPrice = Number((invItem as any).baseCostPrice);
+            } else {
+              const taxRate =
+                invItem.purchaseTaxPercent !== undefined
+                  ? Number(invItem.purchaseTaxPercent)
+                  : (invItem as any).taxRate !== undefined
+                  ? Number((invItem as any).taxRate)
+                  : invItem.hasPurchaseTax !== false
+                  ? 15
+                  : 0;
+              const costWithTax = Number(invItem.costPrice || (Number(invItem.salePrice || 0) * 0.7) || 0);
+              itemCostPrice = taxRate > 0 && costWithTax > 0 ? costWithTax / (1 + taxRate / 100) : costWithTax;
+            }
+          } else {
+            itemCostPrice = Number(oItem.costPrice || (Number(oItem.salePrice || 0) * 0.7) || 0);
+          }
 
           // Determinar proveedor correspondiente al producto
           let rawSupplier =

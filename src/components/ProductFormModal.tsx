@@ -502,7 +502,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const discRate = Math.max(0, Math.min(99, discount)) / 100;
     const publishedSinIVA = discRate > 0 && discRate < 1 ? netRequiredAfterDiscount / (1 - discRate) : netRequiredAfterDiscount;
     const activeSaleTax = hasSaleTax ? saleTaxPct : 0;
-    return activeSaleTax > 0 ? publishedSinIVA * (1 + activeSaleTax / 100) : publishedSinIVA;
+    const rawPvp = activeSaleTax > 0 ? publishedSinIVA * (1 + activeSaleTax / 100) : publishedSinIVA;
+    return Math.round(rawPvp * 100) / 100;
   };
 
   // Toggle hasPurchaseTax check and recalculate purchase costs
@@ -602,11 +603,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const numWithout = parseFloat(newVal);
     if (!isNaN(numWithout) && numWithout >= 0) {
       const activeTax = hasPurchaseTax ? purchaseTaxPercent : 0;
-      const withTax = (numWithout * (1 + activeTax / 100)).toFixed(2);
-      setCostWithTax(withTax);
-      setCostPrice(withTax);
+      const withTaxNum = Math.round(numWithout * (1 + activeTax / 100) * 100) / 100;
+      setCostWithTax(withTaxNum.toFixed(2));
+      setCostPrice(withTaxNum.toFixed(2));
       const newPvp = computePublishedPvp(numWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
-      setSalePrice(newPvp.toFixed(2));
+      setSalePrice((Math.round(newPvp * 100) / 100).toFixed(2));
     }
   };
 
@@ -617,10 +618,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const numWith = parseFloat(newVal);
     if (!isNaN(numWith) && numWith >= 0) {
       const activeTax = hasPurchaseTax ? purchaseTaxPercent : 0;
-      const numWithout = activeTax > 0 ? numWith / (1 + activeTax / 100) : numWith;
+      const numWithout = activeTax > 0 ? Math.round((numWith / (1 + activeTax / 100)) * 100) / 100 : numWith;
       setCostWithoutTax(numWithout.toFixed(2));
       const newPvp = computePublishedPvp(numWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
-      setSalePrice(newPvp.toFixed(2));
+      setSalePrice((Math.round(newPvp * 100) / 100).toFixed(2));
     }
   };
 
@@ -833,28 +834,28 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  const costWithoutNum = parseFloat(costWithoutTax) || 0;
+  const costWithoutNum = Math.round((parseFloat(costWithoutTax) || 0) * 100) / 100;
   const activePurchaseTax = hasPurchaseTax ? purchaseTaxPercent : 0;
-  const purchaseTaxAmount = costWithoutNum * (activePurchaseTax / 100);
-  const costTotalPaidToSupplier = costWithoutNum + purchaseTaxAmount;
+  const purchaseTaxAmount = Math.round((costWithoutNum * (activePurchaseTax / 100)) * 100) / 100;
+  const costTotalPaidToSupplier = Math.round((costWithoutNum + purchaseTaxAmount) * 100) / 100;
 
-  const pvpListaNum = parseFloat(salePrice) || 0;
+  const pvpListaNum = Math.round((parseFloat(salePrice) || 0) * 100) / 100;
   const activeSaleTax = applySaleTax ? saleTaxPercent : 0;
-  const publishedPriceSinIVA = activeSaleTax > 0
+  const publishedPriceSinIVA = Math.round((activeSaleTax > 0
     ? pvpListaNum / (1 + activeSaleTax / 100)
-    : pvpListaNum;
+    : pvpListaNum) * 100) / 100;
 
   const discountNum = Math.max(0, Math.min(99, Number(discountPercent) || 0));
   const discountRate = discountNum / 100;
-  const discountAmountSinIVA = publishedPriceSinIVA * discountRate;
-  const baseImponibleAfterDiscount = publishedPriceSinIVA - discountAmountSinIVA;
+  const discountAmountSinIVA = Math.round((publishedPriceSinIVA * discountRate) * 100) / 100;
+  const baseImponibleAfterDiscount = Math.round((publishedPriceSinIVA - discountAmountSinIVA) * 100) / 100;
 
-  const saleTaxAmount = activeSaleTax > 0
+  const saleTaxAmount = Math.round((activeSaleTax > 0
     ? baseImponibleAfterDiscount * (activeSaleTax / 100)
-    : 0;
+    : 0) * 100) / 100;
 
-  const totalClientePaid = baseImponibleAfterDiscount + saleTaxAmount;
-  const unitProfit = baseImponibleAfterDiscount - costWithoutNum;
+  const totalClientePaid = Math.round((baseImponibleAfterDiscount + saleTaxAmount) * 100) / 100;
+  const unitProfit = Math.round((baseImponibleAfterDiscount - costWithoutNum) * 100) / 100;
   const calculatedMarginPercent = costWithoutNum > 0 ? (unitProfit / costWithoutNum) * 100 : 0;
 
   // Aliases for full JSX backward compatibility
@@ -868,7 +869,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Breakdown for Tax / Tributary
   const ivaCreditoCompra = purchaseTaxAmount;
   const ivaDebitoVenta = saleTaxAmount;
-  const ivaNetoPorPagar = ivaDebitoVenta - ivaCreditoCompra;
+  const ivaNetoPorPagar = Math.round((ivaDebitoVenta - ivaCreditoCompra) * 100) / 100;
 
   const isLoss = unitProfit < -0.001;
   const isBreakEven = Math.abs(unitProfit) <= 0.001 && costWithoutNum > 0;

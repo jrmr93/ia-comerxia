@@ -19,6 +19,7 @@ import {
   Phone,
   Plus,
   Printer,
+  Receipt,
   Search,
   Store,
   Trash2,
@@ -43,6 +44,7 @@ import { normalizeEcuadorPhone, buildWhatsAppLink, isCashPayment } from '../util
 import { validateEcuadorId } from '../utils/ecuadorIdValidator.ts';
 import { directPrintShippingTicket } from './ShippingTicketModal.tsx';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
+import { calculateLineItem, calculateInvoiceTotals, extractBaseUnitPriceWithoutTax } from '../utils/ecuadorTaxCalculator.ts';
 
 export interface UnifiedOrderManageModalProps {
   order: CustomerOrder | null;
@@ -195,6 +197,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       costPrice?: number;
       supplierName?: string;
       salePrice: number;
+      discount?: number;
+      discountPercent?: number;
       quantity: number;
       imageUrl?: string | null;
     }>
@@ -210,6 +214,9 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [voucherInput, setVoucherInput] = useState<string>('');
   const [notesInput, setNotesInput] = useState<string>('');
   const [autoCreatePurchase, setAutoCreatePurchase] = useState<boolean>(false);
+  // Tax & Invoice state (Ecuador Tax Standard: 15% IVA)
+  const [applySaleTax, setApplySaleTax] = useState<boolean>(false);
+  const [saleTaxPercent, setSaleTaxPercent] = useState<number>(15);
 
   // Execution states
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -270,6 +277,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       setVoucherInput('');
       setNotesInput('');
       setAutoCreatePurchase(false);
+      setApplySaleTax(true);
+      setSaleTaxPercent(15);
       setVoucherError(null);
     } else if (order) {
       // Initialize from existing order
@@ -327,18 +336,41 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
       // Parse existing items
       const rawItems = Array.isArray(order.items) ? order.items : [];
+      const orderApplyTax = (order as any).applySaleTax !== false;
+      const orderTaxPct = Number((order as any).saleTaxPercent || 15);
       const parsedItems = rawItems.map((it: any) => {
         const targetId = it.inventoryItemId || it.id;
         const matchingProduct = products.find((p) => p.id === targetId || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
+        const cPrice = Number(it.costPrice ?? matchingProduct?.costWithoutTax ?? matchingProduct?.costPrice ?? 0);
+        const rawSale = Number(it.salePrice || it.item?.salePrice || matchingProduct?.salePrice || 0);
+        const basePriceInfo = extractBaseUnitPriceWithoutTax({
+          rawSalePrice: rawSale,
+          costWithoutTax: cPrice,
+          applySaleTax: orderApplyTax,
+          saleTaxPercent: orderTaxPct,
+          marginPercent: it.marginPercent !== undefined ? Number(it.marginPercent) : (matchingProduct as any)?.marginPercent,
+        });
+        const baseSalePrice = basePriceInfo.unitPriceWithoutTax;
+        const marginPct = basePriceInfo.marginPercent;
+        let discVal = Number(it.discount ?? 0);
+        if (discVal === 0 && (it.discountPercent || matchingProduct?.discountPercent)) {
+          const pct = Number(it.discountPercent || matchingProduct?.discountPercent || 0);
+          if (pct > 0) {
+            discVal = Math.round((baseSalePrice * pct / 100) * 100) / 100;
+          }
+        }
         return {
           id: targetId,
           inventoryItemId: it.inventoryItemId || it.id,
           name: it.name || it.item?.name || 'Producto',
           sku: it.sku || it.item?.sku || '',
           barcode: it.barcode || matchingProduct?.barcode || undefined,
-          costPrice: it.costPrice ? Number(it.costPrice) : (matchingProduct?.costPrice ? Number(matchingProduct.costPrice) : undefined),
+          costPrice: cPrice,
+          marginPercent: marginPct,
           supplierName: it.supplierName || (matchingProduct as any)?.supplier || undefined,
-          salePrice: Number(it.salePrice || it.item?.salePrice || 0),
+          salePrice: baseSalePrice,
+          discount: discVal,
+          discountPercent: it.discountPercent ? Number(it.discountPercent) : (matchingProduct?.discountPercent ? Number(matchingProduct.discountPercent) : 0),
           quantity: Number(it.quantity || 1),
           imageUrl: it.imageUrl || it.item?.imageUrl || matchingProduct?.imageUrl || null,
         };
@@ -346,7 +378,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       setItems(parsedItems);
 
       // Shipping cost calculation
-      const itemsSub = parsedItems.reduce((acc, it) => acc + (it.salePrice * it.quantity), 0);
+      const itemsSub = parsedItems.reduce((acc, it) => acc + (Math.max(0, it.salePrice - (it.discount || 0)) * it.quantity), 0);
       const explicitShip = Number((order as any).shippingCost);
       if (!isNaN(explicitShip) && explicitShip > 0) {
         setShippingCost(String(explicitShip));
@@ -363,6 +395,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       setBankOrAccount((order as any).bankOrAccount || derivedBank);
       setVoucherInput(order.paymentVoucher || '');
       setNotesInput(order.notes || '');
+      setApplySaleTax((order as any).applySaleTax !== false);
+      setSaleTaxPercent(Number((order as any).saleTaxPercent || 15));
       setVoucherError(null);
     }
   }, [isOpen, isCreateMode, order?.id]);
@@ -437,6 +471,23 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       if (existingIdx >= 0) {
         return prev.map((it, idx) => (idx === existingIdx ? { ...it, quantity: it.quantity + 1 } : it));
       }
+      const cPrice = Number(prod.costWithoutTax ?? prod.costPrice ?? 0);
+      const rawSale = Number(prod.salePrice || 0);
+      const basePriceInfo = extractBaseUnitPriceWithoutTax({
+        rawSalePrice: rawSale,
+        costWithoutTax: cPrice,
+        applySaleTax,
+        saleTaxPercent,
+        marginPercent: (prod as any).marginPercent !== undefined ? Number((prod as any).marginPercent) : undefined,
+      });
+      const sPrice = basePriceInfo.unitPriceWithoutTax;
+      const marginPct = basePriceInfo.marginPercent;
+      let discVal = 0;
+      if (prod.discountPercent && prod.discountPercent > 0) {
+        discVal = Math.round((sPrice * prod.discountPercent / 100) * 100) / 100;
+      } else if ((prod as any).discount) {
+        discVal = Number((prod as any).discount || 0);
+      }
       return [
         ...prev,
         {
@@ -445,9 +496,12 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           name: prod.name,
           sku: prod.sku || '',
           barcode: prod.barcode || undefined,
-          costPrice: prod.costPrice ? Number(prod.costPrice) : undefined,
+          costPrice: cPrice,
+          marginPercent: marginPct,
           supplierName: (prod as any).supplier || (prod as any).supplierName || undefined,
-          salePrice: Number(prod.salePrice || 0),
+          salePrice: sPrice,
+          discount: discVal,
+          discountPercent: prod.discountPercent || 0,
           quantity: 1,
           imageUrl: prod.imageUrl || null,
         },
@@ -525,19 +579,34 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     };
   }, [items, products]);
 
-  // Financial Calculations
-  const productsSubtotal = useMemo(() => {
-    return items.reduce((sum, it) => sum + (Number(it.salePrice || 0) * Number(it.quantity || 1)), 0);
-  }, [items]);
+  // Financial Calculations - SRI Ecuador Central Engine
+  const invoiceTotals = useMemo(() => {
+    const calculatedItems = items.map((it) => {
+      const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
+      const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
+      const unitSale = Number(it.salePrice || 0);
+      return calculateLineItem({
+        id: it.id,
+        name: it.name,
+        sku: it.sku,
+        costWithoutTax: unitCost,
+        unitSalePrice: unitSale,
+        discount: Number(it.discount || 0),
+        quantity: Number(it.quantity || 1),
+        applySaleTax,
+        saleTaxPercent,
+      });
+    });
 
-  const shippingFee = useMemo(() => {
-    if (deliveryType === 'pickup') return 0;
-    return Math.max(0, Number(shippingCost) || 0);
-  }, [deliveryType, shippingCost]);
+    const fee = deliveryType === 'pickup' ? 0 : Math.max(0, Number(shippingCost) || 0);
+    return calculateInvoiceTotals(calculatedItems, { shippingFee: fee, applySaleTax, defaultTaxPercent: saleTaxPercent });
+  }, [items, products, applySaleTax, saleTaxPercent, deliveryType, shippingCost]);
 
-  const totalOrderAmount = useMemo(() => {
-    return productsSubtotal + shippingFee;
-  }, [productsSubtotal, shippingFee]);
+  const productsSubtotal = invoiceTotals.subtotalNoTax;
+  const totalDiscountAmount = invoiceTotals.totalDiscount;
+  const salesTaxAmount = invoiceTotals.totalTax;
+  const shippingFee = invoiceTotals.shippingFee;
+  const totalOrderAmount = invoiceTotals.totalInvoiceAmount;
 
   // Cash payment detection
   const isCash = useMemo(() => {
@@ -595,6 +664,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         trackingNumber: !isPick ? (trackingNumber.trim() || undefined) : undefined,
         shippingCost: shippingFee,
         items: items as any,
+        subtotalAmount: productsSubtotal.toFixed(2),
+        taxAmount: salesTaxAmount.toFixed(2),
+        applySaleTax,
+        saleTaxPercent,
         totalAmount: totalOrderAmount.toFixed(2),
         paymentMethod,
         paymentVoucher: voucherInput.trim() || undefined,
@@ -617,6 +690,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       trackingNumber: !isPick ? (trackingNumber.trim() || undefined) : undefined,
       shippingCost: shippingFee,
       items: items as any,
+      subtotalAmount: productsSubtotal.toFixed(2),
+      taxAmount: salesTaxAmount.toFixed(2),
+      applySaleTax,
+      saleTaxPercent,
       totalAmount: totalOrderAmount.toFixed(2),
       paymentMethod,
       paymentVoucher: voucherInput.trim() || undefined,
@@ -1024,7 +1101,9 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
     msg += `📦 *Detalle de Productos:*\n`;
     items.forEach((it) => {
-      msg += `• ${it.quantity}x ${it.name} - $${(it.salePrice * it.quantity).toFixed(2)}\n`;
+      const netUnit = Math.max(0, Number(it.salePrice || 0) - Number(it.discount || 0));
+      const lineSub = netUnit * Number(it.quantity || 1);
+      msg += `• ${it.quantity}x ${it.name} - $${lineSub.toFixed(2)}\n`;
     });
 
     if (!isPick && shippingFee > 0) {
@@ -1086,7 +1165,9 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
     msg += `📦 *Detalle de Productos:*\n`;
     items.forEach((it) => {
-      msg += `• ${it.quantity}x ${it.name} - $${(it.salePrice * it.quantity).toFixed(2)}\n`;
+      const netUnit = Math.max(0, Number(it.salePrice || 0) - Number(it.discount || 0));
+      const lineSub = netUnit * Number(it.quantity || 1);
+      msg += `• ${it.quantity}x ${it.name} - $${lineSub.toFixed(2)}\n`;
     });
 
     msg += `\n📦 *Subtotal Productos:* $${productsSubtotal.toFixed(2)} ${currency}\n`;
@@ -1149,8 +1230,11 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  Confirmación y Gestión de Pedido
+                <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>{isCreateMode ? 'Creación de Pedido / Factura Proforma' : 'Gestión y Confirmación de Factura / Pedido'}</span>
+                  <span className="px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[9px] font-mono font-bold">
+                    SRI ECUADOR
+                  </span>
                 </h3>
                 {isCreateMode ? (
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 text-[10px] font-bold uppercase tracking-wider">
@@ -1180,9 +1264,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 )}
               </div>
               <p className="text-xs text-slate-200/90 mt-0.5">
-                {isCreateMode
-                  ? 'Punto de partida de cualquier pedido: registra cliente, entrega, productos y confirma el cobro con comprobante o efectivo.'
-                  : 'Modal central de confirmación: valida comprobante de pago, datos de cliente, despacho e ítems del pedido.'}
+                Formato de Factura con desglose fiscal de Ecuador: Valor unitario = Costo sin IVA + Margen de ganancia, más desglose SRI.
               </p>
             </div>
           </div>
@@ -1912,82 +1994,66 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
-                {/* Table Header */}
-                <div className="hidden sm:grid sm:grid-cols-12 gap-3 px-4 py-2 bg-slate-100 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                  <div className="col-span-5 flex items-center gap-1.5">
-                    <Package className="w-3.5 h-3.5 text-purple-600" />
-                    <span>Producto</span>
+              <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs bg-white">
+                {/* Table Header (Formato Factura SRI 6 Columnas Exactas) */}
+                <div className="hidden lg:grid lg:grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800">
+                  <div className="col-span-2 flex items-center gap-1.5">
+                    <Receipt className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Código</span>
                   </div>
-                  <div className="col-span-2 text-right">Precio Unit. ($)</div>
-                  <div className="col-span-2 text-center">Cantidad</div>
-                  <div className="col-span-2 text-right">Subtotal</div>
-                  <div className="col-span-1 text-center">Quitar</div>
+                  <div className="col-span-3">Producto</div>
+                  <div className="col-span-1 text-center">Cantidad</div>
+                  <div className="col-span-2 text-right" title="Costo sin IVA del producto + porcentaje de ganancia">Valor Unitario ($)</div>
+                  <div className="col-span-2 text-right" title="Descuento unitario otorgado en dólares">Descuento ($)</div>
+                  <div className="col-span-2 text-right" title="Subtotal base imponible de la línea sin IVA">Total Venta Sin IVA ($)</div>
                 </div>
 
-                {/* Items List - Separados por línea horizontal para mejor visualización */}
-                <div className="divide-y-2 divide-slate-200 border-t-2 border-slate-200 max-h-64 overflow-y-auto">
+                {/* Items List - Formato Factura SRI */}
+                <div className="divide-y divide-slate-200 max-h-72 overflow-y-auto">
                   {items.map((it, idx) => {
                     const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
                     const avail = match ? Math.max(0, Number(match.stock || 0)) : 0;
+                    const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
+                    const calculatedRow = calculateLineItem({
+                      costWithoutTax: unitCost,
+                      unitSalePrice: Number(it.salePrice || 0),
+                      profitValue: it.marginPercent !== undefined ? Number(it.marginPercent) : undefined,
+                      profitCalculationMode: 'MARKUP_PERCENT',
+                      discount: Number(it.discount || 0),
+                      quantity: Number(it.quantity || 1),
+                      applySaleTax,
+                      saleTaxPercent,
+                    });
+                    const itemSubtotal = calculatedRow.lineSubtotal;
+
                     return (
-                      <div key={idx} className="p-3 sm:px-4 sm:py-3 sm:grid sm:grid-cols-12 gap-3 items-center hover:bg-slate-50/70 transition border-b border-slate-200">
-                        {/* Title & Info */}
-                        <div className="col-span-5 flex items-center gap-2.5 min-w-0 mb-1.5 sm:mb-0">
-                          <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                      <div key={idx} className="p-3 lg:px-3 lg:py-2.5 lg:grid lg:grid-cols-12 gap-2 items-center hover:bg-purple-50/30 transition border-b border-slate-200/80">
+                        {/* 1. Código */}
+                        <div className="col-span-2 flex items-center gap-1 font-mono font-bold text-purple-900 text-xs truncate">
+                          <span>{it.sku || (it.id ? `PRD-${it.id}` : '—')}</span>
+                        </div>
+
+                        {/* 2. Producto */}
+                        <div className="col-span-3 flex items-center gap-2 min-w-0 mb-1 lg:mb-0">
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
                             {it.imageUrl ? (
                               <img src={it.imageUrl} alt={it.name} className="w-full h-full object-cover" />
                             ) : (
-                              <Package className="w-4 h-4 text-slate-400" />
+                              <Package className="w-3.5 h-3.5 text-slate-400" />
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-slate-900 truncate text-xs">{it.name}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              {it.sku && <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 rounded">SKU: {it.sku}</span>}
-                              {it.barcode && (
-                                <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 px-1 rounded border border-emerald-100">
-                                  {it.barcode}
-                                </span>
-                              )}
-                              {avail >= it.quantity ? (
-                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                                  En Stock ({avail})
-                                </span>
-                              ) : avail > 0 ? (
-                                <span className="text-[9px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded">
-                                  Faltan {it.quantity - avail} un.
-                                </span>
-                              ) : (
-                                <span className="text-[9px] font-bold text-rose-800 bg-rose-50 px-1.5 py-0.2 rounded">
-                                  Sin Stock ({avail})
-                                </span>
-                              )}
-                            </div>
+                            {avail < it.quantity && (
+                              <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-1 rounded">
+                                Faltan {it.quantity - avail} un.
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        {/* Price */}
-                        <div className="col-span-2 flex items-center justify-start sm:justify-end gap-1">
-                          <span className="text-[10px] text-slate-400 sm:hidden">Precio:</span>
-                          <div className="relative flex items-center">
-                            <span className="text-xs text-slate-400 font-bold absolute left-2 pointer-events-none">$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={it.salePrice}
-                              onChange={(e) => {
-                                const newP = Math.max(0, Number(e.target.value) || 0);
-                                setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, salePrice: newP } : item)));
-                              }}
-                              className="w-18 h-7 pl-5 pr-1.5 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-purple-500"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Quantity Stepper */}
-                        <div className="col-span-2 flex justify-center">
+                        {/* 3. Cantidad Stepper */}
+                        <div className="col-span-1 flex justify-center mb-1 lg:mb-0">
                           <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-slate-50 h-7">
                             <button
                               type="button"
@@ -1998,37 +2064,74 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                   setItems((prev) => prev.filter((_, i) => i !== idx));
                                 }
                               }}
-                              className="w-6 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
+                              className="w-5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
                             >
                               <Minus className="w-3 h-3" />
                             </button>
-                            <span className="w-7 text-center text-xs font-mono font-bold text-slate-900">{it.quantity}</span>
+                            <span className="w-5 text-center text-xs font-mono font-bold text-slate-900">{it.quantity}</span>
                             <button
                               type="button"
                               onClick={() => {
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, quantity: item.quantity + 1 } : item)));
                               }}
-                              className="w-6 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
+                              className="w-5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
                             >
                               <Plus className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
 
-                        {/* Subtotal */}
-                        <div className="col-span-2 text-right">
-                          <span className="font-mono font-bold text-xs text-purple-900 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100">
-                            ${(it.salePrice * it.quantity).toFixed(2)}
-                          </span>
+                        {/* 4. Valor Unitario ($) = Costo sin IVA + % Ganancia */}
+                        <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
+                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Valor Unit. ($):</span>
+                          <div className="relative flex items-center" title={`Costo Sin IVA ($${unitCost.toFixed(2)}) + % Ganancia (${calculatedRow.markupPercent}%)`}>
+                            <span className="text-xs text-purple-600 font-bold absolute left-2 pointer-events-none">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={it.salePrice}
+                              onChange={(e) => {
+                                const newP = Math.max(0, Number(e.target.value) || 0);
+                                const baseCost = Number(it.costPrice || 0);
+                                const newMargin = baseCost > 0 ? Math.round(((newP - baseCost) / baseCost) * 100) : 0;
+                                setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, salePrice: newP, marginPercent: newMargin } : item)));
+                              }}
+                              className="w-20 h-7 pl-5 pr-1 rounded-lg bg-purple-50/40 border border-purple-200 text-right font-mono font-bold text-purple-950 text-xs focus:outline-none focus:bg-white focus:border-purple-600"
+                            />
+                          </div>
                         </div>
 
-                        {/* Trash */}
-                        <div className="col-span-1 text-center flex justify-end sm:justify-center">
+                        {/* 5. Descuento ($) */}
+                        <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
+                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Descuento ($):</span>
+                          <div className="relative flex items-center">
+                            <span className="text-xs text-slate-400 font-bold absolute left-2 pointer-events-none">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={it.discount ?? 0}
+                              onChange={(e) => {
+                                const newDisc = Math.max(0, Number(e.target.value) || 0);
+                                setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, discount: newDisc } : item)));
+                              }}
+                              className="w-18 h-7 pl-4 pr-1 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-purple-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 6. Total Venta Sin IVA ($) & Trash */}
+                        <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1">
+                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Total Venta Sin IVA:</span>
+                          <span className="font-mono font-bold text-xs text-purple-950 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-200 inline-block">
+                            ${itemSubtotal.toFixed(2)}
+                          </span>
                           <button
                             type="button"
                             onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition cursor-pointer"
-                            title="Quitar"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition cursor-pointer ml-1"
+                            title="Quitar ítem"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -2039,13 +2142,13 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
 
                 {/* Subtotal Footer */}
-                <div className="px-4 py-2 bg-purple-50/50 border-t border-purple-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-600 font-medium">
-                    Ítems: <strong>{items.length}</strong> • Unidades: <strong>{items.reduce((s, i) => s + i.quantity, 0)}</strong>
+                <div className="px-4 py-2 bg-slate-900 text-white flex items-center justify-between text-xs border-t border-slate-800">
+                  <span className="text-slate-300 font-medium">
+                    Ítems: <strong className="text-white">{items.length}</strong> • Unidades Totales: <strong className="text-white">{items.reduce((s, i) => s + i.quantity, 0)}</strong>
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-600 font-bold uppercase text-[10px]">Subtotal Productos:</span>
-                    <span className="font-mono font-black text-purple-900 text-sm">
+                    <span className="text-slate-400 font-bold uppercase text-[10px]">Base Imponible Sin IVA:</span>
+                    <span className="font-mono font-black text-purple-300 text-sm">
                       ${productsSubtotal.toFixed(2)} {currency}
                     </span>
                   </div>
@@ -2087,6 +2190,85 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               </div>
             )}
+
+            {/* Cuadro Desglose Fiscal Factura Ecuador (SRI Layout) */}
+            <div className="p-4 rounded-xl bg-slate-900 text-white border border-slate-800 shadow-md space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-purple-400" />
+                  <span className="font-extrabold text-xs tracking-wider uppercase text-purple-300">
+                    Desglose Fiscal Factura / Proforma Ecuador (SRI)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="modal-apply-sale-tax" className="text-[11px] font-bold text-slate-300 cursor-pointer">
+                    Incrementar IVA {saleTaxPercent}%:
+                  </label>
+                  <input
+                    type="checkbox"
+                    id="modal-apply-sale-tax"
+                    checked={applySaleTax}
+                    onChange={(e) => setApplySaleTax(e.target.checked)}
+                    className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-700 bg-slate-800 cursor-pointer"
+                  />
+                  {applySaleTax && (
+                    <div className="flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded border border-slate-700 ml-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={saleTaxPercent}
+                        onChange={(e) => setSaleTaxPercent(Math.max(0, Number(e.target.value) || 0))}
+                        className="w-10 h-5 rounded bg-slate-900 border border-slate-600 text-center font-mono font-bold text-[11px] text-purple-300 focus:outline-none"
+                      />
+                      <span className="text-[11px] font-bold text-purple-300">%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                {/* Columna Izquierda: Información de Tarifas e Impuestos */}
+                <div className="space-y-1.5 bg-slate-800/60 p-3 rounded-lg border border-slate-800">
+                  <div className="flex justify-between text-slate-300">
+                    <span>SUBTOTAL {saleTaxPercent}% (GRAVA IVA):</span>
+                    <span className="font-bold text-white">${invoiceTotals.subtotalTaxable15.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>SUBTOTAL 0% / EXENTO:</span>
+                    <span className="font-bold text-slate-300">${invoiceTotals.subtotalZero0.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300 border-t border-slate-700/60 pt-1.5">
+                    <span>SUBTOTAL SIN IMPUESTOS:</span>
+                    <span className="font-bold text-white">${invoiceTotals.subtotalNoTax.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Columna Derecha: Descuentos, IVA, Envío y Total Factura */}
+                <div className="space-y-1.5 bg-slate-800/60 p-3 rounded-lg border border-slate-800">
+                  {totalDiscountAmount > 0 && (
+                    <div className="flex justify-between text-purple-300">
+                      <span>TOTAL DESCUENTO APLICADO:</span>
+                      <span className="font-bold">-${totalDiscountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-amber-300">
+                    <span>IVA {saleTaxPercent}% (VENTA):</span>
+                    <span className="font-bold">+${salesTaxAmount.toFixed(2)}</span>
+                  </div>
+                  {deliveryType === 'shipping' && (
+                    <div className="flex justify-between text-sky-300">
+                      <span>VALOR FLETE / ENVÍO:</span>
+                      <span className="font-bold">+${shippingFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-emerald-400 font-extrabold text-sm border-t border-slate-700/80 pt-1.5">
+                    <span>VALOR TOTAL FACTURA:</span>
+                    <span className="text-base">${totalOrderAmount.toFixed(2)} {currency}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ================= SECTION 4: PAGO, TESORERÍA Y RESUMEN FINANCIERO ================= */}
@@ -2261,7 +2443,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           <div className="space-y-0.5">
             <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              Resumen Financiero del Pedido
+              Resumen Financiero y Facturación (Ecuador)
             </span>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
               <span>
@@ -2269,8 +2451,24 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               </span>
               <span>•</span>
               <span>
-                Subtotal: <strong className="font-mono text-white">${productsSubtotal.toFixed(2)}</strong>
+                Base Imponible: <strong className="font-mono text-white">${productsSubtotal.toFixed(2)}</strong>
               </span>
+              {totalDiscountAmount > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-purple-300">
+                    Desc. Total: <strong className="font-mono text-purple-300">-${totalDiscountAmount.toFixed(2)}</strong>
+                  </span>
+                </>
+              )}
+              {applySaleTax && salesTaxAmount > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-amber-300">
+                    IVA ({saleTaxPercent}%): <strong className="font-mono text-amber-300">+${salesTaxAmount.toFixed(2)}</strong>
+                  </span>
+                </>
+              )}
               {deliveryType === 'shipping' && (
                 <>
                   <span>•</span>
@@ -2286,7 +2484,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             </div>
           </div>
           <div className="text-right sm:border-l sm:border-slate-700 sm:pl-6">
-            <span className="text-[10px] text-slate-400 font-semibold block uppercase">Total a Cobrar</span>
+            <span className="text-[10px] text-slate-400 font-semibold block uppercase">Total Pedido / PVP</span>
             <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
               ${totalOrderAmount.toFixed(2)} <span className="text-sm font-bold text-slate-300">{currency}</span>
             </span>

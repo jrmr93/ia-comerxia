@@ -136,6 +136,47 @@ export const getPurchaseStatusStyles = (status?: string) => {
   }
 };
 
+export function getInventoryCostWithoutTax(inv: InventoryItem | any): number {
+  if (!inv) return 0;
+  
+  if (
+    inv.costWithoutTax !== undefined &&
+    inv.costWithoutTax !== null &&
+    String(inv.costWithoutTax).trim() !== '' &&
+    !isNaN(Number(inv.costWithoutTax))
+  ) {
+    const val = Number(inv.costWithoutTax);
+    if (val >= 0) return val;
+  }
+
+  if (
+    inv.baseCostPrice !== undefined &&
+    inv.baseCostPrice !== null &&
+    String(inv.baseCostPrice).trim() !== '' &&
+    !isNaN(Number(inv.baseCostPrice))
+  ) {
+    const val = Number(inv.baseCostPrice);
+    if (val >= 0) return val;
+  }
+
+  const taxRate =
+    inv.purchaseTaxPercent !== undefined
+      ? Number(inv.purchaseTaxPercent)
+      : (inv as any).taxRate !== undefined
+      ? Number((inv as any).taxRate)
+      : inv.hasPurchaseTax !== false
+      ? 15
+      : 0;
+
+  const costWithTax = Number(inv.costPrice || inv.salePrice || 0);
+
+  if (taxRate > 0 && costWithTax > 0) {
+    return costWithTax / (1 + taxRate / 100);
+  }
+
+  return costWithTax;
+}
+
 export const PurchasesView: React.FC<PurchasesViewProps> = ({
   purchases = [],
   inventoryItems = [],
@@ -166,6 +207,24 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [groupByOrder, setGroupByOrder] = useState<boolean>(true);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = safeLocalStorage.getItem('comerxia_purchases_view_mode');
+        if (saved === 'grid' || saved === 'table') return saved;
+      } catch {}
+    }
+    return 'grid';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        safeLocalStorage.setItem('comerxia_purchases_view_mode', viewMode);
+      } catch {}
+    }
+  }, [viewMode]);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedPurchaseId, setExpandedPurchaseId] = useState<number | null>(highlightPurchaseId || null);
 
@@ -284,6 +343,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   }, [isFinancialModalOpen, financialPeriod]);
 
   // Normalized Purchases guaranteeing array types for items, receptions, and returns
+  // Normalized Purchases guaranteeing array types and auto-syncing pending purchases with live inventory values
   const normalizedPurchases = useMemo(() => {
     return (purchases || []).map((p) => {
       let parsedItems = Array.isArray(p.items) ? p.items : [];
@@ -301,14 +361,85 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         try { parsedReturns = JSON.parse(p.returns); } catch {}
       }
 
+      const itemsList = Array.isArray(parsedItems) ? parsedItems : [];
+      const isPending = p.status === 'pending';
+
+      // Auto-sync items of pending purchases with current live inventory catalog costs and data
+      const syncedItems = itemsList.map((item) => {
+        if (!isPending || !inventoryItems || inventoryItems.length === 0) return item;
+
+        const matchedInv = inventoryItems.find(
+          (inv) =>
+            (item.inventoryItemId && Number(inv.id) === Number(item.inventoryItemId)) ||
+            (item.sku && inv.sku && item.sku.trim().toLowerCase() === inv.sku.trim().toLowerCase()) ||
+            (item.name && inv.name && item.name.trim().toLowerCase() === inv.name.trim().toLowerCase())
+        );
+
+        const currentCostWithoutTax = getInventoryCostWithoutTax(matchedInv);
+        const currentTaxPercent =
+          matchedInv.purchaseTaxPercent !== undefined
+            ? Number(matchedInv.purchaseTaxPercent)
+            : (matchedInv as any).taxRate !== undefined
+            ? Number((matchedInv as any).taxRate)
+            : matchedInv.hasPurchaseTax !== false
+            ? 15
+            : 0;
+
+        const costPriceStr = currentCostWithoutTax > 0
+          ? currentCostWithoutTax.toFixed(2)
+          : (item.costPrice ? Number(item.costPrice).toFixed(2) : '0.00');
+
+        return {
+          ...item,
+          inventoryItemId: matchedInv.id,
+          name: matchedInv.name || item.name,
+          sku: matchedInv.sku || item.sku,
+          barcode: matchedInv.barcode || item.barcode,
+          costPrice: costPriceStr,
+          salePrice: matchedInv.salePrice || item.salePrice,
+          imageUrl: matchedInv.imageUrl || item.imageUrl,
+          taxPercent: currentTaxPercent,
+        };
+      });
+
+      // Calculate total cost with SRI tax rules (costPrice is sin IVA)
+      let sub0 = 0;
+      let sub15 = 0;
+      let sub5 = 0;
+      syncedItems.forEach((it) => {
+        const unitCost = Number(it.costPrice || 0);
+        const qty = Number(it.quantity || 1);
+        const discount = Number(it.discount || 0);
+        const lineBase = Math.max(0, unitCost * qty - discount);
+
+        const taxPercent =
+          it.taxPercent !== undefined
+            ? Number(it.taxPercent)
+            : (it as any).purchaseTaxPercent !== undefined
+            ? Number((it as any).purchaseTaxPercent)
+            : (it as any).hasPurchaseTax === false
+            ? 0
+            : 15;
+
+        if (taxPercent === 0) sub0 += lineBase;
+        else if (taxPercent === 5) sub5 += lineBase;
+        else sub15 += lineBase;
+      });
+
+      const totalSinImp = sub0 + sub15 + sub5;
+      const totalIva15 = sub15 * 0.15;
+      const totalIva5 = sub5 * 0.05;
+      const calculatedTotalCost = totalSinImp + totalIva15 + totalIva5;
+
       return {
         ...p,
-        items: Array.isArray(parsedItems) ? parsedItems : [],
+        items: syncedItems,
+        totalCost: calculatedTotalCost > 0 ? calculatedTotalCost.toFixed(2) : p.totalCost,
         receptions: Array.isArray(parsedReceptions) ? parsedReceptions : [],
         returns: Array.isArray(parsedReturns) ? parsedReturns : [],
       };
     });
-  }, [purchases]);
+  }, [purchases, inventoryItems]);
 
   // Unique Suppliers list
   const uniqueSuppliers = useMemo(() => {
@@ -862,6 +993,36 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
               <span className="hidden xs:inline">Lista</span>
             </button>
           </div>
+
+          {/* View Layout Toggle: Grid / Cards vs Table / Invoice List */}
+          <div className="flex items-center bg-slate-100 border border-slate-300 p-1 rounded-xl text-xs shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
+                viewMode === 'grid'
+                  ? 'bg-white text-amber-950 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Vista en Paneles / Tarjetas uniformes"
+            >
+              <Receipt className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden xs:inline">Tarjetas</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-white text-amber-950 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Vista Tipo Factura / Tabla Horizontal con detalle de productos"
+            >
+              <FileText className="w-3.5 h-3.5 text-orange-600" />
+              <span className="hidden xs:inline">Facturas / Lista</span>
+            </button>
+          </div>
         </div>
 
         {/* Barra 2: Filtro horizontal continuo (deslizable con el dedo en móvil) */}
@@ -1037,6 +1198,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
               >
                 <PurchaseRecordCard
                   purchase={purchase}
+                  viewMode={viewMode}
                   isInGroup={isInGroup}
                   currency={currency}
                   storeConfig={storeConfig}
@@ -1579,7 +1741,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   // Regla ERP #2: Control de productos duplicados al agregar desde el catálogo
   const handleAddCatalogItem = (it: InventoryItem) => {
-    const cost = Number(it.costPrice || it.salePrice || 0);
+    const costWithoutTax = getInventoryCostWithoutTax(it);
     const itemSupplier = it.supplierName || (it as any).supplier || (it as any).channelTitle || supplierName;
     
     // Auto-update order supplier if it's currently the default generic placeholder and the item has a specific supplier
@@ -1599,19 +1761,28 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         (existing.name && it.name && existing.name.trim().toLowerCase() === it.name.trim().toLowerCase())
     );
 
+    const defaultTaxPercent =
+      it.purchaseTaxPercent !== undefined
+        ? Number(it.purchaseTaxPercent)
+        : (it as any).taxRate !== undefined
+        ? Number((it as any).taxRate)
+        : it.hasPurchaseTax !== false
+        ? 15
+        : 0;
+
     if (existingIndex !== -1) {
-      // El producto ya estaba agregado -> se controla y se incrementa la cantidad
+      // El producto ya estaba agregado -> se incrementa la cantidad y SE COLOCA COMO PRIMERO (index 0)
       const existingItem = items[existingIndex];
       const currentQty = Number(existingItem.quantity) || 1;
       const updatedQty = currentQty + 1;
 
       setItems((prev) => {
-        const next = [...prev];
-        next[existingIndex] = {
-          ...next[existingIndex],
+        const updatedItem = {
+          ...prev[existingIndex],
           quantity: updatedQty,
         };
-        return next;
+        const remaining = prev.filter((_, idx) => idx !== existingIndex);
+        return [updatedItem, ...remaining];
       });
 
       showToast(`✓ "${it.name}": Se incrementó la cantidad a ${updatedQty} unidades.`);
@@ -1619,19 +1790,21 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       return;
     }
 
+    // Agregar producto nuevo como PRIMER REGISTRO (index 0)
     setItems((prev) => [
-      ...prev,
       {
         inventoryItemId: it.id,
         name: it.name,
         sku: it.sku,
         barcode: it.barcode || undefined,
-        costPrice: cost.toFixed(2),
+        costPrice: costWithoutTax % 1 === 0 ? costWithoutTax.toFixed(2) : Number(costWithoutTax.toFixed(3)).toString(),
         salePrice: it.salePrice,
         quantity: 1,
         imageUrl: it.imageUrl || null,
         supplierName: itemSupplier,
+        taxPercent: defaultTaxPercent,
       },
+      ...prev,
     ]);
     showToast(`✓ Agregado: "${it.name}"`);
     setProductSearch('');
@@ -1697,14 +1870,56 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Calculate total cost
-  const totalCost = useMemo(() => {
-    return items.reduce((sum, it) => {
-      const cost = Number(it.costPrice || 0);
+  // Desglose fiscal SRI Ecuador (costPrice es sin IVA)
+  const sriBreakdown = useMemo(() => {
+    let subtotal0 = 0;
+    let subtotal15 = 0;
+    let subtotal5 = 0;
+    let totalDiscount = 0;
+
+    items.forEach((it) => {
+      const unitCost = Number(it.costPrice || 0);
       const qty = Number(it.quantity || 1);
-      return sum + cost * qty;
-    }, 0);
+      const discount = Number(it.discount || 0);
+      const lineBase = Math.max(0, unitCost * qty - discount);
+      totalDiscount += discount;
+
+      const taxPercent =
+        it.taxPercent !== undefined
+          ? Number(it.taxPercent)
+          : (it as any).purchaseTaxPercent !== undefined
+          ? Number((it as any).purchaseTaxPercent)
+          : (it as any).hasPurchaseTax === false
+          ? 0
+          : 15;
+
+      if (taxPercent === 0) {
+        subtotal0 += lineBase;
+      } else if (taxPercent === 5) {
+        subtotal5 += lineBase;
+      } else {
+        subtotal15 += lineBase;
+      }
+    });
+
+    const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
+    const iva15 = subtotal15 * 0.15;
+    const iva5 = subtotal5 * 0.05;
+    const grandTotal = subtotalSinImpuesto + iva15 + iva5;
+
+    return {
+      subtotal0,
+      subtotal15,
+      subtotal5,
+      subtotalSinImpuesto,
+      totalDiscount,
+      iva15,
+      iva5,
+      grandTotal,
+    };
   }, [items]);
+
+  const totalCost = sriBreakdown.grandTotal;
 
   const handleSavePurchase = async (openPaymentAfterSave = false) => {
     if (openPaymentAfterSave || status === 'ordered' || status === 'received' || status === 'in_transit' || paymentStatus === 'paid') {
@@ -1817,7 +2032,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+      <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
           <div>
@@ -2208,9 +2423,9 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                           </div>
                         </div>
                         <div className="text-right ml-2 flex-shrink-0">
-                          <span className="text-[10px] text-slate-500 block">Costo sugerido</span>
+                          <span className="text-[10px] text-slate-500 block">Costo (sin IVA)</span>
                           <span className="font-mono font-black text-amber-700 text-xs sm:text-sm">
-                            ${Number(it.costPrice || it.salePrice || 0).toFixed(2)}
+                            ${getInventoryCostWithoutTax(it).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -2220,7 +2435,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               </div>
             )}
 
-            {/* Items List - High Contrast Cards */}
+            {/* Items List - Vista Tipo Factura Desglosada en Tabla Horizontal */}
             {items.length === 0 ? (
               <div className="text-center py-6 px-4 bg-white/80 border border-dashed border-indigo-200 rounded-xl space-y-2">
                 <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto">
@@ -2232,158 +2447,173 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                {items.map((it, idx) => {
-                  const unitCost = Number(it.costPrice || 0);
-                  const qty = Number(it.quantity || 1);
-                  const lineTotal = unitCost * qty;
+              <div className="bg-white border border-indigo-200 rounded-xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto max-h-72 custom-scrollbar">
+                  <table className="w-full text-left text-xs text-slate-800 font-sans border-collapse min-w-[850px]">
+                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300 text-[11px] uppercase tracking-wider sticky top-0 z-10">
+                      <tr>
+                        <th className="p-2.5 w-8 text-center">#</th>
+                        <th className="p-2.5 min-w-[200px]">Producto / Descripción</th>
+                        <th className="p-2.5 min-w-[100px]">SKU / Código</th>
+                        <th className="p-2.5 text-center min-w-[100px]">Cantidad</th>
+                        <th className="p-2.5 text-right min-w-[100px]">Costo Unit. ($)</th>
+                        <th className="p-2.5 text-right min-w-[90px]">Desc. ($)</th>
+                        <th className="p-2.5 text-center min-w-[90px]">IVA (%)</th>
+                        <th className="p-2.5 text-right min-w-[100px]">Subtotal ($)</th>
+                        <th className="p-2.5 text-center w-10">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {items.map((it, idx) => {
+                        const unitCost = Number(it.costPrice || 0);
+                        const qty = Number(it.quantity || 1);
+                        const discount = Number(it.discount || 0);
+                        const lineSubtotal = Math.max(0, Math.round((unitCost * qty - discount) * 100) / 100);
+                        const itemTaxPercent =
+                          it.taxPercent !== undefined
+                            ? Number(it.taxPercent)
+                            : (it as any).purchaseTaxPercent !== undefined
+                            ? Number((it as any).purchaseTaxPercent)
+                            : (it as any).hasPurchaseTax === false
+                            ? 0
+                            : 15;
 
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white border border-slate-200/90 hover:border-indigo-300 rounded-xl p-3 shadow-xs transition space-y-2"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        {/* Product Image / Icon & Name Input */}
-                        <div className="flex items-start space-x-2.5 flex-1 min-w-0">
-                          {it.imageUrl ? (
-                            <img
-                              src={it.imageUrl}
-                              alt=""
-                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-slate-200 mt-0.5 shadow-xs"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                              <Package className="w-5 h-5" />
-                            </div>
-                          )}
-
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <input
-                              type="text"
-                              value={it.name}
-                              disabled={isImmutable}
-                              onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
-                              placeholder="Nombre del producto"
-                              className={`w-full font-bold text-slate-900 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none text-xs sm:text-sm placeholder:text-slate-400 ${
-                                isImmutable ? 'cursor-not-allowed text-slate-600' : ''
-                              }`}
-                            />
-                            
-                            {/* Badges for SKU and Barcode */}
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <div className="inline-flex items-center space-x-1 bg-sky-50 text-sky-800 border border-sky-200 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">
-                                <span>SKU:</span>
+                        return (
+                          <tr key={idx} className="hover:bg-indigo-50/40 transition">
+                            <td className="p-2.5 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
+                            <td className="p-2.5">
+                              <div className="flex items-center space-x-2.5">
+                                {it.imageUrl ? (
+                                  <img
+                                    src={it.imageUrl}
+                                    alt=""
+                                    className="w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-slate-200 shadow-xs"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                                    <Package className="w-4 h-4" />
+                                  </div>
+                                )}
                                 <input
                                   type="text"
-                                  value={it.sku || ''}
+                                  value={it.name}
                                   disabled={isImmutable}
-                                  onChange={(e) => handleUpdateItem(idx, 'sku', e.target.value)}
-                                  placeholder="Auto"
-                                  className="w-16 bg-transparent border-0 p-0 font-mono text-sky-900 focus:outline-none font-bold text-[10px] disabled:text-slate-600"
+                                  onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
+                                  placeholder="Nombre del producto"
+                                  className={`w-full font-extrabold text-slate-900 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none text-xs placeholder:text-slate-400 ${
+                                    isImmutable ? 'cursor-not-allowed text-slate-600' : ''
+                                  }`}
                                 />
                               </div>
-
-                              {it.barcode && (
-                                <span className="inline-flex items-center space-x-1 bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-mono">
-                                  <Barcode className="w-2.5 h-2.5 text-slate-500" />
-                                  <span>{it.barcode}</span>
-                                </span>
+                            </td>
+                            <td className="p-2.5 font-mono text-[11px]">
+                              <input
+                                type="text"
+                                value={it.sku || ''}
+                                disabled={isImmutable}
+                                onChange={(e) => handleUpdateItem(idx, 'sku', e.target.value)}
+                                placeholder="Auto"
+                                className="w-20 bg-sky-50 border border-sky-200 rounded px-1.5 py-0.5 font-mono text-sky-900 font-bold text-[11px] focus:outline-none focus:border-sky-500 disabled:text-slate-600 disabled:bg-slate-100"
+                              />
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <div className="flex items-center justify-center space-x-1">
+                                {!isImmutable && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItem(idx, 'quantity', Math.max(1, qty - 1))}
+                                    className="w-6 h-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                )}
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={it.quantity}
+                                  disabled={isImmutable}
+                                  onChange={(e) => handleUpdateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
+                                  className={`w-11 h-6 px-1 bg-slate-50 border border-slate-300 rounded font-bold text-center text-xs text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white ${
+                                    isImmutable ? 'cursor-not-allowed bg-slate-100 text-slate-600' : ''
+                                  }`}
+                                />
+                                {!isImmutable && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItem(idx, 'quantity', qty + 1)}
+                                    className="w-6 h-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={it.costPrice}
+                                disabled={isImmutable}
+                                onChange={(e) => handleUpdateItem(idx, 'costPrice', e.target.value)}
+                                className={`w-20 h-6 px-1.5 border rounded font-mono font-bold text-xs text-right focus:outline-none ${
+                                  isImmutable
+                                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
+                                    : 'bg-amber-50/80 border-amber-300 text-amber-950 focus:border-amber-500 focus:bg-white'
+                                }`}
+                              />
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={it.discount || ''}
+                                disabled={isImmutable}
+                                onChange={(e) => handleUpdateItem(idx, 'discount', Math.max(0, parseFloat(e.target.value) || 0))}
+                                placeholder="0.00"
+                                className="w-16 h-6 px-1 border border-slate-200 rounded font-mono text-xs text-right focus:outline-none focus:border-indigo-500 disabled:bg-slate-100"
+                              />
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <select
+                                value={itemTaxPercent}
+                                disabled={isImmutable}
+                                onChange={(e) => handleUpdateItem(idx, 'taxPercent', Number(e.target.value))}
+                                className={`px-1.5 py-0.5 border rounded text-[11px] font-mono font-bold focus:outline-none cursor-pointer ${
+                                  itemTaxPercent > 0
+                                    ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                } ${isImmutable ? 'cursor-not-allowed opacity-80' : ''}`}
+                              >
+                                <option value={15}>15% IVA</option>
+                                <option value={5}>5% IVA</option>
+                                <option value={0}>0% Exento</option>
+                              </select>
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-black text-indigo-700">
+                              ${lineSubtotal.toFixed(2)}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              {!isImmutable ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItem(idx)}
+                                  title="Eliminar producto de la lista"
+                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer transition"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <Lock className="w-3.5 h-3.5 text-slate-400 mx-auto" />
                               )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Remove Action Button */}
-                        {!isImmutable && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(idx)}
-                            title="Eliminar producto de la lista"
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition flex-shrink-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                        {isImmutable && (
-                          <span title="Producto protegido en orden cerrada" className="p-1 text-slate-400">
-                            <Lock className="w-3.5 h-3.5 text-slate-400" />
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Controls Bar: Quantity, Cost per unit & Subtotal */}
-                      <div className="grid grid-cols-12 gap-2 pt-2 border-t border-slate-100 items-center">
-                        {/* Quantity Controls */}
-                        <div className="col-span-5 sm:col-span-4">
-                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                            Cantidad (Uds)
-                          </label>
-                          <div className="flex items-center space-x-1">
-                            {!isImmutable && (
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateItem(idx, 'quantity', Math.max(1, qty - 1))}
-                                className="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg flex items-center justify-center text-xs cursor-pointer"
-                              >
-                                -
-                              </button>
-                            )}
-                            <input
-                              type="number"
-                              min="1"
-                              value={it.quantity}
-                              disabled={isImmutable}
-                              onChange={(e) => handleUpdateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
-                              className={`w-12 h-7 px-1 bg-slate-50 border border-slate-300 rounded-lg font-bold text-center text-xs text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white ${
-                                isImmutable ? 'cursor-not-allowed bg-slate-100 text-slate-600' : ''
-                              }`}
-                            />
-                            {!isImmutable && (
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateItem(idx, 'quantity', qty + 1)}
-                                className="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg flex items-center justify-center text-xs cursor-pointer"
-                              >
-                                +
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Unit Cost */}
-                        <div className="col-span-4 sm:col-span-4">
-                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                            Costo Unit. ($)
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={it.costPrice}
-                              disabled={isImmutable}
-                              onChange={(e) => handleUpdateItem(idx, 'costPrice', e.target.value)}
-                              className={`w-full h-7 px-2 border rounded-lg font-mono font-bold text-xs text-right focus:outline-none ${
-                                isImmutable
-                                  ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
-                                  : 'bg-amber-50/60 border-amber-300/80 text-amber-900 focus:border-amber-500 focus:bg-white'
-                              }`}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Subtotal */}
-                        <div className="col-span-3 sm:col-span-4 text-right">
-                          <span className="text-[10px] font-bold text-slate-500 block">Subtotal</span>
-                          <span className="font-mono font-black text-xs sm:text-sm text-emerald-700">
-                            ${lineTotal.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -2408,27 +2638,60 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
         {/* FIXED BOTTOM PANEL: Resumen de Entrada Fijo + Botones de Acción Organizados */}
         <div className="flex-shrink-0 border-t border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-lg z-10">
-          {/* Panel de Resumen de Entrada Fijo en la parte inferior */}
-          <div className="bg-slate-900 text-white rounded-xl p-3 sm:p-3.5 flex items-center justify-between shadow-xs">
+          {/* Panel de Resumen de Entrada Fijo con Desglose SRI */}
+          <div className="bg-slate-900 text-white rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center space-x-2.5">
               <div className="w-8 h-8 rounded-lg bg-indigo-500/30 flex items-center justify-center text-indigo-300 flex-shrink-0">
                 <Boxes className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Resumen de Entrada</span>
+                <span className="text-[11px] text-slate-400 font-medium block">Resumen de Entrada & Facturación SRI</span>
                 <span className="text-xs font-bold text-slate-200">
                   {items.reduce((s, it) => s + (Number(it.quantity) || 1), 0)} unidades totales ({items.length} {items.length === 1 ? 'producto' : 'productos'})
                 </span>
               </div>
             </div>
 
-            <div className="text-right">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-300 block">
-                Total Inversión de Compra
-              </span>
-              <span className="font-mono font-black text-base sm:text-lg text-emerald-400">
-                ${totalCost.toFixed(2)} <span className="text-xs text-slate-300">{currency}</span>
-              </span>
+            {/* SRI Totals Breakdown */}
+            <div className="w-full sm:w-auto bg-slate-800/90 rounded-lg p-2.5 border border-slate-700 text-xs font-mono space-y-1 min-w-[260px]">
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>Subtotal 0%:</span>
+                <span className="font-bold text-slate-200">${sriBreakdown.subtotal0.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>Subtotal 15%:</span>
+                <span className="font-bold text-slate-200">${sriBreakdown.subtotal15.toFixed(2)}</span>
+              </div>
+              {sriBreakdown.subtotal5 > 0 && (
+                <div className="flex justify-between text-slate-400 text-[11px]">
+                  <span>Subtotal 5%:</span>
+                  <span className="font-bold text-slate-200">${sriBreakdown.subtotal5.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-slate-300 font-bold text-[11px] pt-1 border-t border-slate-700">
+                <span>Subtotal Sin Impuesto:</span>
+                <span className="text-white">${sriBreakdown.subtotalSinImpuesto.toFixed(2)}</span>
+              </div>
+              {sriBreakdown.totalDiscount > 0 && (
+                <div className="flex justify-between text-amber-400 text-[11px]">
+                  <span>Total Descuento:</span>
+                  <span>-${sriBreakdown.totalDiscount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>IVA 15%:</span>
+                <span className="font-bold text-slate-200">${sriBreakdown.iva15.toFixed(2)}</span>
+              </div>
+              {sriBreakdown.iva5 > 0 && (
+                <div className="flex justify-between text-slate-400 text-[11px]">
+                  <span>IVA 5%:</span>
+                  <span className="font-bold text-slate-200">${sriBreakdown.iva5.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-emerald-400 font-black text-sm pt-1 border-t border-slate-700">
+                <span>TOTAL FACTURA SRI:</span>
+                <span>${totalCost.toFixed(2)} {currency}</span>
+              </div>
             </div>
           </div>
 

@@ -1156,12 +1156,12 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         finalCostWithTax = Math.round(finalCostWithoutTax * (1 + taxRate / 100) * 100) / 100;
       } else if (finalTaxStatus === 'INCLUDED') {
         // Explicitly with IVA: final cost is raw cost, cost without tax removes IVA
-        finalCostWithTax = Math.round((finalCostWithTax || finalHighestCost) * 100) / 100;
-        finalCostWithoutTax = Math.round((finalCostWithTax / (1 + taxRate / 100)) * 100) / 100;
+        finalCostWithTax = (finalCostWithTax || finalHighestCost);
+        finalCostWithoutTax = (finalCostWithTax / (1 + taxRate / 100));
       } else {
         // NOT_SPECIFIED: User rule: If the content does NOT specify if it has or not IVA,
         // assume tax percentage is 0% and the cost of the product is the one read.
-        finalCostWithTax = Math.round((finalHighestCost || finalCostWithTax) * 100) / 100;
+        finalCostWithTax = (finalHighestCost || finalCostWithTax);
         finalCostWithoutTax = finalCostWithTax;
       }
 
@@ -1172,10 +1172,10 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         if (!optWithout && !optWith) {
           if (finalTaxStatus === 'PLUS_TAX') {
             optWithout = opt.price;
-            optWith = Math.round(opt.price * (1 + taxRate / 100) * 100) / 100;
+            optWith = opt.price * (1 + taxRate / 100);
           } else if (finalTaxStatus === 'INCLUDED') {
             optWith = opt.price;
-            optWithout = Math.round((opt.price / (1 + taxRate / 100)) * 100) / 100;
+            optWithout = opt.price / (1 + taxRate / 100);
           } else {
             // NOT_SPECIFIED: 0% IVA, cost is as read
             optWith = opt.price;

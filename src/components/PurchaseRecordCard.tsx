@@ -19,6 +19,8 @@ import {
   Eye,
   CreditCard,
   Building2,
+  Receipt,
+  FileText,
 } from 'lucide-react';
 import { PurchaseOrder, StoreConfig, CustomerOrder } from '../types.ts';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
@@ -26,6 +28,7 @@ import { directPrintOrder } from '../utils/directOrderPrint.ts';
 interface PurchaseRecordCardProps {
   purchase: PurchaseOrder;
   isInGroup?: boolean;
+  viewMode?: 'grid' | 'table';
   currency: string;
   storeConfig?: Partial<StoreConfig> | null;
   customerOrders?: CustomerOrder[];
@@ -53,6 +56,7 @@ interface PurchaseRecordCardProps {
 export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
   purchase,
   isInGroup = false,
+  viewMode = 'grid',
   currency,
   storeConfig,
   customerOrders,
@@ -110,9 +114,341 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
     : 0;
   const totalPendingCount = isReceived ? 0 : Math.max(0, totalOrderedCount - totalReceivedCount);
 
+  // Desglose fiscal de impuestos SRI Ecuador (Subtotal 0%, Subtotal 15%, Subtotal 5%, Descuento, IVA 15%/5%, Total)
+  const sriBreakdown = React.useMemo(() => {
+    let subtotal0 = 0;
+    let subtotal15 = 0;
+    let subtotal5 = 0;
+    let totalDiscount = 0;
+
+    (purchase.items || []).forEach((item) => {
+      const qty = Number(item.quantity) || 1;
+      const unitCost = Number(item.costPrice || 0);
+      const discount = Number(item.discount || 0);
+      const lineSubtotal = Math.max(0, unitCost * qty - discount);
+      totalDiscount += discount;
+
+      const taxPercent =
+        item.taxPercent !== undefined
+          ? Number(item.taxPercent)
+          : (item as any).purchaseTaxPercent !== undefined
+          ? Number((item as any).purchaseTaxPercent)
+          : (item as any).hasPurchaseTax === false
+          ? 0
+          : 15;
+
+      if (taxPercent === 0) {
+        subtotal0 += lineSubtotal;
+      } else if (taxPercent === 5) {
+        subtotal5 += lineSubtotal;
+      } else {
+        subtotal15 += lineSubtotal;
+      }
+    });
+
+    const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
+    const iva15 = subtotal15 * 0.15;
+    const iva5 = subtotal5 * 0.05;
+    const grandTotal = subtotalSinImpuesto + iva15 + iva5;
+
+    return {
+      subtotal0,
+      subtotal15,
+      subtotal5,
+      subtotalSinImpuesto,
+      totalDiscount,
+      iva15,
+      iva5,
+      grandTotal: grandTotal > 0 ? grandTotal : Number(purchase.totalCost || 0),
+    };
+  }, [purchase.items, purchase.totalCost]);
+
   // Standardized button style matching sales action buttons (same height, font, padding and alignment)
   const btnPurchaseStyle =
     'w-full h-8 px-2 rounded-lg text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition active:scale-95 cursor-pointer whitespace-nowrap select-none';
+
+  if (viewMode === 'table') {
+    return (
+      <div
+        id={`purchase-record-${purchase.id}`}
+        className="w-full bg-white rounded-2xl border border-slate-300 overflow-hidden shadow-xs space-y-0"
+      >
+        {/* Encabezado Principal tipo Factura ERP */}
+        <div className="bg-slate-900 text-white p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono font-black text-sm text-indigo-300 bg-indigo-950/80 px-2.5 py-1 rounded-lg border border-indigo-700/60">
+              #{purchase.purchaseNumber}
+            </span>
+
+            {/* Badge de Estado del Pedido */}
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${statusStyles.badgeClass}`}>
+              {statusStyles.label}
+            </span>
+
+            {/* Status Indicator Badges */}
+            {isAutoFromSales ? (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                <Lock className="w-3 h-3 text-amber-700" />
+                <span>Auto por Venta</span>
+              </span>
+            ) : isPending ? (
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                <Clock className="w-3 h-3 text-amber-700" />
+                <span>Borrador / Pendiente</span>
+              </span>
+            ) : null}
+
+            {/* Proveedor */}
+            <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 ml-1">
+              <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span>
+                Proveedor: <strong className="text-white font-bold">{purchase.supplierName}</strong>
+              </span>
+            </span>
+
+            {/* Contacto */}
+            {purchase.supplierContact && (
+              <span className="text-xs text-slate-400 font-mono">({purchase.supplierContact})</span>
+            )}
+          </div>
+
+          <div className="font-mono font-black text-sm sm:text-base text-emerald-400">
+            Total Factura: ${sriBreakdown.grandTotal.toFixed(2)}{' '}
+            <span className="text-xs font-bold text-emerald-200">{currency}</span>
+          </div>
+        </div>
+
+        {/* Tabla Horizontal de Productos Tipo Factura ERP */}
+        <div className="overflow-x-auto border-t border-b border-slate-200">
+          <table className="w-full text-left text-xs text-slate-800 font-sans border-collapse min-w-[700px]">
+            <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300 text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="p-3 w-10 text-center">#</th>
+                <th className="p-3">Producto / Descripción</th>
+                <th className="p-3">SKU / Código</th>
+                <th className="p-3 text-center">Cant. Pedida</th>
+                <th className="p-3 text-center">En Bodega</th>
+                <th className="p-3 text-center">Pendiente</th>
+                <th className="p-3 text-right">Costo Unit.</th>
+                <th className="p-3 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {Array.isArray(purchase.items) &&
+                purchase.items.map((item, idx) => {
+                  const ordered = Number(item.quantity) || 1;
+                  const rec = isReceived ? ordered : Number(item.receivedQuantity) || 0;
+                  const pending = isReceived ? 0 : Math.max(0, ordered - rec);
+                  const unitCost = Number(item.costPrice || 0);
+                  const discount = Number(item.discount || 0);
+                  const lineSubtotal = Math.max(0, unitCost * ordered - discount);
+
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/80 transition">
+                      <td className="p-3 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
+                      <td className="p-3">
+                        <div className="flex items-center space-x-2.5">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-9 h-9 object-cover rounded-lg border border-slate-200 shrink-0" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200">
+                              <Package className="w-4 h-4" />
+                            </div>
+                          )}
+                          <span className="font-extrabold text-slate-900 text-xs line-clamp-1">{item.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 font-mono text-[11px]">
+                        <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-bold text-sky-800">
+                          {item.sku || '-'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center font-mono font-bold text-slate-900">{ordered} u.</td>
+                      <td className="p-3 text-center font-mono font-bold text-emerald-700 bg-emerald-50/60">{rec} u.</td>
+                      <td className="p-3 text-center font-mono font-bold text-amber-700 bg-amber-50/60">{pending} u.</td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-800">${unitCost.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono font-black text-indigo-700">${lineSubtotal.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+            <tfoot className="bg-slate-50 font-bold border-t border-slate-300 text-xs">
+              <tr>
+                <td colSpan={3} className="p-3 text-slate-700">
+                  Desglose de Factura: <strong>{purchase.items?.length || 0} ítems</strong> ({totalOrderedCount} unidades en total)
+                </td>
+                <td className="p-3 text-center font-mono text-slate-900">{totalOrderedCount} u.</td>
+                <td className="p-3 text-center font-mono text-emerald-800">{totalReceivedCount} u.</td>
+                <td className="p-3 text-center font-mono text-amber-800">{totalPendingCount} u.</td>
+                <td className="p-3 text-right text-slate-600 uppercase font-sans text-[11px]">Total Compra:</td>
+                <td className="p-3 text-right font-mono font-black text-sm sm:text-base text-indigo-900">${sriBreakdown.grandTotal.toFixed(2)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Desglose de Totales Fiscales SRI Ecuador (Estilo efaccilito) */}
+        <div className="bg-slate-50 border-t border-slate-200 p-3 sm:p-4 text-xs">
+          <div className="max-w-xs ml-auto space-y-1 font-mono text-[11px]">
+            <div className="flex justify-between text-slate-600">
+              <span>Subtotal 0%:</span>
+              <span className="font-bold text-slate-900">${sriBreakdown.subtotal0.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Subtotal 15%:</span>
+              <span className="font-bold text-slate-900">${sriBreakdown.subtotal15.toFixed(2)}</span>
+            </div>
+            {sriBreakdown.subtotal5 > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Subtotal 5%:</span>
+                <span className="font-bold text-slate-900">${sriBreakdown.subtotal5.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-slate-700 font-bold pt-1 border-t border-slate-200">
+              <span>Subtotal Sin Impuesto:</span>
+              <span className="text-slate-900">${sriBreakdown.subtotalSinImpuesto.toFixed(2)}</span>
+            </div>
+            {sriBreakdown.totalDiscount > 0 && (
+              <div className="flex justify-between text-amber-700 font-bold">
+                <span>Total Descuento:</span>
+                <span>-${sriBreakdown.totalDiscount.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-slate-600">
+              <span>IVA 15%:</span>
+              <span className="font-bold text-slate-900">${sriBreakdown.iva15.toFixed(2)}</span>
+            </div>
+            {sriBreakdown.iva5 > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>IVA 5%:</span>
+                <span className="font-bold text-slate-900">${sriBreakdown.iva5.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-indigo-950 font-black text-xs sm:text-sm pt-1.5 border-t-2 border-indigo-600 bg-indigo-50/80 p-2 rounded-lg mt-1 shadow-2xs">
+              <span>TOTAL FACTURA SRI:</span>
+              <span>${sriBreakdown.grandTotal.toFixed(2)} {currency}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Acciones Factura */}
+        <div className="p-3 bg-slate-100/90 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isPending ? (
+              isLinkedOrderUnconfirmed ? (
+                <button
+                  type="button"
+                  onClick={() => showToast?.(`⚠️ No se puede confirmar la compra al proveedor: El Pedido de Venta #${linkedOrderNumber} aún no ha sido confirmado.`)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 text-amber-800 border border-amber-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Venta Sin Confirmar</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onConfirmPay(purchase)}
+                  disabled={isConfirming}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Confirmar Pago</span>
+                </button>
+              )
+            ) : !isReceived && !isCancelled ? (
+              <button
+                type="button"
+                onClick={() => onReceive(purchase)}
+                disabled={isReceiving}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{isPartiallyReceived ? 'Recibir Restante' : 'Recibir en Bodega'}</span>
+              </button>
+            ) : isReceived ? (
+              <span className="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Recibido en Bodega</span>
+              </span>
+            ) : (
+              <span className="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-900 border border-rose-300 text-xs font-bold flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                <span>Cancelado</span>
+              </span>
+            )}
+
+            {!isPending && !isReceived && !isCancelled && (
+              <button
+                type="button"
+                onClick={() => onPartialReceive(purchase)}
+                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Boxes className="w-3.5 h-3.5 text-amber-600" />
+                <span>Recepción Parcial</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onOpenWhatsapp(purchase, 'whatsapp')}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+            >
+              <MessageCircle className="w-3.5 h-3.5 fill-current" />
+              <span>WhatsApp Proveedor</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onQuickCopyPhotos(purchase)}
+              disabled={isCopyingPhotos}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer disabled:opacity-50"
+            >
+              {isCopyingPhotos ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Copiando...</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copiar Portadas</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => directPrintOrder({ purchase, storeConfig, currency, showToast })}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              <span>Imprimir</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onEditOrDetail(purchase)}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+            >
+              {isPending && !isAutoFromSales ? <Edit3 className="w-3.5 h-3.5 text-slate-600" /> : <Eye className="w-3.5 h-3.5 text-slate-600" />}
+              <span>{isPending && !isAutoFromSales ? 'Editar' : 'Detalle'}</span>
+            </button>
+
+            {isPending && !isAutoFromSales && (
+              <button
+                type="button"
+                onClick={() => onDelete(purchase)}
+                className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Eliminar</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -423,7 +759,7 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
               <div className="text-right">
                 <div className="text-[10px] text-slate-500 font-medium">Costo Total</div>
                 <div className="font-mono font-black text-sm sm:text-base text-slate-900">
-                  ${Number(purchase.totalCost || 0).toFixed(2)}{' '}
+                  ${sriBreakdown.grandTotal.toFixed(2)}{' '}
                   <span className="text-[11px] font-semibold text-slate-500">{currency}</span>
                 </div>
               </div>
@@ -448,81 +784,84 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
             )}
           </div>
 
-          {/* 3. LISTA COMPLETA DE PRODUCTOS (Completamente visible, organizada y legible) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-            {Array.isArray(purchase.items) &&
-              purchase.items.map((item, idx) => {
-                const ordered = Number(item.quantity) || 1;
-                const rec = isReceived ? ordered : Number(item.receivedQuantity) || 0;
-                const pending = isReceived ? 0 : Math.max(0, ordered - rec);
+          {/* 3. LISTA DE PRODUCTOS CON TAMAÑO FIJO DE PANEL Y SCROLL INTERNO (Requirement #1) */}
+          <div className="max-h-[220px] overflow-y-auto pr-1 select-text border border-slate-200/80 rounded-xl p-2 bg-slate-50/50 custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {Array.isArray(purchase.items) &&
+                purchase.items.map((item, idx) => {
+                  const ordered = Number(item.quantity) || 1;
+                  const rec = isReceived ? ordered : Number(item.receivedQuantity) || 0;
+                  const pending = isReceived ? 0 : Math.max(0, ordered - rec);
+                  const unitCost = Number(item.costPrice || 0);
 
-                return (
-                  <div
-                    key={idx}
-                    className="bg-slate-50/70 border border-slate-200 rounded-xl p-2.5 shadow-2xs space-y-1.5"
-                  >
-                    <div className="flex items-start space-x-2.5">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-10 h-10 object-cover rounded-lg border border-slate-200 flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-slate-400 flex-shrink-0 border border-slate-200">
-                          <Package className="w-4 h-4" />
-                        </div>
-                      )}
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-slate-50/70 border border-slate-200 rounded-xl p-2.5 shadow-2xs space-y-1.5"
+                    >
+                      <div className="flex items-start space-x-2.5">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-10 h-10 object-cover rounded-lg border border-slate-200 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-slate-400 flex-shrink-0 border border-slate-200">
+                            <Package className="w-4 h-4" />
+                          </div>
+                        )}
 
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-xs text-slate-900 truncate" title={item.name}>
-                          {item.name}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-xs text-slate-900 truncate" title={item.name}>
+                            {item.name}
+                          </div>
+                          <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 mt-0.5">
+                            {item.sku && (
+                              <span className="font-mono bg-white px-1 rounded border border-slate-200">
+                                SKU: {item.sku}
+                              </span>
+                            )}
+                            {item.barcode && (
+                              <span className="font-mono bg-white px-1 rounded border border-slate-200">
+                                EAN: {item.barcode}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 mt-0.5">
-                          {item.sku && (
-                            <span className="font-mono bg-white px-1 rounded border border-slate-200">
-                              SKU: {item.sku}
-                            </span>
-                          )}
-                          {item.barcode && (
-                            <span className="font-mono bg-white px-1 rounded border border-slate-200">
-                              EAN: {item.barcode}
-                            </span>
-                          )}
+
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-[9px] text-slate-400">Costo Unit.</div>
+                          <div className="font-mono font-bold text-[11px] text-slate-800">
+                            ${unitCost.toFixed(2)}
+                          </div>
+                          <div className="font-mono font-black text-xs text-indigo-700">
+                            ${(unitCost * ordered).toFixed(2)}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-[9px] text-slate-400">Unitario</div>
-                        <div className="font-mono font-bold text-[11px] text-slate-800">
-                          ${Number(item.costPrice || 0).toFixed(2)}
-                        </div>
-                        <div className="font-mono font-black text-xs text-indigo-700">
-                          ${(Number(item.costPrice || 0) * ordered).toFixed(2)}
+                      {/* Breakdown de Unidades Pedidas, En Bodega y Pendiente */}
+                      <div className="pt-1 border-t border-slate-200/60">
+                        <div className="grid grid-cols-3 gap-1 text-center text-[10px]">
+                          <div className="bg-white px-1 py-0.5 rounded border border-slate-200">
+                            <span className="text-slate-400 block text-[9px]">Pedidas</span>
+                            <span className="font-bold text-slate-800">{ordered}</span>
+                          </div>
+                          <div className="bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">
+                            <span className="text-emerald-600 block text-[9px]">En Bodega</span>
+                            <span className="font-bold text-emerald-800">{rec}</span>
+                          </div>
+                          <div className="bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
+                            <span className="text-amber-600 block text-[9px]">Pendiente</span>
+                            <span className="font-bold text-amber-800">{pending}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-
-                    {/* Breakdown de Unidades Pedidas, En Bodega y Pendiente */}
-                    <div className="pt-1 border-t border-slate-200/60">
-                      <div className="grid grid-cols-3 gap-1 text-center text-[10px]">
-                        <div className="bg-white px-1 py-0.5 rounded border border-slate-200">
-                          <span className="text-slate-400 block text-[9px]">Pedidas</span>
-                          <span className="font-bold text-slate-800">{ordered}</span>
-                        </div>
-                        <div className="bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">
-                          <span className="text-emerald-600 block text-[9px]">En Bodega</span>
-                          <span className="font-bold text-emerald-800">{rec}</span>
-                        </div>
-                        <div className="bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
-                          <span className="text-amber-600 block text-[9px]">Pendiente</span>
-                          <span className="font-bold text-amber-800">{pending}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+            </div>
           </div>
 
           {/* 4. Historial de Entregas y Recepciones (si existen) */}

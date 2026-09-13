@@ -3,13 +3,22 @@
 /**
  * Returns exact currency formatted string for tooltips / full views
  */
-export const formatExactCurrency = (val: number, currency: string = 'USD'): string => {
+export const formatExactCurrency = (val: number, currency: string = 'USD', decimals: number = 2): string => {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
     currency: currency || 'USD',
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: decimals,
   }).format(val || 0);
 };
+
+export const format2Decimals = (val: number | string): string => {
+  const num = typeof val === 'number' ? val : parseFloat(String(val || 0)) || 0;
+  if (isNaN(num)) return '0.00';
+  return num.toFixed(2);
+};
+
+export const format3Decimals = format2Decimals;
 
 /**
  * Returns smart display currency:
