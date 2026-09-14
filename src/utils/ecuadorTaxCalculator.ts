@@ -22,6 +22,7 @@ export interface EcuadorTaxLineItemInput {
   
   profitCalculationMode?: 'MARKUP_PERCENT' | 'MARGIN_PERCENT' | 'FIXED_DOLLAR';
   profitValue?: number;          // Valor del margen %, markup %, o ganancia fija $
+  marginPercent?: number;        // Alias opcional para margen % de ganancia
   
   discount?: number;             // Descuento unitario en dólares ($)
   discountPercent?: number;      // Descuento unitario en porcentaje (%)

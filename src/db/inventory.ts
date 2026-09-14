@@ -2821,18 +2821,20 @@ export async function saveEcuadorApiConfig(
   if (!state.ecuadorApiConfigs) state.ecuadorApiConfigs = [];
 
   let localConfig = state.ecuadorApiConfigs.find((c) => c.userId === userId);
+  const cleanKey = (data.apiKey !== undefined && data.apiKey.trim().length > 0) ? data.apiKey.trim() : undefined;
+
   if (!localConfig) {
     localConfig = {
       id: state.nextId?.ecuadorApiConfigs ? state.nextId.ecuadorApiConfigs++ : 1,
       userId,
-      apiKey: data.apiKey ?? null,
+      apiKey: cleanKey ?? null,
       isActive: data.isActive !== undefined ? data.isActive : true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     state.ecuadorApiConfigs.push(localConfig);
   } else {
-    if (data.apiKey !== undefined) localConfig.apiKey = data.apiKey;
+    if (cleanKey !== undefined) localConfig.apiKey = cleanKey;
     if (data.isActive !== undefined) localConfig.isActive = data.isActive;
     localConfig.updatedAt = new Date().toISOString();
   }
@@ -2846,10 +2848,11 @@ export async function saveEcuadorApiConfig(
     const existing = await getEcuadorApiConfig(userId);
 
     if (existing && existing.id) {
+      const keyToSet = cleanKey !== undefined ? cleanKey : existing.apiKey;
       const updated = await db
         .update(ecuadorApiConfigs)
         .set({
-          apiKey: data.apiKey !== undefined ? data.apiKey : existing.apiKey,
+          apiKey: keyToSet,
           isActive: data.isActive !== undefined ? data.isActive : existing.isActive,
           updatedAt: new Date(),
         })
@@ -2874,7 +2877,7 @@ export async function saveEcuadorApiConfig(
       .insert(ecuadorApiConfigs)
       .values({
         userId: targetUserId,
-        apiKey: data.apiKey ?? null,
+        apiKey: cleanKey ?? null,
         isActive: data.isActive !== undefined ? data.isActive : true,
       })
       .returning();
@@ -2883,6 +2886,112 @@ export async function saveEcuadorApiConfig(
   } catch (error) {
     console.warn('Error updating ecuador api config in SQL, fallback to local store:', error);
     return localConfig;
+  }
+}
+
+/**
+ * Auto-registers a customer in the Customers Directory immediately when obtained from Ecuador API.
+ */
+export async function autoRegisterCustomerFromEcuadorApi(data: {
+  userId?: number;
+  ci: string;
+  name: string;
+  address?: string | null;
+}) {
+  if (!data.ci || !data.name) return null;
+  const cleanCi = data.ci.trim();
+  const cleanName = data.name.trim();
+  if (!cleanCi || !cleanName) return null;
+
+  const targetUserId = await resolveValidUserId(data.userId);
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  if (!isPostgresConfigured()) {
+    const state = storage.getState();
+    if (!state.customers) state.customers = [];
+
+    // Check if exists by CI
+    let existingIndex = state.customers.findIndex((c) => {
+      return c.ci && String(c.ci).trim().toLowerCase() === cleanCi.toLowerCase();
+    });
+
+    if (existingIndex !== -1) {
+      const existing = state.customers[existingIndex];
+      existing.name = cleanName || existing.name;
+      existing.fullName = cleanName || existing.fullName;
+      if (data.address && !existing.address) existing.address = data.address;
+      existing.updatedAt = nowIso;
+      storage.save();
+      return existing;
+    } else {
+      const nextId = state.nextId.customers ? state.nextId.customers++ : (state.customers.length + 1);
+      if (!state.nextId.customers) state.nextId.customers = nextId + 1;
+
+      const newCustomer = {
+        id: nextId,
+        userId: targetUserId,
+        name: cleanName,
+        fullName: cleanName,
+        phone: '',
+        ci: cleanCi,
+        email: null,
+        address: data.address || null,
+        fullAddress: data.address || null,
+        province: null,
+        canton: null,
+        parish: null,
+        exactAddress: null,
+        reference: null,
+        notes: '[Registrado automáticamente por Ecuador API]',
+        totalOrders: 0,
+        totalSpent: '0.00',
+        lastOrderDate: nowIso,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      state.customers.unshift(newCustomer);
+      storage.save();
+      return newCustomer;
+    }
+  }
+
+  try {
+    const existing = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.userId, targetUserId), eq(customers.ci, cleanCi)))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const updated = await db
+        .update(customers)
+        .set({
+          name: cleanName,
+          address: data.address || existing[0].address,
+          updatedAt: now,
+        })
+        .where(eq(customers.id, existing[0].id))
+        .returning();
+      return updated[0];
+    } else {
+      const inserted = await db
+        .insert(customers)
+        .values({
+          userId: targetUserId,
+          name: cleanName,
+          phone: '',
+          ci: cleanCi,
+          address: data.address || null,
+          notes: '[Registrado automáticamente por Ecuador API]',
+        })
+        .returning();
+      return inserted[0];
+    }
+  } catch (error) {
+    console.warn('Error auto registering customer from Ecuador API in SQL:', error);
+    return null;
   }
 }
 
@@ -5818,7 +5927,7 @@ export function parseCustomerShippingData(addressStr?: string | null, fallbackCi
  * Automatically upserts a customer record when an order is created, modified or confirmed.
  */
 export async function upsertCustomerFromOrder(order: any, preferredUserId?: number) {
-  if (!order || !order.customerPhone) return null;
+  if (!order || (!order.customerPhone && !order.customerCi && !order.ci)) return null;
 
   // Do not register/upsert if order was cancelled
   const orderStatus = (order.status || '').toLowerCase().trim();
@@ -5852,8 +5961,8 @@ export async function upsertCustomerFromOrder(order: any, preferredUserId?: numb
     }
   }
 
-  const phoneNorm = normalizeEcuadorPhone(order.customerPhone);
-  const cleanPhone = phoneNorm.formattedInternational || phoneNorm.e164 || order.customerPhone.trim();
+  const phoneNorm = normalizeEcuadorPhone(order.customerPhone || '');
+  const cleanPhone = phoneNorm.formattedInternational || phoneNorm.e164 || (order.customerPhone ? order.customerPhone.trim() : '');
   const phoneDigits = phoneNorm.digits || cleanPhone.replace(/\D/g, '');
 
   const targetUserId = await resolveValidUserId(order.userId || preferredUserId);

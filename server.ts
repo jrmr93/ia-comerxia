@@ -51,6 +51,7 @@ import {
   updateAiConfig,
   getEcuadorApiConfig,
   saveEcuadorApiConfig,
+  autoRegisterCustomerFromEcuadorApi,
   updateInventoryItem,
   saveProductMarketingCopy,
   updateTelegramConfig,
@@ -708,6 +709,11 @@ async function startServer() {
       }
 
       const cfg = await getEcuadorApiConfig(req.dbUserId || 1);
+      if (cfg.isActive === false) {
+        return res.status(400).json({
+          error: 'El servicio de Ecuador API está desactivado en la Configuración del Sistema.',
+        });
+      }
       if (!cfg.hasApiKey || !cfg.apiKey) {
         return res.status(400).json({
           error: 'La API Key de Ecuador API no está configurada en la Configuración del Sistema.',
@@ -742,9 +748,26 @@ async function startServer() {
           });
         }
 
+        const clientData = json.data || json;
+        if (clientData) {
+          const clientName = clientData.full_name || `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim();
+          if (clientName) {
+            try {
+              await autoRegisterCustomerFromEcuadorApi({
+                userId: req.dbUserId || 1,
+                ci: cleanCedula,
+                name: clientName,
+                address: null,
+              });
+            } catch (autoErr) {
+              console.warn('Could not auto register customer from Cedula API:', autoErr);
+            }
+          }
+        }
+
         return res.json({
           success: true,
-          data: json.data || json,
+          data: clientData,
           error: json.error || null,
           message: json.message || null,
         });
@@ -758,6 +781,92 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error querying Ecuador API by cedula:', error);
       res.status(500).json({ error: error.message || 'Error al consultar datos en Ecuador API' });
+    }
+  });
+
+  app.get('/api/ecuador-api/rucs/:ruc', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { ruc } = req.params;
+      const cleanRuc = (ruc || '').trim();
+      if (!cleanRuc || !/^\d{13}$/.test(cleanRuc)) {
+        return res.status(400).json({
+          error: 'El RUC proporcionado debe contener exactamente 13 dígitos numéricos.',
+        });
+      }
+
+      const cfg = await getEcuadorApiConfig(req.dbUserId || 1);
+      if (cfg.isActive === false) {
+        return res.status(400).json({
+          error: 'El servicio de Ecuador API está desactivado en la Configuración del Sistema.',
+        });
+      }
+      if (!cfg.hasApiKey || !cfg.apiKey) {
+        return res.status(400).json({
+          error: 'La API Key de Ecuador API no está configurada en la Configuración del Sistema.',
+        });
+      }
+
+      const targetUrl = `https://api.ecuadorapi.com/api/v1/rucs/${encodeURIComponent(cleanRuc)}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s max time
+
+      try {
+        const apiRes = await fetch(targetUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${cfg.apiKey.trim()}`,
+            'Accept': 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        const json = await apiRes.json();
+
+        if (!apiRes.ok) {
+          const errMsg = json?.message || json?.error || `Error en Ecuador API RUC (HTTP ${apiRes.status})`;
+          return res.status(apiRes.status).json({
+            success: false,
+            error: errMsg,
+            raw: json,
+          });
+        }
+
+        const rucData = json.data || json;
+        if (rucData) {
+          const rucName = rucData.business_name || rucData.trade_name || rucData.full_name;
+          if (rucName) {
+            try {
+              await autoRegisterCustomerFromEcuadorApi({
+                userId: req.dbUserId || 1,
+                ci: cleanRuc,
+                name: rucName,
+                address: rucData.address || null,
+              });
+            } catch (autoErr) {
+              console.warn('Could not auto register customer from RUC API:', autoErr);
+            }
+          }
+        }
+
+        return res.json({
+          success: true,
+          data: rucData,
+          error: json.error || null,
+          message: json.message || null,
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          return res.status(504).json({ error: 'La consulta de RUC a Ecuador API excedió el tiempo máximo de espera (60 segundos).' });
+        }
+        throw fetchErr;
+      }
+    } catch (error: any) {
+      console.error('Error querying Ecuador API by RUC:', error);
+      res.status(500).json({ error: error.message || 'Error al consultar RUC en Ecuador API' });
     }
   });
 

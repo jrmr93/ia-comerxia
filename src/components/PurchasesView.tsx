@@ -211,7 +211,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = safeLocalStorage.getItem('comerxia_purchases_view_mode');
+        const saved = window.localStorage.getItem('comerxia_purchases_view_mode');
         if (saved === 'grid' || saved === 'table') return saved;
       } catch {}
     }
@@ -221,7 +221,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        safeLocalStorage.setItem('comerxia_purchases_view_mode', viewMode);
+        window.localStorage.setItem('comerxia_purchases_view_mode', viewMode);
       } catch {}
     }
   }, [viewMode]);

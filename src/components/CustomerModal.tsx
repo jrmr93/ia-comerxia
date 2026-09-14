@@ -14,6 +14,7 @@ import {
   Truck,
   Building2,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { Customer } from '../types.ts';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
@@ -59,6 +60,62 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
   // Autocomplete suggestions
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [matchedCustomerInfo, setMatchedCustomerInfo] = useState<Customer | null>(null);
+  const [ecuadorApiStatus, setEcuadorApiStatus] = useState<{ loading: boolean; message?: string } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || customer) return;
+    const cleanDigits = ci.replace(/\D/g, '');
+    if (cleanDigits.length !== 10 && cleanDigits.length !== 13) {
+      setEcuadorApiStatus(null);
+      return;
+    }
+
+    const match = existingCustomers.find((c) => {
+      const cCi = (c.ci || '').replace(/\D/g, '');
+      return cCi && cCi === cleanDigits;
+    });
+
+    if (match) {
+      setEcuadorApiStatus(null);
+      return; // Already matched locally in CRM
+    }
+
+    const timer = setTimeout(async () => {
+      setEcuadorApiStatus({ loading: true });
+      try {
+        const isRuc = cleanDigits.length === 13;
+        const endpoint = isRuc ? `/api/ecuador-api/rucs/${cleanDigits}` : `/api/ecuador-api/cedulas/${cleanDigits}`;
+        const res = await fetch(endpoint);
+        const data = await res.json();
+
+        if (res.ok && data.success && data.data) {
+          const name = isRuc
+            ? (data.data.business_name || data.data.trade_name || '')
+            : (data.data.full_name || `${data.data.first_name || ''} ${data.data.last_name || ''}`.trim());
+
+          if (name) {
+            setFullName(name);
+            if (data.data.address && !generalAddress) {
+              setGeneralAddress(data.data.address);
+            }
+            setEcuadorApiStatus({
+              loading: false,
+              message: `✓ ${isRuc ? 'Razón Social' : 'Nombre'} autocompletado por Ecuador API`,
+            });
+          } else {
+            setEcuadorApiStatus(null);
+          }
+        } else {
+          setEcuadorApiStatus(null);
+        }
+      } catch (err) {
+        console.error('Error auto-fetching Ecuador API in CustomerModal:', err);
+        setEcuadorApiStatus(null);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [ci, existingCustomers, customer, isOpen]);
 
   useEffect(() => {
     if (customer) {
@@ -347,7 +404,17 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                 )}
 
                 <div className="min-h-5 mt-1.5">
-                  {matchedCustomerInfo ? (
+                  {ecuadorApiStatus?.loading ? (
+                    <div className="text-[10px] text-teal-700 flex items-center gap-1 font-semibold truncate animate-pulse">
+                      <Loader2 className="w-3.5 h-3.5 text-teal-600 animate-spin flex-shrink-0" />
+                      <span className="truncate">Consultando Ecuador API...</span>
+                    </div>
+                  ) : ecuadorApiStatus?.message ? (
+                    <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 truncate">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                      <span className="truncate">{ecuadorApiStatus.message}</span>
+                    </p>
+                  ) : matchedCustomerInfo ? (
                     <div className="text-[10px] text-emerald-700 flex items-center gap-1 font-semibold truncate">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                       <span className="truncate">Datos de <strong>{matchedCustomerInfo.fullName || matchedCustomerInfo.name}</strong></span>

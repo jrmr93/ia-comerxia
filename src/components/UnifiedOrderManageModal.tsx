@@ -11,6 +11,7 @@ import {
   Edit3,
   ExternalLink,
   Lock,
+  Loader2,
   Mail,
   MapPin,
   MessageCircle,
@@ -21,6 +22,7 @@ import {
   Printer,
   Receipt,
   Search,
+  Sparkles,
   Store,
   Trash2,
   Truck,
@@ -175,6 +177,66 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [customerFiscalAddress, setCustomerFiscalAddress] = useState<string>('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState<boolean>(false);
   const [matchedCustomerInfo, setMatchedCustomerInfo] = useState<any | null>(null);
+  const [ecuadorApiStatus, setEcuadorApiStatus] = useState<{ loading: boolean; source?: string; message?: string } | null>(null);
+
+  // Auto-fetch Ecuador API (Cedula/RUC) if customer is not found in local CRM database
+  useEffect(() => {
+    if (!isOpen) return;
+    const cleanDigits = (customerCi || '').replace(/\D/g, '');
+    if (cleanDigits.length !== 10 && cleanDigits.length !== 13) {
+      setEcuadorApiStatus(null);
+      return;
+    }
+
+    // 1. Check if customer already exists in local database (dbCustomers)
+    const foundInLocal = (dbCustomers || []).find((c: any) => {
+      const cCi = (c.ci || '').replace(/\D/g, '');
+      return cCi && cCi === cleanDigits;
+    });
+
+    if (foundInLocal) {
+      setEcuadorApiStatus(null);
+      return; // Already matched locally from CRM
+    }
+
+    // 2. Not found in local database -> query Ecuador API with short debounce
+    const timer = setTimeout(async () => {
+      setEcuadorApiStatus({ loading: true });
+      try {
+        const isRuc = cleanDigits.length === 13;
+        const endpoint = isRuc ? `/api/ecuador-api/rucs/${cleanDigits}` : `/api/ecuador-api/cedulas/${cleanDigits}`;
+        const res = await fetch(endpoint);
+        const data = await res.json();
+
+        if (res.ok && data.success && data.data) {
+          const name = isRuc
+            ? (data.data.business_name || data.data.trade_name || '')
+            : (data.data.full_name || `${data.data.first_name || ''} ${data.data.last_name || ''}`.trim());
+
+          if (name) {
+            setCustomerName(name);
+            if (data.data.address && !customerFiscalAddress) {
+              setCustomerFiscalAddress(data.data.address);
+            }
+            setEcuadorApiStatus({
+              loading: false,
+              source: 'Ecuador API',
+              message: `✓ ${isRuc ? 'Razón Social' : 'Nombre'} autocompletado por Ecuador API`,
+            });
+          } else {
+            setEcuadorApiStatus(null);
+          }
+        } else {
+          setEcuadorApiStatus(null);
+        }
+      } catch (err) {
+        console.error('Error auto-fetching Ecuador API:', err);
+        setEcuadorApiStatus(null);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [customerCi, dbCustomers, isOpen]);
 
   // Delivery & Logistics Data State
   const [deliveryType, setDeliveryType] = useState<'pickup' | 'shipping'>('pickup');
@@ -1499,7 +1561,17 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 )}
 
                 <div className="h-5 mt-1">
-                  {matchedCustomerInfo ? (
+                  {ecuadorApiStatus?.loading ? (
+                    <div className="text-[10px] text-teal-700 flex items-center gap-1 font-semibold truncate animate-pulse">
+                      <Loader2 className="w-3 h-3 text-teal-600 animate-spin shrink-0" />
+                      <span className="truncate">Consultando Ecuador API...</span>
+                    </div>
+                  ) : ecuadorApiStatus?.message ? (
+                    <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 truncate">
+                      <Sparkles className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span className="truncate">{ecuadorApiStatus.message}</span>
+                    </p>
+                  ) : matchedCustomerInfo ? (
                     <div className="text-[10px] text-emerald-700 flex items-center gap-1 font-semibold truncate">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
                       <span className="truncate">Cliente: <strong>{matchedCustomerInfo.name || matchedCustomerInfo.ci}</strong></span>
@@ -2060,7 +2132,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     const calculatedRow = calculateLineItem({
                       costWithoutTax: unitCost,
                       unitSalePrice: Number(it.salePrice || 0),
-                      profitValue: it.marginPercent !== undefined ? Number(it.marginPercent) : undefined,
+                      profitValue: (it as any).marginPercent !== undefined ? Number((it as any).marginPercent) : undefined,
                       profitCalculationMode: 'MARKUP_PERCENT',
                       discount: Number(it.discount || 0),
                       quantity: Number(it.quantity || 1),
@@ -2543,7 +2615,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       {showPrintA4Modal && (
         <OrderPrintA4Modal
           order={currentOrderForTicket}
-          inventoryItems={inventoryItems}
+          inventoryItems={products}
           storeConfig={storeConfig}
           currency={currency}
           onClose={() => setShowPrintA4Modal(false)}

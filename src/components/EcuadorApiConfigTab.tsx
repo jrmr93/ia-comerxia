@@ -10,6 +10,7 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
   const [showKey, setShowKey] = useState(false);
   const [hasKey, setHasKey] = useState(false);
   const [apiKeyMasked, setApiKeyMasked] = useState('');
+  const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
       if (res.ok && data.config) {
         setHasKey(data.config.hasApiKey);
         setApiKeyMasked(data.config.apiKeyMasked || '');
+        setIsActive(data.config.isActive !== false);
       } else {
         setError(data.error || 'No se pudo cargar la configuración de Ecuador API');
       }
@@ -61,7 +63,7 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
       const res = await fetch('/api/ecuador-api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: apiKey.trim() }),
+        body: JSON.stringify({ apiKey: apiKey.trim(), isActive }),
       });
       const data = await res.json();
 
@@ -84,8 +86,8 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
 
   const handleTestLookup = async () => {
     const clean = testCedula.trim();
-    if (!clean || !/^\d{10}$/.test(clean)) {
-      setTestError('Ingresa un número de cédula válido de 10 dígitos (ej. 1700000000)');
+    if (!clean || (!/^\d{10}$/.test(clean) && !/^\d{13}$/.test(clean))) {
+      setTestError('Ingresa un número válido de 10 dígitos (Cédula) o 13 dígitos (RUC)');
       return;
     }
 
@@ -93,17 +95,20 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
     setTestError(null);
     setTestResult(null);
 
+    const isRuc = clean.length === 13;
+    const endpoint = isRuc ? `/api/ecuador-api/rucs/${encodeURIComponent(clean)}` : `/api/ecuador-api/cedulas/${encodeURIComponent(clean)}`;
+
     try {
-      const res = await fetch(`/api/ecuador-api/cedulas/${encodeURIComponent(clean)}`);
+      const res = await fetch(endpoint);
       const data = await res.json();
 
       if (res.ok && data.success && data.data) {
         setTestResult(data.data);
       } else {
-        setTestError(data.error || 'No se encontraron datos para la cédula ingresada');
+        setTestError(data.error || `No se encontraron datos para el ${isRuc ? 'RUC' : 'número de cédula'} ingresado`);
       }
     } catch (err: any) {
-      console.error('Error testing cedula lookup:', err);
+      console.error('Error testing identification lookup:', err);
       setTestError('Error al comunicarse con la API de Ecuador');
     } finally {
       setTesting(false);
@@ -129,7 +134,7 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
         <div className="relative z-10 space-y-2">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[11px] font-bold tracking-wide uppercase">
-              Integración Nacional
+              Integración Nacional SRI
             </span>
             {hasKey ? (
               <span className="flex items-center gap-1 text-[11px] bg-emerald-500/30 text-emerald-200 px-2 py-0.5 rounded-full font-semibold border border-emerald-400/30">
@@ -142,10 +147,10 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
             )}
           </div>
           <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-            Ecuador API (Consulta de Cédulas)
+            Ecuador API (Cédulas y RUCs)
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Permite la búsqueda automatizada e instantánea de nombres y apellidos de ciudadanos ecuatorianos mediante su número de Cédula de Identidad en los módulos de Clientes y Ventas.
+            Permite la búsqueda automatizada e instantánea de Nombres, Apellidos y Razones Sociales de contribuyentes en Ecuador mediante Cédula (10 dígitos) o RUC (13 dígitos) en el módulo de Ventas y Registro de Clientes.
           </p>
         </div>
       </div>
@@ -216,6 +221,32 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
             )}
           </div>
 
+          {/* Switch toggle para activar / desactivar Ecuador API */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <h4 className="text-xs font-bold text-slate-800">Estado de Integración con Ecuador API</h4>
+              <p className="text-[11px] text-slate-500">
+                {isActive
+                  ? '✓ Activo: Se consultarán automáticamente Cédulas y RUCs no registrados en las ventas.'
+                  : '✕ Desactivado: El sistema no realizará peticiones externas a la API.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsActive(!isActive)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                isActive ? 'bg-emerald-600' : 'bg-slate-300'
+              }`}
+              title={isActive ? 'Desactivar Ecuador API' : 'Activar Ecuador API'}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  isActive ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
           <div className="pt-1 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -248,8 +279,8 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
               <Search className="w-3.5 h-3.5" />
             </div>
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Probador de Consulta por Cédula</h3>
-              <p className="text-[11px] text-slate-500">Verifica la respuesta en tiempo real de la API de Ecuador</p>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Probador de Consulta (Cédulas y RUCs)</h3>
+              <p className="text-[11px] text-slate-500">Prueba la consulta de Cédulas (10 dígitos) o RUCs (13 dígitos) en tiempo real</p>
             </div>
           </div>
         </div>
@@ -259,16 +290,16 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
             <input
               type="text"
               value={testCedula}
-              maxLength={10}
+              maxLength={13}
               onChange={(e) => setTestCedula(e.target.value.replace(/\D/g, ''))}
-              placeholder="Ingresa cédula de 10 dígitos (ej. 1700000000)"
+              placeholder="Ingresa Cédula (10 dígitos) o RUC (13 dígitos, ej. 1790012345001)"
               className="w-full pl-3 pr-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500 bg-white"
             />
           </div>
           <button
             type="button"
             onClick={handleTestLookup}
-            disabled={testing || !testCedula || testCedula.length !== 10}
+            disabled={testing || !testCedula || (testCedula.length !== 10 && testCedula.length !== 13)}
             className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {testing ? (
@@ -277,7 +308,7 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
               </>
             ) : (
               <>
-                <UserCheck className="w-3.5 h-3.5" /> Consultar Cédula
+                <UserCheck className="w-3.5 h-3.5" /> Consultar {testCedula.length === 13 ? 'RUC' : 'Cédula'}
               </>
             )}
           </button>
@@ -302,22 +333,54 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombre Completo</span>
-                <p className="font-bold text-slate-900 truncate">{testResult.full_name || testResult.fullName || 'N/A'}</p>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5 sm:col-span-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {testResult.business_name ? 'Razón Social / Empresa' : 'Nombre Completo'}
+                </span>
+                <p className="font-bold text-slate-900 truncate">
+                  {testResult.business_name || testResult.full_name || testResult.fullName || 'N/A'}
+                </p>
               </div>
+
+              {testResult.trade_name && (
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombre Comercial</span>
+                  <p className="font-semibold text-slate-800 truncate">{testResult.trade_name}</p>
+                </div>
+              )}
+
+              {testResult.taxpayer_type && (
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo de Contribuyente</span>
+                  <p className="font-semibold text-slate-800 truncate">{testResult.taxpayer_type}</p>
+                </div>
+              )}
+
+              {testResult.first_name && (
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombres</span>
+                  <p className="font-semibold text-slate-800 truncate">{testResult.first_name}</p>
+                </div>
+              )}
+
+              {testResult.last_name && (
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Apellidos</span>
+                  <p className="font-semibold text-slate-800 truncate">{testResult.last_name}</p>
+                </div>
+              )}
+
+              {testResult.address && (
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5 sm:col-span-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dirección Fiscal / Matriz</span>
+                  <p className="font-medium text-slate-800 truncate">{testResult.address}</p>
+                </div>
+              )}
+
               <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombres</span>
-                <p className="font-semibold text-slate-800 truncate">{testResult.first_name || testResult.firstName || 'N/A'}</p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Apellidos</span>
-                <p className="font-semibold text-slate-800 truncate">{testResult.last_name || testResult.lastName || 'N/A'}</p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-0.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado de Consulta</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado de Registro</span>
                 <p className="font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Verificado por Ecuador API
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {testResult.status || 'Verificado por Ecuador API'}
                 </p>
               </div>
             </div>
