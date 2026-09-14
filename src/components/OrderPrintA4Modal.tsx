@@ -18,6 +18,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { CustomerOrder, PurchaseOrder, StoreConfig } from '../types.ts';
 import { getCustomerCi, getCleanAddress, isPickupDeliveryOrder } from '../utils/orderUtils.ts';
+import { calculateLineItem, calculateInvoiceTotals, extractItemTaxPercent, EcuadorInvoiceTotalsResult } from '../utils/ecuadorTaxCalculator.ts';
 
 export interface OrderPrintA4ModalProps {
   order?: CustomerOrder | null;
@@ -423,7 +424,12 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
 
   // Store metadata
   const storeName = storeConfig?.storeName || 'Comerxia Store';
-  const storeLogo = storeConfig?.logoUrl || null;
+  const storeLogo =
+    storeConfig?.logoDesktopUrl ||
+    storeConfig?.logoUrl ||
+    (storeConfig as any)?.logo_desktop_url ||
+    (storeConfig as any)?.logo_url ||
+    null;
   const storeAddress = storeConfig?.address || '';
   const storePhone = storeConfig?.whatsappNumber || '';
   const storeDescription = storeConfig?.description || '';
@@ -501,7 +507,9 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
     documentTitle = 'PEDIDO DE VENTA';
     documentSubtitle = 'Orden de Venta y Despacho a Cliente';
     orderNumberStr = String(order.orderNumber || order.id || '');
-    orderDateStr = new Date(order.createdAt).toLocaleDateString('es-EC', {
+    const rawOrderDate = order.createdAt ? new Date(order.createdAt) : (order as any).date ? new Date((order as any).date) : new Date();
+    const safeOrderDate = isNaN(rawOrderDate.getTime()) ? new Date() : rawOrderDate;
+    orderDateStr = safeOrderDate.toLocaleDateString('es-EC', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -527,7 +535,9 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
     documentTitle = 'ORDEN DE COMPRA';
     documentSubtitle = 'Adquisición y Reabastecimiento a Proveedor';
     orderNumberStr = String(purchase.purchaseNumber || purchase.id || '');
-    orderDateStr = new Date(purchase.purchaseDate || purchase.createdAt).toLocaleDateString('es-EC', {
+    const rawPurchaseDate = purchase.purchaseDate ? new Date(purchase.purchaseDate) : purchase.createdAt ? new Date(purchase.createdAt) : new Date();
+    const safePurchaseDate = isNaN(rawPurchaseDate.getTime()) ? new Date() : rawPurchaseDate;
+    orderDateStr = safePurchaseDate.toLocaleDateString('es-EC', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -546,11 +556,196 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
     notesStr = purchase.notes || '';
   }
 
+  // SRI Fiscal Breakdown calculation for Sales and Orders (100% identical to UnifiedOrderManageModal)
+  let salesCalculatedItems: EcuadorTaxLineItemResult[] = [];
+  let invoiceTotals: EcuadorInvoiceTotalsResult | null = null;
+  if (isSale && order) {
+    const defaultOrderTax =
+      (order as any).saleTaxPercent !== undefined
+        ? Number((order as any).saleTaxPercent)
+        : (order as any).applySaleTax === false
+        ? 0
+        : 15;
+
+    const itemsSub = rawItems.reduce(
+      (acc: number, it: any) =>
+        acc +
+        Math.max(
+          0,
+          Number(it.salePrice ?? it.unitPrice ?? it.price ?? 0) - Number(it.discount ?? 0)
+        ) *
+          (Number(it.quantity) || 1),
+      0
+    );
+
+    const explicitShip = Number((order as any).shippingCost ?? (order as any).deliveryFee);
+    let derivedShippingCost = 0;
+    if (!isNaN(explicitShip) && explicitShip > 0) {
+      derivedShippingCost = explicitShip;
+    } else {
+      const orderTotal = Number(order.totalAmount || 0);
+      const derivedShip = Math.max(0, orderTotal - itemsSub);
+      derivedShippingCost = derivedShip > 0 ? derivedShip : 0;
+    }
+    const isPickup = isPickupDeliveryOrder(order);
+    const fee = isPickup ? 0 : derivedShippingCost;
+
+    const calculatedItems = rawItems.map((it: any) => {
+      const subItem = it.item && typeof it.item === 'object' ? it.item : {};
+      const unitCost = Number(it.costPrice ?? subItem.costPrice ?? 0);
+      const unitSale = Number(it.salePrice ?? subItem.salePrice ?? it.unitPrice ?? it.price ?? subItem.price ?? 0);
+
+      const itemTaxPercent = extractItemTaxPercent(it, defaultOrderTax);
+
+      return calculateLineItem({
+        id: it.id,
+        name: it.name || subItem.name || it.productName || 'Producto',
+        sku: it.sku || subItem.sku,
+        costWithoutTax: unitCost,
+        unitSalePrice: unitSale,
+        discount: Number(it.discount ?? subItem.discount ?? 0),
+        quantity: Number(it.quantity) || 1,
+        applySaleTax: itemTaxPercent > 0,
+        saleTaxPercent: itemTaxPercent,
+      });
+    });
+
+    salesCalculatedItems = calculatedItems;
+
+    let totals = calculateInvoiceTotals(calculatedItems, { shippingFee: fee });
+
+    // Safety reconciliation: If order stored a non-zero taxAmount but calculated totalTax is 0
+    const storedTax = Number((order as any).taxAmount);
+    if (!isNaN(storedTax) && storedTax > 0 && totals.totalTax === 0) {
+      const recalculateWithTax = rawItems.map((it: any) => {
+        const subItem = it.item && typeof it.item === 'object' ? it.item : {};
+        const unitCost = Number(it.costPrice ?? subItem.costPrice ?? 0);
+        const unitSale = Number(it.salePrice ?? subItem.salePrice ?? it.unitPrice ?? it.price ?? subItem.price ?? 0);
+        return calculateLineItem({
+          id: it.id,
+          name: it.name || subItem.name || it.productName || 'Producto',
+          sku: it.sku || subItem.sku,
+          costWithoutTax: unitCost,
+          unitSalePrice: unitSale,
+          discount: Number(it.discount ?? subItem.discount ?? 0),
+          quantity: Number(it.quantity) || 1,
+          applySaleTax: true,
+          saleTaxPercent: 15,
+        });
+      });
+      salesCalculatedItems = recalculateWithTax;
+      totals = calculateInvoiceTotals(recalculateWithTax, { shippingFee: fee });
+    }
+
+    invoiceTotals = totals;
+  }
+
+  let purchaseSriBreakdown: {
+    subtotal0: number;
+    subtotal15: number;
+    subtotal5: number;
+    subtotalSinImpuesto: number;
+    totalDiscount: number;
+    iva15: number;
+    iva5: number;
+    grandTotal: number;
+  } | null = null;
+
+  if (isPurchase && purchase) {
+    let subtotal0 = 0;
+    let subtotal15 = 0;
+    let subtotal5 = 0;
+    let totalDiscount = 0;
+
+    (rawItems || []).forEach((item: any) => {
+      const qty = Number(item.quantity) || 1;
+      const unitCost = Number(item.costPrice || 0);
+      const discount = Number(item.discount || 0);
+      const lineSubtotal = Math.max(0, unitCost * qty - discount);
+      totalDiscount += discount;
+
+      const taxPercent =
+        item.taxPercent !== undefined
+          ? Number(item.taxPercent)
+          : (item as any).purchaseTaxPercent !== undefined
+          ? Number((item as any).purchaseTaxPercent)
+          : (item as any).hasPurchaseTax === false
+          ? 0
+          : 15;
+
+      if (taxPercent === 0) {
+        subtotal0 += lineSubtotal;
+      } else if (taxPercent === 5) {
+        subtotal5 += lineSubtotal;
+      } else {
+        subtotal15 += lineSubtotal;
+      }
+    });
+
+    const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
+    const iva15 = subtotal15 * 0.15;
+    const iva5 = subtotal5 * 0.05;
+    const grandTotal = Number((purchase as any).totalCost ?? (subtotalSinImpuesto + iva15 + iva5));
+
+    purchaseSriBreakdown = {
+      subtotal0,
+      subtotal15,
+      subtotal5,
+      subtotalSinImpuesto,
+      totalDiscount,
+      iva15,
+      iva5,
+      grandTotal,
+    };
+  }
+
+  // Exact detailed item structures matching horizontal invoice table views
+  const purchaseFormattedItems = isPurchase && purchase ? (rawItems || []).map((item: any, idx: number) => {
+    const ordered = Number(item.quantity) || 1;
+    const isReceived = purchase.status === 'received';
+    const rec = isReceived ? ordered : Number(item.receivedQuantity) || 0;
+    const pending = isReceived ? 0 : Math.max(0, ordered - rec);
+    const unitCost = Number(item.costPrice || 0);
+    const discount = Number(item.discount || 0);
+    const taxPercent =
+      item.taxPercent !== undefined
+        ? Number(item.taxPercent)
+        : (item as any).purchaseTaxPercent !== undefined
+        ? Number((item as any).purchaseTaxPercent)
+        : (item as any).hasPurchaseTax === false
+        ? 0
+        : 15;
+    const lineSubtotal = Math.max(0, unitCost * ordered - discount);
+    const subItem = item.item && typeof item.item === 'object' ? item.item : {};
+    const sku = item.sku || subItem.sku || (item.inventoryItemId ? `SKU-${item.inventoryItemId}` : item.barcode || `CMP-${idx + 1}`);
+    const name = item.name || subItem.name || item.productName || item.title || 'Producto adq.';
+
+    return {
+      index: idx + 1,
+      sku,
+      name,
+      ordered,
+      received: rec,
+      pending,
+      unitCost,
+      discount,
+      taxPercent,
+      lineSubtotal,
+    };
+  }) : [];
+
+  const purchaseTotalOrdered = purchaseFormattedItems.reduce((sum, it) => sum + it.ordered, 0);
+  const purchaseTotalReceived = purchaseFormattedItems.reduce((sum, it) => sum + it.received, 0);
+  const purchaseTotalPending = purchaseFormattedItems.reduce((sum, it) => sum + it.pending, 0);
+
   // Customer / Supplier specifics
   const customerName = order?.customerName || '';
   const customerCi = order ? getCustomerCi(order) : '';
   const customerPhone = order?.customerPhone || '';
-  const customerAddress = order ? getCleanAddress(order.customerAddress) : '';
+  const customerEmail = order ? (order.customerEmail || (order as any).email || '') : '';
+  const customerAddress = order
+    ? getCleanAddress((order as any).customerFiscalAddress || order.customerAddress || order.clientAddress || order.shippingAddress)
+    : '';
   const isPickup = order ? isPickupDeliveryOrder(order) : false;
   const paymentMethod = order?.paymentMethod || '';
 
@@ -1152,6 +1347,7 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
             <div class="field-row"><span class="field-label">Cliente:</span> <span class="field-val"><strong>${customerName || 'Cliente General'}</strong></span></div>
             <div class="field-row"><span class="field-label">Cédula / RUC:</span> <span class="field-val">${customerCi || 'Consumidor Final'}</span></div>
             <div class="field-row"><span class="field-label">Teléfono:</span> <span class="field-val">${customerPhone || '—'}</span></div>
+            ${customerEmail ? `<div class="field-row"><span class="field-label">Correo:</span> <span class="field-val">${customerEmail}</span></div>` : ''}
             <div class="field-row"><span class="field-label">Dirección:</span> <span class="field-val">${customerAddress || (isPickup ? 'Retiro en Local Comercial' : '—')}</span></div>
           `
               : `
@@ -1182,36 +1378,108 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
       </tr>
     </table>
 
-    <!-- TABLA PRINCIPAL DE PRODUCTOS SEGÚN ESPECIFICACIÓN:
-         código sku, nombre producto, cantidad, valor unitario, valor total -->
+    <!-- TABLA PRINCIPAL DE PRODUCTOS TIPO FACTURA HASTA EL DETALLE COMPLETO DE LA VISTA HORIZONTAL -->
     <table class="items-table">
       <thead>
-        <tr>
-          <th class="col-sku">Código SKU</th>
-          <th class="col-name">Nombre Producto</th>
-          <th class="col-qty">Cantidad</th>
-          <th class="col-unit">Valor Unitario</th>
-          <th class="col-total">Valor Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${items
-          .map(
-            (it) => `
+        ${
+          isSale
+            ? `
           <tr>
-            <td class="sku-code">${it.sku}</td>
-            <td class="product-title">${it.name}</td>
-            <td class="qty-cell">${it.quantity}</td>
-            <td class="price-cell">${currencySymbol}${it.unitPrice.toFixed(2)}</td>
-            <td class="total-cell">${currencySymbol}${it.totalPrice.toFixed(2)}</td>
+            <th style="width: 4%; text-align: center;">#</th>
+            <th style="width: 36%;">Producto / Descripción</th>
+            <th style="width: 16%;">SKU / Código</th>
+            <th style="width: 8%; text-align: center;">Cantidad</th>
+            <th style="width: 12%; text-align: right;">Valor Unit. ($)</th>
+            <th style="width: 8%; text-align: right;">Desc. ($)</th>
+            <th style="width: 5%; text-align: center;">IVA</th>
+            <th style="width: 11%; text-align: right;">Subtotal ($)</th>
           </tr>
         `
-          )
-          .join('')}
+            : `
+          <tr>
+            <th style="width: 4%; text-align: center;">#</th>
+            <th style="width: 32%;">Producto / Descripción</th>
+            <th style="width: 15%;">SKU / Código</th>
+            <th style="width: 7%; text-align: center;">Pedida</th>
+            <th style="width: 7%; text-align: center;">Bodega</th>
+            <th style="width: 7%; text-align: center;">Pendiente</th>
+            <th style="width: 10%; text-align: right;">Costo Unit. ($)</th>
+            <th style="width: 7%; text-align: right;">Desc. ($)</th>
+            <th style="width: 5%; text-align: center;">IVA</th>
+            <th style="width: 11%; text-align: right;">Total ($)</th>
+          </tr>
+        `
+        }
+      </thead>
+      <tbody>
+        ${
+          isSale
+            ? salesCalculatedItems
+                .map(
+                  (it, idx) => `
+              <tr>
+                <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
+                <td class="product-title">${it.name}</td>
+                <td class="sku-code">${it.sku || '-'}</td>
+                <td class="qty-cell">${it.quantity} u.</td>
+                <td class="price-cell">${currencySymbol}${it.unitPriceWithoutTax.toFixed(2)}</td>
+                <td class="price-cell" style="color: ${it.unitDiscount > 0 ? '#b45309' : '#64748b'};">${currencySymbol}${(it.unitDiscount * it.quantity).toFixed(2)}</td>
+                <td style="text-align: center; font-weight: bold;">${it.lineTaxPercent}%</td>
+                <td class="total-cell">${currencySymbol}${it.lineSubtotal.toFixed(2)}</td>
+              </tr>
+            `
+                )
+                .join('')
+            : purchaseFormattedItems
+                .map(
+                  (it) => `
+              <tr>
+                <td style="text-align: center; font-weight: bold; color: #64748b;">${it.index}</td>
+                <td class="product-title">${it.name}</td>
+                <td class="sku-code">${it.sku}</td>
+                <td class="qty-cell">${it.ordered} u.</td>
+                <td class="qty-cell" style="color: #15803d;">${it.received} u.</td>
+                <td class="qty-cell" style="color: #b45309;">${it.pending} u.</td>
+                <td class="price-cell">${currencySymbol}${it.unitCost.toFixed(2)}</td>
+                <td class="price-cell" style="color: ${it.discount > 0 ? '#b45309' : '#64748b'};">${currencySymbol}${it.discount.toFixed(2)}</td>
+                <td style="text-align: center; font-weight: bold;">${it.taxPercent}%</td>
+                <td class="total-cell">${currencySymbol}${it.lineSubtotal.toFixed(2)}</td>
+              </tr>
+            `
+                )
+                .join('')
+        }
       </tbody>
+      <tfoot style="background: #f8fafc; font-weight: bold; border-top: 1.5px solid #cbd5e1; font-size: 8.5px;">
+        ${
+          isSale
+            ? `
+          <tr>
+            <td colspan="3" style="padding: 4px 6px; color: #334155;">
+              Desglose de Venta: <strong>${salesCalculatedItems.length} ítems</strong> (${invoiceTotals?.totalUnits || 0} unidades en total)
+            </td>
+            <td style="padding: 4px 6px; text-align: center;">${invoiceTotals?.totalUnits || 0} u.</td>
+            <td colspan="3" style="padding: 4px 6px; text-align: right; text-transform: uppercase;">Total Venta:</td>
+            <td style="padding: 4px 6px; text-align: right; font-weight: 900; color: #0f172a; font-family: ui-monospace, monospace;">${currencySymbol}${invoiceTotals?.totalInvoiceAmount.toFixed(2) || '0.00'}</td>
+          </tr>
+        `
+            : `
+          <tr>
+            <td colspan="3" style="padding: 4px 6px; color: #334155;">
+              Desglose de Factura: <strong>${purchaseFormattedItems.length} ítems</strong> (${purchaseTotalOrdered} un. pedidas)
+            </td>
+            <td style="padding: 4px 6px; text-align: center;">${purchaseTotalOrdered} u.</td>
+            <td style="padding: 4px 6px; text-align: center; color: #15803d;">${purchaseTotalReceived} u.</td>
+            <td style="padding: 4px 6px; text-align: center; color: #b45309;">${purchaseTotalPending} u.</td>
+            <td colspan="3" style="padding: 4px 6px; text-align: right; text-transform: uppercase;">Total Compra:</td>
+            <td style="padding: 4px 6px; text-align: right; font-weight: 900; color: #0f172a; font-family: ui-monospace, monospace;">${currencySymbol}${purchaseSriBreakdown?.grandTotal.toFixed(2) || '0.00'}</td>
+          </tr>
+        `
+        }
+      </tfoot>
     </table>
 
-    <!-- TOTALES DEL PEDIDO -->
+    <!-- TOTALES DEL PEDIDO / COMPRA -->
     <table class="summary-table">
       <tr>
         <td style="width: 52%;">
@@ -1232,28 +1500,140 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
         </td>
         <td style="width: 48%;">
           <table class="totals-box">
-            <tr>
-              <td class="totals-label">Total Unidades:</td>
-              <td class="totals-val">${totalUnits} un.</td>
-            </tr>
-            <tr>
-              <td class="totals-label">Subtotal:</td>
-              <td class="totals-val">${currencySymbol}${subtotal.toFixed(2)}</td>
-            </tr>
             ${
-              isSale && shippingCost > 0
+              isSale && invoiceTotals
                 ? `
               <tr>
-                <td class="totals-label">Costo de Envío:</td>
-                <td class="totals-val">${currencySymbol}${shippingCost.toFixed(2)}</td>
+                <td class="totals-label">Total Unidades:</td>
+                <td class="totals-val">${invoiceTotals.totalUnits} un.</td>
+              </tr>
+              <tr>
+                <td class="totals-label">Subtotal 0%:</td>
+                <td class="totals-val">${currencySymbol}${invoiceTotals.subtotalZero0.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td class="totals-label">Subtotal 15%:</td>
+                <td class="totals-val">${currencySymbol}${invoiceTotals.subtotalTaxable15.toFixed(2)}</td>
+              </tr>
+              <tr style="border-top: 1px solid #cbd5e1;">
+                <td class="totals-label" style="font-weight: 800; color: #0f172a;">Subtotal Sin Impuesto:</td>
+                <td class="totals-val" style="font-weight: 800;">${currencySymbol}${invoiceTotals.subtotalNoTax.toFixed(2)}</td>
+              </tr>
+              ${
+                invoiceTotals.totalDiscount > 0
+                  ? `
+                <tr>
+                  <td class="totals-label" style="color: #9a3412;">Total Descuento:</td>
+                  <td class="totals-val" style="color: #9a3412;">-${currencySymbol}${invoiceTotals.totalDiscount.toFixed(2)}</td>
+                </tr>
+              `
+                  : ''
+              }
+              <tr>
+                <td class="totals-label">IVA VENTA (15%):</td>
+                <td class="totals-val">${currencySymbol}${invoiceTotals.totalTax.toFixed(2)}</td>
+              </tr>
+              ${
+                invoiceTotals.shippingFee > 0
+                  ? `
+                <tr>
+                  <td class="totals-label">Valor Envío / Flete:</td>
+                  <td class="totals-val">+${currencySymbol}${invoiceTotals.shippingFee.toFixed(2)}</td>
+                </tr>
+              `
+                  : ''
+              }
+              <tr class="grand-total-row">
+                <td class="totals-label" style="font-size: 10.5px; color: #0f172a; font-weight: 900;">
+                  ${order?.status === 'confirmed' || order?.status === 'shipped' || order?.status === 'delivered' ? 'TOTAL FACTURA SRI:' : 'TOTAL VENTA SRI:'}
+                </td>
+                <td class="totals-val" style="font-size: 12px; color: #0284c7; font-weight: 900;">
+                  ${currencySymbol}${invoiceTotals.totalInvoiceAmount.toFixed(2)}
+                </td>
               </tr>
             `
-                : ''
+                : isPurchase && purchaseSriBreakdown
+                ? `
+              <tr>
+                <td class="totals-label">Unidades Pedidas:</td>
+                <td class="totals-val">${purchaseTotalOrdered} un.</td>
+              </tr>
+              <tr>
+                <td class="totals-label">Unidades en Bodega:</td>
+                <td class="totals-val" style="color: #15803d;">${purchaseTotalReceived} un.</td>
+              </tr>
+              ${
+                purchaseTotalPending > 0
+                  ? `
+                <tr>
+                  <td class="totals-label">Unidades Pendientes:</td>
+                  <td class="totals-val" style="color: #b45309;">${purchaseTotalPending} un.</td>
+                </tr>
+              `
+                  : ''
+              }
+              <tr>
+                <td class="totals-label">Subtotal 0%:</td>
+                <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.subtotal0.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td class="totals-label">Subtotal 15%:</td>
+                <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.subtotal15.toFixed(2)}</td>
+              </tr>
+              ${
+                purchaseSriBreakdown.subtotal5 > 0
+                  ? `
+                <tr>
+                  <td class="totals-label">Subtotal 5%:</td>
+                  <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.subtotal5.toFixed(2)}</td>
+                </tr>
+              `
+                  : ''
+              }
+              <tr style="border-top: 1px solid #cbd5e1;">
+                <td class="totals-label" style="font-weight: 800; color: #0f172a;">Subtotal Sin Impuesto:</td>
+                <td class="totals-val" style="font-weight: 800;">${currencySymbol}${purchaseSriBreakdown.subtotalSinImpuesto.toFixed(2)}</td>
+              </tr>
+              ${
+                purchaseSriBreakdown.totalDiscount > 0
+                  ? `
+                <tr>
+                  <td class="totals-label" style="color: #9a3412;">Total Descuento:</td>
+                  <td class="totals-val" style="color: #9a3412;">-${currencySymbol}${purchaseSriBreakdown.totalDiscount.toFixed(2)}</td>
+                </tr>
+              `
+                  : ''
+              }
+              <tr>
+                <td class="totals-label">IVA COMPRA (15%):</td>
+                <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.iva15.toFixed(2)}</td>
+              </tr>
+              ${
+                purchaseSriBreakdown.iva5 > 0
+                  ? `
+                <tr>
+                  <td class="totals-label">IVA COMPRA (5%):</td>
+                  <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.iva5.toFixed(2)}</td>
+                </tr>
+              `
+                  : ''
+              }
+              <tr class="grand-total-row">
+                <td class="totals-label" style="font-size: 10.5px; color: #0f172a; font-weight: 900;">TOTAL COMPRA SRI:</td>
+                <td class="totals-val" style="font-size: 12px; color: #0284c7; font-weight: 900;">${currencySymbol}${purchaseSriBreakdown.grandTotal.toFixed(2)}</td>
+              </tr>
+            `
+                : `
+              <tr>
+                <td class="totals-label">Subtotal:</td>
+                <td class="totals-val">${currencySymbol}${subtotal.toFixed(2)}</td>
+              </tr>
+              <tr class="grand-total-row">
+                <td class="totals-label" style="font-size: 11px; color: #0f172a;">TOTAL DEL PEDIDO:</td>
+                <td class="totals-val" style="font-size: 12.5px; color: #0284c7;">${currencySymbol}${finalTotal.toFixed(2)}</td>
+              </tr>
+            `
             }
-            <tr class="grand-total-row">
-              <td class="totals-label" style="font-size: 11px; color: #0f172a;">TOTAL DEL PEDIDO:</td>
-              <td class="totals-val" style="font-size: 12.5px; color: #0284c7;">${currencySymbol}${finalTotal.toFixed(2)}</td>
-            </tr>
           </table>
         </td>
       </tr>
@@ -1496,7 +1876,7 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
           </div>
           <div className="min-w-0">
             <h2 className="text-sm font-bold text-white truncate flex items-center gap-2">
-              <span>{isSale ? 'Imprimir Pedido de Venta' : 'Imprimir Orden de Compra'}</span>
+              <span>{isSale ? 'Imprimir Venta' : 'Imprimir Orden de Compra'}</span>
               <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-sky-950 text-sky-300 border border-sky-800">
                 #{orderNumberStr}
               </span>
@@ -1737,6 +2117,12 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
                         <span className="field-label">Teléfono:</span>{' '}
                         <span className="field-val">{customerPhone || '—'}</span>
                       </div>
+                      {customerEmail ? (
+                        <div className="field-row">
+                          <span className="field-label">Correo:</span>{' '}
+                          <span className="field-val">{customerEmail}</span>
+                        </div>
+                      ) : null}
                       <div className="field-row">
                         <span className="field-label">Dirección:</span>{' '}
                         <span className="field-val">
@@ -1829,38 +2215,98 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
             </tbody>
           </table>
 
-          {/* TABLA PRINCIPAL DE PRODUCTOS SEGÚN ESPECIFICACIÓN:
-              código sku, nombre prodcuto, cantidad, valor unitario, valor total */}
+          {/* TABLA PRINCIPAL DE PRODUCTOS TIPO FACTURA HASTA EL DETALLE COMPLETO DE LA VISTA HORIZONTAL */}
           <table className="items-table">
             <thead>
-              <tr>
-                <th className="col-sku">Código SKU</th>
-                <th className="col-name">Nombre Producto</th>
-                <th className="col-qty">Cantidad</th>
-                <th className="col-unit">Valor Unitario</th>
-                <th className="col-total">Valor Total</th>
-              </tr>
+              {isSale ? (
+                <tr>
+                  <th style={{ width: '4%', textAlign: 'center' }}>#</th>
+                  <th style={{ width: '36%' }}>Producto / Descripción</th>
+                  <th style={{ width: '16%' }}>SKU / Código</th>
+                  <th style={{ width: '8%', textAlign: 'center' }}>Cantidad</th>
+                  <th style={{ width: '12%', textAlign: 'right' }}>Valor Unit. ($)</th>
+                  <th style={{ width: '8%', textAlign: 'right' }}>Desc. ($)</th>
+                  <th style={{ width: '5%', textAlign: 'center' }}>IVA</th>
+                  <th style={{ width: '11%', textAlign: 'right' }}>Subtotal ($)</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th style={{ width: '4%', textAlign: 'center' }}>#</th>
+                  <th style={{ width: '32%' }}>Producto / Descripción</th>
+                  <th style={{ width: '15%' }}>SKU / Código</th>
+                  <th style={{ width: '7%', textAlign: 'center' }}>Pedida</th>
+                  <th style={{ width: '7%', textAlign: 'center' }}>Bodega</th>
+                  <th style={{ width: '7%', textAlign: 'center' }}>Pendiente</th>
+                  <th style={{ width: '10%', textAlign: 'right' }}>Costo Unit. ($)</th>
+                  <th style={{ width: '7%', textAlign: 'right' }}>Desc. ($)</th>
+                  <th style={{ width: '5%', textAlign: 'center' }}>IVA</th>
+                  <th style={{ width: '11%', textAlign: 'right' }}>Total ($)</th>
+                </tr>
+              )}
             </thead>
             <tbody>
-              {items.map((it, idx) => (
-                <tr key={idx}>
-                  <td className="sku-code">{it.sku}</td>
-                  <td className="product-title">{it.name}</td>
-                  <td className="qty-cell">{it.quantity}</td>
-                  <td className="price-cell">
-                    {currencySymbol}
-                    {it.unitPrice.toFixed(2)}
+              {isSale
+                ? (salesCalculatedItems || []).map((it, idx) => (
+                    <tr key={idx}>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>{idx + 1}</td>
+                      <td className="product-title">{it.name}</td>
+                      <td className="sku-code">{it.sku || '-'}</td>
+                      <td className="qty-cell">{it.quantity} u.</td>
+                      <td className="price-cell">{currencySymbol}{it.unitPriceWithoutTax.toFixed(2)}</td>
+                      <td className="price-cell" style={{ color: it.unitDiscount > 0 ? '#b45309' : '#64748b' }}>
+                        {currencySymbol}{(it.unitDiscount * it.quantity).toFixed(2)}
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{it.lineTaxPercent}%</td>
+                      <td className="total-cell">{currencySymbol}{it.lineSubtotal.toFixed(2)}</td>
+                    </tr>
+                  ))
+                : (purchaseFormattedItems || []).map((it, idx) => (
+                    <tr key={idx}>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>{it.index}</td>
+                      <td className="product-title">{it.name}</td>
+                      <td className="sku-code">{it.sku}</td>
+                      <td className="qty-cell">{it.ordered} u.</td>
+                      <td className="qty-cell" style={{ color: '#15803d' }}>{it.received} u.</td>
+                      <td className="qty-cell" style={{ color: '#b45309' }}>{it.pending} u.</td>
+                      <td className="price-cell">{currencySymbol}{it.unitCost.toFixed(2)}</td>
+                      <td className="price-cell" style={{ color: it.discount > 0 ? '#b45309' : '#64748b' }}>
+                        {currencySymbol}{it.discount.toFixed(2)}
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{it.taxPercent}%</td>
+                      <td className="total-cell">{currencySymbol}{it.lineSubtotal.toFixed(2)}</td>
+                    </tr>
+                  ))}
+            </tbody>
+            <tfoot style={{ background: '#f8fafc', fontWeight: 'bold', borderTop: '1.5px solid #cbd5e1', fontSize: '8.5px' }}>
+              {isSale ? (
+                <tr>
+                  <td colSpan={3} style={{ padding: '4px 6px', color: '#334155' }}>
+                    Desglose de Venta: <strong>{salesCalculatedItems.length} ítems</strong> ({invoiceTotals?.totalUnits || 0} unidades en total)
                   </td>
-                  <td className="total-cell">
-                    {currencySymbol}
-                    {it.totalPrice.toFixed(2)}
+                  <td style={{ padding: '4px 6px', textAlign: 'center' }}>{invoiceTotals?.totalUnits || 0} u.</td>
+                  <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'right', textTransform: 'uppercase' }}>Total Venta:</td>
+                  <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 900, color: '#0f172a', fontFamily: 'ui-monospace, monospace' }}>
+                    {currencySymbol}{invoiceTotals?.totalInvoiceAmount.toFixed(2) || '0.00'}
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              ) : (
+                <tr>
+                  <td colSpan={3} style={{ padding: '4px 6px', color: '#334155' }}>
+                    Desglose de Factura: <strong>{purchaseFormattedItems.length} ítems</strong> ({purchaseTotalOrdered} un. pedidas)
+                  </td>
+                  <td style={{ padding: '4px 6px', textAlign: 'center' }}>{purchaseTotalOrdered} u.</td>
+                  <td style={{ padding: '4px 6px', textAlign: 'center', color: '#15803d' }}>{purchaseTotalReceived} u.</td>
+                  <td style={{ padding: '4px 6px', textAlign: 'center', color: '#b45309' }}>{purchaseTotalPending} u.</td>
+                  <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'right', textTransform: 'uppercase' }}>Total Compra:</td>
+                  <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 900, color: '#0f172a', fontFamily: 'ui-monospace, monospace' }}>
+                    {currencySymbol}{purchaseSriBreakdown?.grandTotal.toFixed(2) || '0.00'}
+                  </td>
+                </tr>
+              )}
+            </tfoot>
           </table>
 
-          {/* TOTALES DEL PEDIDO */}
+          {/* TOTALES DEL PEDIDO / COMPRA */}
           <table className="summary-table">
             <tbody>
               <tr>
@@ -1881,35 +2327,174 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
                 <td style={{ width: '48%', verticalAlign: 'top' }}>
                   <table className="totals-box">
                     <tbody>
-                      <tr>
-                        <td className="totals-label">Total Unidades:</td>
-                        <td className="totals-val">{totalUnits} un.</td>
-                      </tr>
-                      <tr>
-                        <td className="totals-label">Subtotal:</td>
-                        <td className="totals-val">
-                          {currencySymbol}
-                          {subtotal.toFixed(2)}
-                        </td>
-                      </tr>
-                      {isSale && shippingCost > 0 && (
-                        <tr>
-                          <td className="totals-label">Costo de Envío:</td>
-                          <td className="totals-val">
-                            {currencySymbol}
-                            {shippingCost.toFixed(2)}
-                          </td>
-                        </tr>
+                      {isSale && invoiceTotals ? (
+                        <>
+                          <tr>
+                            <td className="totals-label">Total Unidades:</td>
+                            <td className="totals-val">{invoiceTotals.totalUnits} un.</td>
+                          </tr>
+                          <tr>
+                            <td className="totals-label">Subtotal 0%:</td>
+                            <td className="totals-val">
+                              {currencySymbol}
+                              {invoiceTotals.subtotalZero0.toFixed(2)}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="totals-label">Subtotal 15%:</td>
+                            <td className="totals-val">
+                              {currencySymbol}
+                              {invoiceTotals.subtotalTaxable15.toFixed(2)}
+                            </td>
+                          </tr>
+                          <tr style={{ borderTop: '1px solid #cbd5e1' }}>
+                            <td className="totals-label" style={{ fontWeight: 800, color: '#0f172a' }}>
+                              Subtotal Sin Impuesto:
+                            </td>
+                            <td className="totals-val" style={{ fontWeight: 800 }}>
+                              {currencySymbol}
+                              {invoiceTotals.subtotalNoTax.toFixed(2)}
+                            </td>
+                          </tr>
+                          {invoiceTotals.totalDiscount > 0 && (
+                            <tr>
+                              <td className="totals-label" style={{ color: '#9a3412' }}>
+                                Total Descuento:
+                              </td>
+                              <td className="totals-val" style={{ color: '#9a3412' }}>
+                                -{currencySymbol}
+                                {invoiceTotals.totalDiscount.toFixed(2)}
+                              </td>
+                            </tr>
+                          )}
+                          <tr>
+                            <td className="totals-label">IVA VENTA (15%):</td>
+                            <td className="totals-val">
+                              {currencySymbol}
+                              {invoiceTotals.totalTax.toFixed(2)}
+                            </td>
+                          </tr>
+                          {invoiceTotals.shippingFee > 0 && (
+                            <tr>
+                              <td className="totals-label">Valor Envío / Flete:</td>
+                              <td className="totals-val">
+                                +{currencySymbol}
+                                {invoiceTotals.shippingFee.toFixed(2)}
+                              </td>
+                            </tr>
+                          )}
+                          <tr className="grand-total-row">
+                            <td className="totals-label" style={{ fontSize: '10.5px', color: '#0f172a', fontWeight: 900 }}>
+                              {order?.status === 'confirmed' || order?.status === 'shipped' || order?.status === 'delivered'
+                                ? 'TOTAL FACTURA SRI:'
+                                : 'TOTAL VENTA SRI:'}
+                            </td>
+                            <td className="totals-val" style={{ fontSize: '12px', color: '#0284c7', fontWeight: 900 }}>
+                              {currencySymbol}
+                              {invoiceTotals.totalInvoiceAmount.toFixed(2)}
+                            </td>
+                          </tr>
+                        </>
+                      ) : isPurchase && purchaseSriBreakdown ? (
+                        <>
+                          <tr>
+                            <td className="totals-label">Subtotal 0%:</td>
+                            <td className="totals-val">
+                              {currencySymbol}
+                              {purchaseSriBreakdown.subtotal0.toFixed(2)}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="totals-label">Subtotal 15%:</td>
+                            <td className="totals-val">
+                              {currencySymbol}
+                              {purchaseSriBreakdown.subtotal15.toFixed(2)}
+                            </td>
+                          </tr>
+                          {purchaseSriBreakdown.subtotal5 > 0 && (
+                            <tr>
+                              <td className="totals-label">Subtotal 5%:</td>
+                              <td className="totals-val">
+                                {currencySymbol}
+                                {purchaseSriBreakdown.subtotal5.toFixed(2)}
+                              </td>
+                            </tr>
+                          )}
+                          <tr style={{ borderTop: '1px solid #cbd5e1' }}>
+                            <td className="totals-label" style={{ fontWeight: 800, color: '#0f172a' }}>
+                              Subtotal Sin Impuesto:
+                            </td>
+                            <td className="totals-val" style={{ fontWeight: 800 }}>
+                              {currencySymbol}
+                              {purchaseSriBreakdown.subtotalSinImpuesto.toFixed(2)}
+                            </td>
+                          </tr>
+                          {purchaseSriBreakdown.totalDiscount > 0 && (
+                            <tr>
+                              <td className="totals-label" style={{ color: '#9a3412' }}>
+                                Total Descuento:
+                              </td>
+                              <td className="totals-val" style={{ color: '#9a3412' }}>
+                                -{currencySymbol}
+                                {purchaseSriBreakdown.totalDiscount.toFixed(2)}
+                              </td>
+                            </tr>
+                          )}
+                          <tr>
+                            <td className="totals-label">IVA COMPRA (15%):</td>
+                            <td className="totals-val">
+                              {currencySymbol}
+                              {purchaseSriBreakdown.iva15.toFixed(2)}
+                            </td>
+                          </tr>
+                          {purchaseSriBreakdown.iva5 > 0 && (
+                            <tr>
+                              <td className="totals-label">IVA COMPRA (5%):</td>
+                              <td className="totals-val">
+                                {currencySymbol}
+                                {purchaseSriBreakdown.iva5.toFixed(2)}
+                              </td>
+                            </tr>
+                          )}
+                          <tr className="grand-total-row">
+                            <td className="totals-label" style={{ fontSize: '10.5px', color: '#0f172a', fontWeight: 900 }}>
+                              TOTAL COMPRA SRI:
+                            </td>
+                            <td className="totals-val" style={{ fontSize: '12px', color: '#0284c7', fontWeight: 900 }}>
+                              {currencySymbol}
+                              {purchaseSriBreakdown.grandTotal.toFixed(2)}
+                            </td>
+                          </tr>
+                        </>
+                      ) : (
+                        <>
+                          <tr>
+                            <td className="totals-label">Subtotal:</td>
+                            <td className="totals-val">
+                              {currencySymbol}
+                              {subtotal.toFixed(2)}
+                            </td>
+                          </tr>
+                          {isSale && shippingCost > 0 && (
+                            <tr>
+                              <td className="totals-label">Costo de Envío:</td>
+                              <td className="totals-val">
+                                {currencySymbol}
+                                {shippingCost.toFixed(2)}
+                              </td>
+                            </tr>
+                          )}
+                          <tr className="grand-total-row">
+                            <td className="totals-label" style={{ fontSize: '11px', color: '#0f172a' }}>
+                              TOTAL DEL PEDIDO:
+                            </td>
+                            <td className="totals-val" style={{ fontSize: '12.5px', color: '#0284c7' }}>
+                              {currencySymbol}
+                              {finalTotal.toFixed(2)}
+                            </td>
+                          </tr>
+                        </>
                       )}
-                      <tr className="grand-total-row">
-                        <td className="totals-label" style={{ fontSize: '11px', color: '#0f172a' }}>
-                          TOTAL DEL PEDIDO:
-                        </td>
-                        <td className="totals-val" style={{ fontSize: '12.5px', color: '#0284c7' }}>
-                          {currencySymbol}
-                          {finalTotal.toFixed(2)}
-                        </td>
-                      </tr>
                     </tbody>
                   </table>
                 </td>

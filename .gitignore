@@ -8,3 +8,4 @@ coverage/
 !.env.example
 uploads/
 data/database.json
+.vscode/launch.json

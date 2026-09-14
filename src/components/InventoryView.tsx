@@ -292,6 +292,47 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }
   }, [viewMode]);
 
+  // Scroll direction detection for inventory controls container
+  const [scrollDirection, setScrollDirection] = useState<'top' | 'up' | 'down'>('top');
+  const lastScrollYRef = React.useRef(0);
+
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      const scrollY =
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const lastY = lastScrollYRef.current;
+          if (scrollY <= 50) {
+            setScrollDirection('top');
+          } else if (scrollY > lastY + 3 && scrollY > 50) {
+            setScrollDirection('down');
+          } else if (scrollY < lastY - 3) {
+            setScrollDirection('up');
+          }
+          lastScrollYRef.current = scrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showSuppliersFilter, setShowSuppliersFilter] = useState(false);
   const [marketingCopyItem, setMarketingCopyItem] = useState<InventoryItem | null>(null);
@@ -778,7 +819,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
 
           {/* Controls Bar: Search (Barra 1) & Filtros (Barra 2) */}
-          <div id="inventory-controls-container" className="sticky top-16 z-20 bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2.5 sm:p-3 shadow-sm space-y-2 max-w-full">
+          <div
+            id="inventory-controls-container"
+            className={`sticky ${
+              scrollDirection === 'down'
+                ? '-translate-y-full opacity-0 pointer-events-none'
+                : scrollDirection === 'up'
+                ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
+                : 'top-16 z-20 translate-y-0 opacity-100'
+            } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
+          >
             {/* Barra 1: Búsqueda y Selector de Vista / Selección */}
             <div className="flex items-center gap-1.5 sm:gap-2 w-full">
               {/* Search Box */}
@@ -789,7 +839,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar por nombre, código de barras, SKU..."
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8.5 sm:pl-9 pr-8 sm:pr-14 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100 focus:bg-white transition font-medium"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8.5 sm:pl-9 pr-8 sm:pr-14 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100 focus:bg-white transition font-medium"
                 />
                 {searchQuery && (
                   <button
@@ -808,7 +858,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 {/* Quick Offer Filter Toggle */}
                 <button
                   onClick={() => setActiveShowOffersOnly(!activeShowOffersOnly)}
-                  className={`px-2.5 py-2 rounded-xl text-xs font-bold transition border flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 ${
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition border flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 ${
                     activeShowOffersOnly || statusFilter === 'offers'
                       ? 'bg-rose-600 border-rose-700 text-white shadow-xs font-black'
                       : 'bg-slate-50 text-slate-700 border-slate-300 hover:text-slate-950 hover:bg-slate-100'
@@ -834,7 +884,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 {filteredItems.length > 0 && (
                   <button
                     onClick={handleSelectAll}
-                    className={`px-2.5 py-2 rounded-xl text-xs font-bold transition border flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 ${
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition border flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 ${
                       selectedIds.length > 0
                         ? 'bg-sky-50 text-sky-900 border-sky-400'
                         : 'bg-slate-50 text-slate-700 border-slate-300 hover:text-slate-900 hover:bg-slate-100'
@@ -864,11 +914,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 )}
 
                 {/* View Mode Toggle */}
-                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-300 shrink-0">
+                <div className="flex bg-slate-100 p-0.5 sm:p-1 rounded-xl border border-slate-300 shrink-0">
                   <button
                     onClick={() => setViewMode('grid')}
-                    title="Vista en tarjetas"
-                    className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${
+                    title="Vista en tarjetas (Paneles)"
+                    className={`p-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1 ${
                       viewMode === 'grid'
                         ? 'bg-white text-sky-700 shadow-xs font-bold'
                         : 'text-slate-500 hover:text-slate-900'
@@ -878,8 +928,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </button>
                   <button
                     onClick={() => setViewMode('table')}
-                    title="Vista en tabla compacta"
-                    className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${
+                    title="Vista en lista compacta"
+                    className={`p-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1 ${
                       viewMode === 'table'
                         ? 'bg-white text-sky-700 shadow-xs font-bold'
                         : 'text-slate-500 hover:text-slate-900'
@@ -891,128 +941,94 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </div>
 
-            {/* Barra 2: Filtro horizontal continuo (deslizable con el dedo en móvil) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar touch-pan-x py-1 w-full scroll-smooth pt-2 border-t border-slate-200/80 select-none">
-              {/* Filtros de Estado */}
-              <span className="text-[11px] text-slate-500 font-bold shrink-0 mr-0.5">Estado:</span>
-              {[
-                { id: 'all', label: 'Todos', count: items.length },
-                { id: 'in_stock', label: 'En Stock', count: inStockCount },
-                { id: 'in_transit', label: 'En Tránsito', count: inTransitCount },
-                { id: 'reserved', label: 'Reservados', count: reservedCount },
-                { id: 'offers', label: 'En Oferta', count: offersCount },
-                { id: 'archived', label: 'Desactivados', count: archivedCount },
-              ].map((st) => {
-                const isSelected = statusFilter === st.id || (st.id === 'offers' && activeShowOffersOnly);
-                return (
-                  <button
-                    key={st.id}
-                    onClick={() => {
-                      setStatusFilter(st.id);
-                      if (st.id === 'offers') {
-                        setActiveShowOffersOnly(true);
-                      } else if (activeShowOffersOnly && st.id !== 'offers') {
-                        setActiveShowOffersOnly(false);
-                      }
-                    }}
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap ${
-                      isSelected
-                        ? st.id === 'offers'
-                          ? 'bg-rose-600 text-white shadow-xs font-black'
-                          : st.id === 'in_stock'
-                          ? 'bg-emerald-700 text-white shadow-xs font-black'
-                          : st.id === 'in_transit'
-                          ? 'bg-indigo-700 text-white shadow-xs font-black'
-                          : st.id === 'reserved'
-                          ? 'bg-amber-600 text-white shadow-xs font-black'
-                          : 'bg-slate-900 text-white shadow-xs'
-                        : st.id === 'offers'
-                        ? 'text-rose-700 bg-rose-50/70 hover:bg-rose-100/70 border border-rose-200 font-black'
-                        : st.id === 'in_stock'
-                        ? 'text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200'
-                        : st.id === 'in_transit'
-                        ? 'text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-200'
-                        : st.id === 'reserved'
-                        ? 'text-amber-800 bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200'
-                        : 'text-slate-700 bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200'
-                    }`}
-                  >
-                    {st.id === 'offers' && <Sparkles className="w-3 h-3 text-rose-400 fill-current shrink-0" />}
-                    {st.id === 'in_stock' && <PackageCheck className="w-3 h-3 text-emerald-500 shrink-0" />}
-                    {st.id === 'in_transit' && <Truck className="w-3 h-3 text-indigo-500 shrink-0" />}
-                    {st.id === 'reserved' && <Lock className="w-3 h-3 text-amber-500 shrink-0" />}
-                    <span>
+            {/* Barra 2: Filtro horizontal continuo (deslizable con el dedo o ratón en cualquier pantalla) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar touch-pan-x py-1 w-full scroll-smooth pt-1.5 border-t border-slate-200/80 select-none whitespace-nowrap">
+              {/* Filtro por Estado con Combobox (Select) */}
+              <div className="flex items-center shrink-0">
+                <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1.5 shrink-0">
+                  <Filter className="w-3 h-3 mr-1 text-emerald-600 shrink-0" />
+                  Estado:
+                </span>
+                <select
+                  id="inventory-status-select"
+                  value={activeShowOffersOnly ? 'offers' : statusFilter}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStatusFilter(val);
+                    if (val === 'offers') {
+                      setActiveShowOffersOnly(true);
+                    } else if (activeShowOffersOnly) {
+                      setActiveShowOffersOnly(false);
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:bg-slate-50 transition"
+                >
+                  {[
+                    { id: 'all', label: 'Todos los Estados', count: items.length },
+                    { id: 'in_stock', label: 'En Stock', count: inStockCount },
+                    { id: 'in_transit', label: 'En Tránsito', count: inTransitCount },
+                    { id: 'reserved', label: 'Reservados', count: reservedCount },
+                    { id: 'offers', label: 'En Oferta', count: offersCount },
+                    { id: 'archived', label: 'Desactivados', count: archivedCount },
+                  ].map((st) => (
+                    <option key={st.id} value={st.id}>
                       {st.label} ({st.count})
-                    </span>
-                  </button>
-                );
-              })}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {/* Separador */}
               <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
 
-              {/* Filtros de Categoría */}
-              <span className="text-[11px] text-slate-500 font-bold flex items-center shrink-0 mr-0.5">
-                <Tag className="w-3 h-3 mr-1 text-sky-600 shrink-0" />
-                Categoría:
-              </span>
-              {categories.map((cat) => {
-                const count = cat === 'all' ? items.length : categoriesCount[cat] || 0;
-                const isSelected = selectedCategory === cat;
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap ${
-                      isSelected
-                        ? 'bg-sky-600 text-white border border-sky-600'
-                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
-                    }`}
-                  >
-                    <span>{cat === 'all' ? 'Todas' : cat}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                        isSelected ? 'bg-sky-900 text-sky-100' : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+              {/* Filtro por Categoría con Combobox (Select) */}
+              <div className="flex items-center shrink-0">
+                <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1.5 shrink-0">
+                  <Tag className="w-3 h-3 mr-1 text-sky-600 shrink-0" />
+                  Categoría:
+                </span>
+                <select
+                  id="inventory-category-select"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500 hover:bg-slate-50 transition"
+                >
+                  {categories.map((cat) => {
+                    const count = cat === 'all' ? items.length : categoriesCount[cat] || 0;
+                    return (
+                      <option key={cat} value={cat}>
+                        {cat === 'all' ? `Todas las Categorías (${count})` : `${cat} (${count})`}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
 
-              {/* Filtros de Proveedor (si existen) */}
+              {/* Filtro por Proveedor con Combobox (Select) */}
               {suppliers.length > 1 && (
                 <>
                   <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
-                  <span className="text-[11px] text-slate-500 font-bold flex items-center shrink-0 mr-0.5">
-                    <Filter className="w-3 h-3 mr-1 text-purple-600 shrink-0" />
-                    Proveedor:
-                  </span>
-                  {suppliers.map((sup) => {
-                    const count = sup === 'all' ? items.length : suppliersCount[sup] || 0;
-                    const isSelected = selectedSupplier === sup;
-                    return (
-                      <button
-                        key={sup}
-                        onClick={() => setSelectedSupplier(sup)}
-                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap ${
-                          isSelected
-                            ? 'bg-purple-700 text-white border border-purple-700'
-                            : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
-                        }`}
-                      >
-                        <span>{sup === 'all' ? 'Todos' : sup}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                            isSelected ? 'bg-purple-950 text-purple-100' : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
+                  <div className="flex items-center shrink-0">
+                    <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1.5 shrink-0">
+                      <Truck className="w-3 h-3 mr-1 text-purple-600 shrink-0" />
+                      Proveedor:
+                    </span>
+                    <select
+                      id="inventory-supplier-select"
+                      value={selectedSupplier}
+                      onChange={(e) => setSelectedSupplier(e.target.value)}
+                      className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500 hover:bg-slate-50 transition"
+                    >
+                      {suppliers.map((sup) => {
+                        const count = sup === 'all' ? items.length : suppliersCount[sup] || 0;
+                        return (
+                          <option key={sup} value={sup}>
+                            {sup === 'all' ? `Todos los Proveedores (${count})` : `${sup} (${count})`}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
                 </>
               )}
 
@@ -1552,11 +1568,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       ) : (
         /* TABLE VIEW */
         <div className="bg-white border border-slate-300 rounded-2xl overflow-hidden shadow-sm">
-          <div className="overflow-x-auto touch-pan-x">
-            <table className="w-full min-w-[680px] text-left text-xs text-slate-800">
+          <div className="overflow-x-auto overflow-y-hidden touch-pan-x">
+            <table className="w-full min-w-[640px] text-left text-xs text-slate-800">
               <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300">
                 <tr>
-                  <th className="p-3.5 w-10">
+                  <th className="px-2 py-2 w-8">
                     <button
                       onClick={handleSelectAll}
                       className="cursor-pointer text-slate-600 hover:text-sky-700"
@@ -1568,14 +1584,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       )}
                     </button>
                   </th>
-                  <th className="p-3.5">Producto</th>
-                  <th className="p-3.5">Proveedor</th>
-                  <th className="p-3.5">SKU</th>
-                  <th className="p-3.5">Categoría</th>
-                  <th className="p-3.5">PVP, Costos y Utilidad</th>
-                  <th className="p-3.5">Stock</th>
-                  <th className="p-3.5">Estado</th>
-                  <th className="p-3.5 text-right">Acciones</th>
+                  <th className="px-2 py-2">Producto</th>
+                  <th className="px-2 py-2">Proveedor</th>
+                  <th className="px-2 py-2">SKU</th>
+                  <th className="px-2 py-2">Categoría</th>
+                  <th className="px-2 py-2">Precios & Utilidad</th>
+                  <th className="px-2 py-2">Stock</th>
+                  <th className="px-2 py-2">Estado</th>
+                  <th className="px-2 py-2 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -1601,15 +1617,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           onMarkProductAsSeen(item.id);
                         }
                       }}
-                      className={`transition duration-200 ${
+                      className={`transition duration-150 ${
                         isSelected
                           ? 'bg-sky-50/60'
                           : isUnseen
-                          ? 'bg-amber-50/90 hover:bg-amber-100/90 border-l-4 border-l-amber-500 ring-1 ring-amber-300/80 shadow-xs'
+                          ? 'bg-amber-50/90 hover:bg-amber-100/90 border-l-4 border-l-amber-500'
                           : 'hover:bg-slate-50/80'
                       }`}
                     >
-                      <td className="p-3.5">
+                      <td className="px-2 py-1.5">
                         <button
                           type="button"
                           onClick={(e) => toggleSelectOne(item.id, e)}
@@ -1622,9 +1638,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           )}
                         </button>
                       </td>
-                      <td className="p-3.5">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 relative">
+                      <td className="px-2 py-1.5">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 relative">
                             <ProductMediaDisplay
                               imageUrl={item.imageUrl}
                               videoUrl={item.videoUrl}
@@ -1636,237 +1652,126 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               showPlayBadge={false}
                               placeholderText=""
                             />
-                            {item.videoUrl && !item.imageUrl && (
-                              <span className="absolute bottom-0.5 right-0.5 bg-slate-950/90 text-sky-300 text-[7px] font-black px-0.5 rounded">
-                                VID
-                              </span>
-                            )}
-                            {item.images && item.images.length > 1 && (
-                              <span className="absolute bottom-0.5 right-0.5 bg-white/90 text-purple-700 text-[8px] font-bold px-1 rounded shadow-2xs">
-                                {item.images.length}
-                              </span>
-                            )}
                           </div>
-                          <div>
-                            <div className="flex items-center space-x-1.5">
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-1">
                               <span
                                 onClick={handleItemClick}
-                                className="font-bold text-slate-900 hover:text-sky-600 cursor-pointer block truncate max-w-[220px]"
+                                className="font-bold text-slate-900 hover:text-sky-600 cursor-pointer block truncate max-w-[200px]"
                               >
                                 {item.name}
                               </span>
                               {isUnseen && (
-                                <span className="inline-flex items-center space-x-1 text-[9px] px-2 py-0.5 rounded-md font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 border border-amber-500 shadow-xs animate-pulse">
-                                  <Sparkles className="w-3 h-3 text-slate-950 fill-slate-950" />
-                                  <span>NUEVO TELEGRAM</span>
-                                </span>
-                              )}
-                              {item.images && item.images.length > 1 && (
-                                <span className="text-[10px] text-purple-600 font-medium">
-                                  ({item.images.length} fotos)
+                                <span className="inline-flex items-center text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-400 text-slate-950">
+                                  NUEVO
                                 </span>
                               )}
                             </div>
-                            <span className="text-[11px] text-slate-500 block truncate max-w-[150px]">
+                            <span className="text-[10px] text-slate-500 block truncate max-w-[140px]">
                               {item.category}
                             </span>
                           </div>
                         </div>
                       </td>
-                      <td className="p-3.5">
+                      <td className="px-2 py-1.5">
                         <button
                           type="button"
                           onClick={() => setSelectedSupplier(item.supplierName || 'Proveedor Telegram')}
-                          className="text-slate-700 hover:text-purple-700 font-medium block truncate max-w-[140px] text-left hover:underline cursor-pointer"
+                          className="text-slate-700 hover:text-purple-700 font-medium block truncate max-w-[130px] text-left hover:underline cursor-pointer text-xs"
                           title={`Filtrar por proveedor: ${item.supplierName || 'Proveedor Telegram'}`}
                         >
                           👤 {item.supplierName || 'Proveedor Telegram'}
                         </button>
                       </td>
-                      <td className="p-3.5 font-mono">
+                      <td className="px-2 py-1.5 font-mono text-xs">
                         <span className="text-sky-700 font-bold block">{item.sku}</span>
                         {item.barcode && (
-                          <span className="text-[10px] text-slate-500 font-normal flex items-center space-x-1 mt-0.5" title={`Código de barras: ${item.barcode}`}>
-                            <Barcode className="w-2.5 h-2.5 text-slate-400" />
-                            <span>{item.barcode}</span>
+                          <span className="text-[9px] text-slate-500 block truncate max-w-[100px]" title={`Código de barras: ${item.barcode}`}>
+                            {item.barcode}
                           </span>
                         )}
                       </td>
-                      <td className="p-3.5 text-slate-700">{item.category}</td>
-                      <td className="p-3.5">
+                      <td className="px-2 py-1.5 text-slate-700 text-xs">{item.category}</td>
+                      <td className="px-2 py-1.5 font-mono">
                         {(() => {
                           const fin = calculateItemFinancials(item);
                           return (
-                            <div className="font-mono text-xs space-y-1.5 min-w-[195px]">
-                              {/* PVP & Oferta */}
+                            <div className="font-mono text-[11px] space-y-0.5 min-w-[170px]">
                               <div className="flex items-center justify-between gap-1">
-                                <div>
-                                  <span className="text-[9px] font-bold text-slate-600 block uppercase tracking-tight font-sans">
-                                    {fin.hasDiscount ? 'PVP Oferta' : 'PVP Regular'}
-                                  </span>
-                                  {fin.hasDiscount ? (
-                                    <div className="flex items-baseline space-x-1">
-                                      <span className="font-black text-rose-600 text-sm">
-                                        ${fin.effectivePVP.toFixed(2)}
-                                      </span>
-                                      <span className="text-[10px] line-through text-slate-400 font-medium">
-                                        ${fin.pvpNum.toFixed(2)}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <span className="font-black text-emerald-800 text-sm block">
-                                      ${fin.effectivePVP.toFixed(2)}
-                                    </span>
-                                  )}
-                                </div>
-
+                                <span className="font-bold text-slate-900 text-xs">${fin.effectivePVP.toFixed(2)}</span>
                                 {fin.hasDiscount && (
-                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-2xs">
-                                    🔥 -{fin.discountPercent}%
+                                  <span className="text-[9px] font-black px-1 py-0.2 rounded bg-rose-600 text-white">
+                                    -{fin.discountPercent}%
                                   </span>
                                 )}
                               </div>
-
-                              {/* Costos: Sin IVA vs Con IVA */}
-                              <div className="text-[10px] bg-amber-50/80 p-1.5 rounded-lg border border-amber-200/80 space-y-0.5">
-                                <div className="flex justify-between gap-1">
-                                  <span className="text-amber-900 font-sans font-bold">Costo s/IVA:</span>
-                                  <span className="font-black text-amber-950">${fin.costWithoutTax.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between gap-1">
-                                  <span className="text-amber-900 font-sans font-bold">Costo c/IVA:</span>
-                                  <span className="font-black text-amber-950">${fin.costWithTax.toFixed(2)}</span>
-                                </div>
-                              </div>
-
-                              {/* Ventas: Sin IVA vs Con IVA */}
-                              <div className="text-[10px] bg-sky-50/80 p-1.5 rounded-lg border border-sky-200/80 space-y-0.5">
-                                <div className="flex justify-between gap-1">
-                                  <span className="text-sky-900 font-sans font-bold">Venta s/IVA:</span>
-                                  <span className="font-black text-sky-950">${fin.salePriceWithoutTax.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between gap-1">
-                                  <span className="text-sky-900 font-sans font-bold">Venta c/IVA:</span>
-                                  <span className="font-black text-sky-950">${fin.salePriceWithTax.toFixed(2)}</span>
-                                </div>
-                              </div>
-
-                              {/* Utilidad Real */}
-                              <div
-                                className={`text-[10px] font-bold p-1.5 rounded-lg border flex items-center justify-between ${
-                                  fin.isLoss
-                                    ? 'bg-rose-50 text-rose-800 border-rose-300'
-                                    : fin.isBreakEven
-                                    ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                    : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                }`}
-                              >
-                                <span className="font-sans">Utilidad:</span>
-                                <span>
-                                  {fin.isLoss ? `-$${Math.abs(fin.unitProfit).toFixed(2)}` : `+$${fin.unitProfit.toFixed(2)}`} ({fin.marginPercent > 0 ? '+' : ''}{fin.marginPercent.toFixed(0)}%)
+                              <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600">
+                                <span>Costo: <strong>${fin.costWithoutTax.toFixed(2)}</strong></span>
+                                <span className={`font-bold ${fin.isLoss ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                  Util: {fin.isLoss ? `-$${Math.abs(fin.unitProfit).toFixed(2)}` : `+$${fin.unitProfit.toFixed(2)}`}
                                 </span>
                               </div>
                             </div>
                           );
                         })()}
                       </td>
-                      <td className="p-3.5">
-                        <div
-                          className="flex flex-col space-y-1 font-mono text-xs"
-                          title={`Físico: ${item.physicalStock ?? item.stock} u. | Reservado: ${item.reservedStock ?? 0} u. | Disponible: ${item.availableStock ?? item.stock} u. | Por recibir: ${item.incomingStock ?? 0} u.`}
-                        >
-                          <div className="flex items-center space-x-1 flex-wrap gap-1">
-                            {(item.physicalStock !== undefined ? item.physicalStock : item.stock) > 0 ? (
-                              <span className="font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs text-[11px] flex items-center gap-1">
-                                <PackageCheck className="w-3 h-3 text-emerald-700" />
-                                <span>{item.availableStock !== undefined ? item.availableStock : item.stock} u. Disp.</span>
-                              </span>
-                            ) : (
-                              <span className="font-black px-2 py-0.5 rounded-md bg-purple-100 text-purple-950 border border-purple-300 shadow-2xs text-[11px] flex items-center gap-1">
-                                <Package className="w-3 h-3 text-purple-700" />
-                                <span>0 u. Disp.</span>
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-1.5 text-[10px] flex-wrap gap-1 pt-0.5">
-                            <span className="font-bold text-sky-900 bg-sky-100 border border-sky-300 px-1.5 py-0.2 rounded" title="Stock físico total en almacén">
-                              📦 {item.physicalStock !== undefined ? item.physicalStock : item.stock} fís.
+                      <td className="px-2 py-1.5">
+                        <div className="flex items-center space-x-1 font-mono text-xs">
+                          {(item.physicalStock !== undefined ? item.physicalStock : item.stock) > 0 ? (
+                            <span className="font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-950 border border-emerald-300 text-[10px] flex items-center gap-1">
+                              <PackageCheck className="w-3 h-3 text-emerald-700" />
+                              <span>{item.availableStock !== undefined ? item.availableStock : item.stock} u. Disp.</span>
                             </span>
-                            {(item.reservedStock || 0) > 0 && (
-                              <span className="font-bold text-amber-950 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded" title="Reservado para pedidos confirmados">
-                                🔒 {item.reservedStock} res.
-                              </span>
-                            )}
-                            {(item.incomingStock || 0) > 0 && (
-                              <span className="font-bold text-indigo-950 bg-indigo-100 border border-indigo-300 px-1.5 py-0.2 rounded" title="En camino por órdenes de compra">
-                                🚚 +{item.incomingStock} rec.
-                              </span>
-                            )}
-                          </div>
+                          ) : (
+                            <span className="font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-950 border border-purple-300 text-[10px] flex items-center gap-1">
+                              <Package className="w-3 h-3 text-purple-700" />
+                              <span>0 u.</span>
+                            </span>
+                          )}
                         </div>
                       </td>
-                      <td className="p-3.5">{getStatusBadge(item.status, item.stock)}</td>
-                      <td className="p-3.5 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
+                      <td className="px-2 py-1.5">{getStatusBadge(item.status, item.stock)}</td>
+                      <td className="px-2 py-1.5 text-right">
+                        <div className="flex items-center justify-end space-x-1">
                           <button
                             onClick={() => setBarcodeItems([item])}
-                            title="Imprimir etiqueta de código de barras para pegar al producto"
-                            className="p-1.5 rounded-lg text-sky-600 hover:text-sky-800 hover:bg-sky-50 transition cursor-pointer"
+                            title="Imprimir código de barras"
+                            className="p-1 rounded text-sky-600 hover:bg-sky-50 transition cursor-pointer"
                           >
-                            <Barcode className="w-4 h-4" />
+                            <Barcode className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => setMarketingCopyItem(item)}
-                            title="Generar publicaciones con IA para Marketplace, WhatsApp y Redes"
-                            className="p-1.5 rounded-lg text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition cursor-pointer"
+                            title="Generar copy con IA"
+                            className="p-1 rounded text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
                           >
-                            <Sparkles className="w-4 h-4" />
+                            <Sparkles className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => onSelectItem(item)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 transition cursor-pointer"
+                            className="p-1 rounded text-slate-500 hover:bg-slate-100 transition cursor-pointer"
                             title="Ver detalle"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => onEditItem(item)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-                            title="Editar producto y costos"
+                            className="p-1 rounded text-slate-500 hover:bg-slate-100 transition cursor-pointer"
+                            title="Editar"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleRequestToggleStatus(item)}
-                            title={item.status === 'archived' ? 'Activar producto' : 'Desactivar producto'}
-                            className={`p-1.5 rounded-lg transition cursor-pointer ${
+                            title={item.status === 'archived' ? 'Activar' : 'Desactivar'}
+                            className={`p-1 rounded transition cursor-pointer ${
                               item.status === 'archived'
                                 ? 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
                                 : 'text-emerald-600 hover:text-amber-700 hover:bg-amber-50'
                             }`}
                           >
-                            <Power className="w-4 h-4" />
+                            <Power className="w-3.5 h-3.5" />
                           </button>
-                          {onDeleteItem && (() => {
-                            const linkCheck = checkProductTransactionLink(item, orders, purchases);
-                            return linkCheck.isLinked ? (
-                              <button
-                                onClick={() => onDeleteItem(item.id)}
-                                title={`Protegido contra eliminación (${linkCheck.reasonText}). Haz clic para ver detalles.`}
-                                className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition cursor-pointer"
-                              >
-                                <Lock className="w-4 h-4" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => onDeleteItem(item.id)}
-                                title="Eliminar producto definitivamente (sin compras ni ventas vinculadas)"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            );
-                          })()}
                         </div>
                       </td>
                     </tr>

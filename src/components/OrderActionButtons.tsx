@@ -305,10 +305,10 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
         id={`btn-print-order-${ord.id}`}
         onClick={handlePrintOrder}
         className={`${btnStyle} bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300`}
-        title="Imprimir pedido"
+        title="Imprimir venta"
       >
         <Printer className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
-        <span>Imprimir Pedido</span>
+        <span>Imprimir Venta</span>
       </button>
 
       {/* 5. Eliminar pedido */}

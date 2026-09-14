@@ -1583,7 +1583,7 @@ function InventoryApp() {
             orders={orders}
             customerOrders={orders}
             suppliers={suppliers}
-            storeConfig={config}
+            storeConfig={storeConfig}
             currency={config?.currency || 'USD'}
             authFetch={authFetch}
             showToast={(msg) => {

@@ -46,6 +46,7 @@ import { PurchasePartialReceptionModal } from './PurchasePartialReceptionModal.t
 import { PurchaseSupplierContactModal } from './PurchaseSupplierContactModal.tsx';
 import { PurchaseRecordCard } from './PurchaseRecordCard.tsx';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
+import { OrderPrintA4Modal } from './OrderPrintA4Modal.tsx';
 import {
   extractPurchasePhotos,
   generatePurchasePhotosCollage,
@@ -162,11 +163,11 @@ export function getInventoryCostWithoutTax(inv: InventoryItem | any): number {
   const taxRate =
     inv.purchaseTaxPercent !== undefined
       ? Number(inv.purchaseTaxPercent)
+      : inv.hasPurchaseTax === false
+      ? 0
       : (inv as any).taxRate !== undefined
       ? Number((inv as any).taxRate)
-      : inv.hasPurchaseTax !== false
-      ? 15
-      : 0;
+      : 15;
 
   const costWithTax = Number(inv.costPrice || inv.salePrice || 0);
 
@@ -225,6 +226,47 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
     }
   }, [viewMode]);
 
+  // Scroll direction detection for purchases search container
+  const [scrollDirection, setScrollDirection] = useState<'top' | 'up' | 'down'>('top');
+  const lastScrollYRef = React.useRef(0);
+
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      const scrollY =
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const lastY = lastScrollYRef.current;
+          if (scrollY <= 50) {
+            setScrollDirection('top');
+          } else if (scrollY > lastY + 3 && scrollY > 50) {
+            setScrollDirection('down');
+          } else if (scrollY < lastY - 3) {
+            setScrollDirection('up');
+          }
+          lastScrollYRef.current = scrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedPurchaseId, setExpandedPurchaseId] = useState<number | null>(highlightPurchaseId || null);
 
@@ -261,6 +303,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   const [purchaseToReceive, setPurchaseToReceive] = useState<PurchaseOrder | null>(null);
   const [isReceivingPurchase, setIsReceivingPurchase] = useState(false);
   const [purchaseForPartialReception, setPurchaseForPartialReception] = useState<PurchaseOrder | null>(null);
+  const [purchaseToPrintA4, setPurchaseToPrintA4] = useState<PurchaseOrder | null>(null);
 
   // Supplier Contact & Photos Clipboard Modal State
   const [contactModalPurchase, setContactModalPurchase] = useState<PurchaseOrder | null>(null);
@@ -379,11 +422,11 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         const currentTaxPercent =
           matchedInv.purchaseTaxPercent !== undefined
             ? Number(matchedInv.purchaseTaxPercent)
+            : matchedInv.hasPurchaseTax === false
+            ? 0
             : (matchedInv as any).taxRate !== undefined
             ? Number((matchedInv as any).taxRate)
-            : matchedInv.hasPurchaseTax !== false
-            ? 15
-            : 0;
+            : 15;
 
         const costPriceStr = currentCostWithoutTax > 0
           ? currentCostWithoutTax.toFixed(2)
@@ -938,7 +981,13 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       {/* Toolbar & Filters (Dos Barras Horizontales Estáticas) */}
       <div
         id="purchases-search-container"
-        className="sticky top-16 z-20 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-300 p-2.5 sm:p-3 shadow-sm space-y-2 transition-all max-w-full"
+        className={`sticky ${
+          scrollDirection === 'down'
+            ? '-translate-y-full opacity-0 pointer-events-none'
+            : scrollDirection === 'up'
+            ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
+            : 'top-16 z-20 translate-y-0 opacity-100'
+        } bg-white/95 backdrop-blur-md rounded-2xl border border-slate-300 p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
       >
         {/* Barra 1: Búsqueda y Selector de Modo de Vista */}
         <div className="flex items-center gap-1.5 sm:gap-2 w-full">
@@ -1001,26 +1050,26 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
               onClick={() => setViewMode('grid')}
               className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
                 viewMode === 'grid'
-                  ? 'bg-white text-amber-950 shadow-2xs'
+                  ? 'bg-white text-amber-950 shadow-2xs font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
               title="Vista en Paneles / Tarjetas uniformes"
             >
-              <Receipt className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden xs:inline">Tarjetas</span>
+              <Receipt className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>Paneles</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('table')}
               className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
                 viewMode === 'table'
-                  ? 'bg-white text-amber-950 shadow-2xs'
+                  ? 'bg-white text-amber-950 shadow-2xs font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
               title="Vista Tipo Factura / Tabla Horizontal con detalle de productos"
             >
-              <FileText className="w-3.5 h-3.5 text-orange-600" />
-              <span className="hidden xs:inline">Facturas / Lista</span>
+              <FileText className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+              <span>Facturas</span>
             </button>
           </div>
         </div>
@@ -1764,11 +1813,11 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     const defaultTaxPercent =
       it.purchaseTaxPercent !== undefined
         ? Number(it.purchaseTaxPercent)
+        : it.hasPurchaseTax === false
+        ? 0
         : (it as any).taxRate !== undefined
         ? Number((it as any).taxRate)
-        : it.hasPurchaseTax !== false
-        ? 15
-        : 0;
+        : 15;
 
     if (existingIndex !== -1) {
       // El producto ya estaba agregado -> se incrementa la cantidad y SE COLOCA COMO PRIMERO (index 0)
@@ -3394,6 +3443,16 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
           </div>
         </form>
       </div>
+
+      {purchaseToPrintA4 && (
+        <OrderPrintA4Modal
+          purchase={purchaseToPrintA4}
+          storeConfig={storeConfig}
+          currency={currency}
+          onClose={() => setPurchaseToPrintA4(null)}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 };

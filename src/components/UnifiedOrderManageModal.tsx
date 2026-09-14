@@ -44,7 +44,8 @@ import { normalizeEcuadorPhone, buildWhatsAppLink, isCashPayment } from '../util
 import { validateEcuadorId } from '../utils/ecuadorIdValidator.ts';
 import { directPrintShippingTicket } from './ShippingTicketModal.tsx';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
-import { calculateLineItem, calculateInvoiceTotals, extractBaseUnitPriceWithoutTax } from '../utils/ecuadorTaxCalculator.ts';
+import { OrderPrintA4Modal } from './OrderPrintA4Modal.tsx';
+import { calculateLineItem, calculateInvoiceTotals, extractBaseUnitPriceWithoutTax, extractItemTaxPercent } from '../utils/ecuadorTaxCalculator.ts';
 
 export interface UnifiedOrderManageModalProps {
   order: CustomerOrder | null;
@@ -185,6 +186,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [trackingNumber, setTrackingNumber] = useState<string>('');
   const [trackingNotes, setTrackingNotes] = useState<string>('');
   const [shippingCost, setShippingCost] = useState<string>('0');
+  const [showPrintA4Modal, setShowPrintA4Modal] = useState<boolean>(false);
 
   // Items List
   const [items, setItems] = useState<
@@ -585,9 +587,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
       const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
       const unitSale = Number(it.salePrice || 0);
-      const itemTaxPercent = (it as any).saleTaxPercent !== undefined
-        ? Number((it as any).saleTaxPercent)
-        : (match?.saleTaxPercent !== undefined ? Number(match.saleTaxPercent) : (match?.taxRate !== undefined ? Number(match.taxRate) : 15));
+      const itemTaxPercent = extractItemTaxPercent(it, 15, match);
 
       return calculateLineItem({
         id: it.id,
@@ -662,6 +662,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         customerCi: customerCi.trim() || order.customerCi,
         customerAddress: finalDest,
         clientAddress: customerFiscalAddress.trim() || order.clientAddress,
+        customerFiscalAddress: customerFiscalAddress.trim() || (order as any).customerFiscalAddress,
+        customerEmail: customerEmail.trim() || order.customerEmail || (order as any).email,
         shippingAddress: finalDest,
         deliveryType,
         trackingCarrier: !isPick ? trackingCarrier : undefined,
@@ -682,12 +684,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     return {
       id: 999999,
       userId: 1,
-      orderNumber: 'PED-MANUAL',
+      orderNumber: 'PRE-FACTURA',
       customerName: cleanName,
       customerPhone: cleanPhone || '0980000000',
       customerCi: customerCi.trim() || undefined,
       customerAddress: finalDest,
       clientAddress: customerFiscalAddress.trim() || undefined,
+      customerFiscalAddress: customerFiscalAddress.trim() || undefined,
+      customerEmail: customerEmail.trim() || undefined,
       shippingAddress: finalDest,
       deliveryType,
       trackingCarrier: !isPick ? trackingCarrier : undefined,
@@ -1278,12 +1282,15 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             <button
               type="button"
               disabled={items.length === 0}
-              onClick={() => directPrintOrder({ order: currentOrderForTicket, storeConfig, currency, showToast })}
+              onClick={() => {
+                setShowPrintA4Modal(true);
+                directPrintOrder({ order: currentOrderForTicket, storeConfig, currency, showToast });
+              }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition cursor-pointer border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
               title="Imprimir ticket de venta"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>{isConfirmed ? 'Imprimir Factura' : 'Imprimir Pre-Factura'}</span>
+              <span>Imprimir Venta</span>
             </button>
             <button
               type="button"
@@ -2195,62 +2202,6 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               </div>
             )}
 
-            {/* Cuadro Desglose Fiscal Factura Ecuador (SRI Layout) */}
-            <div className="p-4 rounded-xl bg-slate-900 text-white border border-slate-800 shadow-md space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Receipt className="w-4 h-4 text-purple-400" />
-                  <span className="font-extrabold text-xs tracking-wider uppercase text-purple-300">
-                    Desglose Fiscal Factura / Proforma Ecuador (SRI)
-                  </span>
-                </div>
-                <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/30 text-[10px] font-mono font-bold">
-                  Cálculo Tributario Automático por Producto
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-                {/* Columna Izquierda: Información de Tarifas e Impuestos */}
-                <div className="space-y-1.5 bg-slate-800/60 p-3 rounded-lg border border-slate-800">
-                  <div className="flex justify-between text-slate-300">
-                    <span>SUBTOTAL GRAVA IVA:</span>
-                    <span className="font-bold text-white">${invoiceTotals.subtotalTaxable15.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>SUBTOTAL 0% / EXENTO:</span>
-                    <span className="font-bold text-slate-300">${invoiceTotals.subtotalZero0.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300 border-t border-slate-700/60 pt-1.5">
-                    <span>SUBTOTAL SIN IMPUESTOS:</span>
-                    <span className="font-bold text-white">${invoiceTotals.subtotalNoTax.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Columna Derecha: Descuentos, IVA, Envío y Total Factura */}
-                <div className="space-y-1.5 bg-slate-800/60 p-3 rounded-lg border border-slate-800">
-                  {totalDiscountAmount > 0 && (
-                    <div className="flex justify-between text-purple-300">
-                      <span>TOTAL DESCUENTO APLICADO:</span>
-                      <span className="font-bold">-${totalDiscountAmount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-amber-300">
-                    <span>IVA VENTA:</span>
-                    <span className="font-bold">+${salesTaxAmount.toFixed(2)}</span>
-                  </div>
-                  {deliveryType === 'shipping' && (
-                    <div className="flex justify-between text-sky-300">
-                      <span>VALOR FLETE / ENVÍO:</span>
-                      <span className="font-bold">+${shippingFee.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-emerald-400 font-extrabold text-sm border-t border-slate-700/80 pt-1.5">
-                    <span>VALOR TOTAL FACTURA:</span>
-                    <span className="text-base">${totalOrderAmount.toFixed(2)} {currency}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* ================= SECTION 4: PAGO, TESORERÍA Y RESUMEN FINANCIERO ================= */}
@@ -2420,56 +2371,59 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           </div>
         </div>
 
-        {/* ================= FIXED FINANCIAL RESUMEN (NO SCROLLEABLE) ================= */}
-        <div className="px-6 py-3 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-md border-t border-slate-700/60 z-10">
-          <div className="space-y-0.5">
-            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Resumen Financiero y Facturación (Ecuador)
-            </span>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-              <span>
-                Artículos: <strong className="font-mono text-white">{items.reduce((s, i) => s + i.quantity, 0)}</strong>
-              </span>
-              <span>•</span>
-              <span>
-                Base Imponible: <strong className="font-mono text-white">${productsSubtotal.toFixed(2)}</strong>
-              </span>
-              {totalDiscountAmount > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="text-purple-300">
-                    Desc. Total: <strong className="font-mono text-purple-300">-${totalDiscountAmount.toFixed(2)}</strong>
-                  </span>
-                </>
-              )}
-              {applySaleTax && salesTaxAmount > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="text-amber-300">
-                    IVA ({saleTaxPercent}%): <strong className="font-mono text-amber-300">+${salesTaxAmount.toFixed(2)}</strong>
-                  </span>
-                </>
-              )}
-              {deliveryType === 'shipping' && (
-                <>
-                  <span>•</span>
-                  <span>
-                    Envío ({trackingCarrier}): <strong className="font-mono text-sky-400">${shippingFee.toFixed(2)}</strong>
-                  </span>
-                </>
-              )}
-              <span>•</span>
-              <span>
-                Modalidad: <strong className="text-white">{deliveryType === 'pickup' ? 'Retiro en Local' : 'Envío a Domicilio'}</strong>
-              </span>
+        {/* FIXED BOTTOM PANEL: Resumen de Venta Fijo con Desglose SRI (Mismo estilo y ubicación que compras) */}
+        <div className="flex-shrink-0 border-t border-slate-200 bg-slate-900 p-3 sm:p-3.5 space-y-3 shadow-lg z-10">
+          <div className="text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8.5 h-8.5 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 flex-shrink-0">
+                <Receipt className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-400 font-medium block">Resumen de Venta & Facturación SRI</span>
+                <span className="text-xs font-bold text-slate-200">
+                  {items.reduce((s, i) => s + i.quantity, 0)} unidades totales ({items.length} {items.length === 1 ? 'producto' : 'productos'})
+                </span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  Modalidad: <strong className="text-slate-200">{deliveryType === 'pickup' ? 'Retiro en Local' : 'Envío a Domicilio'}</strong>
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="text-right sm:border-l sm:border-slate-700 sm:pl-6">
-            <span className="text-[10px] text-slate-400 font-semibold block uppercase">{isConfirmed ? 'Total Factura / PVP' : 'Total Pre-Factura / PVP'}</span>
-            <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-400">
-              ${totalOrderAmount.toFixed(2)} <span className="text-sm font-bold text-slate-300">{currency}</span>
-            </span>
+
+            {/* SRI Totals Breakdown */}
+            <div className="w-full sm:w-auto bg-slate-800/90 rounded-xl p-3 border border-slate-700 text-xs font-mono space-y-1 min-w-[280px]">
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>Subtotal 0%:</span>
+                <span className="font-bold text-slate-200">${invoiceTotals.subtotalZero0.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>Subtotal 15%:</span>
+                <span className="font-bold text-slate-200">${invoiceTotals.subtotalTaxable15.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-slate-300 font-bold text-[11px] pt-1 border-t border-slate-700/80">
+                <span>Subtotal Sin Impuesto:</span>
+                <span className="text-white">${invoiceTotals.subtotalNoTax.toFixed(2)}</span>
+              </div>
+              {totalDiscountAmount > 0 && (
+                <div className="flex justify-between text-purple-300 text-[11px]">
+                  <span>Total Descuento:</span>
+                  <span>-${totalDiscountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-amber-300 text-[11px]">
+                <span>IVA VENTA (15%):</span>
+                <span className="font-bold">+${salesTaxAmount.toFixed(2)}</span>
+              </div>
+              {deliveryType === 'shipping' && shippingFee > 0 && (
+                <div className="flex justify-between text-sky-300 text-[11px]">
+                  <span>Valor Envío ({trackingCarrier}):</span>
+                  <span className="font-bold">+${shippingFee.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-emerald-400 font-black text-sm pt-1.5 border-t border-slate-700">
+                <span>TOTAL FACTURA SRI:</span>
+                <span>${totalOrderAmount.toFixed(2)} {currency}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2533,6 +2487,16 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           </div>
         </div>
       </div>
+
+      {showPrintA4Modal && (
+        <OrderPrintA4Modal
+          order={currentOrderForTicket}
+          storeConfig={storeConfig}
+          currency={currency}
+          onClose={() => setShowPrintA4Modal(false)}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 };

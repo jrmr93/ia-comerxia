@@ -221,7 +221,7 @@ export function generateShippingTicketHtml(params: {
   const phoneNorm = normalizeEcuadorPhone(order.customerPhone);
   const formattedPhone = phoneNorm.formattedLocal || order.customerPhone || 'No registrado';
   const storeName = storeConfig.storeName || 'Comerxia Store';
-  const logoUrl = storeConfig.logoUrl;
+  const logoUrl = storeConfig?.logoDesktopUrl || storeConfig?.logoUrl || (storeConfig as any)?.logo_desktop_url || (storeConfig as any)?.logo_url || null;
   const storePhone = storeConfig.whatsappNumber || '';
   const storeAddress = storeConfig.address || '';
 
@@ -679,7 +679,7 @@ export const ShippingTicketModal: React.FC<ShippingTicketModalProps> = ({
   const phoneNorm = normalizeEcuadorPhone(order.customerPhone);
   const formattedPhone = phoneNorm.formattedLocal || order.customerPhone || 'No registrado';
   const storeName = storeConfig.storeName || 'Comerxia Store';
-  const logoUrl = storeConfig.logoUrl;
+  const logoUrl = storeConfig?.logoDesktopUrl || storeConfig?.logoUrl || (storeConfig as any)?.logo_desktop_url || (storeConfig as any)?.logo_url || null;
   const storePhone = storeConfig.whatsappNumber || '';
   const storeAddress = storeConfig.address || '';
 

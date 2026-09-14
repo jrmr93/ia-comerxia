@@ -99,6 +99,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [salePrice, setSalePrice] = useState('0.00');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [marginPercent, setMarginPercent] = useState<number>(30);
+  const [profitAmount, setProfitAmount] = useState<string>('30.00');
   const [costOptions, setCostOptions] = useState<CostOption[]>([]);
   const [stock, setStock] = useState(1);
   const [imageUrl, setImageUrl] = useState('');
@@ -313,38 +314,65 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         } catch {}
       }
 
-      // Check if product has purchase tax (IVA en compra)
+      // Unified product tax rate determination (single IVA for both purchases and sales)
+      const explicitSaleTax =
+        editingItem.saleTaxPercent !== undefined && editingItem.saleTaxPercent !== null && !isNaN(Number(editingItem.saleTaxPercent))
+          ? Number(editingItem.saleTaxPercent)
+          : parsedAttr.saleTaxPercent !== undefined && parsedAttr.saleTaxPercent !== null && !isNaN(Number(parsedAttr.saleTaxPercent))
+          ? Number(parsedAttr.saleTaxPercent)
+          : undefined;
+
+      const explicitPurchaseTax =
+        editingItem.purchaseTaxPercent !== undefined && editingItem.purchaseTaxPercent !== null && !isNaN(Number(editingItem.purchaseTaxPercent))
+          ? Number(editingItem.purchaseTaxPercent)
+          : parsedAttr.purchaseTaxPercent !== undefined && parsedAttr.purchaseTaxPercent !== null && !isNaN(Number(parsedAttr.purchaseTaxPercent))
+          ? Number(parsedAttr.purchaseTaxPercent)
+          : undefined;
+
       const rawTaxRate =
         editingItem.taxRate !== undefined && editingItem.taxRate !== null && !isNaN(Number(editingItem.taxRate))
           ? Number(editingItem.taxRate)
           : parsedAttr.taxRate !== undefined && !isNaN(Number(parsedAttr.taxRate))
           ? Number(parsedAttr.taxRate)
-          : parsedAttr.taxPercent !== undefined && !isNaN(Number(parsedAttr.taxPercent))
-          ? Number(parsedAttr.taxPercent)
           : undefined;
 
-      const itemHasPurchaseTax =
+      const unifiedTaxPercent =
+        explicitSaleTax !== undefined
+          ? explicitSaleTax
+          : explicitPurchaseTax !== undefined
+          ? explicitPurchaseTax
+          : rawTaxRate !== undefined
+          ? rawTaxRate
+          : (defaultTelegramTaxPercent ?? telegramTaxPercent ?? 15);
+
+      const explicitApplySaleTax =
+        editingItem.applySaleTax !== undefined
+          ? Boolean(editingItem.applySaleTax)
+          : parsedAttr.applySaleTax !== undefined
+          ? Boolean(parsedAttr.applySaleTax)
+          : undefined;
+
+      const explicitHasPurchaseTax =
         editingItem.hasPurchaseTax !== undefined
           ? Boolean(editingItem.hasPurchaseTax)
           : parsedAttr.hasPurchaseTax !== undefined
           ? Boolean(parsedAttr.hasPurchaseTax)
-          : parsedAttr.taxStatus === 'NOT_SPECIFIED'
-          ? false
-          : rawTaxRate !== undefined
-          ? rawTaxRate > 0
-          : true;
+          : undefined;
 
-      const effectivePurchaseTaxPercent =
-        rawTaxRate !== undefined && rawTaxRate > 0
-          ? rawTaxRate
-          : parsedAttr.purchaseTaxPercent !== undefined && !isNaN(Number(parsedAttr.purchaseTaxPercent)) && Number(parsedAttr.purchaseTaxPercent) > 0
-          ? Number(parsedAttr.purchaseTaxPercent)
-          : (defaultTelegramTaxPercent ?? telegramTaxPercent ?? 15);
+      const unifiedHasTax =
+        explicitApplySaleTax !== undefined
+          ? explicitApplySaleTax
+          : explicitHasPurchaseTax !== undefined
+          ? explicitHasPurchaseTax
+          : unifiedTaxPercent > 0;
 
-      setHasPurchaseTax(itemHasPurchaseTax);
-      setPurchaseTaxPercent(effectivePurchaseTaxPercent);
-      const activeTaxRate = itemHasPurchaseTax ? effectivePurchaseTaxPercent : 0;
-      setTaxRate(activeTaxRate);
+      const effectiveUnifiedTaxRate = unifiedHasTax ? unifiedTaxPercent : 0;
+
+      setHasPurchaseTax(unifiedHasTax);
+      setPurchaseTaxPercent(unifiedTaxPercent);
+      setApplySaleTax(unifiedHasTax);
+      setSaleTaxPercent(unifiedTaxPercent);
+      setTaxRate(effectiveUnifiedTaxRate);
 
       let initialCostWithout =
         editingItem.costWithoutTax !== undefined && editingItem.costWithoutTax !== null
@@ -355,16 +383,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           ? String(editingItem.costWithTax)
           : editingItem.costPrice || '0.00';
 
-      if (!itemHasPurchaseTax) {
+      if (!unifiedHasTax) {
         const effCost = initialCostWith || initialCostWithout || editingItem.costPrice || '0.00';
         initialCostWithout = effCost;
         initialCostWith = effCost;
       } else {
         if (!initialCostWithout && initialCostWith) {
-          initialCostWithout = (parseFloat(initialCostWith) / (1 + effectivePurchaseTaxPercent / 100)).toFixed(2);
+          initialCostWithout = (parseFloat(initialCostWith) / (1 + unifiedTaxPercent / 100)).toFixed(2);
         }
         if (!initialCostWith && initialCostWithout) {
-          initialCostWith = (parseFloat(initialCostWithout) * (1 + effectivePurchaseTaxPercent / 100)).toFixed(2);
+          initialCostWith = (parseFloat(initialCostWithout) * (1 + unifiedTaxPercent / 100)).toFixed(2);
         }
       }
 
@@ -372,24 +400,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCostWithTax(initialCostWith || editingItem.costPrice || '0.00');
       setCostPrice(initialCostWith || editingItem.costPrice || '0.00');
       setSalePrice(editingItem.salePrice || '0.00');
-
-      // Check if product has applySaleTax configured
-      const itemApplySaleTax =
-        editingItem.applySaleTax !== undefined
-          ? Boolean(editingItem.applySaleTax)
-          : parsedAttr.applySaleTax !== undefined
-          ? Boolean(parsedAttr.applySaleTax)
-          : false;
-      setApplySaleTax(itemApplySaleTax);
-
-      // Percentage defaults to Telegram IVA defined in config (or item's saved sale tax)
-      const itemSaleTaxPercent =
-        editingItem.saleTaxPercent !== undefined && !isNaN(Number(editingItem.saleTaxPercent))
-          ? Number(editingItem.saleTaxPercent)
-          : parsedAttr.saleTaxPercent !== undefined && !isNaN(Number(parsedAttr.saleTaxPercent))
-          ? Number(parsedAttr.saleTaxPercent)
-          : (defaultTelegramTaxPercent ?? telegramTaxPercent ?? effectivePurchaseTaxPercent);
-      setSaleTaxPercent(itemSaleTaxPercent);
 
       // Extract cost options
       if (Array.isArray(parsedAttr.costOptions) && parsedAttr.costOptions.length > 0) {
@@ -400,17 +410,25 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCostOptions([]);
       }
 
-      // Calculate initial margin based on net cost without IVA
+      // Calculate initial margin & profit based on net cost without IVA
       const costWithoutNum = parseFloat(initialCostWithout) || 0;
+      let initMargin = 30;
+      let initProfit = 0;
       if (parsedAttr.profitMarginPercent !== undefined) {
-        setMarginPercent(Number(parsedAttr.profitMarginPercent));
+        initMargin = Number(parsedAttr.profitMarginPercent);
+        initProfit = costWithoutNum * (initMargin / 100);
       } else if (costWithoutNum > 0 && saleNum > 0) {
-        const baseSale = itemApplySaleTax && itemSaleTaxPercent > 0 ? saleNum / (1 + itemSaleTaxPercent / 100) : saleNum;
-        const util = baseSale - costWithoutNum;
-        setMarginPercent(Math.round((util / costWithoutNum) * 100));
+        const itemApplyTax = unifiedHasTax;
+        const itemTaxPct = unifiedTaxPercent;
+        const baseSale = itemApplyTax && itemTaxPct > 0 ? saleNum / (1 + itemTaxPct / 100) : saleNum;
+        initProfit = baseSale - costWithoutNum;
+        initMargin = Math.round((initProfit / costWithoutNum) * 100);
       } else {
-        setMarginPercent(30);
+        initMargin = 30;
+        initProfit = costWithoutNum * 0.3;
       }
+      setMarginPercent(initMargin);
+      setProfitAmount(initProfit.toFixed(2));
 
       setDiscountPercent(editingItem.discountPercent || 0);
       setStock(editingItem.stock ?? 0);
@@ -454,6 +472,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCostWithTax('115.00');
       setCostPrice('115.00');
       setMarginPercent(30);
+      setProfitAmount('30.00');
       setSalePrice('130.00');
       setDiscountPercent(0);
       setCostOptions([
@@ -489,83 +508,91 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setTimeout(() => setCopiedTelegram(false), 2000);
   };
 
-  // Helper to compute published list PVP so that after discount, net base equals costWithout + targetProfit
+  // Helper to compute published list PVP = (costWithout + targetProfit) / (1 - discount%) * (1 + IVA%)
+  // ensures promotional discount DOES NOT erode or diminish the target profit earned by the merchant
   const computePublishedPvp = (
     costWithout: number,
-    margin: number,
+    profitVal: number | string,
     discount: number,
     hasSaleTax: boolean,
     saleTaxPct: number
   ): number => {
-    const targetProfit = costWithout * (margin / 100);
-    const netRequiredAfterDiscount = costWithout + targetProfit;
-    const discRate = Math.max(0, Math.min(99, discount)) / 100;
-    const publishedSinIVA = discRate > 0 && discRate < 1 ? netRequiredAfterDiscount / (1 - discRate) : netRequiredAfterDiscount;
+    const profitNum = typeof profitVal === 'string' ? (parseFloat(profitVal) || 0) : profitVal;
+    const targetNetBaseSinIVA = costWithout + Math.max(0, profitNum);
+    const discountRate = Math.max(0, Math.min(0.99, (discount || 0) / 100));
+    const publishedSinIVA = discountRate < 1 ? targetNetBaseSinIVA / (1 - discountRate) : targetNetBaseSinIVA;
     const activeSaleTax = hasSaleTax ? saleTaxPct : 0;
     const rawPvp = activeSaleTax > 0 ? publishedSinIVA * (1 + activeSaleTax / 100) : publishedSinIVA;
     return Math.round(rawPvp * 100) / 100;
   };
 
-  // Toggle hasPurchaseTax check and recalculate purchase costs
-  const handleToggleHasPurchaseTax = (checked: boolean) => {
-    setHasPurchaseTax(checked);
-    const activeRate = checked ? (purchaseTaxPercent > 0 ? purchaseTaxPercent : (defaultTelegramTaxPercent ?? telegramTaxPercent ?? 15)) : 0;
-    setTaxRate(activeRate);
+  // Unified TAX handler: updates BOTH purchase tax and sale tax to the same rate
+  const updateUnifiedTax = (newPercent: number, isEnabled: boolean = true) => {
+    const clamped = Math.max(0, newPercent);
+    const active = isEnabled && clamped > 0;
+
+    setHasPurchaseTax(active);
+    setPurchaseTaxPercent(clamped);
+    setApplySaleTax(active);
+    setSaleTaxPercent(clamped);
+    setTaxRate(clamped);
 
     const costWithout = parseFloat(costWithoutTax) || 0;
     if (costWithout > 0) {
-      const newCostWith = checked ? costWithout * (1 + activeRate / 100) : costWithout;
+      const newCostWith = active ? costWithout * (1 + clamped / 100) : costWithout;
       setCostWithTax(newCostWith.toFixed(2));
       setCostPrice(newCostWith.toFixed(2));
 
-      const newPvp = computePublishedPvp(costWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
+      const newPvp = computePublishedPvp(costWithout, profitAmount, discountPercent, active, clamped);
       setSalePrice(newPvp.toFixed(2));
     }
   };
 
-  // Change purchase tax percentage and recalculate costs if check is active
+  // Toggle hasPurchaseTax check and recalculate purchase costs & sale price
+  const handleToggleHasPurchaseTax = (checked: boolean) => {
+    const activeRate = checked ? (purchaseTaxPercent > 0 ? purchaseTaxPercent : (defaultTelegramTaxPercent ?? telegramTaxPercent ?? 15)) : 0;
+    updateUnifiedTax(activeRate, checked);
+  };
+
+  // Change purchase tax percentage and recalculate costs & sale price
   const handlePurchaseTaxPercentChange = (newPercent: number) => {
     const clamped = Math.max(0, newPercent);
-    setPurchaseTaxPercent(clamped);
-    if (hasPurchaseTax) {
-      setTaxRate(clamped);
-      const costWithout = parseFloat(costWithoutTax) || 0;
-      if (costWithout > 0) {
-        const newCostWith = costWithout * (1 + clamped / 100);
-        setCostWithTax(newCostWith.toFixed(2));
-        setCostPrice(newCostWith.toFixed(2));
-      }
-    }
+    updateUnifiedTax(clamped, clamped > 0);
   };
 
-  // Toggle applySaleTax check and recalculate sale price
+  // Toggle applySaleTax check and recalculate sale price & purchase costs
   const handleToggleApplySaleTax = (checked: boolean) => {
-    setApplySaleTax(checked);
-    const costWithout = parseFloat(costWithoutTax) || 0;
-    if (costWithout > 0) {
-      const newPvp = computePublishedPvp(costWithout, marginPercent, discountPercent, checked, saleTaxPercent);
-      setSalePrice(newPvp.toFixed(2));
-    }
+    const activeRate = checked ? (saleTaxPercent > 0 ? saleTaxPercent : (defaultTelegramTaxPercent ?? telegramTaxPercent ?? 15)) : 0;
+    updateUnifiedTax(activeRate, checked);
   };
 
-  // Change sale tax percentage and recalculate sale price if check is active
+  // Change sale tax percentage and recalculate sale price & purchase costs
   const handleSaleTaxPercentChange = (newPercent: number) => {
-    setSaleTaxPercent(newPercent);
-    if (applySaleTax) {
-      const costWithout = parseFloat(costWithoutTax) || 0;
-      if (costWithout > 0) {
-        const newPvp = computePublishedPvp(costWithout, marginPercent, discountPercent, true, newPercent);
-        setSalePrice(newPvp.toFixed(2));
-      }
-    }
+    const clamped = Math.max(0, newPercent);
+    updateUnifiedTax(clamped, clamped > 0);
   };
 
-  // Recalculate sale price when margin changes
+  // Recalculate profit amount ($) and sale price when margin % changes
   const handleMarginChange = (newMargin: number) => {
     setMarginPercent(newMargin);
     const costWithout = parseFloat(costWithoutTax) || 0;
     if (costWithout > 0) {
-      const newPvp = computePublishedPvp(costWithout, newMargin, discountPercent, applySaleTax, saleTaxPercent);
+      const newProfitNum = Math.round((costWithout * (newMargin / 100)) * 100) / 100;
+      setProfitAmount(newProfitNum.toFixed(2));
+      const newPvp = computePublishedPvp(costWithout, newProfitNum, discountPercent, applySaleTax, saleTaxPercent);
+      setSalePrice(newPvp.toFixed(2));
+    }
+  };
+
+  // Recalculate margin % and sale price when user edits profit amount ($) directly
+  const handleProfitAmountChange = (newProfitStr: string) => {
+    setProfitAmount(newProfitStr);
+    const newProfitNum = parseFloat(newProfitStr);
+    const costWithout = parseFloat(costWithoutTax) || 0;
+    if (!isNaN(newProfitNum) && costWithout > 0) {
+      const newMargin = Math.round((newProfitNum / costWithout) * 100);
+      setMarginPercent(newMargin);
+      const newPvp = computePublishedPvp(costWithout, newProfitNum, discountPercent, applySaleTax, saleTaxPercent);
       setSalePrice(newPvp.toFixed(2));
     }
   };
@@ -575,22 +602,24 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setDiscountPercent(newDiscount);
     const costWithout = parseFloat(costWithoutTax) || 0;
     if (costWithout > 0) {
-      const newPvp = computePublishedPvp(costWithout, marginPercent, newDiscount, applySaleTax, saleTaxPercent);
+      const newPvp = computePublishedPvp(costWithout, profitAmount, newDiscount, applySaleTax, saleTaxPercent);
       setSalePrice(newPvp.toFixed(2));
     }
   };
 
-  // Recalculate margin when user manually types a custom sale price (PVP)
+  // Recalculate margin & profit amount when user manually types a custom sale price (PVP)
   const handleSalePriceChange = (newVal: string) => {
     setSalePrice(newVal);
     const num = parseFloat(newVal);
     const costWithout = parseFloat(costWithoutTax) || 0;
     if (!isNaN(num) && costWithout > 0) {
-      const publishedSinIVA = applySaleTax && saleTaxPercent > 0 ? num / (1 + saleTaxPercent / 100) : num;
-      const discRate = Math.max(0, Math.min(99, discountPercent)) / 100;
-      const netBaseAfterDiscount = publishedSinIVA * (1 - discRate);
-      const util = netBaseAfterDiscount - costWithout;
-      const calculatedMargin = Math.round((util / costWithout) * 100);
+      const priceSinIVA = applySaleTax && saleTaxPercent > 0 ? num / (1 + saleTaxPercent / 100) : num;
+      const discountNum = Math.max(0, Math.min(99, Number(discountPercent) || 0));
+      const discountRate = discountNum / 100;
+      const baseImponibleNeta = priceSinIVA * (1 - discountRate);
+      const profit = baseImponibleNeta - costWithout;
+      setProfitAmount(profit.toFixed(2));
+      const calculatedMargin = Math.round((profit / costWithout) * 100);
       if (calculatedMargin >= -100 && calculatedMargin <= 1000) {
         setMarginPercent(calculatedMargin);
       }
@@ -606,7 +635,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const withTaxNum = Math.round(numWithout * (1 + activeTax / 100) * 100) / 100;
       setCostWithTax(withTaxNum.toFixed(2));
       setCostPrice(withTaxNum.toFixed(2));
-      const newPvp = computePublishedPvp(numWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
+      const profitNum = Math.round((numWithout * (marginPercent / 100)) * 100) / 100;
+      setProfitAmount(profitNum.toFixed(2));
+      const newPvp = computePublishedPvp(numWithout, profitNum, discountPercent, applySaleTax, saleTaxPercent);
       setSalePrice((Math.round(newPvp * 100) / 100).toFixed(2));
     }
   };
@@ -620,7 +651,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const activeTax = hasPurchaseTax ? purchaseTaxPercent : 0;
       const numWithout = activeTax > 0 ? Math.round((numWith / (1 + activeTax / 100)) * 100) / 100 : numWith;
       setCostWithoutTax(numWithout.toFixed(2));
-      const newPvp = computePublishedPvp(numWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
+      const profitNum = Math.round((numWithout * (marginPercent / 100)) * 100) / 100;
+      setProfitAmount(profitNum.toFixed(2));
+      const newPvp = computePublishedPvp(numWithout, profitNum, discountPercent, applySaleTax, saleTaxPercent);
       setSalePrice((Math.round(newPvp * 100) / 100).toFixed(2));
     }
   };
@@ -647,7 +680,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setCostWithTax(optWith.toFixed(2));
     setCostPrice(optWith.toFixed(2));
 
-    const newPvp = computePublishedPvp(optWithout, marginPercent, discountPercent, applySaleTax, saleTaxPercent);
+    const profitNum = Math.round((optWithout * (marginPercent / 100)) * 100) / 100;
+    setProfitAmount(profitNum.toFixed(2));
+
+    const newPvp = computePublishedPvp(optWithout, profitNum, discountPercent, applySaleTax, saleTaxPercent);
     setSalePrice(newPvp.toFixed(2));
   };
 
@@ -774,15 +810,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const allPhotos = Array.from(new Set([imageUrl, ...extraImages].filter(Boolean)));
       const effectiveCover = imageUrl || allPhotos[0] || null;
 
+      const effectiveHasTax = (hasPurchaseTax || applySaleTax) && (purchaseTaxPercent > 0 || saleTaxPercent > 0);
+      const effectiveTaxRate = effectiveHasTax ? Math.max(purchaseTaxPercent, saleTaxPercent) : 0;
+
       const mergedAttributes = {
         ...existingAttr,
         costOptions,
         profitMarginPercent: marginPercent,
         selectedCostPrice: parseFloat(costPrice) || 0,
-        hasPurchaseTax,
-        purchaseTaxPercent: hasPurchaseTax ? purchaseTaxPercent : 0,
-        applySaleTax,
-        saleTaxPercent,
+        hasPurchaseTax: effectiveHasTax,
+        purchaseTaxPercent: effectiveTaxRate,
+        applySaleTax: effectiveHasTax,
+        saleTaxPercent: effectiveTaxRate,
         images: allPhotos,
         totalPhotos: allPhotos.length,
       };
@@ -801,11 +840,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           costPrice: String(parseFloat(costWithTax || costPrice) || 0),
           costWithoutTax: String(parseFloat(costWithoutTax) || 0),
           costWithTax: String(parseFloat(costWithTax || costPrice) || 0),
-          taxRate: hasPurchaseTax ? String(purchaseTaxPercent) : '0.00',
-          hasPurchaseTax,
-          purchaseTaxPercent: hasPurchaseTax ? purchaseTaxPercent : 0,
-          applySaleTax,
-          saleTaxPercent,
+          taxRate: String(effectiveTaxRate),
+          hasPurchaseTax: effectiveHasTax,
+          purchaseTaxPercent: effectiveTaxRate,
+          applySaleTax: effectiveHasTax,
+          saleTaxPercent: effectiveTaxRate,
           salePrice: String(parseFloat(salePrice) || 0),
           discountPercent: Math.max(0, Math.min(100, Number(discountPercent) || 0)),
           stock: Number(stock),
@@ -859,6 +898,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const calculatedMarginPercent = costWithoutNum > 0 ? (unitProfit / costWithoutNum) * 100 : 0;
 
   // Aliases for full JSX backward compatibility
+  const activeTaxRate = activeSaleTax;
   const salePriceWithoutTax = publishedPriceSinIVA;
   const pvpNum = pvpListaNum;
   const effectivePvp = totalClientePaid;
@@ -1076,166 +1116,134 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             {/* ========================================================================= */}
             {/* MÓDULO FINANCIERO: COSTOS, MARGEN Y PRECIO DE VENTA (ALINEADO Y CLARO)    */}
             {/* ========================================================================= */}
-            <div className="sm:col-span-2 p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-3.5 shadow-2xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-800 shadow-2xs">
-                    <Scale className="w-4 h-4" />
+            {/* ========================================================================= */}
+            {/* SECCIÓN FINANCIERA Y PRECIOS - COLUMNA UNIFICADA DE INGRESO (SRI ECUADOR) */}
+            {/* ========================================================================= */}
+            <div className="sm:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-200/90 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-xl bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 shadow-2xs">
+                      <DollarSign className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Columna de Ingreso Financiero</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Los 5 únicos campos modificables. Los demás valores se autocalcularán en tiempo real.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                      <span>Estructura de Costos y Margen de Ganancia</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Gestiona el costo de compra, define el margen comercial y calcula el PVP con ganancia unitaria en tiempo real.
-                    </p>
-                  </div>
+                  <span className="text-[10px] font-black text-purple-900 bg-purple-100 border border-purple-300 px-2.5 py-1 rounded-full uppercase tracking-wider font-mono">
+                    Formulario SRI
+                  </span>
                 </div>
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${
-                  hasPurchaseTax
-                    ? 'text-sky-900 bg-sky-100/90 border-sky-300'
-                    : 'text-slate-700 bg-slate-200/80 border-slate-300'
-                }`}>
-                  IVA Compra: {hasPurchaseTax ? `${purchaseTaxPercent}%` : '0% (Sin IVA)'}
-                </span>
-              </div>
 
-              {/* ========================================================================= */}
-              {/* CONFIGURACIÓN DE IVA EN COMPRA (CHECK & PORCENTAJE)                       */}
-              {/* ========================================================================= */}
-              {/* ========================================================================= */}
-              {/* CONFIGURACIÓN DE IVA EN COMPRA (TASA DIRECTA DE NATURALEZA DE PRODUCTO)    */}
-              {/* ========================================================================= */}
-              <div className="p-3.5 rounded-2xl border bg-sky-50/80 border-sky-300 shadow-2xs space-y-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center space-x-2 flex-wrap">
-                      <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <ShoppingBag className="w-3.5 h-3.5 text-sky-700" />
-                        <span>Tarifa IVA en Compra (Proveedor)</span>
-                      </span>
-                      <span className="text-[10px] font-black text-sky-900 bg-sky-100/90 border border-sky-300 px-2 py-0.5 rounded-full font-mono">
-                        {purchaseTaxPercent > 0 ? `+${purchaseTaxPercent}% IVA` : '0% Exento'}
+                {/* Grid de la Columna de Ingreso Financiero (5 Campos Modificables) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  
+                  {/* 1. IVA Aplicable / Clasificación Tributaria (%) [MODIFICABLE] */}
+                  <div className="p-3.5 rounded-xl bg-white border border-sky-200 shadow-2xs space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Receipt className="w-3.5 h-3.5 text-sky-600" />
+                        <span>1. Tarifa IVA Aplicable (%)</span>
+                      </label>
+                      <span className="text-[10px] font-black text-sky-900 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200 font-mono">
+                        {saleTaxPercent > 0 ? `${saleTaxPercent}% IVA` : '0% Exento'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 mt-0.5">
-                      Configura la tarifa del impuesto que aplica el proveedor en la adquisición (0%, 5%, 8%, 15% o personalizada).
-                    </p>
-                  </div>
-
-                  {/* Campo de porcentaje de IVA para Compra */}
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <div className="flex flex-col items-start sm:items-end">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-[11px] font-bold text-slate-700">Tasa IVA Compra:</span>
-                        <div className="relative w-20">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.5"
-                            value={purchaseTaxPercent}
-                            onChange={(e) => handlePurchaseTaxPercentChange(Math.max(0, Number(e.target.value)))}
-                            className="w-full border rounded-xl pl-2.5 pr-6 py-1.5 text-xs font-mono font-black transition text-center bg-white border-sky-400 text-sky-950 focus:outline-none focus:ring-2 focus:ring-sky-500/20 shadow-2xs"
-                          />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
-                        </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="relative w-24 shrink-0">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.5"
+                          value={saleTaxPercent}
+                          onChange={(e) => handleSaleTaxPercentChange(Math.max(0, Number(e.target.value)))}
+                          className="w-full bg-white border border-sky-300 rounded-xl pl-2.5 pr-6 py-2 text-sm text-sky-950 font-mono font-black focus:outline-none focus:border-sky-500 shadow-2xs text-center"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                      </div>
+                      <div className="flex-1 flex flex-wrap gap-1">
+                        {[0, 5, 8, 12, 15].map((rate) => (
+                          <button
+                            key={rate}
+                            type="button"
+                            onClick={() => handleSaleTaxPercentChange(rate)}
+                            className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition cursor-pointer shrink-0 ${
+                              saleTaxPercent === rate
+                                ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-sky-50 hover:text-sky-800'
+                            }`}
+                          >
+                            {rate === 0 ? '0%' : `${rate}%`}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Presets rápidos de tasas de IVA y desglose dinámico */}
-                <div className="pt-2 border-t border-sky-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                    <span className="text-[10px] font-bold text-sky-900 uppercase tracking-wider">Tarifas SRI:</span>
-                    {[0, 5, 8, 12, 15].map((rate) => (
-                      <button
-                        key={rate}
-                        type="button"
-                        onClick={() => handlePurchaseTaxPercentChange(rate)}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition cursor-pointer ${
-                          purchaseTaxPercent === rate
-                            ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
-                            : 'bg-white text-slate-700 border-sky-200 hover:bg-sky-100 hover:text-sky-950'
-                        }`}
-                      >
-                        {rate === 0 ? '0% Exento' : `${rate}%`}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center space-x-2 text-[11px] font-mono bg-white/90 px-2.5 py-1 rounded-lg border border-sky-200 text-slate-700 shadow-2xs">
-                    <span>Base Compra: <strong>${(parseFloat(costWithoutTax) || 0).toFixed(2)}</strong></span>
-                    <span className="text-sky-700 font-bold">+ IVA ({purchaseTaxPercent}%): <strong>${Math.max(0, (parseFloat(costWithTax || costPrice) || 0) - (parseFloat(costWithoutTax) || 0)).toFixed(2)}</strong></span>
-                    <span className="text-slate-400">=</span>
-                    <span className="text-slate-900 font-black">Costo Total: ${(parseFloat(costWithTax || costPrice) || 0).toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Fila 1: Costos de Adquisición (Sin IVA y Con IVA) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-amber-50/70 border border-amber-200">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <DollarSign className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Costo Sin IVA ($)</span>
-                    </label>
-                    <span className="text-[10px] text-emerald-700 font-black">Base para Margen y Utilidad</span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={costWithoutTax}
-                      onChange={(e) => handleCostWithoutTaxChange(e.target.value)}
-                      className="w-full bg-white border border-amber-300 rounded-xl pl-7 pr-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-amber-500 font-mono font-bold transition shadow-2xs"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-amber-950 flex items-center gap-1">
-                      <DollarSign className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Costo Con IVA ($)</span>
-                    </label>
-                    <span className="text-[10px] text-amber-800 font-bold">Total Pagado al Proveedor</span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-600 text-sm font-bold">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={costWithTax}
-                      onChange={(e) => handleCostWithTaxChange(e.target.value)}
-                      className="w-full bg-white border border-amber-300 rounded-xl pl-7 pr-3 py-2 text-sm text-amber-950 focus:outline-none focus:border-amber-500 font-mono font-black transition shadow-2xs"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Fila 2: Margen de Ganancia (%) y Precio de Venta Sugerido (PVP) Perfectamente Alineados */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
-                {/* Margen de Ganancia */}
-                <div className="p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col justify-between space-y-2.5 shadow-2xs">
-                  <div>
-                    <div className="flex justify-between items-center mb-1.5">
-                      <label className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-                        <Percent className="w-3.5 h-3.5 text-sky-600" />
-                        <span>Margen de Ganancia (%)</span>
+                  {/* 2. Costo del Producto Sin IVA ($) [MODIFICABLE] */}
+                  <div className="p-3.5 rounded-xl bg-white border border-amber-200 shadow-2xs space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5 text-amber-600" />
+                        <span>2. Costo del Producto (Sin IVA)</span>
                       </label>
-                      <span className="text-xs font-black text-sky-800 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200 font-mono">
+                      <span className="text-[10px] text-amber-800 font-mono font-bold bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                        Antes de Impuestos
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={costWithoutTax}
+                        onChange={(e) => handleCostWithoutTaxChange(e.target.value)}
+                        className="w-full bg-white border border-amber-300 rounded-xl pl-7 pr-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-amber-500 font-mono font-bold transition shadow-2xs"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. Utilidad / Ganancia ($) [MODIFICABLE] */}
+                  <div className="p-3.5 rounded-xl bg-white border border-emerald-200 shadow-2xs space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>3. Utilidad / Ganancia ($)</span>
+                      </label>
+                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 font-mono">
+                        +${(parseFloat(profitAmount) || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 text-sm font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={profitAmount}
+                        onChange={(e) => handleProfitAmountChange(e.target.value)}
+                        className="w-full bg-white border border-emerald-300 rounded-xl pl-7 pr-3 py-2 text-sm text-emerald-950 focus:outline-none focus:border-emerald-500 font-mono font-bold transition shadow-2xs"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4. Margen de Utilidad sobre Venta (%) [MODIFICABLE] */}
+                  <div className="p-3.5 rounded-xl bg-white border border-purple-200 shadow-2xs space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Percent className="w-3.5 h-3.5 text-purple-600" />
+                        <span>4. Margen de Utilidad (%)</span>
+                      </label>
+                      <span className="text-[10px] font-black text-purple-800 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200 font-mono">
                         +{marginPercent}%
                       </span>
                     </div>
-
                     <div className="flex items-center space-x-2">
                       <div className="relative w-24 shrink-0">
                         <input
@@ -1244,22 +1252,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           max="1000"
                           value={marginPercent}
                           onChange={(e) => handleMarginChange(Number(e.target.value))}
-                          className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-2.5 pr-6 py-2 text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-sky-500 font-mono font-black transition text-center"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-2.5 pr-6 py-2 text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-purple-500 font-mono font-black transition text-center"
                         />
                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                       </div>
-
-                      {/* Presets de margen */}
                       <div className="flex-1 flex flex-wrap gap-1">
                         {MARGIN_PRESETS.map((p) => (
                           <button
                             key={p}
                             type="button"
                             onClick={() => handleMarginChange(p)}
-                            className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition cursor-pointer shrink-0 ${
+                            className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition cursor-pointer shrink-0 ${
                               marginPercent === p
-                                ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300'
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-purple-50 hover:text-purple-700'
                             }`}
                           >
                             +{p}%
@@ -1268,333 +1274,90 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       </div>
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-500">
-                    Aumenta o reduce el porcentaje para recalcular el PVP y tu margen neto.
-                  </p>
-                </div>
 
-                {/* Precio de Venta Sugerido (PVP) - Panel Resaltado y Llamativo */}
-                <div className="p-3.5 rounded-xl bg-gradient-to-b from-emerald-50/90 via-emerald-50/30 to-white border-2 border-emerald-500 flex flex-col justify-between space-y-2.5 shadow-sm ring-2 ring-emerald-500/10 transition">
-                  <div>
-                    <div className="flex justify-between items-center mb-1.5 flex-wrap gap-1.5">
-                      <label className="text-xs font-black text-emerald-950 flex items-center space-x-1.5 tracking-tight">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-md bg-emerald-600 text-white shadow-2xs shrink-0">
-                          <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
-                        </span>
-                        <span>Precio de Venta Sugerido (PVP)</span>
+                  {/* 5. Descuento Unitario en Venta (%) [MODIFICABLE] */}
+                  <div className="p-3.5 rounded-xl bg-white border border-rose-200 shadow-2xs space-y-2 sm:col-span-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-rose-600" />
+                        <span>5. Descuento Aplicable en Venta (%)</span>
                       </label>
-                      <div className="flex items-center space-x-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={handleQuoteMarketEcuador}
-                          disabled={isQuotingMarket}
-                          className={`inline-flex items-center space-x-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border transition cursor-pointer shadow-2xs ${
-                            isQuotingMarket
-                              ? 'bg-amber-50 text-amber-700 border-amber-300 animate-pulse'
-                              : 'bg-white hover:bg-sky-50 text-sky-800 border-sky-300 hover:border-sky-400'
-                          }`}
-                          title="Cotizar este producto en el mercado de Ecuador con IA y Google Search"
-                        >
-                          {isQuotingMarket ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
-                              <span>Cotizando en Ecuador...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-3 h-3 text-sky-600" />
-                              <span>Cotizar en Ecuador (IA)</span>
-                            </>
-                          )}
-                        </button>
-                        <span className="text-[10px] font-black text-emerald-900 bg-emerald-200/80 px-2 py-0.5 rounded-md border border-emerald-300 uppercase tracking-wide">
-                          Al Público
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600 text-lg font-black font-mono select-none">
-                        $
+                      <span className="text-[10px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 font-mono">
+                        -{discountPercent}% ($-{discountAmountSinIVA.toFixed(2)})
                       </span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={salePrice}
-                        onChange={(e) => handleSalePriceChange(e.target.value)}
-                        className="w-full bg-white border-2 border-emerald-500 rounded-xl pl-8 pr-3.5 py-2 text-lg text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-mono font-black transition shadow-xs"
-                        placeholder="0.00"
-                      />
                     </div>
-                  </div>
-                  <p className="text-[10px] text-emerald-800 font-medium">
-                    Si ingresas un precio manual, el margen (%) se recalcula automáticamente.
-                  </p>
-                </div>
-              </div>
-
-              {/* ========================================================================= */}
-              {/* FICHA DE COTIZACIÓN DE MERCADO EN ECUADOR (GOOGLE SEARCH GROUNDING + IA)  */}
-              {/* ========================================================================= */}
-              {showQuoteDrawer && (
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-sky-950 text-white border border-sky-700/50 shadow-lg relative overflow-hidden transition-all">
-                  <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5 mb-3 relative z-10">
                     <div className="flex items-center space-x-2">
-                      <span className="text-xl">🇪🇨</span>
-                      <div>
-                        <h4 className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
-                          <span>Cotización en Tiempo Real - Mercado Ecuador</span>
-                          <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-400/30">
-                            Google Search + IA
-                          </span>
-                        </h4>
-                        <p className="text-[11px] text-slate-300">
-                          Precios referenciales en USD en tiendas locales, distribuidores y marketplaces ecuatorianos
-                        </p>
+                      <div className="relative w-28 shrink-0">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.5"
+                          value={discountPercent}
+                          onChange={(e) => handleDiscountChange(Number(e.target.value))}
+                          className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-2.5 pr-6 py-2 text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-rose-500 font-mono font-black transition text-center"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
                       </div>
-                    </div>
-
-                    <div className="flex items-center space-x-1">
-                      <button
-                        type="button"
-                        onClick={handleQuoteMarketEcuador}
-                        disabled={isQuotingMarket}
-                        className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition cursor-pointer"
-                        title="Actualizar cotización"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isQuotingMarket ? 'animate-spin text-sky-400' : ''}`} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowQuoteDrawer(false)}
-                        className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
-                        title="Cerrar cotización"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {isQuotingMarket ? (
-                    <div className="py-8 flex flex-col items-center justify-center space-y-3 relative z-10">
-                      <Loader2 className="w-8 h-8 text-sky-400 animate-spin" />
-                      <div className="text-center">
-                        <p className="text-xs font-bold text-white">Consultando precios en vivo en Ecuador...</p>
-                        <p className="text-[11px] text-slate-300 max-w-sm mt-1">
-                          Rastreando Mercado Libre Ecuador, distribuidores de Quito/Guayaquil y tiendas online con búsqueda de Google.
-                        </p>
-                      </div>
-                    </div>
-                  ) : marketQuoteError ? (
-                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-xs flex items-start space-x-2 relative z-10">
-                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="font-semibold text-rose-300">Aviso sobre la cotización</p>
-                        <p className="text-[11px] text-rose-200/90 mt-0.5">{marketQuoteError}</p>
-                        <button
-                          type="button"
-                          onClick={handleQuoteMarketEcuador}
-                          className="mt-2 text-[11px] font-bold text-white underline hover:text-rose-100 cursor-pointer"
-                        >
-                          Reintentar cotización
-                        </button>
-                      </div>
-                    </div>
-                  ) : marketQuote ? (
-                    <div className="space-y-3 relative z-10">
-                      {/* Rango de Mercado */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-2.5 text-center">
-                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
-                            Mínimo Local
-                          </span>
-                          <span className="text-sm font-bold font-mono text-slate-200">
-                            ${marketQuote.minMarketPrice.toFixed(2)}
-                          </span>
-                          <span className="text-[9px] text-slate-400 block mt-0.5">Mercado más bajo</span>
-                        </div>
-
-                        <div className="bg-sky-950/30 border border-sky-500/40 rounded-xl p-2.5 text-center">
-                          <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-300 block mb-0.5">
-                            Promedio EC
-                          </span>
-                          <span className="text-sm font-black font-mono text-sky-300">
-                            ${marketQuote.avgMarketPrice.toFixed(2)}
-                          </span>
-                          <span className="text-[9px] text-sky-200/70 block mt-0.5">Media ecuatoriana</span>
-                        </div>
-
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-2.5 text-center">
-                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
-                            Máximo Retail
-                          </span>
-                          <span className="text-sm font-bold font-mono text-slate-200">
-                            ${marketQuote.maxMarketPrice.toFixed(2)}
-                          </span>
-                          <span className="text-[9px] text-slate-400 block mt-0.5">Comercio formal</span>
-                        </div>
-                      </div>
-
-                      {/* Bloque Destacado: Precio Sugerido y Botón de 1 Clic */}
-                      <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-950/70 to-teal-950/70 border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
-                        <div>
-                          <div className="flex items-center space-x-2 flex-wrap gap-1">
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
-                              PVP Sugerido Competitivo
-                            </span>
-                            <span className="text-[11px] text-slate-200">
-                              Ganancia estimada: <strong className="text-emerald-400 font-mono">+${marketQuote.estimatedProfit.toFixed(2)} USD</strong> (+{marketQuote.profitMarginPercent}%)
-                            </span>
-                          </div>
-                          <div className="flex items-baseline space-x-2 mt-1">
-                            <span className="text-2xl font-black font-mono text-emerald-400 tracking-tight">
-                              ${marketQuote.suggestedSalePrice.toFixed(2)}
-                            </span>
-                            <span className="text-xs text-slate-300 font-bold">USD</span>
-                            <span className="text-[11px] text-slate-400">
-                              (Costo base: ${(parseFloat(costWithTax || costPrice) || 0).toFixed(2)})
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Botón de 1 Clic para autocompletar el PVP */}
-                        <button
-                          type="button"
-                          onClick={() => handleApplySuggestedPrice(marketQuote.suggestedSalePrice)}
-                          className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center space-x-2 shrink-0 cursor-pointer ${
-                            appliedPriceFeedback
-                              ? 'bg-emerald-400 text-slate-950 border border-emerald-300 shadow-emerald-500/20'
-                              : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 border border-emerald-400 hover:scale-[1.02] active:scale-[0.98]'
-                          }`}
-                        >
-                          {appliedPriceFeedback ? (
-                            <>
-                              <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
-                              <span>¡PVP Aplicado al Formulario!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
-                              <span>Aplicar ${marketQuote.suggestedSalePrice.toFixed(2)} al PVP</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Resumen del mercado */}
-                      <div className="bg-white/5 rounded-xl p-3 border border-white/5 space-y-2">
-                        <p className="text-xs text-slate-200 leading-relaxed">
-                          {marketQuote.marketSummary}
-                        </p>
-
-                        {marketQuote.keyTips && marketQuote.keyTips.length > 0 && (
-                          <div className="pt-2 border-t border-white/10">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                              Consejos para venta en Ecuador:
-                            </span>
-                            <ul className="space-y-1">
-                              {marketQuote.keyTips.map((tip, i) => (
-                                <li key={i} className="text-[11px] text-slate-300 flex items-start space-x-1.5">
-                                  <span className="text-emerald-400 font-bold">•</span>
-                                  <span>{tip}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Enlaces y fuentes consultadas */}
-                      {marketQuote.sources && marketQuote.sources.length > 0 && (
-                        <div className="pt-1 flex items-center flex-wrap gap-1.5">
-                          <span className="text-[10px] text-slate-400">Fuentes consultadas:</span>
-                          {marketQuote.sources.map((src, idx) => (
-                            <a
-                              key={idx}
-                              href={src.url || `https://listado.mercadolibre.com.ec/${encodeURIComponent(name)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center space-x-1 text-[10px] text-sky-300 hover:text-sky-200 bg-sky-950/40 hover:bg-sky-900/60 px-2 py-0.5 rounded-lg border border-sky-700/30 transition cursor-pointer"
-                            >
-                              <span>{src.title}</span>
-                              <ExternalLink className="w-2.5 h-2.5 ml-0.5" />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              {/* ========================================================================= */}
-              {/* CONFIGURACIÓN DE IVA PARA VENTA AL PÚBLICO (TASA DIRECTA DE NATURALEZA)    */}
-              {/* ========================================================================= */}
-              <div className="p-3.5 rounded-2xl border bg-amber-50/80 border-amber-300 shadow-2xs space-y-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center space-x-2 flex-wrap">
-                      <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <Receipt className="w-3.5 h-3.5 text-amber-700" />
-                        <span>Tarifa IVA en Venta al Público</span>
-                      </span>
-                      <span className="text-[10px] font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-full font-mono">
-                        {saleTaxPercent > 0 ? `+${saleTaxPercent}% IVA` : '0% Exento'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 mt-0.5">
-                      Define la tarifa del IVA registrada para la facturación al público de este producto (0%, 5%, 8%, 15% o personalizada).
-                    </p>
-                  </div>
-
-                  {/* Campo de porcentaje de IVA para Venta */}
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <div className="flex flex-col items-start sm:items-end">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="text-[11px] font-bold text-slate-700">Tasa IVA Venta:</span>
-                        <div className="relative w-20">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.5"
-                            value={saleTaxPercent}
-                            onChange={(e) => handleSaleTaxPercentChange(Math.max(0, Number(e.target.value)))}
-                            className="w-full border rounded-xl pl-2.5 pr-6 py-1.5 text-xs font-mono font-black transition text-center bg-white border-amber-400 text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-2xs"
-                          />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
-                        </div>
+                      <div className="flex-1 flex flex-wrap gap-1">
+                        {DISCOUNT_PRESETS.map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => handleDiscountChange(d)}
+                            className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition cursor-pointer shrink-0 ${
+                              discountPercent === d
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-rose-50 hover:text-rose-700'
+                            }`}
+                          >
+                            {d === 0 ? 'Sin desc.' : `-${d}%`}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Presets rápidos de tasas de IVA y desglose dinámico */}
-                <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                    <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider">Tarifas SRI:</span>
-                    {[0, 5, 8, 12, 15].map((rate) => (
-                      <button
-                        key={rate}
-                        type="button"
-                        onClick={() => handleSaleTaxPercentChange(rate)}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition cursor-pointer ${
-                          saleTaxPercent === rate
-                            ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                            : 'bg-white text-slate-700 border-amber-200 hover:bg-amber-100 hover:text-amber-950'
-                        }`}
-                      >
-                        {rate === 0 ? '0% Exento' : `${rate}%`}
-                      </button>
-                    ))}
+                {/* ========================================================================= */}
+                {/* RESUMEN AUTOCALCULADO SRI (SOLO LECTURA / NO MODIFICABLE DE NINGUNA FORMA) */}
+                {/* ========================================================================= */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 via-slate-850 to-purple-950 text-white border border-slate-800 shadow-md space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 flex-wrap gap-2">
+                    <div className="flex items-center space-x-2">
+                      <Lock className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-purple-300">
+                        Valores Autocalculados SRI (No Modificables)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleQuoteMarketEcuador}
+                      disabled={isQuotingMarket}
+                      className="inline-flex items-center space-x-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 transition cursor-pointer shadow-2xs"
+                      title="Cotizar en el mercado de Ecuador con IA"
+                    >
+                      <Sparkles className="w-3 h-3 text-sky-300" />
+                      <span>{isQuotingMarket ? 'Cotizando...' : 'Cotizar Mercado EC (IA)'}</span>
+                    </button>
                   </div>
 
-                  <div className="flex items-center space-x-2 text-[11px] font-mono bg-white/90 px-2.5 py-1 rounded-lg border border-amber-200 text-slate-700 shadow-2xs">
-                    <span>Base Sin IVA: <strong>${salePriceWithoutTax.toFixed(2)}</strong></span>
-                    <span className="text-amber-700 font-bold">+ IVA Venta ({saleTaxPercent}%): <strong>${saleTaxAmount.toFixed(2)}</strong></span>
-                    <span className="text-slate-400">=</span>
-                    <span className="text-emerald-800 font-black">PVP: ${pvpNum.toFixed(2)}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center font-mono">
+                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+                      <span className="text-[10px] text-slate-400 block uppercase font-sans font-bold mb-0.5">Costo Con IVA</span>
+                      <span className="text-sm font-bold text-amber-300">${costTotalPaidToSupplier.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+                      <span className="text-[10px] text-slate-400 block uppercase font-sans font-bold mb-0.5">Base Sin IVA</span>
+                      <span className="text-sm font-bold text-sky-300">${publishedPriceSinIVA.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+                      <span className="text-[10px] text-slate-400 block uppercase font-sans font-bold mb-0.5">IVA ({activeTaxRate}%)</span>
+                      <span className="text-sm font-bold text-emerald-300">${saleTaxAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-emerald-500/20 p-2.5 rounded-xl border border-emerald-500/40">
+                      <span className="text-[10px] text-emerald-300 block uppercase font-sans font-black mb-0.5">PVP Final SRI</span>
+                      <span className="text-base font-black text-emerald-400">${totalClientePaid.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -1873,97 +1636,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
             </div>
 
-            {/* Descuento por Porcentaje en Oferta (Tienda Online) */}
-            <div className="sm:col-span-2 p-3.5 rounded-2xl bg-gradient-to-r from-rose-50/80 via-rose-50/40 to-amber-50/60 border border-rose-200/90 shadow-2xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-rose-950 flex items-center space-x-1.5">
-                  <BadgePercent className="w-4 h-4 text-rose-600" />
-                  <span>Descuento Promocional en Tienda (%)</span>
-                </label>
-                {discountNum > 0 ? (
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-rose-600 text-white shadow-2xs">
-                    <Flame className="w-3 h-3 fill-current animate-pulse text-amber-300" />
-                    <span>OFERTA -{discountNum}%</span>
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                    Sin oferta (0%)
-                  </span>
-                )}
-              </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <div className="flex items-center space-x-1.5">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={discountPercent}
-                    onChange={(e) => {
-                      const val = Math.max(0, Math.min(99, Number(e.target.value) || 0));
-                      handleDiscountChange(val);
-                    }}
-                    placeholder="0"
-                    className="w-24 bg-white border border-rose-300 rounded-xl px-3 py-2 text-sm text-rose-950 font-bold focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono transition shadow-2xs"
-                  />
-                  <span className="text-sm font-bold text-rose-800 font-mono">%</span>
-                </div>
-
-                <div className="flex-1 flex space-x-1 overflow-x-auto py-0.5 scrollbar-thin">
-                  {DISCOUNT_PRESETS.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => handleDiscountChange(d)}
-                      className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg border transition cursor-pointer flex-shrink-0 ${
-                        discountNum === d
-                          ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50 hover:border-rose-300'
-                      }`}
-                    >
-                      {d === 0 ? '0% (Normal)' : `-${d}%`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dynamic Price Preview & Profit / Loss Status */}
-              {discountNum > 0 ? (
-                <div className="space-y-2">
-                  <div className="p-3 bg-white rounded-xl border border-rose-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-slate-500 font-medium">PVP Normal:</span>
-                      <span className="line-through text-slate-400 font-mono font-medium">${pvpNum.toFixed(2)}</span>
-                      <span className="text-slate-400">→</span>
-                      <span className="text-rose-950 font-bold">Precio Oferta:</span>
-                      <span className="font-black text-rose-600 text-sm font-mono">${effectivePvp.toFixed(2)}</span>
-                    </div>
-
-                    {isLoss ? (
-                      <span className="inline-flex items-center space-x-1 text-[11px] font-black text-rose-700 font-mono bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-300 animate-pulse">
-                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                        <span>PÉRDIDA: -${Math.abs(effectiveUnitProfit).toFixed(2)}/u</span>
-                      </span>
-                    ) : isBreakEven ? (
-                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-amber-800 font-mono bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300">
-                        <Scale className="w-3.5 h-3.5 text-amber-700" />
-                        <span>EQUILIBRIO: $0.00/u</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-800 font-mono bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300">
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Ganancia tras oferta: +${effectiveUnitProfit.toFixed(2)}/u ({effectiveMarginPercent.toFixed(1)}%)</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[11px] text-slate-500 font-medium">
-                  💡 Los productos con descuento ({'>'} 0%) se mostrarán <strong>primero en la tienda online</strong> con una etiqueta llamativa de <strong>OFERTA</strong>.
-                </p>
-              )}
-            </div>
 
             {/* Panel de Existencias & Stock (Requirement #3) */}
             <div className="sm:col-span-2 space-y-2 p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200">

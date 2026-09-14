@@ -113,17 +113,9 @@ export function calculatePriceFromProfitTarget(params: {
   if (params.mode === 'FIXED_DOLLAR') {
     unitProfitAmount = val;
     unitPriceWithoutTax = roundMonetary(cost + val);
-  } else if (params.mode === 'MARKUP_PERCENT') {
+  } else if (params.mode === 'MARKUP_PERCENT' || params.mode === 'MARGIN_PERCENT') {
     unitProfitAmount = roundMonetary(cost * (val / 100));
     unitPriceWithoutTax = roundMonetary(cost + unitProfitAmount);
-  } else if (params.mode === 'MARGIN_PERCENT') {
-    const marginRate = val / 100;
-    if (marginRate >= 1) {
-      unitPriceWithoutTax = roundMonetary(cost * 2);
-    } else {
-      unitPriceWithoutTax = roundMonetary(cost / (1 - marginRate));
-    }
-    unitProfitAmount = roundMonetary(unitPriceWithoutTax - cost);
   }
   
   const markupPercent = cost > 0 ? roundMonetary(((unitPriceWithoutTax - cost) / cost) * 100) : 0;
@@ -148,28 +140,30 @@ export function extractBaseUnitPriceWithoutTax(params: {
   applySaleTax?: boolean;
   saleTaxPercent?: number;
   marginPercent?: number;
+  pricingMode?: 'EXCLUDING_TAX' | 'INCLUDING_TAX';
 }): { unitPriceWithoutTax: number; marginPercent: number } {
   const cost = Math.max(0, Number(params.costWithoutTax) || 0);
   const rawSale = Math.max(0, Number(params.rawSalePrice) || 0);
-  const applyTax = params.applySaleTax !== false;
-  const taxPct = applyTax ? Math.max(0, Number(params.saleTaxPercent ?? 15)) : 0;
 
-  // 1. Si se especifica el margen %, calcular directamente sobre el costo sin IVA
+  // 1. Si se especifica el margen %, calcular directamente sobre el costo sin IVA (Costo + Utilidad)
   if (params.marginPercent !== undefined && params.marginPercent > 0 && cost > 0) {
     const margin = Number(params.marginPercent);
     const unitPriceWithoutTax = roundMonetary(cost * (1 + margin / 100));
     return { unitPriceWithoutTax, marginPercent: margin };
   }
 
-  // 2. Si se tiene un rawSale (PVP o precio de catálogo)
+  // 2. Si la modalidad de precio es explícitamente INCLUDING_TAX, desglosar el IVA
+  if (params.pricingMode === 'INCLUDING_TAX' && rawSale > 0) {
+    const applyTax = params.applySaleTax !== false;
+    const taxPct = applyTax ? Math.max(0, Number(params.saleTaxPercent ?? 15)) : 0;
+    const deconstructed = deconstructInclusivePrice(rawSale, taxPct);
+    const unitPriceWithoutTax = deconstructed.priceWithoutTax;
+    const margin = cost > 0 ? roundMonetary(((unitPriceWithoutTax - cost) / cost) * 100) : 0;
+    return { unitPriceWithoutTax, marginPercent: margin };
+  }
+
+  // 3. rawSale (PVP sin IVA) absorbe el Costo + Utilidad del producto directamente
   if (rawSale > 0) {
-    if (taxPct > 0 && cost > 0 && rawSale > cost * (1 + taxPct / 100) - 0.01) {
-      // rawSale es un PVP final con IVA incluido (e.g., $13.80 para costo $10 + 20% margen + 15% IVA)
-      const deconstructed = deconstructInclusivePrice(rawSale, taxPct);
-      const unitPriceWithoutTax = deconstructed.priceWithoutTax;
-      const margin = cost > 0 ? roundMonetary(((unitPriceWithoutTax - cost) / cost) * 100) : 0;
-      return { unitPriceWithoutTax, marginPercent: margin };
-    }
     const margin = cost > 0 ? roundMonetary(((rawSale - cost) / cost) * 100) : 0;
     return { unitPriceWithoutTax: roundMonetary(rawSale), marginPercent: margin };
   }
@@ -180,6 +174,12 @@ export function extractBaseUnitPriceWithoutTax(params: {
 
 /**
  * Calcula de forma completa y precisa todos los valores tributarios y comerciales de un ítem.
+ * Flujo:
+ * 1. Base Unitaria (PVP Sin IVA) = Costo + Utilidad.
+ * 2. Base Imponible Unitaria Neta = (Costo + Utilidad) - Descuento ($).
+ * 3. Subtotal de Línea = Base Imponible Unitaria Neta * Cantidad.
+ * 4. IVA Amount = Subtotal de Línea * (Tarifa IVA % / 100).
+ * 5. Total de Línea = Subtotal de Línea + IVA Amount.
  */
 export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLineItemResult {
   const qty = Math.max(1, Math.round(Number(input.quantity) || 1));
@@ -202,11 +202,14 @@ export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLin
     costWithoutTax = deconstructed.priceWithoutTax;
   }
   
-  // 2. Resolver Precio Unitario de Lista (PVP sin IVA)
+  // 2. Resolver Precio Unitario de Lista (PVP sin IVA = Costo + Utilidad / (1 - Descuento%))
   let unitPriceWithoutTax = 0;
   let unitPriceWithTax = 0;
   
-  if (input.unitSalePrice !== undefined && input.unitSalePrice >= 0) {
+  const discountPct = input.discountPercent !== undefined && input.discountPercent > 0 ? Number(input.discountPercent) : 0;
+  const discountRate = Math.max(0, Math.min(0.99, discountPct / 100));
+
+  if (input.unitSalePrice !== undefined && Number(input.unitSalePrice) > 0) {
     const rawPrice = Number(input.unitSalePrice);
     if (input.pricingMode === 'INCLUDING_TAX') {
       unitPriceWithTax = roundMonetary(rawPrice);
@@ -216,13 +219,22 @@ export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLin
       unitPriceWithoutTax = roundMonetary(rawPrice);
       unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
     }
+  } else if (input.marginPercent !== undefined && Number(input.marginPercent) > 0 && costWithoutTax > 0) {
+    const margin = Number(input.marginPercent);
+    const targetNetPriceWithoutTax = roundMonetary(costWithoutTax * (1 + margin / 100));
+    unitPriceWithoutTax = discountRate > 0 ? roundMonetary(targetNetPriceWithoutTax / (1 - discountRate)) : targetNetPriceWithoutTax;
+    unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
   } else if (input.profitValue !== undefined && input.profitCalculationMode) {
     const fromProfit = calculatePriceFromProfitTarget({
       costWithoutTax,
       profitValue: input.profitValue,
       mode: input.profitCalculationMode,
     });
-    unitPriceWithoutTax = fromProfit.unitPriceWithoutTax;
+    const targetNetPriceWithoutTax = fromProfit.unitPriceWithoutTax;
+    unitPriceWithoutTax = discountRate > 0 ? roundMonetary(targetNetPriceWithoutTax / (1 - discountRate)) : targetNetPriceWithoutTax;
+    unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
+  } else {
+    unitPriceWithoutTax = costWithoutTax;
     unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
   }
   
@@ -235,7 +247,7 @@ export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLin
   }
   unitDiscount = Math.min(unitDiscount, unitPriceWithoutTax); // No exceder PVP
   
-  // 4. Base Imponible Unitaria (Net Unit Price)
+  // 4. Base Imponible Unitaria (Net Unit Price) = (Costo + Utilidad) - Descuento
   const netUnitPrice = roundMonetary(Math.max(0, unitPriceWithoutTax - unitDiscount));
   
   // 5. Métricas de Utilidad
@@ -337,3 +349,69 @@ export function calculateInvoiceTotals(
     totalUnits,
   };
 }
+
+/**
+ * Extrae de forma unificada y segura la tarifa de IVA (15, 0, etc.) de un ítem de pedido o producto.
+ * Analiza tanto propiedades directas en el ítem como en it.item (subItem) o productos emparejados.
+ */
+export function extractItemTaxPercent(it: any, defaultTaxPercent: number = 15, matchProduct?: any): number {
+  if (!it && !matchProduct) return defaultTaxPercent;
+
+  const subItem = it && it.item && typeof it.item === 'object' ? it.item : {};
+  const match = matchProduct && typeof matchProduct === 'object' ? matchProduct : {};
+
+  const parseTaxValue = (val: any): number | null => {
+    if (val === undefined || val === null || val === '') return null;
+    if (typeof val === 'number') return isNaN(val) ? null : val;
+    if (typeof val === 'string') {
+      const cleanStr = val.replace('%', '').trim();
+      const num = Number(cleanStr);
+      return isNaN(num) ? null : num;
+    }
+    return null;
+  };
+
+  // 1. Verificar saleTaxPercent o purchaseTaxPercent explícito
+  const taxVal = parseTaxValue(
+    it?.saleTaxPercent ?? subItem?.saleTaxPercent ?? match?.saleTaxPercent ??
+    it?.purchaseTaxPercent ?? subItem?.purchaseTaxPercent ?? match?.purchaseTaxPercent
+  );
+  if (taxVal !== null) return taxVal;
+
+  // 2. Verificar taxRate
+  const taxRateVal = parseTaxValue(it?.taxRate ?? subItem?.taxRate ?? match?.taxRate);
+  if (taxRateVal !== null) return taxRateVal;
+
+  // 3. Verificar taxPercent
+  const taxPctVal = parseTaxValue(it?.taxPercent ?? subItem?.taxPercent ?? match?.taxPercent);
+  if (taxPctVal !== null) return taxPctVal;
+
+  // 4. Verificar tax (numérico <= 100)
+  const taxDirectVal = parseTaxValue(it?.tax ?? subItem?.tax ?? match?.tax);
+  if (taxDirectVal !== null && taxDirectVal <= 100) return taxDirectVal;
+
+  // 5. Flags booleanos de IVA 0% (Exento / Sin IVA)
+  if (
+    it?.applySaleTax === false || subItem?.applySaleTax === false || match?.applySaleTax === false ||
+    it?.hasPurchaseTax === false || subItem?.hasPurchaseTax === false || match?.hasPurchaseTax === false ||
+    it?.applyTax === false || subItem?.applyTax === false || match?.applyTax === false ||
+    it?.hasTax === false || subItem?.hasTax === false || match?.hasTax === false ||
+    it?.hasSaleTax === false || subItem?.hasSaleTax === false || match?.hasSaleTax === false
+  ) {
+    return 0;
+  }
+
+  // 6. Flags booleanos de IVA (Aplica IVA)
+  if (
+    it?.applySaleTax === true || subItem?.applySaleTax === true || match?.applySaleTax === true ||
+    it?.hasPurchaseTax === true || subItem?.hasPurchaseTax === true || match?.hasPurchaseTax === true ||
+    it?.applyTax === true || subItem?.applyTax === true || match?.applyTax === true ||
+    it?.hasTax === true || subItem?.hasTax === true || match?.hasTax === true ||
+    it?.hasSaleTax === true || subItem?.hasSaleTax === true || match?.hasSaleTax === true
+  ) {
+    return 15;
+  }
+
+  return defaultTaxPercent;
+}
+

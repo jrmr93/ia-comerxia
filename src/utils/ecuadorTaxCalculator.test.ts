@@ -6,6 +6,7 @@ import {
   deconstructInclusivePrice,
   roundMonetary,
   extractBaseUnitPriceWithoutTax,
+  extractItemTaxPercent,
 } from './ecuadorTaxCalculator.ts';
 
 describe('Motor de Cálculo Tributario SRI Ecuador (Pruebas Unitarias)', () => {
@@ -204,17 +205,68 @@ describe('Motor de Cálculo Tributario SRI Ecuador (Pruebas Unitarias)', () => {
     expect(invoice.totalInvoiceAmount).toBe(13.80);
   });
 
-  // 9. Extraer Valor Unitario Sin IVA desde PVP con IVA ($13.80 -> $12.00 Base Sin IVA)
-  test('Caso 9: Extraer Valor Unitario Sin IVA cuando el precio ingresado es PVP con IVA ($13.80 con 15% IVA -> $12.00 Base Sin IVA)', () => {
-    const extracted = extractBaseUnitPriceWithoutTax({
-      rawSalePrice: 13.80,
+  // 9. Extraer Valor Unitario Sin IVA desde producto (Costo + Utilidad = $12.00 Base Sin IVA)
+  test('Caso 9: Extraer Valor Unitario Sin IVA absorbiendo Costo + Utilidad directamente de los productos', () => {
+    const extractedDirect = extractBaseUnitPriceWithoutTax({
+      rawSalePrice: 12.00,
       costWithoutTax: 10.00,
       applySaleTax: true,
       saleTaxPercent: 15,
     });
 
-    expect(extracted.unitPriceWithoutTax).toBe(12.00);
-    expect(extracted.marginPercent).toBe(20.00);
+    expect(extractedDirect.unitPriceWithoutTax).toBe(12.00);
+    expect(extractedDirect.marginPercent).toBe(20.00);
+
+    const extractedInclusive = extractBaseUnitPriceWithoutTax({
+      rawSalePrice: 13.80,
+      costWithoutTax: 10.00,
+      pricingMode: 'INCLUDING_TAX',
+      applySaleTax: true,
+      saleTaxPercent: 15,
+    });
+
+    expect(extractedInclusive.unitPriceWithoutTax).toBe(12.00);
+    expect(extractedInclusive.marginPercent).toBe(20.00);
+  });
+
+  // 10. Extracción Unificada de Tarifa de IVA de Ítems
+  test('Caso 10: Extracción unificada de IVA de ítems con tarifa 0% vs 15% y estructuras anidadas', () => {
+    // 1. saleTaxPercent directo = 0
+    expect(extractItemTaxPercent({ saleTaxPercent: 0 }, 15)).toBe(0);
+    // 2. taxRate = "0.00"
+    expect(extractItemTaxPercent({ taxRate: '0.00' }, 15)).toBe(0);
+    // 3. SubItem con saleTaxPercent = 0
+    expect(extractItemTaxPercent({ item: { saleTaxPercent: 0 } }, 15)).toBe(0);
+    // 4. SubItem con taxRate = 0
+    expect(extractItemTaxPercent({ item: { taxRate: 0 } }, 15)).toBe(0);
+    // 5. Flag applySaleTax = false
+    expect(extractItemTaxPercent({ item: { applySaleTax: false } }, 15)).toBe(0);
+    // 6. Matched product con taxRate = 0
+    expect(extractItemTaxPercent({}, 15, { taxRate: 0 })).toBe(0);
+    // 7. Normal item 15%
+    expect(extractItemTaxPercent({ saleTaxPercent: 15 }, 15)).toBe(15);
+  });
+
+  // 11. Preservación de Utilidad Objetivo ante Descuentos
+  test('Caso 11: El descuento aplicado NUNCA reduce ni afecta la utilidad objetivo esperada', () => {
+    // Costo sin IVA = $100, Margen = 30% ($30 utilidad esperada), Descuento = 20%
+    const item = calculateLineItem({
+      costWithoutTax: 100,
+      marginPercent: 30,
+      discountPercent: 20,
+      quantity: 1,
+      applySaleTax: true,
+      saleTaxPercent: 15,
+    });
+
+    // La base neta debe ser $130 (Costo $100 + Utilidad $30)
+    expect(item.netUnitPrice).toBe(130.0);
+    // La utilidad ganada debe ser exactamente de $30 (NO reducida por el 20% de descuento)
+    expect(item.unitProfitAmount).toBe(30.0);
+    // El precio de lista sin IVA debió calcularse en $162.50 para permitir un 20% de descuento ($32.50)
+    expect(item.unitPriceWithoutTax).toBe(162.5);
+    expect(item.unitDiscount).toBe(32.5);
   });
 });
+
 

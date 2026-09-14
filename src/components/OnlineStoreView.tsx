@@ -88,6 +88,7 @@ import { OrdersCardsView } from './OrdersCardsView.tsx';
 import { PartialDeliveryModal } from './PartialDeliveryModal.tsx';
 import { ShippingTicketModal, directPrintShippingTicket } from './ShippingTicketModal.tsx';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
+import { OrderPrintA4Modal } from './OrderPrintA4Modal.tsx';
 import { RequestShippingDataModal } from './RequestShippingDataModal.tsx';
 import { ManageShippingGuideModal } from './ManageShippingGuideModal.tsx';
 import { ManagePendingShippingModal } from './ManagePendingShippingModal.tsx';
@@ -946,9 +947,9 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
           const lastY = lastOrderScrollYRef.current;
           if (scrollY <= 50) {
             setOrderScrollDirection('top');
-          } else if (scrollY > lastY + 6 && scrollY > 75) {
+          } else if (scrollY > lastY + 3 && scrollY > 50) {
             setOrderScrollDirection('down');
-          } else if (scrollY < lastY - 6) {
+          } else if (scrollY < lastY - 3) {
             setOrderScrollDirection('up');
           }
           lastOrderScrollYRef.current = scrollY;
@@ -1026,6 +1027,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
   // Partial Delivery modal state & handlers
   const [orderForPartialDelivery, setOrderForPartialDelivery] = useState<CustomerOrder | null>(null);
+  const [orderToPrintA4, setOrderToPrintA4] = useState<CustomerOrder | null>(null);
 
   const handleCompleteRemainingDelivery = async (order: CustomerOrder) => {
     const isPickup = isPickupDeliveryOrder(order);
@@ -4414,7 +4416,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 : orderScrollDirection === 'up'
                 ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
                 : `${isCustomerOnly ? 'top-0' : 'top-16'} z-20 translate-y-0 opacity-100`
-            } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2.5 sm:p-3 space-y-2 shadow-sm transition-all duration-300 transform max-w-full`}
+            } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
           >
             {/* Barra 1: Búsqueda y Selector de Vista */}
             <div className="flex items-center gap-1.5 sm:gap-2 w-full">
@@ -4426,7 +4428,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                   value={orderSearchQuery}
                   onChange={(e) => setOrderSearchQuery(e.target.value)}
                   placeholder="Buscar por # orden, cliente, teléfono, producto..."
-                  className="w-full pl-8.5 sm:pl-9 pr-8 sm:pr-14 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:bg-white transition font-medium"
+                  className="w-full pl-8.5 sm:pl-9 pr-8 sm:pr-14 py-1.5 sm:py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:bg-white transition font-medium"
                 />
                 {orderSearchQuery && (
                   <button
@@ -4444,31 +4446,31 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               </div>
 
               {/* View Mode Switcher */}
-              <div className="flex items-center space-x-1 bg-slate-100 border border-slate-300 p-1 rounded-xl flex-shrink-0">
+              <div className="flex items-center space-x-1 bg-slate-100 border border-slate-300 p-0.5 sm:p-1 rounded-xl flex-shrink-0">
                 <button
                   onClick={() => setOrderViewMode('cards')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
                     orderViewMode === 'cards'
-                      ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                      ? 'bg-white text-sky-900 shadow-xs border border-slate-200/60 font-black'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  title="Vista en Tarjetas"
+                  title="Vista en Paneles / Tarjetas uniformes"
                 >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span className="hidden xs:inline">Tarjetas</span>
+                  <LayoutGrid className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                  <span>Paneles</span>
                 </button>
 
                 <button
                   onClick={() => setOrderViewMode('table')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
                     orderViewMode === 'table'
-                      ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                      ? 'bg-white text-indigo-900 shadow-xs border border-slate-200/60 font-black'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  title="Vista en Lista / Tabla"
+                  title="Vista Tipo Factura / Lista Detallada con desglose fiscal"
                 >
-                  <List className="w-3.5 h-3.5" />
-                  <span className="hidden xs:inline">Lista</span>
+                  <Receipt className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>Facturas</span>
                 </button>
               </div>
             </div>
@@ -4661,14 +4663,15 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               onOpenShippingCost={handleOpenShippingCost}
               onOpenPendingShipping={handleOpenConfirmOrder}
               onOpenPrintShippingTicket={(ord) => setOrderToPrintShipping(ord)}
-              onOpenPrintA4Order={(ord) =>
+              onOpenPrintA4Order={(ord) => {
+                setOrderToPrintA4(ord);
                 directPrintOrder({
                   order: ord,
                   storeConfig,
                   currency: storeConfig?.currency || currency || 'USD',
                   showToast,
-                })
-              }
+                });
+              }}
               onOpenRequestShippingData={(ord) => setOrderToRequestShippingData(ord)}
               onUpdateStatus={async (orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes) => {
                 await onUpdateOrderStatus(orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes);
@@ -4698,14 +4701,15 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               onOpenShippingCost={handleOpenShippingCost}
               onOpenPendingShipping={handleOpenConfirmOrder}
               onOpenPrintShippingTicket={(ord) => setOrderToPrintShipping(ord)}
-              onOpenPrintA4Order={(ord) =>
+              onOpenPrintA4Order={(ord) => {
+                setOrderToPrintA4(ord);
                 directPrintOrder({
                   order: ord,
                   storeConfig,
                   currency: storeConfig?.currency || currency || 'USD',
                   showToast,
-                })
-              }
+                });
+              }}
               onOpenRequestShippingData={(ord) => setOrderToRequestShippingData(ord)}
               onUpdateStatus={async (orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes) => {
                 await onUpdateOrderStatus(orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes);
@@ -6741,6 +6745,16 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
           whatsappNumber={storeConfig?.whatsappNumber}
           storeName={storeConfig?.storeName}
           activeTheme={activeTheme}
+        />
+      )}
+
+      {orderToPrintA4 && (
+        <OrderPrintA4Modal
+          order={orderToPrintA4}
+          storeConfig={storeConfig}
+          currency={currency}
+          onClose={() => setOrderToPrintA4(null)}
+          showToast={showToast}
         />
       )}
     </div>

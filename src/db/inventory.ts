@@ -225,12 +225,19 @@ export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item:
     } catch {}
   }
 
-  if (hasPurchaseTax === undefined) {
-    hasPurchaseTax = taxRate > 0;
-  }
-  if (purchaseTaxPercent === undefined) {
-    purchaseTaxPercent = taxRate > 0 ? taxRate : 15.0;
-  }
+  const unifiedRate = saleTaxPercent !== undefined && !isNaN(Number(saleTaxPercent))
+    ? Number(saleTaxPercent)
+    : purchaseTaxPercent !== undefined && !isNaN(Number(purchaseTaxPercent))
+    ? Number(purchaseTaxPercent)
+    : taxRate;
+
+  const unifiedHasTax = applySaleTax !== undefined
+    ? Boolean(applySaleTax)
+    : hasPurchaseTax !== undefined
+    ? Boolean(hasPurchaseTax)
+    : unifiedRate > 0;
+
+  const finalTaxRate = unifiedHasTax ? unifiedRate : 0;
 
   if (costWithoutTax === undefined || costWithoutTax === null || costWithTax === undefined || costWithTax === null) {
     const costNum = parseFloat(String(item.costPrice || '0')) || 0;
@@ -239,7 +246,7 @@ export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item:
     }
     if (!costWithoutTax) {
       const numWith = parseFloat(String(costWithTax)) || costNum;
-      costWithoutTax = (numWith / (1 + taxRate / 100)).toFixed(2);
+      costWithoutTax = (numWith / (1 + finalTaxRate / 100)).toFixed(2);
     }
   }
 
@@ -247,11 +254,11 @@ export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item:
     ...item,
     costWithoutTax: costWithoutTax ? String(Number(costWithoutTax).toFixed(2)) : '0.00',
     costWithTax: costWithTax ? String(Number(costWithTax).toFixed(2)) : '0.00',
-    taxRate: String(taxRate.toFixed(2)),
-    hasPurchaseTax: Boolean(hasPurchaseTax),
-    purchaseTaxPercent: Number(purchaseTaxPercent),
-    applySaleTax: applySaleTax !== undefined ? Boolean(applySaleTax) : false,
-    saleTaxPercent: saleTaxPercent !== undefined && !isNaN(Number(saleTaxPercent)) ? Number(saleTaxPercent) : taxRate,
+    taxRate: String(finalTaxRate.toFixed(2)),
+    hasPurchaseTax: Boolean(unifiedHasTax),
+    purchaseTaxPercent: Number(finalTaxRate),
+    applySaleTax: Boolean(unifiedHasTax),
+    saleTaxPercent: Number(finalTaxRate),
   };
 }
 
@@ -1230,11 +1237,21 @@ export async function createInventoryItem(data: {
     (data as any).hasPurchaseTax !== undefined ||
     (data as any).purchaseTaxPercent !== undefined
   ) {
+    const rawRate = (data as any).saleTaxPercent !== undefined
+      ? Number((data as any).saleTaxPercent)
+      : ((data as any).purchaseTaxPercent !== undefined ? Number((data as any).purchaseTaxPercent) : taxRateNum);
+
+    const hasTax = (data as any).applySaleTax !== undefined
+      ? Boolean((data as any).applySaleTax)
+      : ((data as any).hasPurchaseTax !== undefined ? Boolean((data as any).hasPurchaseTax) : rawRate > 0);
+
+    const effectiveRate = hasTax ? rawRate : 0;
+
     effectiveExtractedAttributes = JSON.stringify({
-      applySaleTax: Boolean((data as any).applySaleTax),
-      saleTaxPercent: Number((data as any).saleTaxPercent) || taxRateNum,
-      hasPurchaseTax: (data as any).hasPurchaseTax !== undefined ? Boolean((data as any).hasPurchaseTax) : taxRateNum > 0,
-      purchaseTaxPercent: Number((data as any).purchaseTaxPercent) || taxRateNum,
+      applySaleTax: hasTax,
+      saleTaxPercent: effectiveRate,
+      hasPurchaseTax: hasTax,
+      purchaseTaxPercent: effectiveRate,
     });
   }
 
