@@ -291,6 +291,56 @@ export const ecuadorApiConfigs = pgTable('ecuador_api_configs', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// Configuración de Facturación Electrónica SRI por usuario
+export const sriConfigs = pgTable('sri_configs', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  ruc: text('ruc').default('1700000000001'),
+  razonSocial: text('razon_social').default('COMERXIA E-COMMERCE S.A.'),
+  nombreComercial: text('nombre_comercial').default('COMERXIA ECUADOR'),
+  estab: text('estab').default('001'),
+  ptoEmi: text('pto_emi').default('001'),
+  dirMatriz: text('dir_matriz').default('Quito, Ecuador'),
+  obligadoContabilidad: text('obligado_contabilidad').default('NO'),
+  contribuyenteEspecial: text('contribuyente_especial'),
+  regimenRimpe: text('regimen_rimpe').default('NO'), // 'CONTRIBUYENTE_RIMPE', 'EMPRENDEDOR_RIMPE', 'NEGOCIO_POPULAR_RIMPE', 'NO'
+  ambiente: text('ambiente').default('1'), // '1' = Pruebas, '2' = Producción
+  p12Base64: text('p12_base64'),
+  p12Password: text('p12_password'),
+  p12Filename: text('p12_filename'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Historial y Registro de Facturas Electrónicas Emitidas al SRI
+export const sriInvoices = pgTable('sri_invoices', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  orderId: integer('order_id').references(() => customerOrders.id, { onDelete: 'set null' }),
+  orderNumber: text('order_number'),
+  secuencial: text('secuencial').notNull(),
+  claveAcceso: text('clave_acceso').notNull(),
+  ambiente: text('ambiente').default('1'),
+  customerName: text('customer_name').notNull(),
+  customerCiRuc: text('customer_ci_ruc').notNull(),
+  totalAmount: numeric('total_amount', { precision: 12, scale: 2 }).notNull().default('0.00'),
+  estadoRecepcion: text('estado_recepcion').default('PENDIENTE'), // 'RECIBIDA', 'DEVUELTA', 'ERROR', 'SIMULADO_OK'
+  estadoAutorizacion: text('estado_autorizacion').default('PENDIENTE'), // 'AUTORIZADO', 'NO AUTORIZADO', 'SIMULADO_OK'
+  fechaAutorizacion: timestamp('fecha_autorizacion'),
+  numeroAutorizacion: text('numero_autorizacion'),
+  xmlGenerado: text('xml_generado'),
+  xmlFirmado: text('xml_firmado'),
+  mensajesSri: text('mensajes_sri'), // JSON string array
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+
 
 // Store Analytics Events tracking (visits, product views, cart additions, whatsapp clicks)
 export const storeAnalyticsEvents = pgTable('store_analytics_events', {

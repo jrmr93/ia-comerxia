@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db, isPostgresConfigured } from './index.ts';
-import { aiConfigs, customerOrders, customers, ecuadorApiConfigs, inventoryItems, payments, purchases, serverDomainConfigs, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
+import { aiConfigs, customerOrders, customers, ecuadorApiConfigs, inventoryItems, payments, purchases, serverDomainConfigs, sriConfigs, sriInvoices, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
 import { validateEcuadorId } from '../utils/ecuadorIdValidator.ts';
 import {
@@ -11744,4 +11744,360 @@ export async function syncPaymentsFromOrdersAndPurchases(userId?: number) {
     message: `✓ Conciliación ERP automática completada: ${syncedInflows} cobros de pedidos, ${syncedOutflows} pagos a proveedores y ${syncedRefunds} reembolsos de devoluciones registrados en tesorería.`,
   };
 }
+
+// ==========================================
+// FACTURACIÓN ELECTRÓNICA SRI ECUADOR HELPERS
+// ==========================================
+
+export async function getSriConfig(userId: number = 1) {
+  const state = storage.getState();
+  if (!state.sriConfigs) state.sriConfigs = [];
+
+  let localConfig = state.sriConfigs.find((c: any) => c.userId === userId) || state.sriConfigs[0];
+
+  if (!isPostgresConfigured()) {
+    if (!localConfig) {
+      localConfig = {
+        id: state.nextId?.sriConfigs || 1,
+        userId,
+        ruc: '1700000000001',
+        razonSocial: 'COMERXIA E-COMMERCE S.A.',
+        nombreComercial: 'COMERXIA ECUADOR',
+        estab: '001',
+        ptoEmi: '001',
+        dirMatriz: 'Quito, Ecuador',
+        obligadoContabilidad: 'NO',
+        contribuyenteEspecial: null,
+        regimenRimpe: 'NO',
+        ambiente: '1',
+        p12Base64: null,
+        p12Password: null,
+        p12Filename: null,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      state.sriConfigs.push(localConfig);
+      storage.save();
+    }
+    return {
+      ...localConfig,
+      hasP12Certificate: Boolean(localConfig.p12Base64 && localConfig.p12Base64.length > 0),
+    };
+  }
+
+  try {
+    const configs = await db
+      .select()
+      .from(sriConfigs)
+      .where(eq(sriConfigs.userId, userId))
+      .limit(1);
+
+    let sqlRow = configs.length > 0 ? configs[0] : null;
+    if (!sqlRow) {
+      const anyConfig = await db.select().from(sriConfigs).limit(1);
+      if (anyConfig.length > 0) {
+        sqlRow = anyConfig[0];
+      }
+    }
+
+    if (!sqlRow) {
+      let targetUserId = userId || 1;
+      const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
+      if (userCheck.length === 0) {
+        const anyUser = await db.select({ id: users.id }).from(users).limit(1);
+        if (anyUser.length > 0) {
+          targetUserId = anyUser[0].id;
+        }
+      }
+
+      const created = await db
+        .insert(sriConfigs)
+        .values({
+          userId: targetUserId,
+          ruc: '1700000000001',
+          razonSocial: 'COMERXIA E-COMMERCE S.A.',
+          nombreComercial: 'COMERXIA ECUADOR',
+          estab: '001',
+          ptoEmi: '001',
+          dirMatriz: 'Quito, Ecuador',
+          obligadoContabilidad: 'NO',
+          regimenRimpe: 'NO',
+          ambiente: '1',
+          isActive: true,
+        })
+        .returning();
+
+      sqlRow = created[0];
+    }
+
+    return {
+      ...sqlRow,
+      hasP12Certificate: Boolean(sqlRow.p12Base64 && sqlRow.p12Base64.length > 0),
+    };
+  } catch (error) {
+    console.warn('Error fetching SRI config from SQL, fallback to local state:', error);
+    return {
+      id: localConfig?.id || 1,
+      userId,
+      ruc: localConfig?.ruc || '1700000000001',
+      razonSocial: localConfig?.razonSocial || 'COMERXIA E-COMMERCE S.A.',
+      nombreComercial: localConfig?.nombreComercial || 'COMERXIA ECUADOR',
+      estab: localConfig?.estab || '001',
+      ptoEmi: localConfig?.ptoEmi || '001',
+      dirMatriz: localConfig?.dirMatriz || 'Quito, Ecuador',
+      obligadoContabilidad: localConfig?.obligadoContabilidad || 'NO',
+      regimenRimpe: localConfig?.regimenRimpe || 'NO',
+      ambiente: localConfig?.ambiente || '1',
+      p12Base64: localConfig?.p12Base64 || null,
+      p12Password: localConfig?.p12Password || null,
+      p12Filename: localConfig?.p12Filename || null,
+      isActive: localConfig?.isActive !== false,
+      hasP12Certificate: Boolean(localConfig?.p12Base64 && localConfig.p12Base64.length > 0),
+    };
+  }
+}
+
+export async function saveSriConfig(userId: number = 1, data: any) {
+  const state = storage.getState();
+  if (!state.sriConfigs) state.sriConfigs = [];
+
+  let localConfig = state.sriConfigs.find((c: any) => c.userId === userId);
+
+  if (!localConfig) {
+    localConfig = {
+      id: state.nextId?.sriConfigs ? state.nextId.sriConfigs++ : 1,
+      userId,
+      ruc: data.ruc || '1700000000001',
+      razonSocial: data.razonSocial || 'COMERXIA E-COMMERCE S.A.',
+      nombreComercial: data.nombreComercial || 'COMERXIA ECUADOR',
+      estab: data.estab || '001',
+      ptoEmi: data.ptoEmi || '001',
+      dirMatriz: data.dirMatriz || 'Quito, Ecuador',
+      obligadoContabilidad: data.obligadoContabilidad || 'NO',
+      contribuyenteEspecial: data.contribuyenteEspecial || null,
+      regimenRimpe: data.regimenRimpe || 'NO',
+      ambiente: data.ambiente || '1',
+      p12Base64: data.p12Base64 !== undefined ? data.p12Base64 : null,
+      p12Password: data.p12Password !== undefined ? data.p12Password : null,
+      p12Filename: data.p12Filename !== undefined ? data.p12Filename : null,
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    state.sriConfigs.push(localConfig);
+  } else {
+    if (data.ruc) localConfig.ruc = data.ruc;
+    if (data.razonSocial) localConfig.razonSocial = data.razonSocial;
+    if (data.nombreComercial) localConfig.nombreComercial = data.nombreComercial;
+    if (data.estab) localConfig.estab = data.estab;
+    if (data.ptoEmi) localConfig.ptoEmi = data.ptoEmi;
+    if (data.dirMatriz) localConfig.dirMatriz = data.dirMatriz;
+    if (data.obligadoContabilidad) localConfig.obligadoContabilidad = data.obligadoContabilidad;
+    if (data.contribuyenteEspecial !== undefined) localConfig.contribuyenteEspecial = data.contribuyenteEspecial;
+    if (data.regimenRimpe) localConfig.regimenRimpe = data.regimenRimpe;
+    if (data.ambiente) localConfig.ambiente = data.ambiente;
+    if (data.p12Base64 !== undefined) localConfig.p12Base64 = data.p12Base64;
+    if (data.p12Password !== undefined) localConfig.p12Password = data.p12Password;
+    if (data.p12Filename !== undefined) localConfig.p12Filename = data.p12Filename;
+    if (data.isActive !== undefined) localConfig.isActive = data.isActive;
+    localConfig.updatedAt = new Date().toISOString();
+  }
+  storage.save();
+
+  if (!isPostgresConfigured()) {
+    return localConfig;
+  }
+
+  try {
+    const existing = await getSriConfig(userId);
+
+    if (existing && existing.id) {
+      const updated = await db
+        .update(sriConfigs)
+        .set({
+          ruc: data.ruc || existing.ruc,
+          razonSocial: data.razonSocial || existing.razonSocial,
+          nombreComercial: data.nombreComercial || existing.nombreComercial,
+          estab: data.estab || existing.estab,
+          ptoEmi: data.ptoEmi || existing.ptoEmi,
+          dirMatriz: data.dirMatriz || existing.dirMatriz,
+          obligadoContabilidad: data.obligadoContabilidad || existing.obligadoContabilidad,
+          contribuyenteEspecial: data.contribuyenteEspecial !== undefined ? data.contribuyenteEspecial : existing.contribuyenteEspecial,
+          regimenRimpe: data.regimenRimpe || existing.regimenRimpe,
+          ambiente: data.ambiente || existing.ambiente,
+          p12Base64: data.p12Base64 !== undefined ? data.p12Base64 : existing.p12Base64,
+          p12Password: data.p12Password !== undefined ? data.p12Password : existing.p12Password,
+          p12Filename: data.p12Filename !== undefined ? data.p12Filename : existing.p12Filename,
+          isActive: data.isActive !== undefined ? data.isActive : existing.isActive,
+          updatedAt: new Date(),
+        })
+        .where(eq(sriConfigs.id, existing.id))
+        .returning();
+
+      if (updated.length > 0) {
+        return updated[0];
+      }
+    }
+
+    const inserted = await db
+      .insert(sriConfigs)
+      .values({
+        userId,
+        ruc: data.ruc || '1700000000001',
+        razonSocial: data.razonSocial || 'COMERXIA E-COMMERCE S.A.',
+        nombreComercial: data.nombreComercial || 'COMERXIA ECUADOR',
+        estab: data.estab || '001',
+        ptoEmi: data.ptoEmi || '001',
+        dirMatriz: data.dirMatriz || 'Quito, Ecuador',
+        obligadoContabilidad: data.obligadoContabilidad || 'NO',
+        contribuyenteEspecial: data.contribuyenteEspecial || null,
+        regimenRimpe: data.regimenRimpe || 'NO',
+        ambiente: data.ambiente || '1',
+        p12Base64: data.p12Base64 || null,
+        p12Password: data.p12Password || null,
+        p12Filename: data.p12Filename || null,
+        isActive: data.isActive !== undefined ? data.isActive : true,
+      })
+      .returning();
+
+    return inserted[0];
+  } catch (error) {
+    console.error('Error saving SRI config to SQL:', error);
+    return localConfig;
+  }
+}
+
+export async function getNextSriSecuencial(userId: number = 1): Promise<string> {
+  const state = storage.getState();
+  if (!state.sriInvoices) state.sriInvoices = [];
+
+  let count = 0;
+  if (!isPostgresConfigured()) {
+    count = state.sriInvoices.filter((inv: any) => inv.userId === userId).length;
+  } else {
+    try {
+      const records = await db
+        .select({ id: sriInvoices.id })
+        .from(sriInvoices)
+        .where(eq(sriInvoices.userId, userId));
+      count = records.length;
+    } catch {
+      count = state.sriInvoices.length;
+    }
+  }
+
+  const nextSec = count + 1;
+  return nextSec.toString().padStart(9, '0');
+}
+
+export async function createSriInvoice(data: {
+  userId: number;
+  orderId?: number | null;
+  orderNumber?: string | null;
+  secuencial: string;
+  claveAcceso: string;
+  ambiente: string;
+  customerName: string;
+  customerCiRuc: string;
+  totalAmount: string;
+  estadoRecepcion: string;
+  estadoAutorizacion: string;
+  fechaAutorizacion?: string | null;
+  numeroAutorizacion?: string | null;
+  xmlGenerado?: string | null;
+  xmlFirmado?: string | null;
+  mensajesSri?: string | null;
+}) {
+  const state = storage.getState();
+  if (!state.sriInvoices) state.sriInvoices = [];
+
+  const localRecord = {
+    id: state.nextId?.sriInvoices ? state.nextId.sriInvoices++ : state.sriInvoices.length + 1,
+    ...data,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  state.sriInvoices.unshift(localRecord);
+  storage.save();
+
+  if (!isPostgresConfigured()) {
+    return localRecord;
+  }
+
+  try {
+    const inserted = await db
+      .insert(sriInvoices)
+      .values({
+        userId: data.userId,
+        orderId: data.orderId || null,
+        orderNumber: data.orderNumber || null,
+        secuencial: data.secuencial,
+        claveAcceso: data.claveAcceso,
+        ambiente: data.ambiente || '1',
+        customerName: data.customerName,
+        customerCiRuc: data.customerCiRuc,
+        totalAmount: data.totalAmount,
+        estadoRecepcion: data.estadoRecepcion,
+        estadoAutorizacion: data.estadoAutorizacion,
+        fechaAutorizacion: data.fechaAutorizacion ? new Date(data.fechaAutorizacion) : null,
+        numeroAutorizacion: data.numeroAutorizacion || null,
+        xmlGenerado: data.xmlGenerado || null,
+        xmlFirmado: data.xmlFirmado || null,
+        mensajesSri: data.mensajesSri || null,
+      })
+      .returning();
+
+    return inserted[0];
+  } catch (error) {
+    console.error('Error saving SRI invoice record to SQL:', error);
+    return localRecord;
+  }
+}
+
+export async function getSriInvoicesByUser(userId: number = 1) {
+  const state = storage.getState();
+  if (!state.sriInvoices) state.sriInvoices = [];
+
+  if (!isPostgresConfigured()) {
+    return state.sriInvoices
+      .filter((inv: any) => inv.userId === userId)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  try {
+    const records = await db
+      .select()
+      .from(sriInvoices)
+      .where(eq(sriInvoices.userId, userId))
+      .orderBy(desc(sriInvoices.id));
+    return records;
+  } catch (error) {
+    console.warn('Error fetching SRI invoices from SQL, fallback to local state:', error);
+    return state.sriInvoices.filter((inv: any) => inv.userId === userId);
+  }
+}
+
+export async function getSriInvoiceByOrderId(orderId: number) {
+  const state = storage.getState();
+  if (!state.sriInvoices) state.sriInvoices = [];
+
+  if (!isPostgresConfigured()) {
+    return state.sriInvoices.find((inv: any) => inv.orderId === orderId) || null;
+  }
+
+  try {
+    const records = await db
+      .select()
+      .from(sriInvoices)
+      .where(eq(sriInvoices.orderId, orderId))
+      .limit(1);
+    return records.length > 0 ? records[0] : null;
+  } catch (error) {
+    console.warn('Error fetching SRI invoice by orderId from SQL:', error);
+    return state.sriInvoices.find((inv: any) => inv.orderId === orderId) || null;
+  }
+}
+
 

@@ -8,6 +8,9 @@ import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { optionalAuth, requireAuth, requireAdmin, AuthRequest } from './src/middleware/auth.ts';
 import { ensureTablesCreated, getDatabaseRuntimeInfo, testDatabaseConnection } from './src/db/index.ts';
+import { generarClaveAcceso, generarFacturaXml, firmarFacturaXml, generarFirmaSimuladaXml } from './src/utils/sri-signer.ts';
+import { postSoapRequest, parseSriMensajes, SRI_ENDPOINTS } from './src/utils/sri-soap.ts';
+import { generateSriRideHtml } from './src/utils/sri-ride.ts';
 import {
   validateUserCredentials,
   verifyUserPasswordById,
@@ -51,6 +54,12 @@ import {
   updateAiConfig,
   getEcuadorApiConfig,
   saveEcuadorApiConfig,
+  getSriConfig,
+  saveSriConfig,
+  getNextSriSecuencial,
+  createSriInvoice,
+  getSriInvoicesByUser,
+  getSriInvoiceByOrderId,
   autoRegisterCustomerFromEcuadorApi,
   updateInventoryItem,
   saveProductMarketingCopy,
@@ -867,6 +876,400 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error querying Ecuador API by RUC:', error);
       res.status(500).json({ error: error.message || 'Error al consultar RUC en Ecuador API' });
+    }
+  });
+
+  // 1f. Facturación Electrónica SRI Ecuador Endpoints
+  app.get('/api/sri/config', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const cfg = await getSriConfig(req.dbUserId || 1);
+      res.json({
+        success: true,
+        config: {
+          id: cfg.id,
+          userId: cfg.userId,
+          ruc: cfg.ruc,
+          razonSocial: cfg.razonSocial,
+          nombreComercial: cfg.nombreComercial,
+          estab: cfg.estab,
+          ptoEmi: cfg.ptoEmi,
+          dirMatriz: cfg.dirMatriz,
+          obligadoContabilidad: cfg.obligadoContabilidad,
+          contribuyenteEspecial: cfg.contribuyenteEspecial || '',
+          regimenRimpe: cfg.regimenRimpe || 'NO',
+          ambiente: cfg.ambiente || '1',
+          hasP12Certificate: Boolean(cfg.p12Base64 && cfg.p12Base64.length > 0),
+          p12Filename: cfg.p12Filename || '',
+          isActive: cfg.isActive !== false,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching SRI config:', error);
+      res.status(500).json({ error: error.message || 'Error al obtener configuración fiscal del SRI' });
+    }
+  });
+
+  app.post('/api/sri/config', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const {
+        ruc,
+        razonSocial,
+        nombreComercial,
+        estab,
+        ptoEmi,
+        dirMatriz,
+        obligadoContabilidad,
+        contribuyenteEspecial,
+        regimenRimpe,
+        ambiente,
+        p12Base64,
+        p12Password,
+        p12Filename,
+        isActive,
+      } = req.body;
+
+      const updated = await saveSriConfig(req.dbUserId || 1, {
+        ruc,
+        razonSocial,
+        nombreComercial,
+        estab,
+        ptoEmi,
+        dirMatriz,
+        obligadoContabilidad,
+        contribuyenteEspecial,
+        regimenRimpe,
+        ambiente,
+        p12Base64,
+        p12Password,
+        p12Filename,
+        isActive,
+      });
+
+      res.json({
+        success: true,
+        message: 'Configuración fiscal del SRI guardada exitosamente',
+        config: {
+          id: updated.id,
+          ruc: updated.ruc,
+          razonSocial: updated.razonSocial,
+          ambiente: updated.ambiente,
+          hasP12Certificate: Boolean(updated.p12Base64 && updated.p12Base64.length > 0),
+        },
+      });
+    } catch (error: any) {
+      console.error('Error saving SRI config:', error);
+      res.status(400).json({ error: error.message || 'Error al guardar configuración fiscal del SRI' });
+    }
+  });
+
+  app.get('/api/sri/facturas', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const records = await getSriInvoicesByUser(req.dbUserId || 1);
+      res.json({ success: true, invoices: records });
+    } catch (error: any) {
+      console.error('Error listing SRI invoices:', error);
+      res.status(500).json({ error: error.message || 'Error al obtener lista de facturas del SRI' });
+    }
+  });
+
+  app.get('/api/sri/facturas/:id/xml', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const records = await getSriInvoicesByUser(req.dbUserId || 1);
+      const invoice = records.find((inv: any) => inv.id === id);
+
+      if (!invoice) {
+        return res.status(404).json({ error: 'Factura no encontrada' });
+      }
+
+      const xmlContent = invoice.xmlFirmado || invoice.xmlGenerado || '';
+      if (!xmlContent) {
+        return res.status(404).json({ error: 'Contenido XML no disponible para este comprobante' });
+      }
+
+      res.setHeader('Content-Type', 'application/xml');
+      res.setHeader('Content-Disposition', `attachment; filename="Factura_${invoice.claveAcceso}.xml"`);
+      return res.send(xmlContent);
+    } catch (error: any) {
+      console.error('Error downloading SRI invoice XML:', error);
+      res.status(500).json({ error: error.message || 'Error al descargar XML' });
+    }
+  });
+
+  app.get('/api/sri/facturas/:id/ride', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const records = await getSriInvoicesByUser(req.dbUserId || 1);
+      const invoice = records.find((inv: any) => inv.id === id);
+
+      if (!invoice) {
+        return res.status(404).send('Factura no encontrada');
+      }
+
+      const sriConfig = await getSriConfig(req.dbUserId || 1);
+      const storeConfig = await getStoreConfig(req.dbUserId || 1);
+
+      const html = generateSriRideHtml({
+        invoice,
+        sriConfig,
+        storeConfig: storeConfig as any,
+      });
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.send(html);
+    } catch (error: any) {
+      console.error('Error generating SRI invoice RIDE:', error);
+      res.status(500).send(`Error al generar RIDE: ${error.message || error}`);
+    }
+  });
+
+  app.post('/api/sri/emitir/:orderId', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const orderId = parseInt(req.params.orderId, 10);
+      if (isNaN(orderId)) {
+        return res.status(400).json({ error: 'ID de orden inválido' });
+      }
+
+      const orders = await getCustomerOrders(req.dbUserId || 1);
+      const order = orders.find((o: any) => o.id === orderId);
+      if (!order) {
+        return res.status(404).json({ error: `No se encontró la orden de venta con ID #${orderId}` });
+      }
+
+      // Check if invoice already issued
+      const existingInvoice = await getSriInvoiceByOrderId(orderId);
+      if (existingInvoice && existingInvoice.estadoAutorizacion === 'AUTORIZADO') {
+        return res.status(400).json({
+          error: `Esta orden ya posee la Factura Electrónica SRI Autorizada #${existingInvoice.secuencial}`,
+          invoice: existingInvoice,
+        });
+      }
+
+      const cfg = await getSriConfig(req.dbUserId || 1);
+      const { forceSimulated } = req.body || {};
+
+      // Determine buyer identification type
+      let cleanId = (order.customerCi || '').trim();
+      let tipoId: '04' | '05' | '06' | '07' | '08' = '07'; // Default Consumidor Final
+
+      if (cleanId.length === 13) {
+        tipoId = '04'; // RUC
+      } else if (cleanId.length === 10) {
+        tipoId = '05'; // Cedula
+      } else if (cleanId && cleanId.toUpperCase() !== '9999999999999') {
+        tipoId = '06'; // Pasaporte / Otro
+      } else {
+        tipoId = '07'; // Consumidor Final
+        cleanId = '9999999999999';
+      }
+
+      // Parse order items into SRI DetalleFactura
+      let orderItems: any[] = [];
+      try {
+        orderItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
+      } catch {
+        orderItems = [];
+      }
+
+      if (orderItems.length === 0) {
+        orderItems = [
+          {
+            name: `Pedido de Venta #${order.orderNumber}`,
+            quantity: 1,
+            price: Number(order.totalAmount || 0),
+          },
+        ];
+      }
+
+      const detalles: any[] = orderItems.map((item: any, idx: number) => {
+        const cant = Number(item.quantity || item.qty || 1);
+        const price = Number(item.price || item.unitPrice || item.salePrice || 0);
+        const desc = Number(item.discount || 0);
+
+        return {
+          codigoPrincipal: item.sku || `PROD-${idx + 1}`,
+          descripcion: item.name || item.productName || `Producto #${idx + 1}`,
+          cantidad: cant,
+          precioUnitario: price,
+          descuento: desc,
+          tarifaIva: '15' as const, // Tax standard Ecuador 15%
+        };
+      });
+
+      // Sequential and date
+      const secuencial = await getNextSriSecuencial(req.dbUserId || 1);
+      const fechaEmision = new Date().toISOString().split('T')[0];
+      const codigoNumerico = Math.floor(10000000 + Math.random() * 90000000).toString();
+
+      const emisor = {
+        ruc: cfg.ruc || '1700000000001',
+        razonSocial: cfg.razonSocial || 'COMERXIA E-COMMERCE S.A.',
+        nombreComercial: cfg.nombreComercial || 'COMERXIA ECUADOR',
+        estab: cfg.estab || '001',
+        ptoEmi: cfg.ptoEmi || '001',
+        secuencial,
+        dirMatriz: cfg.dirMatriz || 'Quito, Ecuador',
+        obligadoContabilidad: (cfg.obligadoContabilidad || 'NO') as 'SI' | 'NO',
+        contribuyenteEspecial: cfg.contribuyenteEspecial || undefined,
+        regimenRimpe: cfg.regimenRimpe || 'NO',
+      };
+
+      const comprador = {
+        tipoIdentificacionComprador: tipoId,
+        razonSocialComprador: order.customerName || 'CONSUMIDOR FINAL',
+        identificacionComprador: cleanId,
+        direccionComprador: order.customerAddress || 'Ecuador',
+        correoComprador: (order as any).customerEmail || 'ventas@comerxia.com',
+      };
+
+      const pagos = [
+        {
+          formaPago: '01', // Sin utilización del sistema financiero
+          total: Number(order.totalAmount || 0),
+        },
+      ];
+
+      const facturaPayload = {
+        emisor,
+        comprador,
+        detalles,
+        pagos,
+        fechaEmision,
+      };
+
+      const ambiente = (cfg.ambiente || '1') as '1' | '2';
+      const claveAcceso = generarClaveAcceso({
+        fechaEmision,
+        tipoComprobante: '01',
+        ruc: emisor.ruc,
+        ambiente,
+        estab: emisor.estab,
+        ptoEmi: emisor.ptoEmi,
+        secuencial,
+        codigoNumerico,
+        tipoEmision: '1',
+      });
+
+      const xmlRaw = generarFacturaXml(facturaPayload as any, claveAcceso, ambiente);
+
+      const useSimulation = Boolean(forceSimulated || !cfg.hasP12Certificate || !cfg.p12Base64);
+      let xmlFirmado = '';
+      let estadoRecepcion = 'PENDIENTE';
+      let estadoAutorizacion = 'PENDIENTE';
+      let fechaAutorizacion = null;
+      let numeroAutorizacion = null;
+      let mensajesRecepcion: any[] = [];
+      let mensajesAutorizacion: any[] = [];
+
+      if (useSimulation) {
+        // --- SIMULATED SANDBOX EMISSION ---
+        xmlFirmado = generarFirmaSimuladaXml(xmlRaw);
+        estadoRecepcion = 'RECIBIDA';
+        estadoAutorizacion = 'AUTORIZADO';
+        fechaAutorizacion = new Date().toISOString();
+        numeroAutorizacion = claveAcceso;
+        mensajesAutorizacion = [
+          {
+            identificador: '1',
+            mensaje: 'AUTORIZADO (MODO SIMULADO / SANDBOX)',
+            informacionAdicional: 'Comprobante procesado exitosamente por el simulador nativo de pruebas SRI de Comerxia.',
+            tipo: 'INFORMATIVO',
+          },
+        ];
+      } else {
+        // --- REAL XAdES-BES SIGNING AND SRI WEBSERVICE SUBMISSION ---
+        const p12Buffer = Buffer.from(cfg.p12Base64, 'base64');
+        xmlFirmado = firmarFacturaXml(xmlRaw, p12Buffer, cfg.p12Password || '');
+        const xmlBase64 = Buffer.from(xmlFirmado).toString('base64');
+
+        // 1. Reception SOAP call
+        const receptionSoapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ec="http://ec.gob.sri.ws.recepcion">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <ec:validarComprobante>
+         <xml>${xmlBase64}</xml>
+      </ec:validarComprobante>
+   </soapenv:Body>
+</soapenv:Envelope>`;
+
+        const receptionUrl = ambiente === '2' ? SRI_ENDPOINTS.RECEPCION.PRODUCCION : SRI_ENDPOINTS.RECEPCION.PRUEBAS;
+        const receptionResponse = await postSoapRequest(receptionUrl, receptionSoapEnvelope);
+        const receptionText = receptionResponse.text;
+
+        if (!receptionResponse.ok) {
+          const soapFaultMatch = receptionText.match(/<faultstring>([^<]+)<\/faultstring>/) || receptionText.match(/<message>([^<]+)<\/message>/);
+          const faultDetail = soapFaultMatch ? soapFaultMatch[1] : 'Error SOAP o de red';
+          throw new Error(`Error en servicio de Recepción SRI: ${faultDetail}`);
+        }
+
+        const estadoMatch = receptionText.match(/<estado>([^<]+)<\/estado>/);
+        estadoRecepcion = estadoMatch ? estadoMatch[1] : 'ERROR';
+        mensajesRecepcion = parseSriMensajes(receptionText);
+
+        if (estadoRecepcion === 'RECIBIDA') {
+          // Wait 1.5 seconds before querying authorization
+          await new Promise((r) => setTimeout(r, 1500));
+
+          const authorizationSoapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ec="http://ec.gob.sri.ws.autorizacion">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <ec:autorizacionComprobante>
+         <claveAccesoComprobante>${claveAcceso}</claveAccesoComprobante>
+      </ec:autorizacionComprobante>
+   </soapenv:Body>
+</soapenv:Envelope>`;
+
+          const authorizationUrl = ambiente === '2' ? SRI_ENDPOINTS.AUTORIZACION.PRODUCCION : SRI_ENDPOINTS.AUTORIZACION.PRUEBAS;
+          const authResponse = await postSoapRequest(authorizationUrl, authorizationSoapEnvelope);
+          const authText = authResponse.text;
+
+          const authEstadoMatch = authText.match(/<estado>([^<]+)<\/estado>/);
+          estadoAutorizacion = authEstadoMatch ? authEstadoMatch[1] : 'NO AUTORIZADO';
+
+          const fechaAuthMatch = authText.match(/<fechaAutorizacion>([^<]+)<\/fechaAutorizacion>/);
+          fechaAutorizacion = fechaAuthMatch ? fechaAuthMatch[1] : new Date().toISOString();
+
+          const numAuthMatch = authText.match(/<numeroAutorizacion>([^<]+)<\/numeroAutorizacion>/);
+          numeroAutorizacion = numAuthMatch ? numAuthMatch[1] : claveAcceso;
+
+          mensajesAutorizacion = parseSriMensajes(authText);
+        } else {
+          estadoAutorizacion = 'DEVUELTA';
+        }
+      }
+
+      // Save SRI Invoice Record
+      const allMessages = [...mensajesRecepcion, ...mensajesAutorizacion];
+      const invoiceRecord = await createSriInvoice({
+        userId: req.dbUserId || 1,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        secuencial,
+        claveAcceso,
+        ambiente,
+        customerName: comprador.razonSocialComprador,
+        customerCiRuc: comprador.identificacionComprador,
+        totalAmount: String(order.totalAmount || '0.00'),
+        estadoRecepcion,
+        estadoAutorizacion,
+        fechaAutorizacion,
+        numeroAutorizacion,
+        xmlGenerado: xmlRaw,
+        xmlFirmado,
+        mensajesSri: JSON.stringify(allMessages),
+      });
+
+      res.json({
+        success: true,
+        message: `Factura Electrónica SRI #${secuencial} procesada exitosamente`,
+        simulated: useSimulation,
+        invoice: invoiceRecord,
+      });
+    } catch (error: any) {
+      console.error('Error emitting SRI invoice:', error);
+      res.status(500).json({ error: error.message || 'Error al emitir factura electrónica SRI' });
     }
   });
 

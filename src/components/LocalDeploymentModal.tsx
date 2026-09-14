@@ -11,6 +11,7 @@ import {
   Download,
   ExternalLink,
   FileCode,
+  FileText,
   Globe,
   HardDrive,
   Layers,
@@ -43,12 +44,14 @@ import { GoogleAiConfigModal } from './GoogleAiConfigModal.tsx';
 import { StoreSettingsTab } from './StoreSettingsTab.tsx';
 import { GmailConfigTab } from './GmailConfigTab.tsx';
 import { EcuadorApiConfigTab } from './EcuadorApiConfigTab.tsx';
+import { SriConfigTab } from './SriConfigTab.tsx';
+import { SriInvoicesView } from './SriInvoicesView.tsx';
 import { DevTestingTab } from './DevTestingTab.tsx';
 
 interface LocalDeploymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'store' | 'email' | 'sandbox';
+  initialTab?: 'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'sri' | 'sri_invoices' | 'store' | 'email' | 'sandbox';
   config?: TelegramConfig | null;
   onConfigSaved?: () => void;
   storeConfig?: StoreConfig | null;
@@ -71,7 +74,7 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
   const [downloadingType, setDownloadingType] = useState<string | null>(null);
 
   // Modal Main Navigation
-  const [activeTab, setActiveTab] = useState<'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'email' | 'store' | 'sandbox'>(initialTab || 'store');
+  const [activeTab, setActiveTab] = useState<'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'sri' | 'sri_invoices' | 'email' | 'store' | 'sandbox'>(initialTab || 'store');
 
   // Sub-tabs inside "Despliegue"
   const [deploySubTab, setDeploySubTab] = useState<'guide' | 'scripts'>('guide');
@@ -902,6 +905,66 @@ module.exports = {
                   )}
                 </button>
 
+                {/* Facturación Electrónica SRI */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('sri')}
+                  className={`text-left px-3 py-2 sm:py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between shrink-0 group ${
+                    activeTab === 'sri'
+                      ? 'bg-sky-600 text-white shadow-xs font-semibold'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 bg-slate-50 md:bg-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition ${
+                      activeTab === 'sri'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-sky-100 text-sky-700 group-hover:scale-105'
+                    }`}>
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold truncate">Facturación SRI</div>
+                      <div className={`text-[10px] hidden sm:block truncate ${activeTab === 'sri' ? 'text-sky-100' : 'text-slate-400'}`}>
+                        Emisor y Firma .p12
+                      </div>
+                    </div>
+                  </div>
+                  {activeTab === 'sri' && (
+                    <span className="w-1.5 h-5 rounded-full bg-white shrink-0 hidden md:block" />
+                  )}
+                </button>
+
+                {/* Historial Facturas SRI */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('sri_invoices')}
+                  className={`text-left px-3 py-2 sm:py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between shrink-0 group ${
+                    activeTab === 'sri_invoices'
+                      ? 'bg-sky-700 text-white shadow-xs font-semibold'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 bg-slate-50 md:bg-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition ${
+                      activeTab === 'sri_invoices'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-sky-100 text-sky-800 group-hover:scale-105'
+                    }`}>
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold truncate">Historial Facturas</div>
+                      <div className={`text-[10px] hidden sm:block truncate ${activeTab === 'sri_invoices' ? 'text-sky-100' : 'text-slate-400'}`}>
+                        Comprobantes y XML
+                      </div>
+                    </div>
+                  </div>
+                  {activeTab === 'sri_invoices' && (
+                    <span className="w-1.5 h-5 rounded-full bg-white shrink-0 hidden md:block" />
+                  )}
+                </button>
+
                 {/* 4. Correo Gmail */}
                 <button
                   type="button"
@@ -1170,6 +1233,20 @@ module.exports = {
              ======================================================== */}
           {activeTab === 'ecuador_api' && (
             <EcuadorApiConfigTab onSaved={onConfigSaved} />
+          )}
+
+          {/* ========================================================
+              TAB: FACTURACIÓN ELECTRÓNICA SRI ECUADOR
+             ======================================================== */}
+          {activeTab === 'sri' && (
+            <SriConfigTab onSaved={onConfigSaved} />
+          )}
+
+          {/* ========================================================
+              TAB: HISTORIAL DE FACTURAS SRI
+             ======================================================== */}
+          {activeTab === 'sri_invoices' && (
+            <SriInvoicesView />
           )}
 
           {/* ========================================================

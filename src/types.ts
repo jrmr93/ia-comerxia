@@ -743,3 +743,122 @@ export interface StoreAnalyticsDashboardData {
   deviceBreakdown: Array<{ name: string; value: number }>;
   productPerformance: StoreAnalyticsProductPerformance[];
 }
+
+// ==========================================
+// ESTRUCTURAS TRIBUTARIAS SRI ECUADOR
+// ==========================================
+
+export interface SriConfig {
+  id?: number;
+  userId?: number;
+  ruc: string;
+  razonSocial: string;
+  nombreComercial: string;
+  estab: string; // '001'
+  ptoEmi: string; // '001'
+  dirMatriz: string;
+  obligadoContabilidad: 'SI' | 'NO';
+  contribuyenteEspecial?: string;
+  regimenMicroempresas?: boolean;
+  regimenRimpe?: 'CONTRIBUYENTE_RIMPE' | 'EMPRENDEDOR_RIMPE' | 'NEGOCIO_POPULAR_RIMPE' | 'NO';
+  ambiente: '1' | '2'; // 1 = Pruebas, 2 = Producción
+  p12Base64?: string;
+  p12Password?: string;
+  hasP12Certificate?: boolean;
+  p12Filename?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SriEmisor {
+  ruc: string;
+  razonSocial: string;
+  nombreComercial: string;
+  estab: string;
+  ptoEmi: string;
+  secuencial: string;
+  dirMatriz: string;
+  obligadoContabilidad: 'SI' | 'NO';
+  contribuyenteEspecial?: string;
+  regimenMicroempresas?: boolean;
+  regimenRimpe?: 'CONTRIBUYENTE_RIMPE' | 'EMPRENDEDOR_RIMPE' | 'NEGOCIO_POPULAR_RIMPE' | 'NO';
+}
+
+export interface SriComprador {
+  tipoIdentificacionComprador: '04' | '05' | '06' | '07' | '08'; // 04=RUC, 05=Cedula, 06=Pasaporte, 07=Consumidor Final, 08=Id Exterior
+  razonSocialComprador: string;
+  identificacionComprador: string;
+  direccionComprador: string;
+  correoComprador: string;
+}
+
+export interface SriDetalleFactura {
+  codigoPrincipal: string;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  descuento: number;
+  tarifaIva: '0' | '15' | '5' | 'NoObjeto' | 'Exento';
+}
+
+export interface SriPago {
+  formaPago: string; // '01' Sin utilizacion del sistema financiero, '20' Otros con utilizacion del sistema financiero
+  total: number;
+  plazo?: number;
+  unidadTiempo?: string;
+}
+
+export interface SriFactura {
+  emisor: SriEmisor;
+  comprador: SriComprador;
+  detalles: SriDetalleFactura[];
+  pagos: SriPago[];
+  fechaEmision: string; // YYYY-MM-DD
+}
+
+export interface SriEnvioResult {
+  claveAcceso: string;
+  xmlGenerado: string;
+  xmlFirmado?: string;
+  estadoRecepcion: string; // 'RECIBIDA', 'DEVUELTA', 'ERROR', 'SIMULADO_OK'
+  mensajesRecepcion: Array<{
+    identificador: string;
+    mensaje: string;
+    informacionAdicional?: string;
+    tipo: string;
+  }>;
+  estadoAutorizacion?: string; // 'AUTORIZADO', 'NO AUTORIZADO', 'PROCESAMIENTO', 'SIMULADO_OK'
+  fechaAutorizacion?: string;
+  numeroAutorizacion?: string;
+  mensajesAutorizacion?: Array<{
+    identificador: string;
+    mensaje: string;
+    informacionAdicional?: string;
+    tipo: string;
+  }>;
+  ambiente: '1' | '2';
+}
+
+export interface SriInvoiceRecord {
+  id: number;
+  userId: number;
+  orderId?: number | null;
+  orderNumber?: string | null;
+  secuencial: string;
+  claveAcceso: string;
+  ambiente: string;
+  customerName: string;
+  customerCiRuc: string;
+  totalAmount: string;
+  estadoRecepcion: string;
+  estadoAutorizacion: string;
+  fechaAutorizacion?: string | null;
+  numeroAutorizacion?: string | null;
+  xmlGenerado?: string | null;
+  xmlFirmado?: string | null;
+  mensajesSri?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+

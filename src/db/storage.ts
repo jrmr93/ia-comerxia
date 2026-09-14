@@ -302,6 +302,8 @@ export interface DatabaseState {
   aiConfigs: LocalAiConfig[];
   emailConfigs: LocalEmailConfig[];
   ecuadorApiConfigs: LocalEcuadorApiConfig[];
+  sriConfigs?: any[];
+  sriInvoices?: any[];
   storeConfigs: LocalStoreConfig[];
   serverDomainConfigs: LocalServerDomainConfig[];
   customers: LocalCustomer[];
@@ -318,6 +320,8 @@ export interface DatabaseState {
     aiConfigs: number;
     emailConfigs: number;
     ecuadorApiConfigs: number;
+    sriConfigs?: number;
+    sriInvoices?: number;
     storeConfigs: number;
     serverDomainConfigs: number;
     customers: number;
@@ -401,6 +405,29 @@ class StorageManager {
           updatedAt: new Date().toISOString(),
         },
       ],
+      sriConfigs: [
+        {
+          id: 1,
+          userId: 1,
+          ruc: '1700000000001',
+          razonSocial: 'COMERXIA E-COMMERCE S.A.',
+          nombreComercial: 'COMERXIA ECUADOR',
+          estab: '001',
+          ptoEmi: '001',
+          dirMatriz: 'Quito, Ecuador',
+          obligadoContabilidad: 'NO',
+          contribuyenteEspecial: null,
+          regimenRimpe: 'NO',
+          ambiente: '1',
+          p12Base64: null,
+          p12Password: null,
+          p12Filename: null,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      sriInvoices: [],
       storeConfigs: [
         {
           id: 1,
@@ -462,6 +489,8 @@ class StorageManager {
         aiConfigs: 2,
         emailConfigs: 2,
         ecuadorApiConfigs: 2,
+        sriConfigs: 2,
+        sriInvoices: 1,
         storeConfigs: 2,
         serverDomainConfigs: 2,
         customers: 1,

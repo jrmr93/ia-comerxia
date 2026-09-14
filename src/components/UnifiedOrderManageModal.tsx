@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  Download,
   Edit3,
   ExternalLink,
   Lock,
@@ -178,6 +179,54 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [showCustomerDropdown, setShowCustomerDropdown] = useState<boolean>(false);
   const [matchedCustomerInfo, setMatchedCustomerInfo] = useState<any | null>(null);
   const [ecuadorApiStatus, setEcuadorApiStatus] = useState<{ loading: boolean; source?: string; message?: string } | null>(null);
+
+  // Facturación Electrónica SRI State
+  const [sriEmitting, setSriEmitting] = useState(false);
+  const [sriInvoiceRecord, setSriInvoiceRecord] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (order && order.id) {
+      fetch('/api/sri/facturas')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.invoices) {
+            const match = data.invoices.find((inv: any) => inv.orderId === order.id);
+            if (match) setSriInvoiceRecord(match);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setSriInvoiceRecord(null);
+    }
+  }, [order]);
+
+  const handleEmitSriInvoice = async () => {
+    if (!order || !order.id) {
+      showToast('⚠️ Debes guardar el pedido antes de emitir la Factura Electrónica SRI.');
+      return;
+    }
+
+    setSriEmitting(true);
+    try {
+      const res = await fetch(`/api/sri/emitir/${order.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forceSimulated: false }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSriInvoiceRecord(data.invoice);
+        showToast(`✓ Factura Electrónica SRI #${data.invoice.secuencial} procesada exitosamente`);
+      } else {
+        showToast(`⚠️ ${data.error || 'Error al emitir factura en el SRI'}`);
+      }
+    } catch (err: any) {
+      console.error('Error emitting SRI invoice:', err);
+      showToast('⚠️ Error de conexión al comunicarse con el SRI');
+    } finally {
+      setSriEmitting(false);
+    }
+  };
 
   // Auto-fetch Ecuador API (Cedula/RUC) if customer is not found in local CRM database
   useEffect(() => {
@@ -1368,6 +1417,53 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           </div>
 
           <div className="flex items-center gap-2">
+            {/* SRI Electronic Invoice Emission & RIDE Button */}
+            {!isCreateMode && (
+              sriInvoiceRecord ? (
+                <div className="flex items-center gap-1.5">
+                  <a
+                    href={`/api/sri/facturas/${sriInvoiceRecord.id}/ride`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/40 hover:bg-emerald-500/60 text-emerald-100 text-xs font-bold transition cursor-pointer border border-emerald-400/40 shadow-2xs"
+                    title={`Ver e imprimir RIDE oficial de la Factura #${sriInvoiceRecord.secuencial}`}
+                  >
+                    <Printer className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>RIDE SRI #{sriInvoiceRecord.secuencial}</span>
+                  </a>
+                  <a
+                    href={`/api/sri/facturas/${sriInvoiceRecord.id}/xml`}
+                    download={`Factura_${sriInvoiceRecord.claveAcceso}.xml`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-sky-600/40 hover:bg-sky-500/60 text-sky-100 text-xs font-bold transition cursor-pointer border border-sky-400/40 shadow-2xs"
+                    title="Descargar XML oficial"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>XML</span>
+                  </a>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={sriEmitting || items.length === 0}
+                  onClick={handleEmitSriInvoice}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-bold transition cursor-pointer border border-sky-400/40 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                  title="Emitir y firmar Factura Electrónica oficialmente en el SRI"
+                >
+                  {sriEmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-200" />
+                      <span>Firmando SRI...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Receipt className="w-3.5 h-3.5 text-sky-200" />
+                      <span>Facturar en SRI</span>
+                    </>
+                  )}
+                </button>
+              )
+            )}
+
             {/* Direct Print Actions for both modes */}
             <button
               type="button"
