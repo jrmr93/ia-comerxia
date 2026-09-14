@@ -1417,6 +1417,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             setPurchaseToConfirm(p);
           }}
           onOpenContactModal={handleOpenWhatsappModal}
+          onOpenPrintA4={(p) => setPurchaseToPrintA4(p)}
           showToast={showToast}
         />
       )}
@@ -1613,6 +1614,17 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         showToast={showToast}
         initialAction={contactModalInitialAction}
       />
+
+      {purchaseToPrintA4 && (
+        <OrderPrintA4Modal
+          purchase={purchaseToPrintA4}
+          inventoryItems={inventoryItems}
+          storeConfig={storeConfig}
+          currency={currency}
+          onClose={() => setPurchaseToPrintA4(null)}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 };
@@ -1634,6 +1646,7 @@ interface PurchaseFormModalProps {
   onOpenPayableForPurchase?: (purchase: any) => void;
   onConfirmPayment?: (purchase: PurchaseOrder) => void;
   onOpenContactModal?: (purchase: PurchaseOrder, action?: 'whatsapp' | 'copy_photos') => void;
+  onOpenPrintA4?: (purchase: PurchaseOrder) => void;
   showToast: (msg: string) => void;
 }
 
@@ -1650,6 +1663,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   onOpenPayableForPurchase,
   onConfirmPayment,
   onOpenContactModal,
+  onOpenPrintA4,
   showToast,
 }) => {
   const isEditing = Boolean(purchase);
@@ -2114,6 +2128,21 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {purchase && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenPrintA4) {
+                    onOpenPrintA4(purchase);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition cursor-pointer border border-sky-400/40 shadow-xs"
+                title="Imprimir vista previa de la Orden de Compra"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir Compra</span>
+              </button>
+            )}
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition"
@@ -2813,6 +2842,21 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                       </button>
                     )
                   )}
+                  {purchase && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenPrintA4) {
+                          onOpenPrintA4(purchase);
+                        }
+                      }}
+                      className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs cursor-pointer transition shadow-xs"
+                      title="Imprimir Orden de Compra"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Imprimir Compra</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={onClose}
@@ -3444,16 +3488,6 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
           </div>
         </form>
       </div>
-
-      {purchaseToPrintA4 && (
-        <OrderPrintA4Modal
-          purchase={purchaseToPrintA4}
-          storeConfig={storeConfig}
-          currency={currency}
-          onClose={() => setPurchaseToPrintA4(null)}
-          showToast={showToast}
-        />
-      )}
     </div>
   );
 };
