@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Share2,
   X,
@@ -8,6 +8,8 @@ import {
   ExternalLink,
   ShieldCheck,
   Sparkles,
+  Tag,
+  Filter,
 } from 'lucide-react';
 import { StoreConfig } from '../types.ts';
 import { getPublicStoreUrl } from '../utils/storeUrls.ts';
@@ -16,6 +18,8 @@ interface ShareStoreModalProps {
   isOpen: boolean;
   onClose: () => void;
   storeConfig?: StoreConfig;
+  categories?: string[];
+  initialCategory?: string;
   onShowToast?: (msg: string) => void;
 }
 
@@ -23,14 +27,49 @@ export const ShareStoreModal: React.FC<ShareStoreModalProps> = ({
   isOpen,
   onClose,
   storeConfig,
+  categories = [],
+  initialCategory = '',
   onShowToast,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Derive public customer store URL
-  const customerStoreUrl = useMemo(() => {
+  // Filter out 'all' from categories list for cleanest dropdown options
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>();
+    categories.forEach((cat) => {
+      if (cat && cat !== 'all') {
+        set.add(cat.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [categories]);
+
+  // Sync selectedCategory when modal opens or initialCategory changes
+  useEffect(() => {
+    if (isOpen) {
+      if (initialCategory && initialCategory !== 'all') {
+        setSelectedCategory(initialCategory);
+      } else {
+        setSelectedCategory('all');
+      }
+    }
+  }, [isOpen, initialCategory]);
+
+  // Derive public customer store URL with optional category filter
+  const baseStoreUrl = useMemo(() => {
     return getPublicStoreUrl(storeConfig?.domain);
   }, [storeConfig?.domain]);
+
+  const customerStoreUrl = useMemo(() => {
+    if (!baseStoreUrl) return '';
+    if (selectedCategory && selectedCategory !== 'all') {
+      const url = new URL(baseStoreUrl);
+      url.searchParams.set('categoria', selectedCategory);
+      return url.toString();
+    }
+    return baseStoreUrl;
+  }, [baseStoreUrl, selectedCategory]);
 
   if (!isOpen) return null;
 
@@ -66,13 +105,21 @@ export const ShareStoreModal: React.FC<ShareStoreModalProps> = ({
 
     setCopied(true);
     if (onShowToast) {
-      onShowToast('✓ Enlace copiado al portapapeles');
+      onShowToast(
+        selectedCategory !== 'all'
+          ? `✓ Enlace de la categoría "${selectedCategory}" copiado al portapapeles`
+          : '✓ Enlace de la tienda copiado al portapapeles'
+      );
     }
     setTimeout(() => setCopied(false), 2500);
   };
 
   const storeName = storeConfig?.storeName || 'Nuestra Tienda Online';
-  const whatsappInvitationText = `¡Hola! 👋 Te invito a ver nuestro catálogo digital y hacer tu pedido en nuestra tienda online *${storeName}*:\n\n👉 ${customerStoreUrl}`;
+  const whatsappInvitationText =
+    selectedCategory !== 'all'
+      ? `¡Hola! 👋 Te invito a explorar nuestra categoría *${selectedCategory}* en nuestra tienda online *${storeName}*:\n\n👉 ${customerStoreUrl}`
+      : `¡Hola! 👋 Te invito a ver nuestro catálogo digital y hacer tu pedido en nuestra tienda online *${storeName}*:\n\n👉 ${customerStoreUrl}`;
+
   const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappInvitationText)}`;
 
   return (
@@ -94,7 +141,7 @@ export const ShareStoreModal: React.FC<ShareStoreModalProps> = ({
                 Compartir Tienda
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Enlace directo y público para catálogo, carrito y pedidos
+                Enlace directo y público para catálogo con filtro por categoría
               </p>
             </div>
           </div>
@@ -112,15 +159,57 @@ export const ShareStoreModal: React.FC<ShareStoreModalProps> = ({
         <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-950 text-xs flex items-start space-x-2.5">
           <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
           <div className="leading-relaxed">
-            <span className="font-bold">Acceso Directo y Seguro: </span>
-            Comparte este enlace para que cualquier persona pueda explorar el catálogo completo de productos, ver ofertas y realizar pedidos directamente.
+            <span className="font-bold">Acceso Directo Filtrado: </span>
+            {selectedCategory !== 'all' ? (
+              <>
+                El cliente al hacer clic en este enlace abrirá la tienda en vista cliente pre-filtrada por la categoría{' '}
+                <strong className="text-emerald-800 font-black">{selectedCategory}</strong>.
+              </>
+            ) : (
+              <>
+                Comparte este enlace para que cualquier persona pueda explorar el catálogo completo de productos o selecciona una categoría a continuación.
+              </>
+            )}
           </div>
+        </div>
+
+        {/* Category Selector Dropdown */}
+        <div className="space-y-1.5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
+          <label className="block text-xs font-extrabold text-slate-800 flex items-center justify-between">
+            <span className="flex items-center space-x-1.5">
+              <Tag className="w-3.5 h-3.5 text-sky-600" />
+              <span>Filtrar por Categoría a Compartir:</span>
+            </span>
+            {selectedCategory !== 'all' && (
+              <span className="text-[10px] bg-sky-100 text-sky-800 font-black px-2 py-0.5 rounded-full border border-sky-200">
+                Filtro Activo
+              </span>
+            )}
+          </label>
+          <select
+            id="share-modal-category-select"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-2xs"
+          >
+            <option value="all">📦 Todas las Categorías (Catálogo Completo)</option>
+            {availableCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                🏷️ {cat}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-500 font-medium pt-0.5">
+            {selectedCategory !== 'all'
+              ? `El enlace incluirá la categoría "${selectedCategory}" para que el cliente la vea seleccionada automáticamente.`
+              : 'Selecciona una categoría específica para generar un link enfocado en ese grupo de productos.'}
+          </p>
         </div>
 
         {/* URL Box & Copy */}
         <div className="space-y-1.5 pt-0.5">
           <label className="block text-xs font-bold text-slate-700">
-            Enlace Directo de la Tienda Online:
+            Enlace para Cliente {selectedCategory !== 'all' ? `(${selectedCategory})` : ''}:
           </label>
           <div className="flex items-center space-x-2">
             <input
@@ -177,7 +266,7 @@ export const ShareStoreModal: React.FC<ShareStoreModalProps> = ({
             className="py-2.5 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition flex items-center justify-center space-x-2 cursor-pointer shadow-xs active:scale-95 text-center"
           >
             <ExternalLink className="w-4 h-4 text-slate-300" />
-            <span>Abrir Tienda</span>
+            <span>Abrir Vista Cliente</span>
           </a>
         </div>
 
@@ -185,7 +274,7 @@ export const ShareStoreModal: React.FC<ShareStoreModalProps> = ({
         <div className="pt-2.5 flex items-center justify-between border-t border-slate-100 flex-wrap gap-2">
           <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-amber-500" />
-            <span>Ideal para tu perfil de WhatsApp, Instagram o redes</span>
+            <span>Ideal para enviar campañas por categoría en WhatsApp o Redes</span>
           </span>
           <button
             type="button"

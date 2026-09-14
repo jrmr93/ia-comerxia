@@ -34,6 +34,7 @@ import {
   Search,
   Send,
   Settings,
+  Share2,
   Sparkles,
   Square,
   Tag,
@@ -52,6 +53,7 @@ import { ProductMediaDisplay } from './ProductMediaDisplay.tsx';
 import { parseVideoUrl } from '../utils/video-helper.ts';
 import { checkProductTransactionLink } from '../utils/productIntegrity.ts';
 import { DeactivateConfirmationModal } from './DeactivateConfirmationModal.tsx';
+import { ShareStoreModal } from './ShareStoreModal.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
 
 export function calculateItemFinancials(item: InventoryItem) {
@@ -344,6 +346,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     bulkItems?: InventoryItem[];
   } | null>(null);
   const [isProcessingStatus, setIsProcessingStatus] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [shareInitialCategory, setShareInitialCategory] = useState<string>('');
 
   // Keep marketingCopyItem in sync with items without losing newly appended images
   useEffect(() => {
@@ -608,17 +612,33 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
 
         {/* Solo el botón de acción correspondiente a la pestaña seleccionada */}
-        <div className="flex items-center w-full sm:w-auto">
-          {/* Si está seleccionado Catálogo: ÚNICAMENTE Nuevo Producto */}
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
+          {/* Si está seleccionado Catálogo: Nuevo Producto y Compartir Categoría */}
           {subTab === 'products' && (
-            <button
-              onClick={onOpenAddProduct}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-black text-xs shadow-xs transition cursor-pointer active:scale-95"
-              title="Agregar nuevo producto manual"
-            >
-              <Plus className="w-4 h-4 mr-1.5 stroke-[2.5]" />
-              <span>Nuevo Producto</span>
-            </button>
+            <>
+              <button
+                type="button"
+                id="btn-inventory-share-store-header"
+                onClick={() => {
+                  setShareInitialCategory(selectedCategory !== 'all' ? selectedCategory : '');
+                  setIsShareModalOpen(true);
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center px-3.5 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 hover:text-emerald-900 font-extrabold text-xs border border-emerald-300 shadow-2xs transition cursor-pointer active:scale-95 whitespace-nowrap"
+                title="Compartir catálogo completo o filtrado por categoría"
+              >
+                <Share2 className="w-4 h-4 mr-1.5 text-emerald-600 stroke-[2.5]" />
+                <span>{selectedCategory !== 'all' ? `Compartir "${selectedCategory}"` : 'Compartir Categoría'}</span>
+              </button>
+
+              <button
+                onClick={onOpenAddProduct}
+                className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-black text-xs shadow-xs transition cursor-pointer active:scale-95"
+                title="Agregar nuevo producto manual"
+              >
+                <Plus className="w-4 h-4 mr-1.5 stroke-[2.5]" />
+                <span>Nuevo Producto</span>
+              </button>
+            </>
           )}
 
           {/* Si está seleccionado Mensajes Proveedor: ÚNICAMENTE Simular Mensaje Telegram */}
@@ -1002,6 +1022,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     );
                   })}
                 </select>
+                <button
+                  type="button"
+                  id="btn-inventory-share-category"
+                  onClick={() => {
+                    setShareInitialCategory(selectedCategory !== 'all' ? selectedCategory : '');
+                    setIsShareModalOpen(true);
+                  }}
+                  className="ml-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 border border-emerald-300 transition cursor-pointer flex items-center space-x-1 shadow-2xs shrink-0"
+                  title="Compartir catálogo filtrado por esta categoría"
+                >
+                  <Share2 className="w-3 h-3 text-emerald-600 stroke-[2.5] shrink-0" />
+                  <span className="hidden sm:inline">
+                    Compartir {selectedCategory !== 'all' ? `"${selectedCategory}"` : 'Categoría'}
+                  </span>
+                  <span className="sm:hidden">Compartir</span>
+                </button>
               </div>
 
               {/* Filtro por Proveedor con Combobox (Select) */}
@@ -1823,6 +1859,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         }}
         onConfirm={handleConfirmStatusChange}
         isProcessing={isProcessingStatus}
+      />
+
+      {/* Share Store & Category Modal */}
+      <ShareStoreModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        storeConfig={storeConfig}
+        categories={categories}
+        initialCategory={shareInitialCategory}
+        onShowToast={(msg) => {
+          setReparseToast(msg);
+          setTimeout(() => setReparseToast(null), 3500);
+        }}
       />
 
       {reparseToast && (

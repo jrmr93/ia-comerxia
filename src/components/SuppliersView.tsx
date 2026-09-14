@@ -44,6 +44,7 @@ interface SuppliersViewProps {
   onOpenNewPurchaseForSupplier?: (supplierName: string, supplierPhone?: string) => void;
   onOpenItemDetail?: (item: InventoryItem) => void;
   onSuppliersCountChange?: (count: number) => void;
+  dbCustomers?: any[];
 }
 
 export const SuppliersView: React.FC<SuppliersViewProps> = ({
@@ -53,6 +54,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
   onOpenNewPurchaseForSupplier,
   onOpenItemDetail,
   onSuppliersCountChange,
+  dbCustomers = [],
 }) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -965,6 +967,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
         onSave={handleSaveSupplier}
         supplier={editingSupplier}
         existingSuppliers={suppliers}
+        dbCustomers={dbCustomers}
       />
 
       {/* Supplier Detail Dossier Modal */}

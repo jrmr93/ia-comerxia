@@ -555,9 +555,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const handleAddProduct = (prod: InventoryItem) => {
     setItems((prev) => {
       const existingIdx = prev.findIndex((it) => it.id === prod.id || (prod.sku && it.sku && it.sku.toLowerCase() === prod.sku.toLowerCase()));
-      if (existingIdx >= 0) {
-        return prev.map((it, idx) => (idx === existingIdx ? { ...it, quantity: it.quantity + 1 } : it));
-      }
+      
       const cPrice = Number(prod.costWithoutTax ?? prod.costPrice ?? 0);
       const rawSale = Number(prod.salePrice || 0);
       const prodTaxPercent = extractItemTaxPercent(prod, 15);
@@ -579,24 +577,26 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       } else if ((prod as any).discount) {
         discVal = Number((prod as any).discount || 0);
       }
-      return [
-        ...prev,
-        {
-          id: prod.id,
-          inventoryItemId: prod.id,
-          name: prod.name,
-          sku: prod.sku || '',
-          barcode: prod.barcode || undefined,
-          costPrice: cPrice,
-          marginPercent: marginPct,
-          supplierName: (prod as any).supplier || (prod as any).supplierName || undefined,
-          salePrice: sPrice,
-          discount: discVal,
-          discountPercent: prod.discountPercent || 0,
-          quantity: 1,
-          imageUrl: prod.imageUrl || null,
-        },
-      ];
+
+      const existingItem = existingIdx >= 0 ? prev[existingIdx] : null;
+      const newItemObj = {
+        id: prod.id,
+        inventoryItemId: prod.id,
+        name: prod.name,
+        sku: prod.sku || '',
+        barcode: prod.barcode || undefined,
+        costPrice: cPrice,
+        marginPercent: marginPct,
+        supplierName: (prod as any).supplier || (prod as any).supplierName || undefined,
+        salePrice: sPrice,
+        discount: discVal,
+        discountPercent: prod.discountPercent || 0,
+        quantity: existingItem ? existingItem.quantity + 1 : 1,
+        imageUrl: prod.imageUrl || null,
+      };
+
+      const rest = prev.filter((_, idx) => idx !== existingIdx);
+      return [newItemObj, ...rest];
     });
     setProductSearch('');
     setShowProductDropdown(false);

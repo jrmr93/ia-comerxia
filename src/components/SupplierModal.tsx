@@ -17,6 +17,8 @@ import {
   AlertCircle,
   Landmark,
   CheckCircle2,
+  RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { Supplier, SupplierBankInfo } from '../types.ts';
 import { validateEcuadorId } from '../utils/ecuadorIdValidator.ts';
@@ -28,6 +30,7 @@ interface SupplierModalProps {
   supplier?: Supplier | null;
   existingSuppliers?: Supplier[];
   initialName?: string;
+  dbCustomers?: any[];
 }
 
 const COMMON_CATEGORIES = [
@@ -64,6 +67,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
   supplier,
   existingSuppliers = [],
   initialName = '',
+  dbCustomers = [],
 }) => {
   const [activeFormTab, setActiveFormTab] = useState<'general' | 'contact' | 'commercial' | 'bank'>('general');
 
@@ -104,6 +108,16 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Ecuador API Lookup State for Supplier RUC
+  const [ecuadorApiStatus, setEcuadorApiStatus] = useState<{
+    loading: boolean;
+    source?: string;
+    message?: string;
+    error?: string;
+    rucStatus?: string;
+  } | null>(null);
+  const [fetchedRuc, setFetchedRuc] = useState<string>('');
 
   useEffect(() => {
     if (supplier) {
@@ -194,8 +208,123 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
       setHolderEmail('');
     }
     setError(null);
+    setEcuadorApiStatus(null);
+    setFetchedRuc('');
     setActiveFormTab('general');
   }, [supplier, isOpen, initialName]);
+
+  // Ecuador API Auto-Fetch on RUC input
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const cleanDigits = (ruc || '').replace(/\D/g, '');
+    if (cleanDigits.length !== 13) {
+      setEcuadorApiStatus(null);
+      return;
+    }
+
+    // Do not re-fetch if editing an existing supplier and RUC hasn't changed from original saved RUC
+    if (supplier?.ruc && (supplier.ruc.replace(/\D/g, '') === cleanDigits) && fetchedRuc !== cleanDigits) {
+      return;
+    }
+
+    if (fetchedRuc === cleanDigits) return;
+
+    // Check if supplier/RUC already exists in local suppliers database
+    const foundInSuppliers = (existingSuppliers || []).find((s) => {
+      const sRuc = (s.ruc || '').replace(/\D/g, '');
+      return s.id !== supplier?.id && sRuc && sRuc === cleanDigits;
+    });
+
+    if (foundInSuppliers) {
+      setEcuadorApiStatus({
+        loading: false,
+        source: 'Base de Datos Local (Proveedores)',
+        message: `Coincidencia local: Proveedor "${foundInSuppliers.name}"`,
+      });
+      return;
+    }
+
+    // Check if customer/CI/RUC already exists in local customers database
+    const foundInCustomers = (dbCustomers || []).find((c: any) => {
+      const cCi = (c.ci || '').replace(/\D/g, '');
+      return cCi && cCi === cleanDigits;
+    });
+
+    if (foundInCustomers) {
+      setEcuadorApiStatus({
+        loading: false,
+        source: 'Base de Datos Local (Clientes)',
+        message: `Coincidencia en clientes: "${foundInCustomers.name}"`,
+      });
+    }
+
+    // Validate RUC / Cedula format before calling API
+    const validation = validateEcuadorId(cleanDigits, true);
+    if (!validation.isValid) {
+      return;
+    }
+
+    let isMounted = true;
+    setEcuadorApiStatus({ loading: true, message: 'Consultando RUC en Ecuador API (SRI)...' });
+
+    const isRuc = cleanDigits.length === 13;
+    const endpoint = isRuc ? `/api/ecuador-api/rucs/${cleanDigits}` : `/api/ecuador-api/cedulas/${cleanDigits}`;
+
+    fetch(endpoint)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.success && data.data) {
+          const apiData = data.data;
+          const businessName = apiData.business_name || apiData.full_name || '';
+          const tradeNameVal = apiData.trade_name || businessName;
+          const addressVal = apiData.address || '';
+          const statusVal = (apiData.status || 'ACTIVO').toUpperCase();
+
+          if (businessName) {
+            setName(businessName);
+          }
+          if (tradeNameVal) {
+            setTradeName(tradeNameVal);
+          }
+          if (addressVal) {
+            setAddress(addressVal);
+          }
+
+          // Auto-assign supplier status (active / inactive) based on RUC status from SRI (ACTIVO vs SUSPENDIDO/INACTIVO)
+          if (statusVal.includes('ACTIVO') && !statusVal.includes('INACTIVO') && !statusVal.includes('SUSPENDIDO')) {
+            setStatus('active');
+          } else {
+            setStatus('inactive');
+          }
+
+          setFetchedRuc(cleanDigits);
+          setEcuadorApiStatus({
+            loading: false,
+            source: 'Ecuador API (SRI)',
+            message: `RUC verificado: ${businessName || tradeNameVal}`,
+            rucStatus: statusVal,
+          });
+        } else {
+          setEcuadorApiStatus({
+            loading: false,
+            error: data.error || 'No se obtuvieron datos de la API',
+          });
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setEcuadorApiStatus({
+          loading: false,
+          error: 'Error al consultar Ecuador API',
+        });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [ruc, isOpen, supplier, existingSuppliers, dbCustomers, fetchedRuc]);
 
   if (!isOpen) return null;
 
@@ -432,7 +561,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                         : 'border-slate-200 focus:ring-amber-500/20 focus:border-amber-500'
                     }`}
                   />
-                  <div className="min-h-5 mt-1">
+                  <div className="min-h-5 mt-1 space-y-1">
                     {rucValidation ? (
                       rucValidation.isValid ? (
                         <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
@@ -449,6 +578,37 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                       <p className="text-[10px] text-slate-400">
                         13 dígitos para RUC o 10 para Cédula (Ecuador)
                       </p>
+                    )}
+
+                    {ecuadorApiStatus && (
+                      <div className="p-2.5 rounded-xl border text-xs flex items-center justify-between shadow-2xs transition animate-in fade-in duration-150 bg-amber-50/60 border-amber-200 text-amber-900">
+                        <div className="flex items-center gap-2">
+                          {ecuadorApiStatus.loading ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600 shrink-0" />
+                          ) : ecuadorApiStatus.error ? (
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          ) : (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          )}
+                          <div>
+                            <span className="font-bold block">
+                              {ecuadorApiStatus.loading ? 'Consultando RUC en SRI / Ecuador API...' : ecuadorApiStatus.source || 'Ecuador API (SRI)'}
+                            </span>
+                            <span className="text-[11px] text-slate-600">
+                              {ecuadorApiStatus.message || ecuadorApiStatus.error}
+                            </span>
+                          </div>
+                        </div>
+                        {ecuadorApiStatus.rucStatus && (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border shrink-0 ${
+                            ecuadorApiStatus.rucStatus.includes('ACTIVO') && !ecuadorApiStatus.rucStatus.includes('INACTIVO')
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'bg-rose-100 text-rose-800 border-rose-300'
+                          }`}>
+                            RUC {ecuadorApiStatus.rucStatus}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -492,8 +652,8 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                     onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-medium"
                   >
-                    <option value="active">Activo (Habilitado para Compras)</option>
-                    <option value="inactive">Inactivo / Bloqueado</option>
+                    <option value="active">Activo (Habilitado / RUC Activo SRI)</option>
+                    <option value="inactive">Inactivo / Suspendido (SRI)</option>
                   </select>
                 </div>
 

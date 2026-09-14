@@ -45,6 +45,7 @@ function InventoryApp() {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [customersCount, setCustomersCount] = useState<number>(0);
+  const [dbCustomers, setDbCustomers] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [suppliersCount, setSuppliersCount] = useState<number>(0);
   const [highlightPurchaseId, setHighlightPurchaseId] = useState<number | undefined>(undefined);
@@ -454,7 +455,10 @@ function InventoryApp() {
         params.has('producto') ||
         params.has('product') ||
         params.has('p') ||
-        params.has('sku')
+        params.has('sku') ||
+        params.has('categoria') ||
+        params.has('category') ||
+        params.has('cat')
       ) {
         return true;
       }
@@ -703,6 +707,7 @@ function InventoryApp() {
 
       if (customersData && Array.isArray(customersData)) {
         setCustomersCount(customersData.length);
+        setDbCustomers(customersData);
       }
 
       if (suppliersData && Array.isArray(suppliersData)) {
@@ -1234,7 +1239,6 @@ function InventoryApp() {
         await fetchData(true);
         if (data.purchase?.id) {
           setHighlightPurchaseId(data.purchase.id);
-          setActiveTab('purchases');
         }
       } else {
         const errData = await res.json().catch(() => null);
@@ -1631,6 +1635,7 @@ function InventoryApp() {
             onOpenNewPurchaseForSupplier={(supplierName) => {
               setActiveTab('purchases');
             }}
+            dbCustomers={dbCustomers}
           />
         ) : activeTab === 'analytics' ? (
           /* Store & Product Analytics Dashboard */

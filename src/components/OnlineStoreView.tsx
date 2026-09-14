@@ -1993,6 +1993,18 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     return Array.from(set);
   }, [products]);
 
+  // Auto-detect and filter by category from URL param (?categoria=... or ?category=... or ?cat=...)
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !products || products.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const catParam = params.get('categoria') || params.get('category') || params.get('cat');
+    if (catParam && catParam.trim()) {
+      const trimmed = catParam.trim();
+      const match = categories.find((c) => c.toLowerCase() === trimmed.toLowerCase()) || trimmed;
+      setSelectedCategory(match);
+    }
+  }, [products, categories]);
+
   // Product counts per category for rich sidebar panels
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: products.filter((p) => p.status !== 'archived').length };
@@ -5644,6 +5656,8 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         storeConfig={storeConfig}
+        categories={categories}
+        initialCategory={selectedCategory !== 'all' ? selectedCategory : undefined}
         onShowToast={showToast}
       />
 
