@@ -42,6 +42,7 @@ interface PurchaseRecordCardProps {
   onQuickCopyPhotos: (purchase: PurchaseOrder) => void;
   isCopyingPhotos?: boolean;
   onEditOrDetail: (purchase: PurchaseOrder) => void;
+  onOpenPrintA4?: (purchase: PurchaseOrder) => void;
   onDelete: (purchase: PurchaseOrder) => void;
   onGoToStoreOrders?: (orderNumber?: string) => void;
   statusStyles: {
@@ -70,6 +71,7 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
   onQuickCopyPhotos,
   isCopyingPhotos = false,
   onEditOrDetail,
+  onOpenPrintA4,
   onDelete,
   onGoToStoreOrders,
   statusStyles,
@@ -418,7 +420,13 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
 
             <button
               type="button"
-              onClick={() => directPrintOrder({ purchase, storeConfig, currency, showToast })}
+              onClick={() => {
+                if (onOpenPrintA4) {
+                  onOpenPrintA4(purchase);
+                } else {
+                  directPrintOrder({ purchase, storeConfig, currency, showToast });
+                }
+              }}
               className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5 text-slate-600" />
@@ -584,14 +592,18 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
           <button
             type="button"
             id={`btn-purchase-print-${purchase.id}`}
-            onClick={() =>
-              directPrintOrder({
-                purchase,
-                storeConfig,
-                currency,
-                showToast,
-              })
-            }
+            onClick={() => {
+              if (onOpenPrintA4) {
+                onOpenPrintA4(purchase);
+              } else {
+                directPrintOrder({
+                  purchase,
+                  storeConfig,
+                  currency,
+                  showToast,
+                });
+              }
+            }}
             className={`${btnPurchaseStyle} bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300`}
             title="Imprimir Orden de Compra directamente"
           >

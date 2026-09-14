@@ -4663,15 +4663,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               onOpenShippingCost={handleOpenShippingCost}
               onOpenPendingShipping={handleOpenConfirmOrder}
               onOpenPrintShippingTicket={(ord) => setOrderToPrintShipping(ord)}
-              onOpenPrintA4Order={(ord) => {
-                setOrderToPrintA4(ord);
-                directPrintOrder({
-                  order: ord,
-                  storeConfig,
-                  currency: storeConfig?.currency || currency || 'USD',
-                  showToast,
-                });
-              }}
+              onOpenPrintA4Order={(ord) => setOrderToPrintA4(ord)}
               onOpenRequestShippingData={(ord) => setOrderToRequestShippingData(ord)}
               onUpdateStatus={async (orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes) => {
                 await onUpdateOrderStatus(orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes);
@@ -4701,15 +4693,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               onOpenShippingCost={handleOpenShippingCost}
               onOpenPendingShipping={handleOpenConfirmOrder}
               onOpenPrintShippingTicket={(ord) => setOrderToPrintShipping(ord)}
-              onOpenPrintA4Order={(ord) => {
-                setOrderToPrintA4(ord);
-                directPrintOrder({
-                  order: ord,
-                  storeConfig,
-                  currency: storeConfig?.currency || currency || 'USD',
-                  showToast,
-                });
-              }}
+              onOpenPrintA4Order={(ord) => setOrderToPrintA4(ord)}
               onOpenRequestShippingData={(ord) => setOrderToRequestShippingData(ord)}
               onUpdateStatus={async (orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes) => {
                 await onUpdateOrderStatus(orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes);
@@ -6373,6 +6357,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
           onUpdateOrderStatus={onUpdateOrderStatus}
           showToast={showToast}
           onOpenShippingTicket={(ord) => setOrderToPrintShipping(ord)}
+          onOpenPrintA4Order={(ord) => setOrderToPrintA4(ord)}
           onCancelOrderClick={(ord) => {
             setOrderToCancel(ord);
             setIsManualOrderModalOpen(false);
@@ -6751,6 +6736,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
       {orderToPrintA4 && (
         <OrderPrintA4Modal
           order={orderToPrintA4}
+          inventoryItems={products}
           storeConfig={storeConfig}
           currency={currency}
           onClose={() => setOrderToPrintA4(null)}

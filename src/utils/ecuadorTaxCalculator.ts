@@ -57,12 +57,15 @@ export interface EcuadorTaxLineItemResult {
 }
 
 export interface EcuadorInvoiceTotalsResult {
-  subtotalTaxable15: number;     // Subtotal 15% (Base imponible que grava IVA)
+  subtotalTaxable15: number;     // Subtotal 15% (Base imponible que grava IVA 15%)
+  subtotalTaxable5: number;      // Subtotal 5% (Base imponible que grava IVA 5%)
   subtotalZero0: number;         // Subtotal 0% / Exento (Base imponible tarifa 0%)
-  subtotalNoTax: number;         // Subtotal Sin Impuestos (Suma de bases imponibles netas)
+  subtotalNoTax: number;         // Subtotal Sin Impuestos (Suma de bases imponibles netas 0% + 15% + 5%)
   grossSubtotal: number;         // Subtotal Bruto sin descuentos
   totalDiscount: number;         // Total Descuento Aplicado en $
-  totalTax: number;              // Total IVA 15% (Venta)
+  taxAmount15: number;           // Monto de IVA 15%
+  taxAmount5: number;            // Monto de IVA 5%
+  totalTax: number;              // Total IVA (Venta)
   shippingFee: number;           // Valor Flete / Envío
   totalInvoiceAmount: number;    // VALOR TOTAL FACTURA (Subtotal neto + IVA + Envío)
   totalAccountingProfit: number; // Utilidad contable real total del pedido en $
@@ -152,7 +155,7 @@ export function extractBaseUnitPriceWithoutTax(params: {
     return { unitPriceWithoutTax, marginPercent: margin };
   }
 
-  // 2. Si la modalidad de precio es explícitamente INCLUDING_TAX, desglosar el IVA
+  // 2. Si la modalidad de precio es explícitamente INCLUDING_TAX, desglosar el IVA del PVP
   if (params.pricingMode === 'INCLUDING_TAX' && rawSale > 0) {
     const applyTax = params.applySaleTax !== false;
     const taxPct = applyTax ? Math.max(0, Number(params.saleTaxPercent ?? 15)) : 0;
@@ -296,9 +299,12 @@ export function calculateInvoiceTotals(
   }
 ): EcuadorInvoiceTotalsResult {
   let subtotalTaxable15 = 0;
+  let subtotalTaxable5 = 0;
   let subtotalZero0 = 0;
   let grossSubtotal = 0;
   let totalLineDiscounts = 0;
+  let taxAmount15 = 0;
+  let taxAmount5 = 0;
   let totalTax = 0;
   let totalAccountingProfit = 0;
   let totalUnits = 0;
@@ -313,8 +319,12 @@ export function calculateInvoiceTotals(
     grossSubtotal += roundMonetary(calculated.unitPriceWithoutTax * calculated.quantity);
     totalLineDiscounts += roundMonetary(calculated.unitDiscount * calculated.quantity);
     
-    if (calculated.lineTaxPercent > 0) {
+    if (Math.abs(calculated.lineTaxPercent - 5) < 0.01) {
+      subtotalTaxable5 += calculated.lineSubtotal;
+      taxAmount5 += calculated.lineTaxAmount;
+    } else if (calculated.lineTaxPercent > 0) {
       subtotalTaxable15 += calculated.lineSubtotal;
+      taxAmount15 += calculated.lineTaxAmount;
     } else {
       subtotalZero0 += calculated.lineSubtotal;
     }
@@ -324,24 +334,30 @@ export function calculateInvoiceTotals(
   });
   
   subtotalTaxable15 = roundMonetary(subtotalTaxable15);
+  subtotalTaxable5 = roundMonetary(subtotalTaxable5);
   subtotalZero0 = roundMonetary(subtotalZero0);
   grossSubtotal = roundMonetary(grossSubtotal);
   totalLineDiscounts = roundMonetary(totalLineDiscounts);
+  taxAmount15 = roundMonetary(taxAmount15);
+  taxAmount5 = roundMonetary(taxAmount5);
   totalTax = roundMonetary(totalTax);
   totalAccountingProfit = roundMonetary(totalAccountingProfit);
   
   const globalDisc = Math.max(0, roundMonetary(Number(params?.globalDiscount) || 0));
   const totalDiscount = roundMonetary(totalLineDiscounts + globalDisc);
-  const subtotalNoTax = roundMonetary(subtotalTaxable15 + subtotalZero0);
+  const subtotalNoTax = roundMonetary(subtotalTaxable15 + subtotalTaxable5 + subtotalZero0);
   const shippingFee = Math.max(0, roundMonetary(Number(params?.shippingFee) || 0));
   const totalInvoiceAmount = roundMonetary(subtotalNoTax + totalTax + shippingFee);
   
   return {
     subtotalTaxable15,
+    subtotalTaxable5,
     subtotalZero0,
     subtotalNoTax,
     grossSubtotal,
     totalDiscount,
+    taxAmount15,
+    taxAmount5,
     totalTax,
     shippingFee,
     totalInvoiceAmount,

@@ -159,12 +159,21 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
             (p: any) => p.id === targetId || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase())
           );
           const cPrice = Number(it.costPrice ?? matchingProduct?.costWithoutTax ?? matchingProduct?.costPrice ?? 0);
+          const hasItemSalePrice = (it.salePrice !== undefined && it.salePrice !== null && !isNaN(Number(it.salePrice))) ||
+                                   (it.item?.salePrice !== undefined && it.item?.salePrice !== null && !isNaN(Number(it.item.salePrice)));
           const rawSale = Number(it.salePrice || it.item?.salePrice || matchingProduct?.salePrice || 0);
+          const itemTaxPct = extractItemTaxPercent(it, orderTaxPct, matchingProduct);
+          const itemApplyTax = itemTaxPct > 0;
+          const pricingMode = hasItemSalePrice
+            ? 'EXCLUDING_TAX'
+            : (itemApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX');
+
           const basePriceInfo = extractBaseUnitPriceWithoutTax({
             rawSalePrice: rawSale,
             costWithoutTax: cPrice,
-            applySaleTax: orderApplyTax,
-            saleTaxPercent: orderTaxPct,
+            pricingMode,
+            applySaleTax: itemApplyTax,
+            saleTaxPercent: itemTaxPct,
             marginPercent: it.marginPercent !== undefined ? Number(it.marginPercent) : (matchingProduct as any)?.marginPercent,
           });
           const baseSalePrice = basePriceInfo.unitPriceWithoutTax;
@@ -225,30 +234,14 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
         const firstLinkedPurchase = linkedPurchasesForOrder[0];
         const isLinkedPurchasePending = linkedPurchasesForOrder.some((p: any) => p.status === 'pending');
 
-        // 2. Shipping cost calculation exactly as UnifiedOrderManageModal.tsx does (lines 381-389 & 605)
-        const itemsSub = parsedItems.reduce(
-          (acc: number, it: any) => acc + Math.max(0, it.salePrice - (it.discount || 0)) * it.quantity,
-          0
-        );
-        const explicitShip = Number((ord as any).shippingCost);
-        let derivedShippingCost = 0;
-        if (!isNaN(explicitShip) && explicitShip > 0) {
-          derivedShippingCost = explicitShip;
-        } else {
-          const orderTotal = Number(ord.totalAmount || 0);
-          const derivedShip = Math.max(0, orderTotal - itemsSub);
-          derivedShippingCost = derivedShip > 0 ? derivedShip : 0;
-        }
-        const fee = isPickup ? 0 : derivedShippingCost;
-
-        // 3. Calculated items & invoice totals exactly as UnifiedOrderManageModal.tsx does (lines 584-607)
+        // Calculated items & invoice totals
         const calculatedItems = parsedItems.map((it: any) => {
           const match = (inventoryItems || []).find(
             (p: any) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase())
           );
           const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
           const unitSale = Number(it.salePrice || 0);
-          const itemTaxPercent = extractItemTaxPercent(it, 15, match);
+          const itemTaxPercent = extractItemTaxPercent(it, orderTaxPct, match);
 
           const lineResult = calculateLineItem({
             id: it.id,
@@ -256,6 +249,7 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
             sku: it.sku,
             costWithoutTax: unitCost,
             unitSalePrice: unitSale,
+            pricingMode: 'EXCLUDING_TAX',
             discount: Number(it.discount || 0),
             quantity: Number(it.quantity || 1),
             applySaleTax: itemTaxPercent > 0,
@@ -267,6 +261,18 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
             imageUrl: it.imageUrl,
           };
         });
+
+        const itemsTotalWithTax = calculatedItems.reduce((acc: number, it: any) => acc + it.lineTotal, 0);
+        const explicitShip = Number((ord as any).shippingCost ?? (ord as any).deliveryFee);
+        let derivedShippingCost = 0;
+        if (!isNaN(explicitShip) && explicitShip >= 0 && (ord as any).shippingCost !== undefined && (ord as any).shippingCost !== null) {
+          derivedShippingCost = explicitShip;
+        } else {
+          const orderTotal = Number(ord.totalAmount || 0);
+          const derivedShip = Math.max(0, orderTotal - itemsTotalWithTax);
+          derivedShippingCost = derivedShip > 0 ? derivedShip : 0;
+        }
+        const fee = isPickup ? 0 : derivedShippingCost;
 
         const invoiceTotals = calculateInvoiceTotals(calculatedItems, { shippingFee: fee });
 

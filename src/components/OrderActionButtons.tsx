@@ -185,6 +185,7 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
     } else {
       directPrintOrder({
         order: ord,
+        inventoryItems,
         storeConfig,
         currency,
         showToast,

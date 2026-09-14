@@ -1287,6 +1287,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     setEditingPurchase(p);
                     setIsNewPurchaseModalOpen(true);
                   }}
+                  onOpenPrintA4={(p) => setPurchaseToPrintA4(p)}
                   onDelete={(p) => setPurchaseToDelete(p)}
                   onGoToStoreOrders={onGoToStoreOrders}
                   statusStyles={statusStyles}

@@ -1,10 +1,11 @@
 import { CustomerOrder, PurchaseOrder, StoreConfig } from '../types.ts';
 import { getCustomerCi, getCleanAddress, isPickupDeliveryOrder } from './orderUtils.ts';
-import { calculateLineItem, calculateInvoiceTotals, extractItemTaxPercent, EcuadorInvoiceTotalsResult } from './ecuadorTaxCalculator.ts';
+import { calculateLineItem, calculateInvoiceTotals, extractItemTaxPercent, extractBaseUnitPriceWithoutTax, EcuadorInvoiceTotalsResult } from './ecuadorTaxCalculator.ts';
 
 export interface DirectOrderPrintParams {
   order?: CustomerOrder | null;
   purchase?: PurchaseOrder | null;
+  inventoryItems?: any[];
   storeConfig?: Partial<StoreConfig> | null;
   currency?: string;
   paperFormat?: 'a4' | 'letter';
@@ -28,6 +29,7 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
   const {
     order,
     purchase,
+    inventoryItems,
     storeConfig,
     currency = 'USD',
     paperFormat = 'a4',
@@ -171,87 +173,104 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
     notesStr = purchase.notes || '';
   }
 
-  // SRI Fiscal Breakdown calculation for Sales and Orders (100% identical to UnifiedOrderManageModal)
+  // SRI Fiscal Breakdown calculation for Sales and Orders (100% identical to OrdersTableView "Vista Factura")
+  let salesCalculatedItems: any[] = [];
   let invoiceTotals: EcuadorInvoiceTotalsResult | null = null;
   if (isSale && order) {
-    const defaultOrderTax =
-      (order as any).saleTaxPercent !== undefined
-        ? Number((order as any).saleTaxPercent)
-        : (order as any).applySaleTax === false
-        ? 0
-        : 15;
+    const orderApplyTax = (order as any).applySaleTax !== false;
+    const orderTaxPct = Number((order as any).saleTaxPercent || 15);
 
-    const itemsSub = rawItems.reduce(
-      (acc: number, it: any) =>
-        acc +
-        Math.max(
-          0,
-          Number(it.salePrice ?? it.unitPrice ?? it.price ?? 0) - Number(it.discount ?? 0)
-        ) *
-          (Number(it.quantity) || 1),
-      0
-    );
+    const parsedItems = rawItems.map((it: any) => {
+      const targetId = it.inventoryItemId || it.id;
+      const matchingProduct = (inventoryItems || []).find(
+        (p: any) => p.id === targetId || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase())
+      );
+      const cPrice = Number(it.costPrice ?? matchingProduct?.costWithoutTax ?? matchingProduct?.costPrice ?? 0);
+      const hasItemSalePrice = (it.salePrice !== undefined && it.salePrice !== null && !isNaN(Number(it.salePrice))) ||
+                               (it.item?.salePrice !== undefined && it.item?.salePrice !== null && !isNaN(Number(it.item.salePrice)));
+      const rawSale = Number(it.salePrice || it.item?.salePrice || matchingProduct?.salePrice || 0);
+      const itemTaxPct = extractItemTaxPercent(it, orderTaxPct, matchingProduct);
+      const itemApplyTax = itemTaxPct > 0;
+      const pricingMode = hasItemSalePrice
+        ? 'EXCLUDING_TAX'
+        : (itemApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX');
 
+      const basePriceInfo = extractBaseUnitPriceWithoutTax({
+        rawSalePrice: rawSale,
+        costWithoutTax: cPrice,
+        pricingMode,
+        applySaleTax: itemApplyTax,
+        saleTaxPercent: itemTaxPct,
+        marginPercent: it.marginPercent !== undefined ? Number(it.marginPercent) : (matchingProduct as any)?.marginPercent,
+      });
+      const baseSalePrice = basePriceInfo.unitPriceWithoutTax;
+      const marginPct = basePriceInfo.marginPercent;
+      let discVal = Number(it.discount ?? 0);
+      if (discVal === 0 && (it.discountPercent || matchingProduct?.discountPercent)) {
+        const pct = Number(it.discountPercent || matchingProduct?.discountPercent || 0);
+        if (pct > 0) {
+          discVal = Math.round((baseSalePrice * pct / 100) * 100) / 100;
+        }
+      }
+      return {
+        id: targetId,
+        inventoryItemId: it.inventoryItemId || it.id,
+        name: it.name || it.item?.name || matchingProduct?.name || 'Producto',
+        sku: it.sku || it.item?.sku || matchingProduct?.sku || '',
+        barcode: it.barcode || matchingProduct?.barcode || undefined,
+        costPrice: cPrice,
+        marginPercent: marginPct,
+        supplierName: it.supplierName || (matchingProduct as any)?.supplier || undefined,
+        salePrice: baseSalePrice,
+        discount: discVal,
+        discountPercent: it.discountPercent ? Number(it.discountPercent) : (matchingProduct?.discountPercent ? Number(matchingProduct.discountPercent) : 0),
+        quantity: Number(it.quantity || 1),
+        imageUrl: it.imageUrl || it.item?.imageUrl || matchingProduct?.imageUrl || null,
+      };
+    });
+
+    const calculatedItems = parsedItems.map((it: any) => {
+      const match = (inventoryItems || []).find(
+        (p: any) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase())
+      );
+      const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
+      const unitSale = Number(it.salePrice || 0);
+      const itemTaxPercent = extractItemTaxPercent(it, orderTaxPct, match);
+
+      const lineResult = calculateLineItem({
+        id: it.id,
+        name: it.name,
+        sku: it.sku,
+        costWithoutTax: unitCost,
+        unitSalePrice: unitSale,
+        pricingMode: 'EXCLUDING_TAX',
+        discount: Number(it.discount || 0),
+        quantity: Number(it.quantity || 1),
+        applySaleTax: itemTaxPercent > 0,
+        saleTaxPercent: itemTaxPercent,
+      });
+
+      return {
+        ...lineResult,
+        imageUrl: it.imageUrl,
+      };
+    });
+
+    const itemsTotalWithTax = calculatedItems.reduce((acc: number, it: any) => acc + it.lineTotal, 0);
     const explicitShip = Number((order as any).shippingCost ?? (order as any).deliveryFee);
     let derivedShippingCost = 0;
-    if (!isNaN(explicitShip) && explicitShip > 0) {
+    if (!isNaN(explicitShip) && explicitShip >= 0 && (order as any).shippingCost !== undefined && (order as any).shippingCost !== null) {
       derivedShippingCost = explicitShip;
     } else {
       const orderTotal = Number(order.totalAmount || 0);
-      const derivedShip = Math.max(0, orderTotal - itemsSub);
+      const derivedShip = Math.max(0, orderTotal - itemsTotalWithTax);
       derivedShippingCost = derivedShip > 0 ? derivedShip : 0;
     }
     const isPickup = isPickupDeliveryOrder(order);
     const fee = isPickup ? 0 : derivedShippingCost;
 
-    const calculatedItems = rawItems.map((it: any) => {
-      const subItem = it.item && typeof it.item === 'object' ? it.item : {};
-      const unitCost = Number(it.costPrice ?? subItem.costPrice ?? 0);
-      const unitSale = Number(it.salePrice ?? subItem.salePrice ?? it.unitPrice ?? it.price ?? subItem.price ?? 0);
-
-      const itemTaxPercent = extractItemTaxPercent(it, defaultOrderTax);
-
-      return calculateLineItem({
-        id: it.id,
-        name: it.name || subItem.name || it.productName || 'Producto',
-        sku: it.sku || subItem.sku,
-        costWithoutTax: unitCost,
-        unitSalePrice: unitSale,
-        discount: Number(it.discount ?? subItem.discount ?? 0),
-        quantity: Number(it.quantity) || 1,
-        applySaleTax: itemTaxPercent > 0,
-        saleTaxPercent: itemTaxPercent,
-      });
-    });
-
     salesCalculatedItems = calculatedItems;
-
-    let totals = calculateInvoiceTotals(calculatedItems, { shippingFee: fee });
-
-    // Safety reconciliation: If order stored a non-zero taxAmount but calculated totalTax is 0
-    const storedTax = Number((order as any).taxAmount);
-    if (!isNaN(storedTax) && storedTax > 0 && totals.totalTax === 0) {
-      const recalculateWithTax = rawItems.map((it: any) => {
-        const subItem = it.item && typeof it.item === 'object' ? it.item : {};
-        const unitCost = Number(it.costPrice ?? subItem.costPrice ?? 0);
-        const unitSale = Number(it.salePrice ?? subItem.salePrice ?? it.unitPrice ?? it.price ?? subItem.price ?? 0);
-        return calculateLineItem({
-          id: it.id,
-          name: it.name || subItem.name || it.productName || 'Producto',
-          sku: it.sku || subItem.sku,
-          costWithoutTax: unitCost,
-          unitSalePrice: unitSale,
-          discount: Number(it.discount ?? subItem.discount ?? 0),
-          quantity: Number(it.quantity) || 1,
-          applySaleTax: true,
-          saleTaxPercent: 15,
-        });
-      });
-      salesCalculatedItems = recalculateWithTax;
-      totals = calculateInvoiceTotals(recalculateWithTax, { shippingFee: fee });
-    }
-
-    invoiceTotals = totals;
+    invoiceTotals = calculateInvoiceTotals(calculatedItems, { shippingFee: fee });
   }
 
   let purchaseSriBreakdown: {
@@ -811,11 +830,11 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
           <tr>
             <th style="width: 4%; text-align: center;">#</th>
             <th style="width: 36%;">Producto / Descripción</th>
-            <th style="width: 16%;">SKU / Código</th>
+            <th style="width: 14%;">SKU / Código</th>
             <th style="width: 8%; text-align: center;">Cantidad</th>
-            <th style="width: 12%; text-align: right;">Valor Unit. ($)</th>
-            <th style="width: 8%; text-align: right;">Desc. ($)</th>
-            <th style="width: 5%; text-align: center;">IVA</th>
+            <th style="width: 11%; text-align: right;">Valor Unit. ($)</th>
+            <th style="width: 9%; text-align: right;">Desc. ($)</th>
+            <th style="width: 7%; text-align: center;">IVA (%)</th>
             <th style="width: 11%; text-align: right;">Subtotal ($)</th>
           </tr>
         `
@@ -842,13 +861,17 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
                 .map(
                   (it, idx) => `
               <tr>
-                <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
+                <td style="text-align: center; font-weight: bold; color: #64748b;">#${idx + 1}</td>
                 <td class="product-title">${it.name}</td>
                 <td class="sku-code">${it.sku || '-'}</td>
                 <td class="qty-cell">${it.quantity} u.</td>
                 <td class="price-cell">${currencySymbol}${it.unitPriceWithoutTax.toFixed(2)}</td>
                 <td class="price-cell" style="color: ${it.unitDiscount > 0 ? '#b45309' : '#64748b'};">${currencySymbol}${(it.unitDiscount * it.quantity).toFixed(2)}</td>
-                <td style="text-align: center; font-weight: bold;">${it.lineTaxPercent}%</td>
+                <td style="text-align: center; font-weight: bold;">
+                  <span style="display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 9px; ${it.lineTaxPercent > 0 ? 'background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe;' : 'background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;'}">
+                    ${it.lineTaxPercent}%
+                  </span>
+                </td>
                 <td class="total-cell">${currencySymbol}${it.lineSubtotal.toFixed(2)}</td>
               </tr>
             `
@@ -939,8 +962,18 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
                 <td class="totals-label">Subtotal 15%:</td>
                 <td class="totals-val">${currencySymbol}${invoiceTotals.subtotalTaxable15.toFixed(2)}</td>
               </tr>
+              ${
+                invoiceTotals.subtotalTaxable5 > 0
+                  ? `
+                <tr>
+                  <td class="totals-label">Subtotal 5%:</td>
+                  <td class="totals-val">${currencySymbol}${invoiceTotals.subtotalTaxable5.toFixed(2)}</td>
+                </tr>
+              `
+                  : ''
+              }
               <tr style="border-top: 1px solid #cbd5e1;">
-                <td class="totals-label" style="font-weight: 800; color: #0f172a;">Subtotal Sin Impuesto:</td>
+                <td class="totals-label" style="font-weight: 800; color: #0f172a;">Subtotal Sin Impuestos:</td>
                 <td class="totals-val" style="font-weight: 800;">${currencySymbol}${invoiceTotals.subtotalNoTax.toFixed(2)}</td>
               </tr>
               ${
@@ -954,9 +987,19 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
                   : ''
               }
               <tr>
-                <td class="totals-label">IVA VENTA (15%):</td>
-                <td class="totals-val">${currencySymbol}${invoiceTotals.totalTax.toFixed(2)}</td>
+                <td class="totals-label">IVA 15%:</td>
+                <td class="totals-val">${currencySymbol}${invoiceTotals.taxAmount15.toFixed(2)}</td>
               </tr>
+              ${
+                invoiceTotals.taxAmount5 > 0 || invoiceTotals.subtotalTaxable5 > 0
+                  ? `
+                <tr>
+                  <td class="totals-label">IVA 5%:</td>
+                  <td class="totals-val">${currencySymbol}${invoiceTotals.taxAmount5.toFixed(2)}</td>
+                </tr>
+              `
+                  : ''
+              }
               ${
                 invoiceTotals.shippingFee > 0
                   ? `
@@ -1362,7 +1405,10 @@ export async function directPrintOrder(params: DirectOrderPrintParams): Promise<
 
   try {
     const htmlContent = generateOrderPrintHtml(params);
-    triggerPrintViaBlobWindow(htmlContent, showToast);
+    const printed = await printViaIsolatedIframe(htmlContent);
+    if (!printed) {
+      triggerPrintViaBlobWindow(htmlContent, showToast);
+    }
   } catch (err) {
     console.error('Error al invocar impresión directa:', err);
     try {

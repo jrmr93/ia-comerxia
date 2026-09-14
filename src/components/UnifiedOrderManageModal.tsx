@@ -76,6 +76,7 @@ export interface UnifiedOrderManageModalProps {
   ) => Promise<boolean>;
   showToast: (msg: string) => void;
   onOpenShippingTicket?: (order: CustomerOrder) => void;
+  onOpenPrintA4Order?: (order: CustomerOrder) => void;
   onCancelOrderClick?: (order: CustomerOrder) => void;
   onGenerateSupplierPurchase?: (order: CustomerOrder) => void | Promise<void>;
   onOpenPendingShipping?: (order: CustomerOrder) => void;
@@ -126,6 +127,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   onUpdateOrderStatus,
   showToast,
   onOpenShippingTicket,
+  onOpenPrintA4Order,
   onCancelOrderClick,
   onGenerateSupplierPurchase,
   onOpenPendingShipping,
@@ -345,11 +347,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         const matchingProduct = products.find((p) => p.id === targetId || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
         const cPrice = Number(it.costPrice ?? matchingProduct?.costWithoutTax ?? matchingProduct?.costPrice ?? 0);
         const rawSale = Number(it.salePrice || it.item?.salePrice || matchingProduct?.salePrice || 0);
+        const itemTaxPct = extractItemTaxPercent(it, orderTaxPct, matchingProduct);
+        const itemApplyTax = itemTaxPct > 0;
         const basePriceInfo = extractBaseUnitPriceWithoutTax({
           rawSalePrice: rawSale,
           costWithoutTax: cPrice,
-          applySaleTax: orderApplyTax,
-          saleTaxPercent: orderTaxPct,
+          pricingMode: itemApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX',
+          applySaleTax: itemApplyTax,
+          saleTaxPercent: itemTaxPct,
           marginPercent: it.marginPercent !== undefined ? Number(it.marginPercent) : (matchingProduct as any)?.marginPercent,
         });
         const baseSalePrice = basePriceInfo.unitPriceWithoutTax;
@@ -380,13 +385,31 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       setItems(parsedItems);
 
       // Shipping cost calculation
-      const itemsSub = parsedItems.reduce((acc, it) => acc + (Math.max(0, it.salePrice - (it.discount || 0)) * it.quantity), 0);
+      const calculatedItemsForShipping = parsedItems.map((it: any) => {
+        const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
+        const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
+        const unitSale = Number(it.salePrice || 0);
+        const itemTaxPercent = extractItemTaxPercent(it, orderTaxPct, match);
+
+        return calculateLineItem({
+          id: it.id,
+          name: it.name,
+          sku: it.sku,
+          costWithoutTax: unitCost,
+          unitSalePrice: unitSale,
+          discount: Number(it.discount || 0),
+          quantity: Number(it.quantity || 1),
+          applySaleTax: itemTaxPercent > 0,
+          saleTaxPercent: itemTaxPercent,
+        });
+      });
+      const itemsTotalWithTax = calculatedItemsForShipping.reduce((acc, it) => acc + it.lineTotal, 0);
       const explicitShip = Number((order as any).shippingCost);
-      if (!isNaN(explicitShip) && explicitShip > 0) {
+      if (!isNaN(explicitShip) && (order as any).shippingCost !== undefined && (order as any).shippingCost !== null) {
         setShippingCost(String(explicitShip));
       } else {
         const orderTotal = Number(order.totalAmount || 0);
-        const derivedShip = Math.max(0, orderTotal - itemsSub);
+        const derivedShip = Math.max(0, orderTotal - itemsTotalWithTax);
         setShippingCost(derivedShip > 0 ? derivedShip.toFixed(2) : '0');
       }
 
@@ -475,11 +498,15 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       }
       const cPrice = Number(prod.costWithoutTax ?? prod.costPrice ?? 0);
       const rawSale = Number(prod.salePrice || 0);
+      const prodTaxPercent = extractItemTaxPercent(prod, 15);
+      const prodApplyTax = prodTaxPercent > 0;
+
       const basePriceInfo = extractBaseUnitPriceWithoutTax({
         rawSalePrice: rawSale,
         costWithoutTax: cPrice,
-        applySaleTax,
-        saleTaxPercent,
+        pricingMode: prodApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX',
+        applySaleTax: prodApplyTax,
+        saleTaxPercent: prodTaxPercent,
         marginPercent: (prod as any).marginPercent !== undefined ? Number((prod as any).marginPercent) : undefined,
       });
       const sPrice = basePriceInfo.unitPriceWithoutTax;
@@ -595,6 +622,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         sku: it.sku,
         costWithoutTax: unitCost,
         unitSalePrice: unitSale,
+        pricingMode: 'EXCLUDING_TAX',
         discount: Number(it.discount || 0),
         quantity: Number(it.quantity || 1),
         applySaleTax: itemTaxPercent > 0,
@@ -1283,11 +1311,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               type="button"
               disabled={items.length === 0}
               onClick={() => {
-                setShowPrintA4Modal(true);
-                directPrintOrder({ order: currentOrderForTicket, storeConfig, currency, showToast });
+                if (onOpenPrintA4Order && currentOrderForTicket) {
+                  onOpenPrintA4Order(currentOrderForTicket);
+                } else {
+                  setShowPrintA4Modal(true);
+                }
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition cursor-pointer border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-              title="Imprimir ticket de venta"
+              title="Imprimir vista previa de venta"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Imprimir Venta</span>
@@ -2006,20 +2037,21 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               </div>
             ) : (
               <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs bg-white">
-                {/* Table Header (Formato Factura SRI 6 Columnas Exactas) */}
+                {/* Table Header (Formato Prefactura SRI 7 Columnas Exactas) */}
                 <div className="hidden lg:grid lg:grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800">
+                  <div className="col-span-1 text-center">N°</div>
                   <div className="col-span-2 flex items-center gap-1.5">
                     <Receipt className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Código</span>
+                    <span>Código / SKU</span>
                   </div>
                   <div className="col-span-3">Producto</div>
                   <div className="col-span-1 text-center">Cantidad</div>
-                  <div className="col-span-2 text-right" title="Costo sin IVA del producto + porcentaje de ganancia">Valor Unitario ($)</div>
-                  <div className="col-span-2 text-right" title="Descuento unitario otorgado en dólares">Descuento ($)</div>
-                  <div className="col-span-2 text-right" title="Subtotal base imponible de la línea sin IVA">Total Venta Sin IVA ($)</div>
+                  <div className="col-span-2 text-right" title="Precio unitario de venta sin IVA">Precio Sin IVA ($)</div>
+                  <div className="col-span-1 text-right" title="Descuento unitario otorgado en dólares">Descuento ($)</div>
+                  <div className="col-span-2 text-right" title="Subtotal base imponible de la línea sin IVA">Total ($)</div>
                 </div>
 
-                {/* Items List - Formato Factura SRI */}
+                {/* Items List - Formato Prefactura SRI (7 Columnas) */}
                 <div className="divide-y divide-slate-200 max-h-72 overflow-y-auto">
                   {items.map((it, idx) => {
                     const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
@@ -2038,13 +2070,18 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     const itemSubtotal = calculatedRow.lineSubtotal;
 
                     return (
-                      <div key={idx} className="p-3 lg:px-3 lg:py-2.5 lg:grid lg:grid-cols-12 gap-2 items-center hover:bg-purple-50/30 transition border-b border-slate-200/80">
-                        {/* 1. Código */}
-                        <div className="col-span-2 flex items-center gap-1 font-mono font-bold text-purple-900 text-xs truncate">
-                          <span>{it.sku || (it.id ? `PRD-${it.id}` : '—')}</span>
+                      <div key={idx} className="p-3 lg:px-3 lg:py-2.5 lg:grid lg:grid-cols-12 gap-2 items-center hover:bg-purple-50/30 transition border-b border-slate-200/80 text-xs">
+                        {/* 1. N° (Número de producto) */}
+                        <div className="col-span-1 flex items-center justify-center font-mono font-bold text-slate-500 text-xs mb-1 lg:mb-0">
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">#{idx + 1}</span>
                         </div>
 
-                        {/* 2. Producto */}
+                        {/* 2. Código de barras / SKU */}
+                        <div className="col-span-2 flex items-center gap-1 font-mono font-bold text-purple-900 text-xs truncate mb-1 lg:mb-0">
+                          <span className="truncate" title={it.barcode || it.sku}>{it.barcode || it.sku || (it.id ? `PRD-${it.id}` : '—')}</span>
+                        </div>
+
+                        {/* 3. Nombre del producto */}
                         <div className="col-span-3 flex items-center gap-2 min-w-0 mb-1 lg:mb-0">
                           <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
                             {it.imageUrl ? (
@@ -2063,7 +2100,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           </div>
                         </div>
 
-                        {/* 3. Cantidad Stepper */}
+                        {/* 4. Cantidad */}
                         <div className="col-span-1 flex justify-center mb-1 lg:mb-0">
                           <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-slate-50 h-7">
                             <button
@@ -2092,10 +2129,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           </div>
                         </div>
 
-                        {/* 4. Valor Unitario ($) = Costo sin IVA + % Ganancia */}
+                        {/* 5. Precio sin IVA ($) */}
                         <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
-                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Valor Unit. ($):</span>
-                          <div className="relative flex items-center" title={`Costo Sin IVA ($${unitCost.toFixed(2)}) + % Ganancia (${calculatedRow.markupPercent}%)`}>
+                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Precio sin IVA:</span>
+                          <div className="relative flex items-center" title={`Precio de venta unitario sin IVA`}>
                             <span className="text-xs text-purple-600 font-bold absolute left-2 pointer-events-none">$</span>
                             <input
                               type="number"
@@ -2113,11 +2150,11 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           </div>
                         </div>
 
-                        {/* 5. Descuento ($) */}
-                        <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
-                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Descuento ($):</span>
+                        {/* 6. Descuento ($) */}
+                        <div className="col-span-1 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
+                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Descuento:</span>
                           <div className="relative flex items-center">
-                            <span className="text-xs text-slate-400 font-bold absolute left-2 pointer-events-none">$</span>
+                            <span className="text-xs text-slate-400 font-bold absolute left-1.5 pointer-events-none">$</span>
                             <input
                               type="number"
                               step="0.01"
@@ -2127,14 +2164,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 const newDisc = Math.max(0, Number(e.target.value) || 0);
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, discount: newDisc } : item)));
                               }}
-                              className="w-18 h-7 pl-4 pr-1 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-purple-500"
+                              className="w-14 h-7 pl-3.5 pr-1 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-purple-500"
                             />
                           </div>
                         </div>
 
-                        {/* 6. Total Venta Sin IVA ($) & Trash */}
+                        {/* 7. Total ($) */}
                         <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1">
-                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Total Venta Sin IVA:</span>
+                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Total:</span>
                           <span className="font-mono font-bold text-xs text-purple-950 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-200 inline-block">
                             ${itemSubtotal.toFixed(2)}
                           </span>
@@ -2389,38 +2426,53 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               </div>
             </div>
 
-            {/* SRI Totals Breakdown */}
-            <div className="w-full sm:w-auto bg-slate-800/90 rounded-xl p-3 border border-slate-700 text-xs font-mono space-y-1 min-w-[280px]">
+            {/* SRI Totals Breakdown (Desglose Tributario Oficial) */}
+            <div className="w-full sm:w-auto bg-slate-800/90 rounded-xl p-3 border border-slate-700 text-xs font-mono space-y-1 min-w-[300px]">
+              {/* 1. Subtotal 0% */}
               <div className="flex justify-between text-slate-400 text-[11px]">
                 <span>Subtotal 0%:</span>
                 <span className="font-bold text-slate-200">${invoiceTotals.subtotalZero0.toFixed(2)}</span>
               </div>
+              {/* 2. Subtotal 15% */}
               <div className="flex justify-between text-slate-400 text-[11px]">
                 <span>Subtotal 15%:</span>
                 <span className="font-bold text-slate-200">${invoiceTotals.subtotalTaxable15.toFixed(2)}</span>
               </div>
+              {/* 3. Subtotal 5% */}
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>Subtotal 5%:</span>
+                <span className="font-bold text-slate-200">${invoiceTotals.subtotalTaxable5.toFixed(2)}</span>
+              </div>
+              {/* 4. Subtotal Sin Impuestos */}
               <div className="flex justify-between text-slate-300 font-bold text-[11px] pt-1 border-t border-slate-700/80">
-                <span>Subtotal Sin Impuesto:</span>
+                <span>Subtotal Sin Impuestos:</span>
                 <span className="text-white">${invoiceTotals.subtotalNoTax.toFixed(2)}</span>
               </div>
-              {totalDiscountAmount > 0 && (
-                <div className="flex justify-between text-purple-300 text-[11px]">
-                  <span>Total Descuento:</span>
-                  <span>-${totalDiscountAmount.toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-amber-300 text-[11px]">
-                <span>IVA VENTA (15%):</span>
-                <span className="font-bold">+${salesTaxAmount.toFixed(2)}</span>
+              {/* 5. Total Descuento */}
+              <div className="flex justify-between text-purple-300 text-[11px]">
+                <span>Total Descuento:</span>
+                <span className="font-bold">-${totalDiscountAmount.toFixed(2)}</span>
               </div>
+              {/* 6. IVA 15% */}
+              <div className="flex justify-between text-amber-300 text-[11px]">
+                <span>IVA 15%:</span>
+                <span className="font-bold">+${(invoiceTotals.taxAmount15 || (salesTaxAmount > 0 ? salesTaxAmount : 0)).toFixed(2)}</span>
+              </div>
+              {/* 7. IVA 5% */}
+              <div className="flex justify-between text-amber-300 text-[11px]">
+                <span>IVA 5%:</span>
+                <span className="font-bold">+${(invoiceTotals.taxAmount5 || 0).toFixed(2)}</span>
+              </div>
+              {/* 8. Valor Envío (Opcional) */}
               {deliveryType === 'shipping' && shippingFee > 0 && (
                 <div className="flex justify-between text-sky-300 text-[11px]">
                   <span>Valor Envío ({trackingCarrier}):</span>
                   <span className="font-bold">+${shippingFee.toFixed(2)}</span>
                 </div>
               )}
+              {/* 9. Total Final */}
               <div className="flex justify-between text-emerald-400 font-black text-sm pt-1.5 border-t border-slate-700">
-                <span>TOTAL FACTURA SRI:</span>
+                <span>TOTAL PREFACTURA:</span>
                 <span>${totalOrderAmount.toFixed(2)} {currency}</span>
               </div>
             </div>
@@ -2491,6 +2543,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       {showPrintA4Modal && (
         <OrderPrintA4Modal
           order={currentOrderForTicket}
+          inventoryItems={inventoryItems}
           storeConfig={storeConfig}
           currency={currency}
           onClose={() => setShowPrintA4Modal(false)}
