@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db, isPostgresConfigured } from './index.ts';
-import { aiConfigs, customerOrders, customers, inventoryItems, payments, purchases, serverDomainConfigs, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
+import { aiConfigs, customerOrders, customers, ecuadorApiConfigs, inventoryItems, payments, purchases, serverDomainConfigs, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
 import { validateEcuadorId } from '../utils/ecuadorIdValidator.ts';
 import {
@@ -2712,6 +2712,180 @@ export async function updateAiConfig(
     return localConfig;
   }
 }
+
+// -------------------------------------------------------------
+// ECUADOR API CONFIGURATION HELPERS (Cédula Identity Lookup)
+// -------------------------------------------------------------
+
+export async function getEcuadorApiConfig(userId: number = 1) {
+  const envApiKey = process.env.ECUADORAPI_KEY || '';
+  const state = storage.getState();
+  if (!state.ecuadorApiConfigs) {
+    state.ecuadorApiConfigs = [];
+  }
+
+  let localConfig = state.ecuadorApiConfigs.find((c) => c.userId === userId) || state.ecuadorApiConfigs[0];
+  const effectiveKey = localConfig?.apiKey || envApiKey || '';
+
+  if (!isPostgresConfigured()) {
+    if (!localConfig) {
+      localConfig = {
+        id: state.nextId?.ecuadorApiConfigs || 1,
+        userId,
+        apiKey: envApiKey || null,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      state.ecuadorApiConfigs.push(localConfig);
+      storage.save();
+    }
+    return {
+      id: localConfig.id,
+      userId: localConfig.userId,
+      apiKey: effectiveKey,
+      hasApiKey: Boolean(effectiveKey && effectiveKey.trim().length > 0),
+      isConfigured: Boolean(effectiveKey && effectiveKey.trim().length > 0),
+      isActive: localConfig.isActive !== false,
+      createdAt: localConfig.createdAt,
+      updatedAt: localConfig.updatedAt,
+    };
+  }
+
+  try {
+    const configs = await db
+      .select()
+      .from(ecuadorApiConfigs)
+      .where(eq(ecuadorApiConfigs.userId, userId))
+      .limit(1);
+
+    let sqlRow = configs.length > 0 ? configs[0] : null;
+    if (!sqlRow) {
+      const anyConfig = await db.select().from(ecuadorApiConfigs).limit(1);
+      if (anyConfig.length > 0) {
+        sqlRow = anyConfig[0];
+      }
+    }
+
+    if (!sqlRow) {
+      let targetUserId = userId || 1;
+      const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
+      if (userCheck.length === 0) {
+        const anyUser = await db.select({ id: users.id }).from(users).limit(1);
+        if (anyUser.length > 0) {
+          targetUserId = anyUser[0].id;
+        }
+      }
+
+      const created = await db
+        .insert(ecuadorApiConfigs)
+        .values({
+          userId: targetUserId,
+          apiKey: envApiKey || null,
+          isActive: true,
+        })
+        .returning();
+
+      sqlRow = created[0];
+    }
+
+    const keyToUse = sqlRow.apiKey || envApiKey || '';
+    return {
+      id: sqlRow.id,
+      userId: sqlRow.userId,
+      apiKey: keyToUse,
+      hasApiKey: Boolean(keyToUse && keyToUse.trim().length > 0),
+      isConfigured: Boolean(keyToUse && keyToUse.trim().length > 0),
+      isActive: sqlRow.isActive !== false,
+      createdAt: sqlRow.createdAt,
+      updatedAt: sqlRow.updatedAt,
+    };
+  } catch (error) {
+    console.warn('Error fetching ecuador api config from SQL, fallback to local state:', error);
+    return {
+      id: localConfig?.id || 1,
+      userId,
+      apiKey: effectiveKey,
+      hasApiKey: Boolean(effectiveKey && effectiveKey.trim().length > 0),
+      isConfigured: Boolean(effectiveKey && effectiveKey.trim().length > 0),
+      isActive: localConfig?.isActive !== false,
+    };
+  }
+}
+
+export async function saveEcuadorApiConfig(
+  userId: number = 1,
+  data: { apiKey?: string; isActive?: boolean }
+) {
+  const state = storage.getState();
+  if (!state.ecuadorApiConfigs) state.ecuadorApiConfigs = [];
+
+  let localConfig = state.ecuadorApiConfigs.find((c) => c.userId === userId);
+  if (!localConfig) {
+    localConfig = {
+      id: state.nextId?.ecuadorApiConfigs ? state.nextId.ecuadorApiConfigs++ : 1,
+      userId,
+      apiKey: data.apiKey ?? null,
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    state.ecuadorApiConfigs.push(localConfig);
+  } else {
+    if (data.apiKey !== undefined) localConfig.apiKey = data.apiKey;
+    if (data.isActive !== undefined) localConfig.isActive = data.isActive;
+    localConfig.updatedAt = new Date().toISOString();
+  }
+  storage.save();
+
+  if (!isPostgresConfigured()) {
+    return localConfig;
+  }
+
+  try {
+    const existing = await getEcuadorApiConfig(userId);
+
+    if (existing && existing.id) {
+      const updated = await db
+        .update(ecuadorApiConfigs)
+        .set({
+          apiKey: data.apiKey !== undefined ? data.apiKey : existing.apiKey,
+          isActive: data.isActive !== undefined ? data.isActive : existing.isActive,
+          updatedAt: new Date(),
+        })
+        .where(eq(ecuadorApiConfigs.id, existing.id))
+        .returning();
+
+      if (updated.length > 0) {
+        return updated[0];
+      }
+    }
+
+    let targetUserId = userId || 1;
+    const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
+    if (userCheck.length === 0) {
+      const anyUser = await db.select({ id: users.id }).from(users).limit(1);
+      if (anyUser.length > 0) {
+        targetUserId = anyUser[0].id;
+      }
+    }
+
+    const inserted = await db
+      .insert(ecuadorApiConfigs)
+      .values({
+        userId: targetUserId,
+        apiKey: data.apiKey ?? null,
+        isActive: data.isActive !== undefined ? data.isActive : true,
+      })
+      .returning();
+
+    return inserted[0];
+  } catch (error) {
+    console.warn('Error updating ecuador api config in SQL, fallback to local store:', error);
+    return localConfig;
+  }
+}
+
 
 export async function getInventoryStats(userId?: number) {
   try {

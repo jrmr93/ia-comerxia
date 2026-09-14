@@ -279,6 +279,19 @@ export const emailConfigs = pgTable('email_configs', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// Ecuador API configuration per user (for Cedula identity lookups)
+export const ecuadorApiConfigs = pgTable('ecuador_api_configs', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  apiKey: text('api_key'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+
 // Store Analytics Events tracking (visits, product views, cart additions, whatsapp clicks)
 export const storeAnalyticsEvents = pgTable('store_analytics_events', {
   id: serial('id').primaryKey(),

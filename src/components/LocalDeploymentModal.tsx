@@ -3,6 +3,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Bot,
+  Building2,
   Check,
   CheckCircle2,
   Copy,
@@ -41,12 +42,13 @@ import { TelegramBotConfigModal } from './TelegramBotConfigModal.tsx';
 import { GoogleAiConfigModal } from './GoogleAiConfigModal.tsx';
 import { StoreSettingsTab } from './StoreSettingsTab.tsx';
 import { GmailConfigTab } from './GmailConfigTab.tsx';
+import { EcuadorApiConfigTab } from './EcuadorApiConfigTab.tsx';
 import { DevTestingTab } from './DevTestingTab.tsx';
 
 interface LocalDeploymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'store' | 'email' | 'sandbox';
+  initialTab?: 'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'store' | 'email' | 'sandbox';
   config?: TelegramConfig | null;
   onConfigSaved?: () => void;
   storeConfig?: StoreConfig | null;
@@ -69,7 +71,7 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
   const [downloadingType, setDownloadingType] = useState<string | null>(null);
 
   // Modal Main Navigation
-  const [activeTab, setActiveTab] = useState<'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'store' | 'email' | 'sandbox'>(initialTab || 'store');
+  const [activeTab, setActiveTab] = useState<'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'email' | 'store' | 'sandbox'>(initialTab || 'store');
 
   // Sub-tabs inside "Despliegue"
   const [deploySubTab, setDeploySubTab] = useState<'guide' | 'scripts'>('guide');
@@ -870,6 +872,36 @@ module.exports = {
                   )}
                 </button>
 
+                {/* 3b. Ecuador API */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('ecuador_api')}
+                  className={`text-left px-3 py-2 sm:py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between shrink-0 group ${
+                    activeTab === 'ecuador_api'
+                      ? 'bg-emerald-700 text-white shadow-xs font-semibold'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 bg-slate-50 md:bg-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition ${
+                      activeTab === 'ecuador_api'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-emerald-100 text-emerald-700 group-hover:scale-105'
+                    }`}>
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold truncate">Ecuador API</div>
+                      <div className={`text-[10px] hidden sm:block truncate ${activeTab === 'ecuador_api' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                        Consulta de Cédulas
+                      </div>
+                    </div>
+                  </div>
+                  {activeTab === 'ecuador_api' && (
+                    <span className="w-1.5 h-5 rounded-full bg-white shrink-0 hidden md:block" />
+                  )}
+                </button>
+
                 {/* 4. Correo Gmail */}
                 <button
                   type="button"
@@ -1131,6 +1163,13 @@ module.exports = {
               onConfigSaved={onConfigSaved || (() => {})}
               onClose={onClose}
             />
+          )}
+
+          {/* ========================================================
+              TAB: ECUADOR API (CONSULTA CÉDULAS)
+             ======================================================== */}
+          {activeTab === 'ecuador_api' && (
+            <EcuadorApiConfigTab onSaved={onConfigSaved} />
           )}
 
           {/* ========================================================

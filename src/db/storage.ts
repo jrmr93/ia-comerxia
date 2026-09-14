@@ -285,6 +285,15 @@ export interface LocalAnalyticsEvent {
   createdAt: string;
 }
 
+export interface LocalEcuadorApiConfig {
+  id: number;
+  userId: number;
+  apiKey?: string | null;
+  isActive?: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DatabaseState {
   users: LocalUser[];
   inventoryItems: LocalInventoryItem[];
@@ -292,6 +301,7 @@ export interface DatabaseState {
   telegramConfigs: LocalTelegramConfig[];
   aiConfigs: LocalAiConfig[];
   emailConfigs: LocalEmailConfig[];
+  ecuadorApiConfigs: LocalEcuadorApiConfig[];
   storeConfigs: LocalStoreConfig[];
   serverDomainConfigs: LocalServerDomainConfig[];
   customers: LocalCustomer[];
@@ -307,6 +317,7 @@ export interface DatabaseState {
     telegramConfigs: number;
     aiConfigs: number;
     emailConfigs: number;
+    ecuadorApiConfigs: number;
     storeConfigs: number;
     serverDomainConfigs: number;
     customers: number;
@@ -380,6 +391,16 @@ class StorageManager {
           updatedAt: new Date().toISOString(),
         },
       ],
+      ecuadorApiConfigs: [
+        {
+          id: 1,
+          userId: 1,
+          apiKey: null,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
       storeConfigs: [
         {
           id: 1,
@@ -440,6 +461,7 @@ class StorageManager {
         telegramConfigs: 2,
         aiConfigs: 2,
         emailConfigs: 2,
+        ecuadorApiConfigs: 2,
         storeConfigs: 2,
         serverDomainConfigs: 2,
         customers: 1,

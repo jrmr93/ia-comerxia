@@ -655,6 +655,24 @@ export async function ensureTablesCreated() {
         ALTER TABLE email_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
       `);
 
+      // 9b. Create ecuador_api_configs table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS ecuador_api_configs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          api_key TEXT,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+
+      await client.query(`
+        ALTER TABLE ecuador_api_configs ADD COLUMN IF NOT EXISTS api_key TEXT;
+        ALTER TABLE ecuador_api_configs ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+        ALTER TABLE ecuador_api_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+      `);
+
       // 10. Create store_analytics_events table
       await client.query(`
         CREATE TABLE IF NOT EXISTS store_analytics_events (

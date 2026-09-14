@@ -49,6 +49,8 @@ import {
   getTelegramMessages,
   getAiConfig,
   updateAiConfig,
+  getEcuadorApiConfig,
+  saveEcuadorApiConfig,
   updateInventoryItem,
   saveProductMarketingCopy,
   updateTelegramConfig,
@@ -643,6 +645,119 @@ async function startServer() {
       res.status(400).json({
         error: error.message || 'Error al enviar correo de prueba. Verifica tu correo de Google y contraseña de aplicación.',
       });
+    }
+  });
+
+  // 1e. Ecuador API (Cédula Identity Lookup) Settings & Proxy Endpoints
+  app.get('/api/ecuador-api/config', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const cfg = await getEcuadorApiConfig(req.dbUserId || 1);
+      const apiKeyMasked = cfg.apiKey
+        ? cfg.apiKey.length > 8
+          ? `${cfg.apiKey.slice(0, 4)}••••••••${cfg.apiKey.slice(-4)}`
+          : '••••••••••••••••'
+        : '';
+      res.json({
+        success: true,
+        config: {
+          id: cfg.id,
+          userId: cfg.userId,
+          hasApiKey: cfg.hasApiKey,
+          isConfigured: cfg.isConfigured,
+          isActive: cfg.isActive,
+          apiKeyMasked,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching Ecuador API config:', error);
+      res.status(500).json({ error: error.message || 'Error al obtener configuración de Ecuador API' });
+    }
+  });
+
+  app.post('/api/ecuador-api/config', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { apiKey, isActive } = req.body;
+      const updated = await saveEcuadorApiConfig(req.dbUserId || 1, {
+        apiKey: typeof apiKey === 'string' ? apiKey.trim() : undefined,
+        isActive: typeof isActive === 'boolean' ? isActive : undefined,
+      });
+
+      res.json({
+        success: true,
+        message: 'Configuración de Ecuador API guardada correctamente',
+        config: {
+          id: updated.id,
+          hasApiKey: Boolean(updated.apiKey && updated.apiKey.trim().length > 0),
+          isActive: updated.isActive !== false,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error saving Ecuador API config:', error);
+      res.status(400).json({ error: error.message || 'Error al guardar configuración de Ecuador API' });
+    }
+  });
+
+  app.get('/api/ecuador-api/cedulas/:cedula', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { cedula } = req.params;
+      const cleanCedula = (cedula || '').trim();
+      if (!cleanCedula || !/^\d{10}$/.test(cleanCedula)) {
+        return res.status(400).json({
+          error: 'La cédula proporcionada debe contener exactamente 10 dígitos numéricos.',
+        });
+      }
+
+      const cfg = await getEcuadorApiConfig(req.dbUserId || 1);
+      if (!cfg.hasApiKey || !cfg.apiKey) {
+        return res.status(400).json({
+          error: 'La API Key de Ecuador API no está configurada en la Configuración del Sistema.',
+        });
+      }
+
+      const targetUrl = `https://api.ecuadorapi.com/api/v1/cedulas/${encodeURIComponent(cleanCedula)}/nombres`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s max time
+
+      try {
+        const apiRes = await fetch(targetUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${cfg.apiKey.trim()}`,
+            'Accept': 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        const json = await apiRes.json();
+
+        if (!apiRes.ok) {
+          const errMsg = json?.message || json?.error || `Error en Ecuador API (HTTP ${apiRes.status})`;
+          return res.status(apiRes.status).json({
+            success: false,
+            error: errMsg,
+            raw: json,
+          });
+        }
+
+        return res.json({
+          success: true,
+          data: json.data || json,
+          error: json.error || null,
+          message: json.message || null,
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          return res.status(504).json({ error: 'La consulta a Ecuador API excedió el tiempo máximo de espera (60 segundos).' });
+        }
+        throw fetchErr;
+      }
+    } catch (error: any) {
+      console.error('Error querying Ecuador API by cedula:', error);
+      res.status(500).json({ error: error.message || 'Error al consultar datos en Ecuador API' });
     }
   });
 
