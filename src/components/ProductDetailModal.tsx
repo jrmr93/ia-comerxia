@@ -1032,7 +1032,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           </div>
                         )}
                       </div>
-
                       {(() => {
                         const itemTaxRate = Number(currentItem.taxRate) || 15;
                         const costWithout = Math.round((
@@ -1045,6 +1044,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             ? Number(currentItem.costWithTax)
                             : cost
                         ) * 100) / 100;
+                        const purchaseTaxVal = Math.max(0, Math.round((costWith - costWithout) * 100) / 100);
 
                         let parsedAttr: Record<string, any> = {};
                         if (currentItem.extractedAttributes) {
@@ -1074,88 +1074,114 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             : parsedAttr.saleTaxPercent !== undefined && !isNaN(Number(parsedAttr.saleTaxPercent))
                             ? Number(parsedAttr.saleTaxPercent)
                             : itemTaxRate;
-                        const baseSaleBeforeTax = Math.round((applySaleTax && saleTaxPercent > 0 ? sale / (1 + saleTaxPercent / 100) : sale) * 100) / 100;
-                        const unitProfit = Math.round((baseSaleBeforeTax - costWithout) * 100) / 100;
+
+                        const discountPercent = Math.max(0, Math.min(100, Number(currentItem.discountPercent) || 0));
+                        const discountVal = Math.round((sale * (discountPercent / 100)) * 100) / 100;
+                        const effectivePvp = Math.max(0, sale - discountVal);
+
+                        const subtotalVenta = Math.round(
+                          (applySaleTax && saleTaxPercent > 0
+                            ? effectivePvp / (1 + saleTaxPercent / 100)
+                            : effectivePvp) * 100
+                        ) / 100;
+                        const saleTaxVal = Math.round((effectivePvp - subtotalVenta) * 100) / 100;
+                        const ivaNetoDeclarar = Math.max(0, Math.round((saleTaxVal - purchaseTaxVal) * 100) / 100);
+                        const totalVentaFinal = effectivePvp;
+                        const unitProfit = Math.round((subtotalVenta - costWithout) * 100) / 100;
 
                         if (!showCosts) {
                           return (
-                            <div className="flex flex-col justify-between p-3 rounded-xl bg-amber-50/80 border border-amber-200/90 text-xs">
-                              <div>
-                                <div className="flex items-center space-x-1.5 text-amber-900 font-bold">
-                                  <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                                  <span>Precios de Costo Protegidos</span>
-                                </div>
-                                <p className="text-[11px] text-amber-800 mt-1 leading-snug">
-                                  Costos de proveedor privados. Haz clic para revelar el desglose con y sin IVA.
-                                </p>
-                              </div>
+                            <div className="mt-2 text-right">
                               <button
                                 type="button"
                                 onClick={() => setShowCosts(true)}
-                                className="mt-2.5 inline-flex items-center justify-center space-x-1 px-2.5 py-1.5 rounded-lg bg-amber-200/90 hover:bg-amber-300 text-amber-950 text-xs font-bold transition cursor-pointer"
+                                className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-800 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-lg border border-amber-300 transition cursor-pointer"
                               >
-                                <Eye className="w-3.5 h-3.5 text-amber-800" />
-                                <span>Ver Costo (Sin / Con IVA)</span>
+                                <Lock className="w-3 h-3 text-amber-700" />
+                                <span>Ver Desglose SRI</span>
                               </button>
                             </div>
                           );
                         }
 
                         return (
-                          <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-amber-950 flex items-center space-x-1">
-                                <DollarSign className="w-3.5 h-3.5 text-amber-700" />
-                                <span>Desglose de Costo</span>
+                          <div className="mt-3 pt-2.5 border-t border-slate-200 space-y-1.5 sm:col-span-2">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-bold text-slate-600 uppercase tracking-wider text-[9.5px]">
+                                Desglose Financiero & Tributario SRI (Texto Compacto)
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => setShowCosts(false)}
-                                className="p-1 rounded text-amber-800 hover:bg-amber-100 transition cursor-pointer"
-                                title="Ocultar costos"
-                              >
-                                <EyeOff className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 text-[11px]">
-                              <div className="bg-white/80 p-2 rounded-lg border border-amber-200">
-                                <span className="text-slate-500 block text-[10px] uppercase font-bold">Sin IVA</span>
-                                <span className="font-mono font-black text-slate-800 text-sm">
-                                  ${costWithout.toFixed(2)}
-                                </span>
-                              </div>
-                              <div className="bg-white/80 p-2 rounded-lg border border-amber-200">
-                                <span className="text-amber-800 block text-[10px] uppercase font-bold">
-                                  Con IVA ({itemTaxRate}%)
-                                </span>
-                                <span className="font-mono font-black text-amber-950 text-sm">
-                                  ${costWith.toFixed(2)}
-                                </span>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  type="button"
+                                  onClick={() => onEdit(currentItem)}
+                                  className="text-[10px] font-bold text-amber-700 hover:text-amber-900 inline-flex items-center space-x-0.5 cursor-pointer"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                  <span>Editar</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowCosts(false)}
+                                  className="text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer inline-flex items-center space-x-0.5"
+                                  title="Ocultar costos"
+                                >
+                                  <EyeOff className="w-3 h-3" />
+                                  <span>Ocultar</span>
+                                </button>
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-amber-200">
-                              <div className="flex items-center gap-1.5 text-slate-700 flex-wrap">
-                                <span>Margen: <strong className="text-slate-900 font-mono">+{margin}%</strong></span>
-                                <span className="text-slate-400">•</span>
-                                <span className="text-emerald-800 font-bold">
-                                  Ganancia: <strong className="font-mono text-emerald-900 font-black">{unitProfit >= 0 ? `+$${unitProfit.toFixed(2)}` : `-$${Math.abs(unitProfit).toFixed(2)}`}/u</strong>
-                                </span>
-                                {applySaleTax && (
-                                  <span className="text-[10px] font-mono font-bold bg-amber-200/80 text-amber-950 px-1.5 py-0.2 rounded border border-amber-300">
-                                    +IVA Venta {saleTaxPercent}%
-                                  </span>
-                                )}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] leading-tight text-slate-700 bg-slate-100/70 p-2.5 rounded-xl border border-slate-200">
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">1. IVA Producto</span>
+                                <span className="font-mono font-bold text-slate-800">{itemTaxRate}%</span>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => onEdit(currentItem)}
-                                className="text-[11px] font-bold text-amber-900 hover:underline inline-flex items-center space-x-1 cursor-pointer"
-                              >
-                                <Edit className="w-3 h-3" />
-                                <span>Editar</span>
-                              </button>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">2. Costo Neto (Sin IVA)</span>
+                                <span className="font-mono font-bold text-slate-800">${costWithout.toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">3. IVA Compra</span>
+                                <span className="font-mono font-bold text-sky-700">${purchaseTaxVal.toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">4. Costo + IVA</span>
+                                <span className="font-mono font-bold text-amber-800">${costWith.toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">5. Descuento</span>
+                                <span className="font-mono font-bold text-slate-700">{discountPercent}% (-${discountVal.toFixed(2)})</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">7. PVP Marcado</span>
+                                <span className="font-mono font-bold text-slate-800">${sale.toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">8. Subtotal Venta</span>
+                                <span className="font-mono font-bold text-slate-800">${subtotalVenta.toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">9. IVA Venta</span>
+                                <span className="font-mono font-bold text-sky-700">${saleTaxVal.toFixed(2)}</span>
+                              </div>
+                              <div className="bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-300">
+                                <span className="text-amber-900 font-bold block text-[9px] uppercase">10. IVA Neto SRI</span>
+                                <span className="font-mono font-black text-amber-950">${ivaNetoDeclarar.toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">11. Margen Utilidad</span>
+                                <span className="font-mono font-bold text-teal-700">+{margin}%</span>
+                              </div>
+                              <div className="bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-300">
+                                <span className="text-emerald-900 font-bold block text-[9px] uppercase">12. Utilidad Neta</span>
+                                <span className={`font-mono font-black ${unitProfit >= 0 ? 'text-emerald-800' : 'text-rose-600'}`}>
+                                  {unitProfit >= 0 ? `+$${unitProfit.toFixed(2)}` : `-$${Math.abs(unitProfit).toFixed(2)}`}/u
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 font-semibold block text-[9px] uppercase">13. Total PVP Final</span>
+                                <span className="font-mono font-bold text-emerald-800">${totalVentaFinal.toFixed(2)}</span>
+                              </div>
                             </div>
                           </div>
                         );

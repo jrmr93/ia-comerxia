@@ -1624,6 +1624,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <th className="px-2 py-2">Proveedor</th>
                   <th className="px-2 py-2">SKU</th>
                   <th className="px-2 py-2">Categoría</th>
+                  <th className="px-2 py-2">Subtotal Venta</th>
                   <th className="px-2 py-2">Precios & Utilidad</th>
                   <th className="px-2 py-2">Stock</th>
                   <th className="px-2 py-2">Estado</th>
@@ -1728,6 +1729,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         )}
                       </td>
                       <td className="px-2 py-1.5 text-slate-700 text-xs">{item.category}</td>
+                      <td className="px-2 py-1.5 font-mono text-xs">
+                        {(() => {
+                          const fin = calculateItemFinancials(item);
+                          return (
+                            <div>
+                              <span className="font-bold text-slate-900 font-mono">${fin.salePriceWithoutTax.toFixed(2)}</span>
+                              <span className="text-[9.5px] text-slate-400 block font-sans">Sin IVA</span>
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-2 py-1.5 font-mono">
                         {(() => {
                           const fin = calculateItemFinancials(item);

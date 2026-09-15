@@ -1320,21 +1320,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </div>
 
                 {/* ========================================================================= */}
-                {/* RESUMEN AUTOCALCULADO SRI (SOLO LECTURA / NO MODIFICABLE DE NINGUNA FORMA) */}
+                {/* DESGLOSE FINANCIERO & TRIBUTARIO SRI (UNIFICADO & COMPACTO)               */}
                 {/* ========================================================================= */}
-                <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 via-slate-850 to-purple-950 text-white border border-slate-800 shadow-md space-y-3">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
-                      <Lock className="w-3.5 h-3.5 text-purple-400" />
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-purple-300">
-                        Valores Autocalculados SRI (No Modificables)
-                      </span>
-                    </div>
+                <div className="p-3.5 rounded-xl bg-slate-900 text-white border border-slate-700/80 shadow-md space-y-2">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                    <span className="font-bold text-slate-100 text-[11px] uppercase tracking-wider flex items-center space-x-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Desglose Financiero & Tributario SRI</span>
+                    </span>
                     <button
                       type="button"
                       onClick={handleQuoteMarketEcuador}
                       disabled={isQuotingMarket}
-                      className="inline-flex items-center space-x-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 transition cursor-pointer shadow-2xs"
+                      className="inline-flex items-center space-x-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 transition cursor-pointer shadow-2xs"
                       title="Cotizar en el mercado de Ecuador con IA"
                     >
                       <Sparkles className="w-3 h-3 text-sky-300" />
@@ -1342,299 +1340,88 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center font-mono">
-                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
-                      <span className="text-[10px] text-slate-400 block uppercase font-sans font-bold mb-0.5">Costo Con IVA</span>
-                      <span className="text-sm font-bold text-amber-300">${costTotalPaidToSupplier.toFixed(2)}</span>
-                    </div>
-                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
-                      <span className="text-[10px] text-slate-400 block uppercase font-sans font-bold mb-0.5">Base Sin IVA</span>
-                      <span className="text-sm font-bold text-sky-300">${publishedPriceSinIVA.toFixed(2)}</span>
-                    </div>
-                    <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
-                      <span className="text-[10px] text-slate-400 block uppercase font-sans font-bold mb-0.5">IVA ({activeTaxRate}%)</span>
-                      <span className="text-sm font-bold text-emerald-300">${saleTaxAmount.toFixed(2)}</span>
-                    </div>
-                    <div className="bg-emerald-500/20 p-2.5 rounded-xl border border-emerald-500/40">
-                      <span className="text-[10px] text-emerald-300 block uppercase font-sans font-black mb-0.5">PVP Final SRI</span>
-                      <span className="text-base font-black text-emerald-400">${totalClientePaid.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ========================================================================= */}
-              {/* RESALTADO VISUAL: UTILIDAD REAL Y DESGLOSE CONTABLE (11 PUNTOS CLAVE)      */}
-              {/* ========================================================================= */}
-              <div
-                className={`rounded-2xl p-4 transition-all border-2 shadow-sm ${
-                  isLoss
-                    ? 'bg-rose-50/95 border-rose-400 text-rose-950'
-                    : isBreakEven
-                    ? 'bg-amber-50/95 border-amber-400 text-amber-950'
-                    : 'bg-gradient-to-br from-emerald-50 via-teal-50/40 to-emerald-100/60 border-emerald-500 shadow-emerald-500/10'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  {/* Left: Icono y Título */}
-                  <div className="flex items-center space-x-3.5">
-                    <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border shadow-xs ${
-                        isLoss
-                          ? 'bg-rose-500 text-white border-rose-600'
-                          : isBreakEven
-                          ? 'bg-amber-500 text-white border-amber-600'
-                          : 'bg-emerald-600 text-white border-emerald-700 ring-4 ring-emerald-100'
-                      }`}
-                    >
-                      {isLoss ? (
-                        <AlertTriangle className="w-6 h-6 animate-pulse text-amber-200" />
-                      ) : isBreakEven ? (
-                        <Scale className="w-6 h-6" />
-                      ) : (
-                        <TrendingUp className="w-6 h-6 stroke-[2.5]" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">
-                          Utilidad Real por Venta
-                        </span>
-                        {isLoss ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-600 text-white">
-                            Venta en Pérdida
-                          </span>
-                        ) : isBreakEven ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-600 text-white">
-                            Punto de Equilibrio
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1 shadow-2xs">
-                            <Sparkles className="w-3 h-3 text-emerald-600" />
-                            <span>Margen Positivo ({calculatedMarginPercent.toFixed(0)}%)</span>
-                          </span>
-                        )}
+                  {/* Grid de 2 Columnas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px]">
+                    {/* Columna Izquierda: Estructura de Compra */}
+                    <div className="space-y-1 bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
+                      <div className="text-[9.5px] font-bold text-sky-400 uppercase tracking-wider pb-0.5 border-b border-slate-700/50">
+                        Estructura de Compra
                       </div>
-                      <h4 className="text-sm sm:text-base font-extrabold text-slate-900 mt-0.5">
-                        {discountNum > 0
-                          ? 'Ganancia Neta tras Descuento en Tienda:'
-                          : 'Ganancia Calculada por Unidad Vendida:'}
-                      </h4>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">1. IVA grava producto:</span>
+                        <span className="font-mono font-bold text-sky-300">{activeTaxRate}%</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">2. Costo neto (Sin IVA):</span>
+                        <span className="font-mono font-bold text-slate-100">${costWithoutNum.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">3. IVA costo compra:</span>
+                        <span className="font-mono font-bold text-sky-300">${purchaseTaxAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">4. Costo + IVA producto:</span>
+                        <span className="font-mono font-bold text-amber-300">${costTotalPaidToSupplier.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">5. % Descuento:</span>
+                        <span className={`font-mono font-bold ${discountPercent > 0 ? 'text-rose-400 font-black' : 'text-slate-400'}`}>{discountPercent}%</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">6. Valor descuento:</span>
+                        <span className={`font-mono font-bold ${discountAmountSinIVA > 0 ? 'text-rose-300' : 'text-slate-400'}`}>-${discountAmountSinIVA.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    {/* Columna Derecha: Venta, Impuestos & Margen */}
+                    <div className="space-y-1 bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
+                      <div className="text-[9.5px] font-bold text-emerald-400 uppercase tracking-wider pb-0.5 border-b border-slate-700/50">
+                        Venta, Impuestos & Margen
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">7. PVP marcado:</span>
+                        <span className="font-mono font-bold text-slate-200">${pvpNum.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">8. Subtotal de venta:</span>
+                        <span className="font-mono font-bold text-slate-100">${publishedPriceSinIVA.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">9. IVA de la venta:</span>
+                        <span className="font-mono font-bold text-sky-300">${saleTaxAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5 bg-amber-950/40 px-1.5 rounded border border-amber-800/40">
+                        <span className="text-amber-200 font-bold">10. IVA Neto a declarar:</span>
+                        <span className="font-mono font-black text-amber-300">${Math.max(0, ivaNetoPorPagar).toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5">
+                        <span className="text-slate-300 font-medium">11. Margen utilidad:</span>
+                        <span className="font-mono font-bold text-emerald-300">+{marginPercent}%</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5 bg-emerald-950/40 px-1.5 rounded border border-emerald-800/40">
+                        <span className="text-emerald-200 font-bold">12. Utilidad neta:</span>
+                        <span className={`font-mono font-black ${effectiveUnitProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {effectiveUnitProfit >= 0 ? `+$${effectiveUnitProfit.toFixed(2)}` : `-$${Math.abs(effectiveUnitProfit).toFixed(2)}`}/u
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Right: Cifra Grande y Notoria */}
-                  <div className="sm:text-right flex flex-col sm:items-end">
-                    <div className="flex items-baseline gap-1.5">
-                      <span
-                        className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${
-                          isLoss
-                            ? 'text-rose-600'
-                            : isBreakEven
-                            ? 'text-amber-700'
-                            : 'text-emerald-700'
-                        }`}
-                      >
-                        {isLoss
-                          ? `-$${Math.abs(effectiveUnitProfit).toFixed(2)}`
-                          : isBreakEven
-                          ? '$0.00'
-                          : `+$${effectiveUnitProfit.toFixed(2)}`}
-                      </span>
-                      <span className="text-xs font-bold text-slate-600 uppercase">
-                        / unidad
-                      </span>
-                    </div>
-
-                    <div className="mt-1 flex items-center gap-2">
-                      <span
-                        className={`text-xs font-black font-mono px-2.5 py-0.5 rounded-md border ${
-                          isLoss
-                            ? 'text-rose-800 bg-rose-100 border-rose-300'
-                            : isBreakEven
-                            ? 'text-amber-800 bg-amber-100 border-amber-300'
-                            : 'text-emerald-800 bg-emerald-100/90 border-emerald-300 shadow-2xs'
-                        }`}
-                      >
-                        {isLoss
-                          ? `${effectiveMarginPercent.toFixed(1)}% margen`
-                          : isBreakEven
-                          ? '0% margen'
-                          : `+${effectiveMarginPercent.toFixed(1)}% margen sobre costo neto`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Desglose Matemático Coherente */}
-                <div className="mt-3 pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-1.5 flex-wrap font-mono font-medium text-slate-700">
-                    <span className="text-slate-500 font-sans font-semibold text-[11px]">Fórmula:</span>
-                    <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900 shadow-2xs">
-                      Venta Sin IVA (${effectiveSalePriceWithoutTax.toFixed(2)})
+                  {/* Fila Inferior Destacada: Total Venta PVP Final */}
+                  <div className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-gradient-to-r from-emerald-900/90 via-teal-900/90 to-slate-900 border border-emerald-500/60 mt-1 shadow-xs">
+                    <span className="text-emerald-200 font-bold uppercase text-[10.5px] tracking-wide">
+                      13. Total de venta PVP final:
                     </span>
-                    <span className="text-slate-400 font-bold">-</span>
-                    <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900 shadow-2xs" title="Costo Neto de compra sin IVA (crédito tributario)">
-                      Costo Neto Sin IVA (${costWithoutNum.toFixed(2)})
-                    </span>
-                    <span className="text-slate-400 font-bold">=</span>
-                    <span
-                      className={`px-2 py-0.5 rounded-md border font-black shadow-2xs ${
-                        isLoss
-                          ? 'bg-rose-100 text-rose-700 border-rose-300'
-                          : isBreakEven
-                          ? 'bg-amber-100 text-amber-800 border-amber-300'
-                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                      }`}
-                    >
-                      Utilidad: {isLoss ? `-$${Math.abs(effectiveUnitProfit).toFixed(2)}` : `+$${effectiveUnitProfit.toFixed(2)}`} / u
+                    <span className="font-mono font-black text-emerald-300 text-xs">
+                      ${totalClientePaid.toFixed(2)}
                     </span>
                   </div>
 
-                  {applySaleTax ? (
-                    <span className="text-[11px] font-medium text-amber-950 bg-amber-100/70 px-2 py-0.5 rounded-md border border-amber-200">
-                      💡 PVP con IVA: ${pvpNum.toFixed(2)} (IVA Venta: +${saleTaxAmount.toFixed(2)} asumido por cliente).
-                    </span>
-                  ) : discountNum > 0 ? (
-                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                      🔥 Oferta -{discountNum}% aplicada (PVP regular: ${pvpNum.toFixed(2)} → Ganancia normal: +${unitProfit.toFixed(2)}/u)
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* ========================================================================= */}
-              {/* DESGLOSE CONTABLE & COMERCIAL COMPLETO (11 PUNTOS CLAVE OBLIGATORIOS)       */}
-              {/* ========================================================================= */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-indigo-950 text-white border border-indigo-700/40 shadow-lg space-y-3.5">
-                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300">
-                      <Receipt className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-white">
-                        Desglose Contable, Fiscal y de Utilidad Real (11 Puntos)
-                      </h4>
-                      <p className="text-[10px] text-slate-300">
-                        Separación clara de IVA crédito, IVA débito, costos y ganancia neta.
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                    Lógica Fiscal Correcta
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-                  {/* 1. Costo Neto (Sin IVA) */}
-                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">1. Costo Neto (Sin IVA)</span>
-                    <span className="text-base font-black font-mono text-slate-100">${costWithoutNum.toFixed(2)}</span>
-                    <span className="text-[9px] text-slate-400">Base para margen y utilidad</span>
-                  </div>
-
-                  {/* 2. IVA Pagado en Compra */}
-                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">2. IVA Compra ({activePurchaseTax}%)</span>
-                    <span className="text-base font-black font-mono text-sky-300">${purchaseTaxAmount.toFixed(2)}</span>
-                    <span className="text-[9px] text-sky-200/70">Crédito tributario a favor</span>
-                  </div>
-
-                  {/* 3. Costo Total Proveedor */}
-                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">3. Total al Proveedor</span>
-                    <span className="text-base font-black font-mono text-amber-300">${costTotalPaidToSupplier.toFixed(2)}</span>
-                    <span className="text-[9px] text-amber-200/70">Desembolso total de compra</span>
-                  </div>
-
-                  {/* 4. Margen de Ganancia */}
-                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">4. Margen Ganancia</span>
-                    <span className="text-base font-black font-mono text-teal-300">+{marginPercent}%</span>
-                    <span className="text-[9px] text-teal-200/70">Sobre costo neto sin IVA</span>
-                  </div>
-
-                  {/* 5. Precio Venta Sin IVA */}
-                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">5. Precio Venta Sin IVA</span>
-                    <span className="text-base font-black font-mono text-emerald-300">${salePriceWithoutTax.toFixed(2)}</span>
-                    <span className="text-[9px] text-emerald-200/70">Costo Neto + Utilidad</span>
-                  </div>
-
-                  {/* 6. IVA de Venta */}
-                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">6. IVA Venta ({activeSaleTax}%)</span>
-                    <span className="text-base font-black font-mono text-amber-300">${saleTaxAmount.toFixed(2)}</span>
-                    <span className="text-[9px] text-amber-200/70">Débito fiscal cobrado al cliente</span>
-                  </div>
-
-                  {/* 7. Precio Final / PVP */}
-                  <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex flex-col justify-between">
-                    <span className="text-[10px] text-emerald-300 font-bold uppercase">7. PVP Final (Con IVA)</span>
-                    <span className="text-lg font-black font-mono text-emerald-400">${pvpNum.toFixed(2)}</span>
-                    <span className="text-[9px] text-emerald-200/80">Precio final al consumidor</span>
-                  </div>
-
-                  {/* 8. IVA Crédito (Compra) */}
-                  <div className="p-2.5 rounded-xl bg-sky-950/40 border border-sky-500/40 flex flex-col justify-between">
-                    <span className="text-[10px] text-sky-300 font-bold uppercase">8. IVA Crédito (Compra)</span>
-                    <span className="text-base font-black font-mono text-sky-300">${ivaCreditoCompra.toFixed(2)}</span>
-                    <span className="text-[9px] text-sky-200/80">A tu favor (Deducible)</span>
-                  </div>
-
-                  {/* 9. IVA Débito (Venta) */}
-                  <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex flex-col justify-between">
-                    <span className="text-[10px] text-amber-300 font-bold uppercase">9. IVA Débito (Venta)</span>
-                    <span className="text-base font-black font-mono text-amber-300">${ivaDebitoVenta.toFixed(2)}</span>
-                    <span className="text-[9px] text-amber-200/80">Generado en la venta</span>
-                  </div>
-                </div>
-
-                {/* Fila Inferior Destacada: 10. IVA Neto por Pagar & 11. Utilidad Real */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/10">
-                  {/* 10. IVA Neto por Pagar */}
-                  <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-400/40 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">
-                        10. IVA Neto a Declarar / Pagar
-                      </span>
-                      <span className="text-[11px] text-slate-300">
-                        (Débito ${ivaDebitoVenta.toFixed(2)} - Crédito ${ivaCreditoCompra.toFixed(2)})
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className={`text-lg font-black font-mono ${ivaNetoPorPagar >= 0 ? 'text-indigo-300' : 'text-emerald-400'}`}>
-                        ${Math.abs(ivaNetoPorPagar).toFixed(2)}
-                      </span>
-                      <span className="text-[9px] text-slate-300 block font-bold">
-                        {ivaNetoPorPagar >= 0 ? 'Por Pagar al Fisco' : 'Crédito a Favor'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 11. Utilidad Real del Producto */}
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-950/90 to-teal-900/90 border-2 border-emerald-400 flex items-center justify-between shadow-md">
-                    <div>
-                      <span className="text-[10px] font-black text-emerald-300 uppercase tracking-wider block flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>11. Utilidad Real del Producto</span>
-                      </span>
-                      <span className="text-[11px] text-emerald-100 font-medium">
-                        Venta sin IVA (${salePriceWithoutTax.toFixed(2)}) - Costo sin IVA (${costWithoutNum.toFixed(2)})
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xl font-black font-mono text-emerald-400">
-                        ${unitProfit.toFixed(2)}
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-200 block font-mono">
-                        Margen {calculatedMarginPercent.toFixed(1)}%
-                      </span>
-                    </div>
+                  <div className="pt-1 border-t border-slate-800 text-[10px] text-slate-400">
+                    Cálculo SRI: IVA Venta - IVA Compra.
                   </div>
                 </div>
               </div>
-            </div>
 
 
 
