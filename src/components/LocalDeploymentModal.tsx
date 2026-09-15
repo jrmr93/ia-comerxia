@@ -7,6 +7,7 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  CreditCard,
   Database,
   Download,
   ExternalLink,
@@ -44,6 +45,7 @@ import { GoogleAiConfigModal } from './GoogleAiConfigModal.tsx';
 import { StoreSettingsTab } from './StoreSettingsTab.tsx';
 import { GmailConfigTab } from './GmailConfigTab.tsx';
 import { EcuadorApiConfigTab } from './EcuadorApiConfigTab.tsx';
+import { PayphoneConfigTab } from './PayphoneConfigTab.tsx';
 import { SriConfigTab } from './SriConfigTab.tsx';
 import { SriInvoicesView } from './SriInvoicesView.tsx';
 import { DevTestingTab } from './DevTestingTab.tsx';
@@ -905,6 +907,36 @@ module.exports = {
                   )}
                 </button>
 
+                {/* 3c. Payphone API (Cobros Visa / Mastercard) */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('payphone_api')}
+                  className={`text-left px-3 py-2 sm:py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between shrink-0 group ${
+                    activeTab === 'payphone_api'
+                      ? 'bg-orange-600 text-white shadow-xs font-semibold'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 bg-slate-50 md:bg-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition ${
+                      activeTab === 'payphone_api'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-orange-100 text-orange-700 group-hover:scale-105'
+                    }`}>
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold truncate">Payphone API</div>
+                      <div className={`text-[10px] hidden sm:block truncate ${activeTab === 'payphone_api' ? 'text-orange-100' : 'text-slate-400'}`}>
+                        Cobros Visa / Mastercard
+                      </div>
+                    </div>
+                  </div>
+                  {activeTab === 'payphone_api' && (
+                    <span className="w-1.5 h-5 rounded-full bg-white shrink-0 hidden md:block" />
+                  )}
+                </button>
+
                 {/* Facturación Electrónica SRI */}
                 <button
                   type="button"
@@ -1233,6 +1265,13 @@ module.exports = {
              ======================================================== */}
           {activeTab === 'ecuador_api' && (
             <EcuadorApiConfigTab onSaved={onConfigSaved} />
+          )}
+
+          {/* ========================================================
+              TAB: PAYPHONE API (COBROS TARJETA VISA / MASTERCARD)
+             ======================================================== */}
+          {activeTab === 'payphone_api' && (
+            <PayphoneConfigTab onSaved={onConfigSaved} />
           )}
 
           {/* ========================================================

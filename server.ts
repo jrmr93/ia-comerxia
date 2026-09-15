@@ -33,6 +33,7 @@ import {
   getEmailConfig,
   saveEmailConfig,
   sendTestEmail,
+  sendPayphonePaymentLinkEmail,
 } from './src/services/email.ts';
 import {
   checkProductSalesAndPurchasesLink,
@@ -55,6 +56,8 @@ import {
   updateAiConfig,
   getEcuadorApiConfig,
   saveEcuadorApiConfig,
+  getPayphoneConfig,
+  savePayphoneConfig,
   getSriConfig,
   saveSriConfig,
   getNextSriSecuencial,
@@ -878,6 +881,223 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error querying Ecuador API by RUC:', error);
       res.status(500).json({ error: error.message || 'Error al consultar RUC en Ecuador API' });
+    }
+  });
+
+  // 1f. Payphone API (Cobros con Tarjeta Visa / Mastercard) Settings & Proxy Endpoints
+  app.get('/api/payphone/config', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const cfg = await getPayphoneConfig(req.dbUserId || 1);
+      const tokenMasked = cfg.token
+        ? cfg.token.length > 8
+          ? `${cfg.token.slice(0, 4)}••••••••${cfg.token.slice(-4)}`
+          : '••••••••••••••••'
+        : '';
+      res.json({
+        success: true,
+        config: {
+          id: cfg.id,
+          userId: cfg.userId,
+          hasToken: cfg.hasToken,
+          isConfigured: cfg.isConfigured,
+          isActive: cfg.isActive,
+          tokenMasked,
+          storeId: cfg.storeId || '',
+          environment: cfg.environment || 'production',
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching Payphone API config:', error);
+      res.status(500).json({ error: error.message || 'Error al obtener configuración de Payphone API' });
+    }
+  });
+
+  app.post('/api/payphone/config', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { token, storeId, environment, isActive } = req.body;
+      const updated = await savePayphoneConfig(req.dbUserId || 1, {
+        token: typeof token === 'string' ? token.trim() : undefined,
+        storeId: typeof storeId === 'string' ? storeId.trim() : undefined,
+        environment: typeof environment === 'string' ? environment.trim() : undefined,
+        isActive: typeof isActive === 'boolean' ? isActive : undefined,
+      });
+
+      res.json({
+        success: true,
+        message: 'Configuración de Payphone API guardada correctamente',
+        config: {
+          id: updated.id,
+          hasToken: Boolean(updated.token && updated.token.trim().length > 0),
+          isActive: updated.isActive !== false,
+          storeId: updated.storeId || '',
+          environment: updated.environment || 'production',
+        },
+      });
+    } catch (error: any) {
+      console.error('Error saving Payphone API config:', error);
+      res.status(400).json({ error: error.message || 'Error al guardar configuración de Payphone API' });
+    }
+  });
+
+  app.post('/api/payphone/generate-link', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const cfg = await getPayphoneConfig(req.dbUserId || 1);
+      if (cfg.isActive === false) {
+        return res.status(400).json({
+          error: 'La pasarela Payphone está desactivada en la Configuración del Sistema.',
+        });
+      }
+      if (!cfg.hasToken || !cfg.token) {
+        return res.status(400).json({
+          error: 'El Token de Payphone no está configurado en la Configuración del Sistema (Payphone API).',
+        });
+      }
+
+      const {
+        orderId,
+        orderNumber,
+        totalAmount = 0,
+        subtotal0 = 0,
+        subtotal15 = 0,
+        tax15 = 0,
+        customerName = 'Cliente',
+        customerPhone,
+        customerEmail,
+        reference = '',
+        additionalData = '',
+      } = req.body;
+
+      // Calculation in cents as integer
+      const amtWithoutTax = Math.round(Math.max(0, Number(subtotal0 || 0)) * 100);
+      const amtWithTax = Math.round(Math.max(0, Number(subtotal15 || 0)) * 100);
+      const taxAmt = Math.round(Math.max(0, Number(tax15 || 0)) * 100);
+      
+      let totalAmt = amtWithoutTax + amtWithTax + taxAmt;
+      if (totalAmt <= 0) {
+        totalAmt = Math.round(Math.max(0, Number(totalAmount || 0)) * 100);
+      }
+
+      if (totalAmt <= 0) {
+        return res.status(400).json({
+          error: 'El monto total a cobrar debe ser mayor a 0.',
+        });
+      }
+
+      // Max 15 chars clientTransactionId
+      const nowStr = Date.now().toString();
+      const rawTxId = `TX-${orderNumber || orderId || '0'}-${nowStr.slice(-4)}`;
+      const clientTransactionId = rawTxId.slice(0, 15);
+
+      const refText = (reference || `Pedido #${orderNumber || orderId || 'Venta'} - ${customerName}`).slice(0, 100);
+      const extraData = (additionalData || `Pago de venta ${customerName}`).slice(0, 250);
+
+      const payphonePayload: any = {
+        amount: totalAmt,
+        amountWithoutTax: amtWithoutTax,
+        amountWithTax: amtWithTax,
+        tax: taxAmt,
+        service: 0,
+        tip: 0,
+        currency: 'USD',
+        reference: refText,
+        clientTransactionId,
+        additionalData: extraData,
+        oneTime: true,
+        expireIn: 0,
+        isAmountEditable: false,
+      };
+
+      if (cfg.storeId && cfg.storeId.trim().length > 0) {
+        payphonePayload.storeId = cfg.storeId.trim();
+      }
+
+      const targetUrl = 'https://pay.payphonetodoesposible.com/api/Links';
+
+      const apiRes = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${cfg.token.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payphonePayload),
+      });
+
+      const responseText = await apiRes.text();
+      let resultData: any;
+      try {
+        resultData = JSON.parse(responseText);
+      } catch {
+        resultData = responseText;
+      }
+
+      if (!apiRes.ok) {
+        let errDesc = 'Error al comunicarse con Payphone API';
+        if (typeof resultData === 'object' && resultData) {
+          if (resultData.message) errDesc = resultData.message;
+          if (Array.isArray(resultData.errors) && resultData.errors.length > 0) {
+            const firstErr = resultData.errors[0];
+            if (Array.isArray(firstErr.errorDescriptions) && firstErr.errorDescriptions.length > 0) {
+              errDesc += `: ${firstErr.errorDescriptions.join(', ')}`;
+            }
+          }
+        }
+        return res.status(apiRes.status).json({
+          success: false,
+          error: errDesc,
+          details: resultData,
+        });
+      }
+
+      // When successful, Payphone returns string URL directly or JSON
+      const payUrl = typeof resultData === 'string' ? resultData : (resultData?.url || resultData?.link || '');
+
+      if (!payUrl || typeof payUrl !== 'string' || !payUrl.startsWith('http')) {
+        return res.status(500).json({
+          error: 'Respuesta inesperada de Payphone API (No se obtuvo un enlace válido).',
+          details: resultData,
+        });
+      }
+
+      res.json({
+        success: true,
+        payUrl,
+        clientTransactionId,
+        amountInCents: totalAmt,
+      });
+    } catch (error: any) {
+      console.error('Error generating Payphone payment link:', error);
+      res.status(500).json({ error: error.message || 'Error al generar enlace de pago en Payphone' });
+    }
+  });
+
+  app.post('/api/payphone/send-email-link', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { to, customerName, orderNumber, totalAmount, payUrl, itemsSummary } = req.body;
+      if (!to || !to.includes('@')) {
+        return res.status(400).json({ error: 'Proporciona una dirección de correo válida para el cliente.' });
+      }
+      if (!payUrl || !payUrl.startsWith('http')) {
+        return res.status(400).json({ error: 'No hay un enlace de pago Payphone válido para enviar.' });
+      }
+
+      const result = await sendPayphonePaymentLinkEmail({
+        to,
+        customerName: customerName || 'Cliente',
+        orderNumber: String(orderNumber || '0'),
+        totalAmount: Number(totalAmount || 0),
+        payUrl,
+        itemsSummary,
+        userId: req.dbUserId || 1,
+      });
+
+      res.json({
+        success: true,
+        message: `✓ Enlace de pago Payphone enviado con éxito a ${to}`,
+        result,
+      });
+    } catch (error: any) {
+      console.error('Error sending Payphone payment link email:', error);
+      res.status(500).json({ error: error.message || 'Error al enviar enlace de pago por correo' });
     }
   });
 
@@ -4081,7 +4301,7 @@ async function startServer() {
 
   app.post('/api/admin/clean-test-data', optionalAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { action, targetStockQuantity } = req.body || {};
+      const { action, actions, targetStockQuantity } = req.body || {};
       const validActions = [
         'orders',
         'purchases',
@@ -4094,16 +4314,42 @@ async function startServer() {
         'reset_stock',
         'reset_customer_balances',
         'reset_supplier_balances',
+        'sri_invoices',
         'all_transactions',
         'reset_all',
         'reset_all_with_products',
       ];
-      if (!action || !validActions.includes(action)) {
-        return res.status(400).json({ error: `Acción inválida. Opciones válidas: ${validActions.join(', ')}` });
+
+      const requestedActions: string[] = Array.isArray(actions)
+        ? actions.filter((act) => validActions.includes(act))
+        : action && validActions.includes(action)
+          ? [action]
+          : [];
+
+      if (requestedActions.length === 0) {
+        return res.status(400).json({ error: `Debe proporcionar al menos una acción válida. Opciones válidas: ${validActions.join(', ')}` });
       }
 
-      const result = await cleanTestData(action, req.dbUserId, { targetStockQuantity });
-      res.json({ success: true, ...result });
+      const results: Array<{ action: string; message?: string }> = [];
+      const messages: string[] = [];
+
+      for (const act of requestedActions) {
+        const result = await cleanTestData(act, req.dbUserId, { targetStockQuantity });
+        results.push({ action: act, message: result.message });
+        if (result.message) {
+          messages.push(result.message);
+        }
+      }
+
+      const finalMessage = requestedActions.length === 1
+        ? (messages[0] || 'Limpieza completada con éxito.')
+        : `Limpieza completada con éxito (${requestedActions.length} secciones procesadas).`;
+
+      res.json({
+        success: true,
+        message: finalMessage,
+        details: results,
+      });
     } catch (error: any) {
       console.error('Failed to clean test data:', error);
       res.status(500).json({ error: error.message || 'Error al limpiar datos de prueba' });

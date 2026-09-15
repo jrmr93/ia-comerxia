@@ -736,3 +736,91 @@ export async function sendInvoiceEmail(params: {
     attachments,
   });
 }
+
+/**
+ * Sends a Payphone payment link email for credit/debit card (Visa / Mastercard) payment.
+ */
+export async function sendPayphonePaymentLinkEmail(params: {
+  to: string;
+  customerName: string;
+  orderNumber: string;
+  totalAmount: number;
+  payUrl: string;
+  itemsSummary?: string;
+  userId?: number;
+}) {
+  const store = await getStoreConfig(params.userId || 1);
+  const storeName = store?.storeName || 'Comerxia Store';
+  const logoUrl = store?.logoUrl || null;
+  const currency = store?.currency || '$';
+  const attachments: any[] = [];
+  const logoHeaderHtml = buildStoreLogoHeader(storeName, logoUrl, attachments);
+
+  const formattedTotal = Number(params.totalAmount || 0).toFixed(2);
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Enlace de Pago - ${storeName}</title>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; padding: 28px 24px; text-align: center; }
+        .content { padding: 28px 24px; }
+        .info-card { background-color: #f1f5f9; border-radius: 12px; padding: 16px; margin: 18px 0; border-left: 4px solid #0284c7; }
+        .btn-pay { display: inline-block; background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); color: #ffffff !important; font-weight: bold; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-size: 16px; text-align: center; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3); margin: 20px 0; }
+        .footer { background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; }
+        .badge-visa { display: inline-block; background: #ffffff; color: #1e3a8a; font-weight: 900; padding: 2px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #cbd5e1; margin-left: 4px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          ${logoHeaderHtml}
+          <h1 style="margin:8px 0 0 0; font-size:22px; font-weight:800;">Enlace de Pago Seguro Payphone</h1>
+          <p style="margin:4px 0 0 0; font-size:13px; color:#94a3b8;">Pago con Tarjeta de Crédito / Débito <span class="badge-visa">VISA</span> <span class="badge-visa">Mastercard</span></p>
+        </div>
+        <div class="content">
+          <h2 style="margin-top:0; font-size:18px; color:#0f172a;">Estimado(a) ${params.customerName || 'Cliente'},</h2>
+          <p style="font-size:14px; color:#475569; line-height:1.6;">
+            Se ha generado un enlace de pago en línea para su pedido <strong>#${params.orderNumber}</strong> en <strong>${storeName}</strong>.
+          </p>
+          
+          <div class="info-card">
+            <p style="margin:4px 0;"><strong>Pedido N°:</strong> #${params.orderNumber}</p>
+            ${params.itemsSummary ? `<p style="margin:4px 0;"><strong>Detalle:</strong> ${params.itemsSummary}</p>` : ''}
+            <p style="margin:8px 0 0 0;"><strong>Monto Total a Pagar:</strong> <strong style="color:#ea580c; font-size:18px;">${currency}${formattedTotal} USD</strong></p>
+          </div>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${params.payUrl}" target="_blank" class="btn-pay">
+              💳 Pagar ${currency}${formattedTotal} con Tarjeta
+            </a>
+          </div>
+
+          <p style="font-size:12px; color:#64748b; line-height:1.5; background: #fff7ed; border: 1px solid #ffedd5; padding: 12px; border-radius: 8px;">
+            🔒 <strong>Instrucciones de Pago:</strong> Haga clic en el botón superior o abra el siguiente enlace en su navegador web. Se abrirá la pasarela cifrada de Payphone certificada PCI-DSS para ingresar su tarjeta de forma 100% segura.<br>
+            <a href="${params.payUrl}" style="color: #ea580c; word-break: break-all;">${params.payUrl}</a>
+          </p>
+        </div>
+        <div class="footer">
+          <p style="margin:0;">Gracias por su preferencia en <strong>${storeName}</strong>.</p>
+          <p style="margin:4px 0 0 0; font-size:11px; color:#94a3b8;">Mensaje automático enviado mediante la pasarela Payphone & Google SMTP.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendGoogleEmail({
+    to: params.to,
+    subject: `💳 Enlace de Pago Payphone: Pedido #${params.orderNumber} (${currency}${formattedTotal}) - ${storeName}`,
+    html,
+    text: `Estimado(a) ${params.customerName}, se ha generado su enlace de pago Payphone para el pedido #${params.orderNumber} por un total de ${currency}${formattedTotal} USD. Haga clic aquí para pagar: ${params.payUrl}`,
+    userId: params.userId,
+    attachments,
+  });
+}

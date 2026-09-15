@@ -294,6 +294,17 @@ export interface LocalEcuadorApiConfig {
   updatedAt: string;
 }
 
+export interface LocalPayphoneConfig {
+  id: number;
+  userId: number;
+  token?: string | null;
+  storeId?: string | null;
+  environment?: string | null;
+  isActive?: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DatabaseState {
   users: LocalUser[];
   inventoryItems: LocalInventoryItem[];
@@ -302,6 +313,7 @@ export interface DatabaseState {
   aiConfigs: LocalAiConfig[];
   emailConfigs: LocalEmailConfig[];
   ecuadorApiConfigs: LocalEcuadorApiConfig[];
+  payphoneConfigs?: LocalPayphoneConfig[];
   sriConfigs?: any[];
   sriInvoices?: any[];
   storeConfigs: LocalStoreConfig[];

@@ -40,6 +40,7 @@ export type CleanActionType =
   | 'telegram'
   | 'analytics'
   | 'reset_stock'
+  | 'sri_invoices'
   | 'all_transactions'
   | 'reset_all'
   | 'reset_all_with_products';
@@ -57,6 +58,7 @@ interface DevStats {
   messagesCount: number;
   analyticsCount: number;
   productsCount: number;
+  sriInvoicesCount?: number;
   totalStockUnits: number;
   pendingOrdersCount?: number;
   pendingPurchasesCount?: number;
@@ -70,7 +72,7 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
   const [stats, setStats] = useState<DevStats | null>(null);
   const [loadingStats, setLoadingStats] = useState<boolean>(false);
 
-  const [selectedAction, setSelectedAction] = useState<CleanActionType>('all_transactions');
+  const [selectedActions, setSelectedActions] = useState<CleanActionType[]>(['all_transactions']);
   const [targetStockQuantity, setTargetStockQuantity] = useState<number>(10);
   const [confirmed, setConfirmed] = useState<boolean>(false);
 
@@ -80,6 +82,49 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
 
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const toggleAction = (actionId: CleanActionType) => {
+    setConfirmed(false);
+    setSelectedActions((prev) => {
+      // If selecting a macro option ('all_transactions', 'reset_all', 'reset_all_with_products'), isolate it
+      if (['all_transactions', 'reset_all', 'reset_all_with_products'].includes(actionId)) {
+        return prev.includes(actionId) ? [] : [actionId];
+      }
+
+      // Filter out macro options when toggling granular items
+      const withoutMacros = prev.filter((a) => !['all_transactions', 'reset_all', 'reset_all_with_products'].includes(a));
+
+      if (withoutMacros.includes(actionId)) {
+        return withoutMacros.filter((a) => a !== actionId);
+      } else {
+        return [...withoutMacros, actionId];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    setConfirmed(false);
+    const granularActions: CleanActionType[] = [
+      'orders',
+      'purchases',
+      'payments',
+      'sri_invoices',
+      'products',
+      'reset_stock',
+      'customers',
+      'suppliers',
+      'reset_customer_balances',
+      'reset_supplier_balances',
+      'telegram',
+      'analytics',
+    ];
+    setSelectedActions(granularActions);
+  };
+
+  const handleDeselectAll = () => {
+    setConfirmed(false);
+    setSelectedActions([]);
+  };
 
   // Fetch real-time dev stats
   const fetchStats = async () => {
@@ -102,7 +147,7 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
   }, []);
 
   const handleExecuteClean = async () => {
-    if (!confirmed) return;
+    if (!confirmed || selectedActions.length === 0) return;
     setIsCleaning(true);
     setResultMessage(null);
     setErrorMessage(null);
@@ -112,7 +157,7 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: selectedAction,
+          actions: selectedActions,
           targetStockQuantity: Number(targetStockQuantity) || 0,
         }),
       });
@@ -270,6 +315,17 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
         'Elimina el registro de movimientos de cobros CxC, pagos a proveedores CxP, gastos operativos y notas de crédito. Reinicia balances a $0.00.',
       preserves: 'Conserva tus pedidos, compras y catálogo.',
       countLabel: stats ? `${stats.paymentsCount} movimientos contables` : undefined,
+    },
+    {
+      id: 'sri_invoices',
+      title: 'Vaciar Historial de Facturas Electrónicas y Prefacturas Guardadas (SRI)',
+      icon: FileSpreadsheet,
+      color: 'purple',
+      badge: 'Historial SRI',
+      description:
+        'Elimina todo el historial de comprobantes electrónicos generados y prefacturas emitidas en el módulo del SRI. Deja la lista de facturación completamente limpia para pruebas.',
+      preserves: 'Conserva tus pedidos, clientes y configuraciones de firma electrónica.',
+      countLabel: stats?.sriInvoicesCount !== undefined ? `${stats.sriInvoicesCount} facturas guardadas` : undefined,
     },
     {
       id: 'products',
@@ -471,6 +527,13 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
           </div>
 
           <div className="bg-slate-800/60 rounded-xl p-2 border border-slate-700/50">
+            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Facturas SRI</div>
+            <div className="text-sm font-black text-purple-400 mt-0.5">
+              {stats ? (stats.sriInvoicesCount ?? 0) : '—'}
+            </div>
+          </div>
+
+          <div className="bg-slate-800/60 rounded-xl p-2 border border-slate-700/50">
             <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Stock Total</div>
             <div className="text-sm font-black text-amber-400 mt-0.5">
               {stats ? `${stats.totalStockUnits} un.` : '—'}
@@ -548,14 +611,34 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
       {/* SECTION 1: CLEANER */}
       {activeDevSection === 'cleaner' && (
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
             <div>
               <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                Selecciona la entidad a limpiar o reiniciar:
+                Selecciona las entidades a limpiar o reiniciar ({selectedActions.length} seleccionadas):
               </h4>
               <p className="text-xs text-slate-500 mt-0.5">
-                Elige qué entidades deseas vaciar para comenzar un nuevo ciclo de pruebas
+                Puedes marcar múltiples secciones para ejecutarlas todas en secuencia de una sola vez.
               </p>
+            </div>
+
+            <div className="flex items-center space-x-2 self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold transition flex items-center space-x-1 border border-indigo-200 cursor-pointer"
+              >
+                <CheckCheck className="w-3.5 h-3.5" />
+                <span>Seleccionar Todo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeselectAll}
+                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition flex items-center space-x-1 border border-slate-200 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Desmarcar Todo</span>
+              </button>
             </div>
           </div>
 
@@ -563,16 +646,13 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {actionOptions.map((opt) => {
               const Icon = opt.icon;
-              const isSelected = selectedAction === opt.id;
+              const isSelected = selectedActions.includes(opt.id);
 
               return (
                 <div
                   key={opt.id}
-                  onClick={() => {
-                    setSelectedAction(opt.id);
-                    setConfirmed(false);
-                  }}
-                  className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between ${
+                  onClick={() => toggleAction(opt.id)}
+                  className={`p-4 rounded-2xl border-2 transition cursor-pointer flex flex-col justify-between relative ${
                     isSelected
                       ? 'border-indigo-600 bg-indigo-50/40 shadow-xs ring-2 ring-indigo-500/20'
                       : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50'
@@ -581,6 +661,16 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center space-x-2.5">
+                        <div
+                          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition ${
+                            isSelected
+                              ? 'bg-indigo-600 border-indigo-600 text-white'
+                              : 'bg-white border-slate-300 text-transparent'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </div>
+
                         <div
                           className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
                             isSelected
@@ -606,12 +696,12 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
+                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed pl-7">
                       {opt.description}
                     </p>
                   </div>
 
-                  <div className="mt-3 pt-2.5 border-t border-slate-100/90 space-y-1">
+                  <div className="mt-3 pt-2.5 border-t border-slate-100/90 space-y-1 pl-7">
                     {opt.countLabel && (
                       <div className="text-[11px] font-bold text-slate-700 flex items-center space-x-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
@@ -629,7 +719,7 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
           </div>
 
           {/* Special parameter: Target Stock Quantity when reset_stock is chosen */}
-          {selectedAction === 'reset_stock' && (
+          {selectedActions.includes('reset_stock') && (
             <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2.5 animate-in fade-in duration-150">
               <div className="flex items-center space-x-2 text-xs font-bold text-amber-900">
                 <Layers className="w-4 h-4 text-amber-600" />
@@ -701,90 +791,67 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
             </div>
           )}
 
-          {/* Safety & Execution Area */}
-          <div className="pt-4 border-t border-slate-200/80 space-y-3">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              <div className="flex items-start space-x-2.5">
-                <input
-                  id="confirm-clean-checkbox"
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer"
-                />
-                <label htmlFor="confirm-clean-checkbox" className="text-xs text-slate-800 font-semibold leading-relaxed cursor-pointer select-none">
-                  {selectedAction === 'products'
-                    ? 'Confirmo que deseo ELIMINAR TODOS LOS PRODUCTOS del catálogo e inventario para empezar un catálogo nuevo desde cero.'
-                    : selectedAction === 'reset_all_with_products'
-                    ? 'Confirmo que deseo EJECUTAR UN RESET DE FÁBRICA ABSOLUTO (se borrarán todos los productos, ventas, compras, pagos y contactos).'
-                    : 'Confirmo que he concluido mi ciclo de pruebas y deseo ejecutar esta limpieza en la base de datos para reiniciar las órdenes y movimientos.'}
-                </label>
+          {/* Sticky Safety & Execution Bar at Bottom */}
+          <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 p-4 rounded-2xl shadow-lg z-20 mt-4 space-y-3">
+            <div className="flex items-start space-x-2.5">
+              <input
+                id="confirm-clean-checkbox"
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                disabled={selectedActions.length === 0}
+                className="w-4 h-4 mt-0.5 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer disabled:opacity-50"
+              />
+              <label htmlFor="confirm-clean-checkbox" className="text-xs text-slate-800 font-semibold leading-relaxed cursor-pointer select-none">
+                {selectedActions.length === 0
+                  ? 'Selecciona al menos una entidad o módulo arriba para habilitar la limpieza.'
+                  : `Confirmo que deseo ejecutar la limpieza de ${selectedActions.length} ${selectedActions.length === 1 ? 'sección seleccionada' : 'secciones seleccionadas'} en la base de datos.`}
+              </label>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+              <div className="text-[11px] text-slate-500 flex items-center space-x-1.5 font-medium">
+                {selectedActions.some((a) => ['products', 'reset_all_with_products', 'sri_invoices'].includes(a)) ? (
+                  <>
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <span className="text-rose-700 font-bold">
+                      Aviso: Has seleccionado módulos con borrado permanente (catálogo, facturas SRI o reset total).
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>Acción segura: Tus productos, categorías y usuarios administradores se conservarán salvo que los selecciones explícitamente.</span>
+                  </>
+                )}
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-                <div className="text-[11px] text-slate-500 flex items-center space-x-1.5 font-medium">
-                  {selectedAction === 'products' || selectedAction === 'reset_all_with_products' ? (
-                    <>
-                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      <span className="text-rose-700 font-bold">
-                        {selectedAction === 'products'
-                          ? 'Aviso: Los productos del catálogo serán eliminados permanentemente.'
-                          : 'Aviso: Se vaciará todo el ERP incluyendo productos y transacciones.'}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Database className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>Acción segura: Tus productos, categorías y usuarios administradores nunca son eliminados.</span>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  disabled={!confirmed || isCleaning}
-                  onClick={handleExecuteClean}
-                  className={`px-5 py-2.5 rounded-xl font-bold text-xs transition shadow-xs flex items-center justify-center space-x-2 cursor-pointer ${
-                    selectedAction === 'all_transactions'
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : selectedAction === 'products' || selectedAction === 'reset_all_with_products' || selectedAction === 'reset_all'
-                      ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                      : selectedAction === 'reset_stock'
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                  } disabled:opacity-40 disabled:cursor-not-allowed`}
-                >
-                  {isCleaning ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>
-                        {selectedAction === 'products'
-                          ? 'Eliminando Catálogo...'
-                          : selectedAction === 'reset_all_with_products'
-                          ? 'Ejecutando Reset de Fábrica...'
-                          : 'Ejecutando Limpieza de Pruebas...'}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      <span>
-                        {selectedAction === 'all_transactions'
-                          ? 'Ejecutar Limpieza Integral de Pruebas'
-                          : selectedAction === 'products'
-                          ? 'Eliminar Todo el Catálogo de Productos'
-                          : selectedAction === 'reset_all_with_products'
-                          ? 'Ejecutar Reset Absoluto (Catálogo + ERP)'
-                          : selectedAction === 'reset_all'
-                          ? 'Ejecutar Limpieza Total de Operaciones'
-                          : selectedAction === 'reset_stock'
-                          ? 'Aplicar Nuevo Stock a Catálogo'
-                          : 'Ejecutar Limpieza Seleccionada'}
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={!confirmed || isCleaning || selectedActions.length === 0}
+                onClick={handleExecuteClean}
+                className={`px-5 py-2.5 rounded-xl font-bold text-xs transition shadow-xs flex items-center justify-center space-x-2 cursor-pointer ${
+                  selectedActions.some((a) => ['products', 'reset_all_with_products', 'reset_all'].includes(a))
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                {isCleaning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Ejecutando Limpieza Secuencial...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>
+                      {selectedActions.length === 0
+                        ? 'Ninguna sección seleccionada'
+                        : `Limpiar ${selectedActions.length} ${selectedActions.length === 1 ? 'Sección Seleccionada' : 'Secciones Seleccionadas'}`}
+                    </span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

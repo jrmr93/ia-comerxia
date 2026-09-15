@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db, isPostgresConfigured } from './index.ts';
-import { aiConfigs, customerOrders, customers, ecuadorApiConfigs, inventoryItems, payments, purchases, serverDomainConfigs, sriConfigs, sriInvoices, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
+import { aiConfigs, customerOrders, customers, ecuadorApiConfigs, payphoneConfigs, inventoryItems, payments, purchases, serverDomainConfigs, sriConfigs, sriInvoices, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
 import { validateEcuadorId } from '../utils/ecuadorIdValidator.ts';
 import {
@@ -2885,6 +2885,213 @@ export async function saveEcuadorApiConfig(
     return inserted[0];
   } catch (error) {
     console.warn('Error updating ecuador api config in SQL, fallback to local store:', error);
+    return localConfig;
+  }
+}
+
+// -------------------------------------------------------------
+// PAYPHONE API CONFIGURATION HELPERS (Visa / Mastercard Links)
+// -------------------------------------------------------------
+
+export async function getPayphoneConfig(userId: number = 1) {
+  const envToken = process.env.PAYPHONE_TOKEN || '';
+  const envStoreId = process.env.PAYPHONE_STORE_ID || '';
+  const envEnv = process.env.PAYPHONE_ENV || 'production';
+  const state = storage.getState();
+  if (!state.payphoneConfigs) {
+    state.payphoneConfigs = [];
+  }
+
+  let localConfig = state.payphoneConfigs.find((c) => c.userId === userId) || state.payphoneConfigs[0];
+  const effectiveToken = localConfig?.token || envToken || '';
+  const effectiveStoreId = localConfig?.storeId || envStoreId || '';
+  const effectiveEnv = localConfig?.environment || envEnv || 'production';
+
+  if (!isPostgresConfigured()) {
+    if (!localConfig) {
+      localConfig = {
+        id: state.nextId?.payphoneConfigs ? state.nextId.payphoneConfigs++ : 1,
+        userId,
+        token: envToken || null,
+        storeId: envStoreId || null,
+        environment: envEnv,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      state.payphoneConfigs.push(localConfig);
+      storage.save();
+    }
+    return {
+      id: localConfig.id,
+      userId: localConfig.userId,
+      token: effectiveToken,
+      storeId: effectiveStoreId,
+      environment: effectiveEnv,
+      hasToken: Boolean(effectiveToken && effectiveToken.trim().length > 0),
+      isConfigured: Boolean(effectiveToken && effectiveToken.trim().length > 0),
+      isActive: localConfig.isActive !== false,
+      createdAt: localConfig.createdAt,
+      updatedAt: localConfig.updatedAt,
+    };
+  }
+
+  try {
+    const configs = await db
+      .select()
+      .from(payphoneConfigs)
+      .where(eq(payphoneConfigs.userId, userId))
+      .limit(1);
+
+    let sqlRow = configs.length > 0 ? configs[0] : null;
+    if (!sqlRow) {
+      const anyConfig = await db.select().from(payphoneConfigs).limit(1);
+      if (anyConfig.length > 0) {
+        sqlRow = anyConfig[0];
+      }
+    }
+
+    if (!sqlRow) {
+      let targetUserId = userId || 1;
+      const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
+      if (userCheck.length === 0) {
+        const anyUser = await db.select({ id: users.id }).from(users).limit(1);
+        if (anyUser.length > 0) {
+          targetUserId = anyUser[0].id;
+        }
+      }
+
+      const created = await db
+        .insert(payphoneConfigs)
+        .values({
+          userId: targetUserId,
+          token: envToken || null,
+          storeId: envStoreId || null,
+          environment: envEnv,
+          isActive: true,
+        })
+        .returning();
+
+      if (created.length > 0) {
+        sqlRow = created[0];
+      }
+    }
+
+    const tokenToUse = sqlRow?.token || effectiveToken;
+    const storeIdToUse = sqlRow?.storeId || effectiveStoreId;
+    const envToUse = sqlRow?.environment || effectiveEnv;
+
+    return {
+      id: sqlRow?.id || 1,
+      userId: sqlRow?.userId || userId,
+      token: tokenToUse,
+      storeId: storeIdToUse,
+      environment: envToUse,
+      hasToken: Boolean(tokenToUse && tokenToUse.trim().length > 0),
+      isConfigured: Boolean(tokenToUse && tokenToUse.trim().length > 0),
+      isActive: sqlRow ? sqlRow.isActive !== false : true,
+      createdAt: sqlRow?.createdAt,
+      updatedAt: sqlRow?.updatedAt,
+    };
+  } catch (error) {
+    console.warn('Error fetching payphone api config from SQL, fallback to local state:', error);
+    return {
+      id: localConfig?.id || 1,
+      userId,
+      token: effectiveToken,
+      storeId: effectiveStoreId,
+      environment: effectiveEnv,
+      hasToken: Boolean(effectiveToken && effectiveToken.trim().length > 0),
+      isConfigured: Boolean(effectiveToken && effectiveToken.trim().length > 0),
+      isActive: localConfig?.isActive !== false,
+    };
+  }
+}
+
+export async function savePayphoneConfig(
+  userId: number = 1,
+  data: { token?: string; storeId?: string; environment?: string; isActive?: boolean }
+) {
+  const state = storage.getState();
+  if (!state.payphoneConfigs) state.payphoneConfigs = [];
+
+  let localConfig = state.payphoneConfigs.find((c) => c.userId === userId);
+  const cleanToken = (data.token !== undefined && data.token.trim().length > 0) ? data.token.trim() : undefined;
+  const cleanStoreId = data.storeId !== undefined ? data.storeId.trim() : undefined;
+  const cleanEnv = data.environment !== undefined ? data.environment.trim() : undefined;
+
+  if (!localConfig) {
+    localConfig = {
+      id: state.nextId?.payphoneConfigs ? state.nextId.payphoneConfigs++ : 1,
+      userId,
+      token: cleanToken ?? null,
+      storeId: cleanStoreId ?? null,
+      environment: cleanEnv ?? 'production',
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    state.payphoneConfigs.push(localConfig);
+  } else {
+    if (cleanToken !== undefined) localConfig.token = cleanToken;
+    if (cleanStoreId !== undefined) localConfig.storeId = cleanStoreId;
+    if (cleanEnv !== undefined) localConfig.environment = cleanEnv;
+    if (data.isActive !== undefined) localConfig.isActive = data.isActive;
+    localConfig.updatedAt = new Date().toISOString();
+  }
+  storage.save();
+
+  if (!isPostgresConfigured()) {
+    return localConfig;
+  }
+
+  try {
+    const existing = await getPayphoneConfig(userId);
+
+    if (existing && existing.id) {
+      const tokenToSet = cleanToken !== undefined ? cleanToken : existing.token;
+      const storeIdToSet = cleanStoreId !== undefined ? cleanStoreId : existing.storeId;
+      const envToSet = cleanEnv !== undefined ? cleanEnv : existing.environment;
+      const updated = await db
+        .update(payphoneConfigs)
+        .set({
+          token: tokenToSet,
+          storeId: storeIdToSet,
+          environment: envToSet,
+          isActive: data.isActive !== undefined ? data.isActive : existing.isActive,
+          updatedAt: new Date(),
+        })
+        .where(eq(payphoneConfigs.id, existing.id))
+        .returning();
+
+      if (updated.length > 0) {
+        return updated[0];
+      }
+    }
+
+    let targetUserId = userId || 1;
+    const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
+    if (userCheck.length === 0) {
+      const anyUser = await db.select({ id: users.id }).from(users).limit(1);
+      if (anyUser.length > 0) {
+        targetUserId = anyUser[0].id;
+      }
+    }
+
+    const inserted = await db
+      .insert(payphoneConfigs)
+      .values({
+        userId: targetUserId,
+        token: cleanToken ?? null,
+        storeId: cleanStoreId ?? null,
+        environment: cleanEnv ?? 'production',
+        isActive: data.isActive !== undefined ? data.isActive : true,
+      })
+      .returning();
+
+    return inserted[0];
+  } catch (error) {
+    console.warn('Error updating payphone api config in SQL, fallback to local store:', error);
     return localConfig;
   }
 }
@@ -8991,6 +9198,13 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
   >();
 
   for (const it of orderItems) {
+    if (
+      it.sku === 'ENVIO-DOMICILIO' ||
+      it.id === -999 ||
+      (it.name && it.name.trim().toLowerCase() === 'servicios de entrega')
+    ) {
+      continue;
+    }
     const isCustom = it.sku === 'CUSTOM';
     const invItem = isCustom
       ? null
@@ -9900,6 +10114,7 @@ export async function getDevTestingStats(_userId?: number) {
   let messagesCount = state.telegramMessages ? state.telegramMessages.length : 0;
   let analyticsCount = state.storeAnalyticsEvents ? state.storeAnalyticsEvents.length : 0;
   let productsCount = state.inventoryItems ? state.inventoryItems.length : 0;
+  let sriInvoicesCount = state.sriInvoices ? state.sriInvoices.length : 0;
   let totalStockUnits = (state.inventoryItems || []).reduce((acc, it) => acc + (Number(it.stock) || 0), 0);
 
   let pendingOrdersCount = (state.customerOrders || []).filter(
@@ -9911,7 +10126,7 @@ export async function getDevTestingStats(_userId?: number) {
 
   if (isPostgresConfigured()) {
     try {
-      const [ordRows, purRows, custRows, supRows, payRows, msgRows, prodRows] = await Promise.all([
+      const [ordRows, purRows, custRows, supRows, payRows, msgRows, prodRows, sriRows] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(customerOrders),
         db.select({ count: sql<number>`count(*)` }).from(purchases),
         db.select({ count: sql<number>`count(*)` }).from(customers),
@@ -9919,6 +10134,7 @@ export async function getDevTestingStats(_userId?: number) {
         db.select({ count: sql<number>`count(*)` }).from(payments),
         db.select({ count: sql<number>`count(*)` }).from(telegramMessages),
         db.select({ count: sql<number>`count(*)`, totalStock: sql<number>`sum(stock)` }).from(inventoryItems),
+        db.select({ count: sql<number>`count(*)` }).from(sriInvoices),
       ]);
       ordersCount = Number(ordRows[0]?.count) || ordersCount;
       purchasesCount = Number(purRows[0]?.count) || purchasesCount;
@@ -9927,6 +10143,7 @@ export async function getDevTestingStats(_userId?: number) {
       paymentsCount = Number(payRows[0]?.count) || paymentsCount;
       messagesCount = Number(msgRows[0]?.count) || messagesCount;
       productsCount = Number(prodRows[0]?.count) || productsCount;
+      sriInvoicesCount = Number(sriRows[0]?.count) || sriInvoicesCount;
       if (prodRows[0]?.totalStock !== null && prodRows[0]?.totalStock !== undefined) {
         totalStockUnits = Number(prodRows[0].totalStock) || 0;
       }
@@ -9944,6 +10161,7 @@ export async function getDevTestingStats(_userId?: number) {
     messagesCount,
     analyticsCount,
     productsCount,
+    sriInvoicesCount,
     totalStockUnits,
     pendingOrdersCount,
     pendingPurchasesCount,
@@ -9968,6 +10186,7 @@ export async function cleanTestData(
     | 'reset_stock'
     | 'reset_customer_balances'
     | 'reset_supplier_balances'
+    | 'sri_invoices'
     | 'all_transactions'
     | 'reset_all'
     | 'reset_all_with_products',
@@ -9983,6 +10202,7 @@ export async function cleanTestData(
     clearedPayments: number;
     clearedProducts: number;
     clearedTelegram: number;
+    clearedSriInvoices: number;
     clearedAnalytics: boolean;
     stockResetProducts: number;
     message: string;
@@ -9994,6 +10214,7 @@ export async function cleanTestData(
     clearedPayments: 0,
     clearedProducts: 0,
     clearedTelegram: 0,
+    clearedSriInvoices: 0,
     clearedAnalytics: false,
     stockResetProducts: 0,
     message: '',
@@ -10172,6 +10393,21 @@ export async function cleanTestData(
     if (state.nextId) state.nextId.payments = 1;
   }
 
+  // 8b. Limpiar Facturas Electrónicas y Prefacturas SRI Guardadas
+  if (action === 'sri_invoices' || action === 'all_transactions' || action === 'reset_all' || action === 'reset_all_with_products') {
+    summary.clearedSriInvoices = state.sriInvoices ? state.sriInvoices.length : 0;
+    if (isPostgresConfigured()) {
+      try {
+        await db.delete(sriInvoices);
+      } catch (err) {
+        console.warn('Error clearing sriInvoices in SQL:', err);
+      }
+    }
+    state.sriInvoices = [];
+    if (!state.nextId) state.nextId = {} as any;
+    state.nextId.sriInvoices = 1;
+  }
+
   // 9. Resetear Stock de Productos
   if (action === 'reset_stock') {
     const targetStock = options?.targetStockQuantity !== undefined ? Math.max(0, options.targetStockQuantity) : 0;
@@ -10202,6 +10438,8 @@ export async function cleanTestData(
     summary.message = `✓ Se eliminaron ${summary.clearedPurchases} órdenes de compra de prueba. Contador reiniciado a #COM-001 y balances de proveedores reseteados.`;
   } else if (action === 'payments') {
     summary.message = `✓ Se eliminaron ${summary.clearedPayments} registros de cobros, pagos y tesorería. Libro mayor reseteado a cero.`;
+  } else if (action === 'sri_invoices') {
+    summary.message = `✓ Se eliminaron ${summary.clearedSriInvoices} facturas electrónicas y prefacturas guardadas del historial SRI.`;
   } else if (action === 'products') {
     summary.message = `✓ Se eliminaron los ${summary.clearedProducts} productos del catálogo de inventario. Catálogo listo para cargar nuevo inventario desde cero.`;
   } else if (action === 'customers') {

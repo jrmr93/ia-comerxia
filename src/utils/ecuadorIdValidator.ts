@@ -51,7 +51,7 @@ export const ECUADOR_PROVINCES: Record<string, string> = {
 
 export interface EcuadorIdValidationResult {
   isValid: boolean;
-  type: 'cedula' | 'ruc_natural' | 'ruc_privada' | 'ruc_publica' | 'invalid';
+  type: 'cedula' | 'ruc_natural' | 'ruc_privada' | 'ruc_publica' | 'final_consumer' | 'invalid';
   cleaned: string;
   formatted: string;
   provinceCode?: string;
@@ -88,6 +88,18 @@ export function validateEcuadorId(
       cleaned: '',
       formatted: '',
       error: 'El número de cédula debe contener dígitos numéricos',
+    };
+  }
+
+  // Identificador especial SRI para Consumidor Final (13 nueves)
+  if (cleaned === '9999999999999') {
+    return {
+      isValid: true,
+      type: 'final_consumer',
+      cleaned: '9999999999999',
+      formatted: '9999999999999',
+      provinceCode: '00',
+      provinceName: 'Ecuador (Consumidor Final)',
     };
   }
 

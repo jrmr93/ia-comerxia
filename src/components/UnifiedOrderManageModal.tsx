@@ -172,6 +172,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
   // Customer Data State
   const [customerCi, setCustomerCi] = useState<string>('');
+  const [docType, setDocType] = useState<'05' | '04' | '07' | '06'>('05');
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerEmail, setCustomerEmail] = useState<string>('');
@@ -179,6 +180,37 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [showCustomerDropdown, setShowCustomerDropdown] = useState<boolean>(false);
   const [matchedCustomerInfo, setMatchedCustomerInfo] = useState<any | null>(null);
   const [ecuadorApiStatus, setEcuadorApiStatus] = useState<{ loading: boolean; source?: string; message?: string } | null>(null);
+
+  // Auto-sync document type with CI input
+  useEffect(() => {
+    const clean = (customerCi || '').trim();
+    if (clean === '9999999999999' || clean.toUpperCase() === 'CONSUMIDOR FINAL') {
+      setDocType('07');
+    } else if (clean.length === 13) {
+      setDocType('04');
+    } else if (clean.length === 10) {
+      setDocType('05');
+    } else if (clean.length > 0) {
+      setDocType('06');
+    }
+  }, [customerCi]);
+
+  const handleSelectDocType = (newType: '05' | '04' | '07' | '06') => {
+    setDocType(newType);
+    if (newType === '07') {
+      setCustomerCi('9999999999999');
+      if (!customerName.trim() || customerName.trim().toUpperCase() === 'CONSUMIDOR FINAL') {
+        setCustomerName('CONSUMIDOR FINAL');
+      }
+    } else {
+      if (customerCi.trim() === '9999999999999') {
+        setCustomerCi('');
+      }
+      if (customerName.trim().toUpperCase() === 'CONSUMIDOR FINAL') {
+        setCustomerName('');
+      }
+    }
+  };
 
   // Facturación Electrónica SRI State
   const [sriEmitting, setSriEmitting] = useState(false);
@@ -207,6 +239,23 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       setSriInvoiceRecord(null);
     }
   }, [order]);
+
+  // Fetch Payphone API configuration when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    setPayphoneUrl(null);
+    fetch('/api/payphone/config')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.config) {
+          setPayphoneConfig({
+            isActive: data.config.isActive !== false,
+            hasToken: Boolean(data.config.hasToken),
+          });
+        }
+      })
+      .catch(() => {});
+  }, [isOpen]);
 
   const handleEmitSriInvoice = async () => {
     if (!order || !order.id) {
@@ -346,8 +395,55 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       discountPercent?: number;
       quantity: number;
       imageUrl?: string | null;
+      saleTaxPercent?: number;
     }>
   >([]);
+
+  // Synchronize delivery fee as a 0% IVA line item ("Servicios de entrega")
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const shipVal = deliveryType === 'shipping' ? Math.max(0, Number(shippingCost) || 0) : 0;
+
+    setItems((prev) => {
+      const existingIdx = prev.findIndex(
+        (it) => it.sku === 'ENVIO-DOMICILIO' || it.name === 'Servicios de entrega' || it.id === -999
+      );
+
+      if (shipVal > 0) {
+        const shippingItemObj = {
+          id: -999,
+          inventoryItemId: -999,
+          name: 'Servicios de entrega',
+          sku: 'ENVIO-DOMICILIO',
+          barcode: 'FLETE-001',
+          costPrice: 0,
+          marginPercent: 0,
+          salePrice: shipVal,
+          discount: 0,
+          discountPercent: 0,
+          quantity: 1,
+          saleTaxPercent: 0,
+          imageUrl: null,
+        };
+
+        if (existingIdx >= 0) {
+          const currentItem = prev[existingIdx];
+          if (currentItem.salePrice === shipVal && (currentItem as any).saleTaxPercent === 0) {
+            return prev;
+          }
+          return prev.map((it, idx) => (idx === existingIdx ? { ...it, salePrice: shipVal, saleTaxPercent: 0 } : it));
+        } else {
+          return [...prev, shippingItemObj];
+        }
+      } else {
+        if (existingIdx >= 0) {
+          return prev.filter((_, idx) => idx !== existingIdx);
+        }
+        return prev;
+      }
+    });
+  }, [deliveryType, shippingCost, isOpen]);
 
   // Product Search for Adding
   const [productSearch, setProductSearch] = useState<string>('');
@@ -367,6 +463,12 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
   const [voucherError, setVoucherError] = useState<string | null>(null);
+
+  // Payphone API State
+  const [payphoneConfig, setPayphoneConfig] = useState<{ isActive: boolean; hasToken: boolean } | null>(null);
+  const [payphoneUrl, setPayphoneUrl] = useState<string | null>(null);
+  const [payphoneGenerating, setPayphoneGenerating] = useState(false);
+  const [payphoneSendingEmail, setPayphoneSendingEmail] = useState(false);
 
   // Order status
   const orderStatus = order?.status || 'pending';
@@ -484,11 +586,12 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       const orderApplyTax = (order as any).applySaleTax !== false;
       const orderTaxPct = Number((order as any).saleTaxPercent || 15);
       const parsedItems = rawItems.map((it: any) => {
-        const targetId = it.inventoryItemId || it.id;
-        const matchingProduct = products.find((p) => p.id === targetId || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
-        const cPrice = Number(it.costPrice ?? matchingProduct?.costWithoutTax ?? matchingProduct?.costPrice ?? 0);
+        const isShippingLine = it.sku === 'ENVIO-DOMICILIO' || (it.name && it.name.trim() === 'Servicios de entrega') || it.id === -999;
+        const targetId = isShippingLine ? -999 : (it.inventoryItemId || it.id);
+        const matchingProduct = isShippingLine ? null : products.find((p) => p.id === targetId || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
+        const cPrice = isShippingLine ? 0 : Number(it.costPrice ?? matchingProduct?.costWithoutTax ?? matchingProduct?.costPrice ?? 0);
         const rawSale = Number(it.salePrice || it.item?.salePrice || matchingProduct?.salePrice || 0);
-        const itemTaxPct = extractItemTaxPercent(it, orderTaxPct, matchingProduct);
+        const itemTaxPct = isShippingLine ? 0 : extractItemTaxPercent(it, orderTaxPct, matchingProduct);
         const itemApplyTax = itemTaxPct > 0;
         const basePriceInfo = extractBaseUnitPriceWithoutTax({
           rawSalePrice: rawSale,
@@ -498,10 +601,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           saleTaxPercent: itemTaxPct,
           marginPercent: it.marginPercent !== undefined ? Number(it.marginPercent) : (matchingProduct as any)?.marginPercent,
         });
-        const baseSalePrice = basePriceInfo.unitPriceWithoutTax;
-        const marginPct = basePriceInfo.marginPercent;
-        let discVal = Number(it.discount ?? 0);
-        if (discVal === 0 && (it.discountPercent || matchingProduct?.discountPercent)) {
+        const baseSalePrice = isShippingLine ? rawSale : basePriceInfo.unitPriceWithoutTax;
+        const marginPct = isShippingLine ? 0 : basePriceInfo.marginPercent;
+        let discVal = isShippingLine ? 0 : Number(it.discount ?? 0);
+        if (!isShippingLine && discVal === 0 && (it.discountPercent || matchingProduct?.discountPercent)) {
           const pct = Number(it.discountPercent || matchingProduct?.discountPercent || 0);
           if (pct > 0) {
             discVal = Math.round((baseSalePrice * pct / 100) * 100) / 100;
@@ -509,49 +612,59 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         }
         return {
           id: targetId,
-          inventoryItemId: it.inventoryItemId || it.id,
-          name: it.name || it.item?.name || 'Producto',
-          sku: it.sku || it.item?.sku || '',
-          barcode: it.barcode || matchingProduct?.barcode || undefined,
+          inventoryItemId: targetId,
+          name: isShippingLine ? 'Servicios de entrega' : (it.name || it.item?.name || 'Producto'),
+          sku: isShippingLine ? 'ENVIO-DOMICILIO' : (it.sku || it.item?.sku || ''),
+          barcode: isShippingLine ? 'FLETE-001' : (it.barcode || matchingProduct?.barcode || undefined),
           costPrice: cPrice,
           marginPercent: marginPct,
-          supplierName: it.supplierName || (matchingProduct as any)?.supplier || undefined,
+          supplierName: isShippingLine ? undefined : (it.supplierName || (matchingProduct as any)?.supplier || undefined),
           salePrice: baseSalePrice,
           discount: discVal,
-          discountPercent: it.discountPercent ? Number(it.discountPercent) : (matchingProduct?.discountPercent ? Number(matchingProduct.discountPercent) : 0),
-          quantity: Number(it.quantity || 1),
-          imageUrl: it.imageUrl || it.item?.imageUrl || matchingProduct?.imageUrl || null,
+          discountPercent: isShippingLine ? 0 : (it.discountPercent ? Number(it.discountPercent) : (matchingProduct?.discountPercent ? Number(matchingProduct.discountPercent) : 0)),
+          quantity: isShippingLine ? 1 : Number(it.quantity || 1),
+          saleTaxPercent: isShippingLine ? 0 : itemTaxPct,
+          imageUrl: isShippingLine ? null : (it.imageUrl || it.item?.imageUrl || matchingProduct?.imageUrl || null),
         };
       });
       setItems(parsedItems);
 
-      // Shipping cost calculation
-      const calculatedItemsForShipping = parsedItems.map((it: any) => {
-        const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
-        const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
-        const unitSale = Number(it.salePrice || 0);
-        const itemTaxPercent = extractItemTaxPercent(it, orderTaxPct, match);
-
-        return calculateLineItem({
-          id: it.id,
-          name: it.name,
-          sku: it.sku,
-          costWithoutTax: unitCost,
-          unitSalePrice: unitSale,
-          discount: Number(it.discount || 0),
-          quantity: Number(it.quantity || 1),
-          applySaleTax: itemTaxPercent > 0,
-          saleTaxPercent: itemTaxPercent,
-        });
-      });
-      const itemsTotalWithTax = calculatedItemsForShipping.reduce((acc, it) => acc + it.lineTotal, 0);
-      const explicitShip = Number((order as any).shippingCost);
-      if (!isNaN(explicitShip) && (order as any).shippingCost !== undefined && (order as any).shippingCost !== null) {
-        setShippingCost(String(explicitShip));
+      // Shipping cost calculation from existing items or explicit/derived fallback
+      const existingShippingItem = parsedItems.find((it: any) => it.sku === 'ENVIO-DOMICILIO' || it.name === 'Servicios de entrega' || it.id === -999);
+      if (existingShippingItem) {
+        const shipPrice = Number(existingShippingItem.salePrice || 0);
+        setShippingCost(String(shipPrice));
+        if (shipPrice > 0) {
+          setDeliveryType('shipping');
+        }
       } else {
-        const orderTotal = Number(order.totalAmount || 0);
-        const derivedShip = Math.max(0, orderTotal - itemsTotalWithTax);
-        setShippingCost(derivedShip > 0 ? derivedShip.toFixed(2) : '0');
+        const calculatedItemsForShipping = parsedItems.map((it: any) => {
+          const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
+          const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
+          const unitSale = Number(it.salePrice || 0);
+          const itemTaxPercent = extractItemTaxPercent(it, orderTaxPct, match);
+
+          return calculateLineItem({
+            id: it.id,
+            name: it.name,
+            sku: it.sku,
+            costWithoutTax: unitCost,
+            unitSalePrice: unitSale,
+            discount: Number(it.discount || 0),
+            quantity: Number(it.quantity || 1),
+            applySaleTax: itemTaxPercent > 0,
+            saleTaxPercent: itemTaxPercent,
+          });
+        });
+        const itemsTotalWithTax = calculatedItemsForShipping.reduce((acc, it) => acc + it.lineTotal, 0);
+        const explicitShip = Number((order as any).shippingCost);
+        if (!isNaN(explicitShip) && (order as any).shippingCost !== undefined && (order as any).shippingCost !== null) {
+          setShippingCost(String(explicitShip));
+        } else {
+          const orderTotal = Number(order.totalAmount || 0);
+          const derivedShip = Math.max(0, orderTotal - itemsTotalWithTax);
+          setShippingCost(derivedShip > 0 ? derivedShip.toFixed(2) : '0');
+        }
       }
 
       // Payment & Notes
@@ -728,6 +841,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     }> = [];
 
     items.forEach((it) => {
+      if (it.sku === 'ENVIO-DOMICILIO' || it.name === 'Servicios de entrega' || it.id === -999) return;
       const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
       const avail = match ? Math.max(0, Number(match.stock || 0)) : 0;
       if (it.quantity > avail) {
@@ -752,10 +866,11 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   // Financial Calculations - SRI Ecuador Central Engine
   const invoiceTotals = useMemo(() => {
     const calculatedItems = items.map((it) => {
-      const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
+      const isShippingLine = it.sku === 'ENVIO-DOMICILIO' || it.name === 'Servicios de entrega' || it.id === -999;
+      const match = isShippingLine ? null : products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
       const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
       const unitSale = Number(it.salePrice || 0);
-      const itemTaxPercent = extractItemTaxPercent(it, 15, match);
+      const itemTaxPercent = isShippingLine ? 0 : extractItemTaxPercent(it, 15, match);
 
       return calculateLineItem({
         id: it.id,
@@ -771,9 +886,95 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       });
     });
 
-    const fee = deliveryType === 'pickup' ? 0 : Math.max(0, Number(shippingCost) || 0);
-    return calculateInvoiceTotals(calculatedItems, { shippingFee: fee });
-  }, [items, products, deliveryType, shippingCost]);
+    return calculateInvoiceTotals(calculatedItems, { shippingFee: 0 });
+  }, [items, products]);
+
+  // Payphone API Helpers & Card Payment Detection
+  const isCardPaymentMethod = useMemo(() => {
+    const m = (paymentMethod || '').toLowerCase().trim();
+    return m.includes('tarjeta') || m.includes('card') || m.includes('visa') || m.includes('mastercard') || m.includes('payphone');
+  }, [paymentMethod]);
+
+  const handleGeneratePayphoneLink = async () => {
+    if (payphoneGenerating) return;
+    setPayphoneGenerating(true);
+
+    try {
+      const res = await fetch('/api/payphone/generate-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order?.id || 0,
+          orderNumber: order?.orderNumber || 'PRE-FACTURA',
+          totalAmount: invoiceTotals.totalInvoiceAmount,
+          subtotal0: invoiceTotals.subtotalZero0,
+          subtotal15: invoiceTotals.subtotalTaxable15,
+          tax15: invoiceTotals.totalTax,
+          customerName: customerName || 'Cliente',
+          customerPhone: customerPhone || '',
+          customerEmail: customerEmail || '',
+          reference: `Pedido #${order?.orderNumber || 'NUEVO'} - ${customerName || 'Cliente'}`,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success && data.payUrl) {
+        setPayphoneUrl(data.payUrl);
+        if (!voucherInput.trim()) {
+          setVoucherInput(data.payUrl);
+        }
+        showToast('✓ Link de pago Payphone generado exitosamente');
+      } else {
+        const msg = data.error || 'Error al generar enlace de pago en Payphone';
+        showToast(`❌ ${msg}`);
+      }
+    } catch (err: any) {
+      console.error('Error generating Payphone link:', err);
+      showToast('⚠️ Error de conexión con el servidor al generar link Payphone');
+    } finally {
+      setPayphoneGenerating(false);
+    }
+  };
+
+  const handleSendPayphoneEmail = async () => {
+    if (!payphoneUrl) {
+      showToast('⚠️ Primero genera el enlace de pago Payphone');
+      return;
+    }
+    if (!customerEmail || !customerEmail.includes('@')) {
+      showToast('⚠️ Ingresa un correo electrónico válido del cliente');
+      return;
+    }
+
+    setPayphoneSendingEmail(true);
+    try {
+      const res = await fetch('/api/payphone/send-email-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: customerEmail.trim(),
+          customerName: customerName || 'Cliente',
+          orderNumber: order?.orderNumber || '0',
+          totalAmount: invoiceTotals.totalInvoiceAmount,
+          payUrl: payphoneUrl,
+          itemsSummary: items.map((it) => `${it.quantity}x ${it.name}`).join(', '),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`✓ Enlace de pago enviado a ${customerEmail}`);
+      } else {
+        showToast(`❌ ${data.error || 'Error al enviar correo'}`);
+      }
+    } catch (err: any) {
+      console.error('Error sending Payphone email link:', err);
+      showToast('⚠️ Error de conexión al enviar correo de Payphone');
+    } finally {
+      setPayphoneSendingEmail(false);
+    }
+  };
 
   const productsSubtotal = invoiceTotals.subtotalNoTax;
   const totalDiscountAmount = invoiceTotals.totalDiscount;
@@ -1640,50 +1841,79 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               {/* 1. Cédula / RUC con autocompletado y validación */}
               <div className="relative flex flex-col justify-start">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-slate-700 font-bold text-xs">Cédula / RUC:</label>
-                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-medium border border-emerald-200/60">
-                    Ecuador
-                  </span>
-                </div>
-                <div className="relative">
-                  <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={customerCi}
-                    onChange={(e) => {
-                      setCustomerCi(e.target.value);
-                      if (e.target.value.trim().length >= 2) {
-                        setShowCustomerDropdown(true);
-                      }
-                    }}
-                    onFocus={() => {
-                      if (customerCi.trim().length >= 2 && matchingCustomerSuggestions.length > 0) {
-                        setShowCustomerDropdown(true);
-                      }
-                    }}
-                    placeholder="Ej. 1712345678"
-                    className={`w-full h-10 pl-9 pr-8 rounded-xl font-mono text-xs focus:outline-none font-semibold transition ${
-                      customerCi.trim()
-                        ? idValidation?.isValid
-                          ? 'bg-emerald-50/50 border border-emerald-400 text-slate-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100'
-                          : 'bg-rose-50/50 border border-rose-400 text-slate-900 focus:border-rose-600 focus:ring-2 focus:ring-rose-100'
-                        : 'bg-slate-50 border border-slate-200 text-slate-900 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100'
+                  <label className="text-slate-700 font-bold text-xs flex items-center gap-1">
+                    <span>Documento SRI:</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDocType('07')}
+                    className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition flex items-center gap-1 border cursor-pointer ${
+                      docType === '07' || customerCi.trim() === '9999999999999'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                        : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200'
                     }`}
-                  />
-                  {customerCi && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCustomerCi('');
-                        setMatchedCustomerInfo(null);
-                        setShowCustomerDropdown(false);
+                    title="Asignar Consumidor Final (9999999999999)"
+                  >
+                    <span>⚡ Consumidor Final</span>
+                  </button>
+                </div>
+                
+                <div className="flex gap-1.5">
+                  {/* Selector de Tipo de Documento */}
+                  <select
+                    value={docType}
+                    onChange={(e) => handleSelectDocType(e.target.value as any)}
+                    className="h-10 px-2 rounded-xl bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-emerald-500 transition cursor-pointer shrink-0"
+                  >
+                    <option value="05">Cédula (05)</option>
+                    <option value="04">RUC (04)</option>
+                    <option value="07">Cons. Final (07)</option>
+                    <option value="06">Pasaporte (06)</option>
+                  </select>
+
+                  <div className="relative flex-1">
+                    <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={customerCi}
+                      disabled={docType === '07'}
+                      onChange={(e) => {
+                        setCustomerCi(e.target.value);
+                        if (e.target.value.trim().length >= 2) {
+                          setShowCustomerDropdown(true);
+                        }
                       }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1 rounded-full hover:bg-slate-200 transition cursor-pointer"
-                      title="Borrar"
-                    >
-                      ✕
-                    </button>
-                  )}
+                      onFocus={() => {
+                        if (customerCi.trim().length >= 2 && matchingCustomerSuggestions.length > 0) {
+                          setShowCustomerDropdown(true);
+                        }
+                      }}
+                      placeholder={docType === '07' ? '9999999999999' : docType === '04' ? 'Ej. 1790000000001' : 'Ej. 1712345678'}
+                      className={`w-full h-10 pl-9 pr-8 rounded-xl font-mono text-xs focus:outline-none font-semibold transition ${
+                        docType === '07'
+                          ? 'bg-purple-50/80 border border-purple-300 text-purple-900 font-bold'
+                          : customerCi.trim()
+                          ? idValidation?.isValid
+                            ? 'bg-emerald-50/50 border border-emerald-400 text-slate-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100'
+                            : 'bg-rose-50/50 border border-rose-400 text-slate-900 focus:border-rose-600 focus:ring-2 focus:ring-rose-100'
+                          : 'bg-slate-50 border border-slate-200 text-slate-900 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100'
+                      }`}
+                    />
+                    {customerCi && docType !== '07' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerCi('');
+                          setMatchedCustomerInfo(null);
+                          setShowCustomerDropdown(false);
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1 rounded-full hover:bg-slate-200 transition cursor-pointer"
+                        title="Borrar"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Dropdown Suggestions */}
@@ -2342,6 +2572,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 if (it.quantity > 1) {
                                   setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, quantity: item.quantity - 1 } : item)));
                                 } else {
+                                  if (it.sku === 'ENVIO-DOMICILIO' || it.name === 'Servicios de entrega' || it.id === -999) {
+                                    setShippingCost('0');
+                                    setDeliveryType('pickup');
+                                  }
                                   setItems((prev) => prev.filter((_, i) => i !== idx));
                                 }
                               }}
@@ -2376,6 +2610,9 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 const newP = Math.max(0, Number(e.target.value) || 0);
                                 const baseCost = Number(it.costPrice || 0);
                                 const newMargin = baseCost > 0 ? Math.round(((newP - baseCost) / baseCost) * 100) : 0;
+                                if (it.sku === 'ENVIO-DOMICILIO' || it.name === 'Servicios de entrega' || it.id === -999) {
+                                  setShippingCost(String(newP));
+                                }
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, salePrice: newP, marginPercent: newMargin } : item)));
                               }}
                               className="w-20 h-7 pl-5 pr-1 rounded-lg bg-purple-50/40 border border-purple-200 text-right font-mono font-bold text-purple-950 text-xs focus:outline-none focus:bg-white focus:border-purple-600"
@@ -2410,7 +2647,13 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           </span>
                           <button
                             type="button"
-                            onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                            onClick={() => {
+                              if (it.sku === 'ENVIO-DOMICILIO' || it.name === 'Servicios de entrega' || it.id === -999) {
+                                setShippingCost('0');
+                                setDeliveryType('pickup');
+                              }
+                              setItems((prev) => prev.filter((_, i) => i !== idx));
+                            }}
                             className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition cursor-pointer ml-1"
                             title="Quitar ítem"
                           >
@@ -2562,6 +2805,106 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </button>
               </div>
             </div>
+
+            {/* Bloque Integración Payphone API (Solo cuando se selecciona tarjeta y el switch de Payphone está activo) */}
+            {isCardPaymentMethod && payphoneConfig?.isActive && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-950 via-slate-900 to-indigo-950 text-white space-y-3 shadow-md border border-orange-500/30">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-orange-400" />
+                    <span className="font-bold text-xs text-white">Pasarela Payphone (Visa / Mastercard)</span>
+                  </div>
+                  <span className="text-[10px] bg-orange-500/30 text-orange-200 border border-orange-400/30 px-2 py-0.5 rounded-full font-bold">
+                    Cobro por Link API
+                  </span>
+                </div>
+
+                {!payphoneConfig?.hasToken ? (
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Para generar enlaces de cobro con tarjeta, ingresa tu Token de Payphone en <strong>Ajustes &gt; Payphone API</strong>.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {!payphoneUrl ? (
+                      <button
+                        type="button"
+                        onClick={handleGeneratePayphoneLink}
+                        disabled={payphoneGenerating || items.length === 0}
+                        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {payphoneGenerating ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                            <span>Generando Enlace Payphone...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="w-4 h-4 text-white" />
+                            <span>Generar Link de Pago Payphone (${invoiceTotals.totalInvoiceAmount.toFixed(2)} USD)</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="p-2.5 rounded-xl bg-slate-900 border border-orange-500/50 flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-orange-300 font-bold uppercase tracking-wider block">Enlace de Pago Generado:</span>
+                            <p className="font-mono text-xs text-white truncate">{payphoneUrl}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(payphoneUrl);
+                              showToast('✓ Link de pago Payphone copiado');
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shrink-0 cursor-pointer shadow-2xs"
+                          >
+                            Copiar Link
+                          </button>
+                        </div>
+
+                        {/* Botones de Notificación: WhatsApp y Correo Gmail */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const norm = normalizeEcuadorPhone(customerPhone);
+                              const msg = `Hola ${customerName || 'Cliente'}, se ha generado su enlace de pago en línea con tarjeta Visa/Mastercard para el pedido #${order?.orderNumber || 'Venta'} por un total de $${invoiceTotals.totalInvoiceAmount.toFixed(2)} USD:\n\n${payphoneUrl}\n\nHaga clic en el enlace para realizar su pago seguro.`;
+                              const url = buildWhatsAppLink(norm.whatsappDigits || customerPhone, msg);
+                              window.open(url, '_blank');
+                            }}
+                            className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                            <span>Enviar por WhatsApp</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleSendPayphoneEmail}
+                            disabled={payphoneSendingEmail}
+                            className="py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
+                          >
+                            {payphoneSendingEmail ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Enviando...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Mail className="w-3.5 h-3.5" />
+                                <span>Enviar por Correo (Gmail)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Account in Treasury & Voucher Input */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

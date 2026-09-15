@@ -291,6 +291,20 @@ export const ecuadorApiConfigs = pgTable('ecuador_api_configs', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// Payphone API configuration per user (for Visa / Mastercard link payments)
+export const payphoneConfigs = pgTable('payphone_configs', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  token: text('token'),
+  storeId: text('store_id'),
+  environment: text('environment').default('production'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Configuración de Facturación Electrónica SRI por usuario
 export const sriConfigs = pgTable('sri_configs', {
   id: serial('id').primaryKey(),
