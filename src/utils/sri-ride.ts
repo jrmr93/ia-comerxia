@@ -28,6 +28,12 @@ export function generateSriRideHtml(params: SriRideParams): string {
   const fechaEmision = matchTag('fechaEmision') || (invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('es-EC') : '');
   const razonSocialComprador = matchTag('razonSocialComprador') || invoice.customerName || 'CONSUMIDOR FINAL';
   const identificacionComprador = matchTag('identificacionComprador') || invoice.customerCiRuc || '9999999999999';
+  const direccionComprador = matchTag('direccionComprador') || 
+    (xmlContent.match(/<campoAdicional nombre="Direccion">([^<]+)<\/campoAdicional>/)?.[1]) || 
+    (invoice as any).customerAddress || 'N/A';
+  const correoComprador = matchTag('correoComprador') || 
+    (xmlContent.match(/<campoAdicional nombre="Email">([^<]+)<\/campoAdicional>/)?.[1]) || 
+    (invoice as any).customerEmail || 'N/A';
 
   // Parse items from XML
   const detallesList: Array<{
@@ -312,6 +318,9 @@ export function generateSriRideHtml(params: SriRideParams): string {
         <td><span class="label-bold">Fecha de Emisión:</span> ${fechaEmision}</td>
         <td><span class="label-bold">Guía de Remisión:</span> N/A</td>
       </tr>
+      <tr>
+        <td colspan="2"><span class="label-bold">Dirección:</span> ${direccionComprador}</td>
+      </tr>
     </table>
 
     {/* Tabla Detalle de Productos */}
@@ -353,6 +362,8 @@ export function generateSriRideHtml(params: SriRideParams): string {
     <div class="totals-grid">
       <div class="box">
         <div style="font-weight:bold; text-transform:uppercase; color:#0284c7; margin-bottom:6px; border-bottom:1px solid #e2e8f0; padding-bottom:3px;">Información Adicional & Pagos</div>
+        <p style="margin-bottom:4px;"><span class="label-bold">Email:</span> ${correoComprador}</p>
+        <p style="margin-bottom:4px;"><span class="label-bold">Dirección:</span> ${direccionComprador}</p>
         <p style="margin-bottom:4px;"><span class="label-bold">Sistema:</span> IA-Comerxia ERP Ecuador</p>
         <p style="margin-bottom:4px;"><span class="label-bold">Forma de Pago:</span> Sin utilización del sistema financiero</p>
         <p style="margin-bottom:4px;"><span class="label-bold">Total Pago:</span> $${Number(importeTotal).toFixed(2)}</p>

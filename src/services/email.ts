@@ -629,3 +629,110 @@ export async function sendTestEmail(targetEmail: string, userId?: number, appUrl
     attachments,
   });
 }
+
+/**
+ * Sends Electronic Invoice (RIDE HTML + SRI XML) to Customer Email via Google SMTP
+ */
+export async function sendInvoiceEmail(params: {
+  to: string;
+  customerName: string;
+  secuencial: string;
+  claveAcceso: string;
+  numeroAutorizacion?: string;
+  fechaAutorizacion?: string;
+  totalAmount: number | string;
+  xmlContent: string;
+  rideHtml: string;
+  userId?: number;
+}) {
+  const storeConfig = await getStoreConfig(params.userId || 1).catch(() => null);
+  const storeName = storeConfig?.storeName || 'COMERXIA';
+  const attachments: any[] = [];
+  const logoHtml = buildStoreLogoHeader(storeName, storeConfig?.logoUrl, attachments);
+
+  const cleanSecuencial = params.secuencial.padStart(9, '0');
+  const numAuth = params.numeroAutorizacion || params.claveAcceso;
+  const formattedTotal = Number(params.totalAmount || 0).toFixed(2);
+
+  if (params.xmlContent && params.xmlContent.trim().length > 0) {
+    attachments.push({
+      filename: `Factura_${cleanSecuencial}.xml`,
+      content: Buffer.from(params.xmlContent, 'utf8'),
+      contentType: 'application/xml',
+      contentDisposition: 'attachment',
+    });
+  }
+
+  if (params.rideHtml && params.rideHtml.trim().length > 0) {
+    attachments.push({
+      filename: `Factura_${cleanSecuencial}.html`,
+      content: Buffer.from(params.rideHtml, 'utf8'),
+      contentType: 'text/html',
+      contentDisposition: 'attachment',
+    });
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+        .header { background: linear-gradient(135deg, #0284c7, #0369a1); padding: 32px 24px; text-align: center; color: #ffffff; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+        .header p { margin: 6px 0 0 0; font-size: 13px; opacity: 0.95; }
+        .content { padding: 28px 24px; }
+        .info-card { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 18px; margin: 20px 0; }
+        .badge-authorized { display: inline-block; background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-radius: 12px; padding: 4px 12px; font-size: 12px; font-weight: 800; }
+        .footer { background: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          ${logoHtml}
+          <h1>${storeName}</h1>
+          <p>Comprobante Electrónico SRI - Factura N° ${cleanSecuencial}</p>
+        </div>
+        <div class="content">
+          <h2 style="margin-top:0; font-size:18px; color:#0f172a;">Estimado(a) ${params.customerName || 'Cliente'},</h2>
+          <p style="font-size:14px; color:#475569; line-height:1.6;">
+            Le informamos que su factura electrónica ha sido emitida y <strong>AUTORIZADA</strong> por el Servicio de Rentas Internas (SRI) de Ecuador.
+          </p>
+          
+          <div class="info-card">
+            <div style="text-align:center; margin-bottom:12px;">
+              <span class="badge-authorized">✓ AUTORIZADO POR EL SRI</span>
+            </div>
+            <p style="margin:4px 0;"><strong>N° Factura:</strong> 001-001-${cleanSecuencial}</p>
+            <p style="margin:4px 0;"><strong>Clave de Acceso:</strong> <span style="font-family:monospace; font-size:11px;">${params.claveAcceso}</span></p>
+            <p style="margin:4px 0;"><strong>N° Autorización:</strong> <span style="font-family:monospace; font-size:11px;">${numAuth}</span></p>
+            <p style="margin:4px 0;"><strong>Monto Total:</strong> <strong style="color:#0284c7; font-size:16px;">$${formattedTotal} USD</strong></p>
+          </div>
+
+          <p style="font-size:13px; color:#64748b; line-height:1.5;">
+            Adjunto a este correo encontrará:
+            <br>• <strong>Factura_${cleanSecuencial}.xml</strong>: Comprobante electrónico firmado y autorizado.
+            <br>• <strong>Factura_${cleanSecuencial}.html</strong>: Representación Impresa (RIDE) interactiva para descargar o imprimir.
+          </p>
+        </div>
+        <div class="footer">
+          <p style="margin:0;">Gracias por su compra en <strong>${storeName}</strong>.</p>
+          <p style="margin:4px 0 0 0; font-size:11px; color:#94a3b8;">Documento generado automáticamente por el sistema de Facturación Electrónica SRI.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendGoogleEmail({
+    to: params.to,
+    subject: `🧾 Factura Electrónica N° ${cleanSecuencial} - ${storeName}`,
+    html,
+    text: `Estimado(a) ${params.customerName}, le adjuntamos su Factura Electrónica N° ${cleanSecuencial} autorizada por el SRI por un total de $${formattedTotal} USD. Clave de acceso: ${params.claveAcceso}`,
+    userId: params.userId,
+    attachments,
+  });
+}

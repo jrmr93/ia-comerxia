@@ -171,6 +171,7 @@ import {
 import { searchProductVideos } from './src/services/video-search.ts';
 import { quoteProductInEcuadorMarket } from './src/services/market-quote.ts';
 import { validateEcuadorId } from './src/utils/ecuadorIdValidator.ts';
+import { sendInvoiceEmail } from './src/services/email.ts';
 import {
   recordAnalyticsEvent,
   getStoreAnalyticsDashboard,
@@ -1337,6 +1338,29 @@ async function startServer() {
         await saveSriConfig(req.dbUserId || 1, { lastFacturaSecuencial: secNum });
       }
 
+      // Auto-send email to customer if invoice is AUTORIZADO
+      let emailEnviado = false;
+      if (isAutorizado && comprador.correoComprador && comprador.correoComprador.includes('@')) {
+        try {
+          const rideHtml = generateSriRideHtml({ invoice: invoiceRecord, sriConfig: cfg });
+          await sendInvoiceEmail({
+            to: comprador.correoComprador,
+            customerName: comprador.razonSocialComprador,
+            secuencial,
+            claveAcceso,
+            numeroAutorizacion: numeroAutorizacion || claveAcceso,
+            fechaAutorizacion: fechaAutorizacion || undefined,
+            totalAmount: order.totalAmount,
+            xmlContent: xmlFirmado || xmlRaw,
+            rideHtml,
+            userId: req.dbUserId || 1,
+          });
+          emailEnviado = true;
+        } catch (emailErr) {
+          console.warn('⚠️ No se pudo enviar el correo automático de la factura al cliente:', emailErr);
+        }
+      }
+
       res.json({
         success: isAutorizado,
         estado: statusLabel,
@@ -1360,12 +1384,60 @@ async function startServer() {
           ambiente,
         },
         simulated: useSimulation,
+        emailEnviado,
         invoice: invoiceRecord,
         mensajesSri: allMessages,
       });
     } catch (error: any) {
       console.error('Error emitting SRI invoice:', error);
       res.status(500).json({ error: error.message || 'Error al emitir factura electrónica SRI' });
+    }
+  });
+
+  // Manual SRI Invoice Email Sending Route
+  app.post('/api/sri/invoices/:id/send-email', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const invoiceId = parseInt(req.params.id, 10);
+      if (isNaN(invoiceId)) {
+        return res.status(400).json({ error: 'ID de factura inválido' });
+      }
+
+      const userId = req.dbUserId || 1;
+      const userInvoices = await getSriInvoicesByUser(userId);
+      const invoice = userInvoices.find((inv: any) => inv.id === invoiceId);
+
+      if (!invoice) {
+        return res.status(404).json({ error: 'Factura no encontrada' });
+      }
+
+      const targetEmail = (req.body?.email || invoice.customerEmail || '').trim();
+      if (!targetEmail || !targetEmail.includes('@')) {
+        return res.status(400).json({ error: 'El cliente no tiene una dirección de correo electrónico válida para el envío.' });
+      }
+
+      const cfg = await getSriConfig(userId);
+      const rideHtml = generateSriRideHtml({ invoice, sriConfig: cfg });
+
+      await sendInvoiceEmail({
+        to: targetEmail,
+        customerName: invoice.customerName || 'Cliente',
+        secuencial: invoice.secuencial,
+        claveAcceso: invoice.claveAcceso,
+        numeroAutorizacion: invoice.numeroAutorizacion || invoice.claveAcceso,
+        fechaAutorizacion: invoice.fechaAutorizacion || undefined,
+        totalAmount: invoice.totalAmount || 0,
+        xmlContent: invoice.xmlFirmado || invoice.xmlGenerado || '',
+        rideHtml,
+        userId,
+      });
+
+      res.json({
+        success: true,
+        message: `✓ Factura SRI #${invoice.secuencial} enviada exitosamente a ${targetEmail}`,
+      });
+    } catch (error: any) {
+      console.error('Error al enviar la factura por correo:', error);
+      res.status(500).json({ error: error.message || 'Error al enviar la factura electrónica por correo' });
     }
   });
 

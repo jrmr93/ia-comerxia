@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, CheckCircle2, AlertCircle, RefreshCw, Search, ExternalLink, ShieldCheck, Sparkles, Building, Printer } from 'lucide-react';
+import { FileText, Download, CheckCircle2, AlertCircle, RefreshCw, Search, ExternalLink, ShieldCheck, Sparkles, Building, Printer, Mail } from 'lucide-react';
 import { SriInvoiceRecord } from '../types';
 
 export const SriInvoicesView: React.FC = () => {
@@ -7,6 +7,8 @@ export const SriInvoicesView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInvoices();
@@ -28,6 +30,28 @@ export const SriInvoicesView: React.FC = () => {
       setError('Error al conectar con el servidor');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendEmail = async (invoiceId: number) => {
+    setSendingEmailId(invoiceId);
+    setToastMessage(null);
+    try {
+      const res = await fetch(`/api/sri/invoices/${invoiceId}/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setToastMessage(data.message || '✓ Factura enviada por correo exitosamente');
+      } else {
+        alert(data.error || 'No se pudo enviar la factura por correo');
+      }
+    } catch (err: any) {
+      console.error('Error sending invoice email:', err);
+      alert('Error de red al enviar la factura por correo');
+    } finally {
+      setSendingEmailId(null);
     }
   };
 
@@ -175,6 +199,15 @@ export const SriInvoicesView: React.FC = () => {
                       {inv.createdAt ? new Date(inv.createdAt).toLocaleString('es-EC') : '—'}
                     </td>
                     <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleSendEmail(inv.id)}
+                        disabled={sendingEmailId === inv.id}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 text-indigo-200 text-[11px] font-semibold transition inline-flex items-center gap-1 border border-indigo-700/50 shadow-xs disabled:opacity-50"
+                        title="Enviar RIDE y XML al correo del cliente"
+                      >
+                        <Mail className={`w-3.5 h-3.5 text-indigo-400 ${sendingEmailId === inv.id ? 'animate-spin' : ''}`} />
+                        {sendingEmailId === inv.id ? 'Enviando...' : 'Enviar Email'}
+                      </button>
                       <a
                         href={`/api/sri/facturas/${inv.id}/ride`}
                         target="_blank"

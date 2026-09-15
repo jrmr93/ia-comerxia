@@ -234,7 +234,7 @@ export function generarFacturaXml(factura: SriFactura, claveAcceso: string, ambi
         <obligadoContabilidad>${emisor.obligadoContabilidad}</obligadoContabilidad>
         <tipoIdentificacionComprador>${comprador.tipoIdentificacionComprador}</tipoIdentificacionComprador>
         <razonSocialComprador>${escapeXml(comprador.razonSocialComprador)}</razonSocialComprador>
-        <identificacionComprador>${comprador.identificacionComprador}</identificacionComprador>
+        <identificacionComprador>${comprador.identificacionComprador}</identificacionComprador>${comprador.direccionComprador ? `\n        <direccionComprador>${escapeXml(comprador.direccionComprador)}</direccionComprador>` : ''}
         <totalSinImpuestos>${totalSinImpuestos.toFixed(2)}</totalSinImpuestos>
         <totalDescuento>${totalDescuento.toFixed(2)}</totalDescuento>
         <totalConImpuestos>${totalImpuestosXml}
