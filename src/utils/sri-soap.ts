@@ -60,41 +60,39 @@ export function postSoapRequest(urlStr: string, soapEnvelope: string): Promise<{
 
 export function parseSriMensajes(xmlText: string): SriMensaje[] {
   const list: SriMensaje[] = [];
-  const mensajesMatch = xmlText.match(/<mensajes>([\s\S]*?)<\/mensajes>/);
-  const content = mensajesMatch ? mensajesMatch[1] : xmlText;
-  
-  let pos = 0;
-  while (true) {
-    const startIdx = content.indexOf('<mensaje>', pos);
-    if (startIdx === -1) break;
-    
-    const nextTag = content.substring(startIdx + 9, startIdx + 40).trim();
-    if (nextTag.startsWith('<identificador>')) {
-      const tipoEndIdx = content.indexOf('</tipo>', startIdx);
-      if (tipoEndIdx === -1) {
-        const endIdx = content.indexOf('</mensaje>', startIdx + 9);
-        if (endIdx === -1) break;
-        pos = endIdx + 10;
-        continue;
-      }
-      const parentEndIdx = content.indexOf('</mensaje>', tipoEndIdx);
-      if (parentEndIdx === -1) break;
-      
-      const block = content.substring(startIdx, parentEndIdx + 10);
-      const id = block.match(/<identificador>([^<]+)<\/identificador>/)?.[1] || '';
-      
-      const innerMessageMatch = block.match(/<identificador>[\s\S]*?<mensaje>([\s\S]*?)<\/mensaje>/);
-      const msg = innerMessageMatch ? innerMessageMatch[1] : '';
-      
-      const info = block.match(/<informacionAdicional>([^<]+)<\/informacionAdicional>/)?.[1] || '';
-      const tipo = block.match(/<tipo>([^<]+)<\/tipo>/)?.[1] || 'ERROR';
-      
-      list.push({ identificador: id, mensaje: msg, informacionAdicional: info, tipo });
-      pos = parentEndIdx + 10;
-    } else {
-      pos = startIdx + 9;
+  if (!xmlText) return list;
+
+  // Global scan for <mensaje> blocks
+  const mensajeBlocks = xmlText.match(/<mensaje>([\s\S]*?)<\/mensaje>/g) || [];
+
+  for (const block of mensajeBlocks) {
+    const id = block.match(/<identificador>([^<]+)<\/identificador>/)?.[1] || '';
+    const msg = block.match(/<mensaje>([^<]+)<\/mensaje>/)?.[1] || '';
+    const info = block.match(/<informacionAdicional>([^<]+)<\/informacionAdicional>/)?.[1] || '';
+    const tipo = block.match(/<tipo>([^<]+)<\/tipo>/)?.[1] || '';
+
+    if (id || msg || info || tipo) {
+      list.push({
+        identificador: id,
+        mensaje: msg.trim(),
+        informacionAdicional: info.trim() || undefined,
+        tipo: tipo || 'INFORMACION',
+      });
     }
   }
+
+  // Fallback: If no structured <mensaje> tags found but xml contains error/motivo/fault
+  if (list.length === 0) {
+    const faultMatch = xmlText.match(/<faultstring>([^<]+)<\/faultstring>/) || xmlText.match(/<message>([^<]+)<\/message>/);
+    if (faultMatch) {
+      list.push({
+        identificador: 'ERROR_SOAP',
+        mensaje: faultMatch[1].trim(),
+        tipo: 'ERROR',
+      });
+    }
+  }
+
   return list;
 }
 

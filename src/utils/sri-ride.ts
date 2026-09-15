@@ -55,10 +55,21 @@ export function generateSriRideHtml(params: SriRideParams): string {
   }
 
   // Parse totals from XML
-  const subtotal15 = matchTag('baseImponible') || '0.00';
+  const totalImpuestosList: Array<{ codigoPorcentaje: string; baseImponible: number; valor: number }> = [];
+  const totalImpuestoRegex = /<totalImpuesto>([\s\S]*?)<\/totalImpuesto>/g;
+  let impMatch;
+  while ((impMatch = totalImpuestoRegex.exec(xmlContent)) !== null) {
+    const block = impMatch[1];
+    const getSub = (subTag: string) => block.match(new RegExp(`<${subTag}>([^<]+)<\/${subTag}>`))?.[1] || '0.00';
+    totalImpuestosList.push({
+      codigoPorcentaje: getSub('codigoPorcentaje'),
+      baseImponible: Number(getSub('baseImponible') || 0),
+      valor: Number(getSub('valor') || 0),
+    });
+  }
+
   const totalSinImpuestos = matchTag('totalSinImpuestos') || invoice.totalAmount || '0.00';
   const totalDescuento = matchTag('totalDescuento') || '0.00';
-  const valorIva = matchTag('valor') || '0.00';
   const importeTotal = matchTag('importeTotal') || invoice.totalAmount || '0.00';
 
   const ambienteText = invoice.ambiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS';
@@ -348,14 +359,34 @@ export function generateSriRideHtml(params: SriRideParams): string {
       </div>
 
       <table class="totals-table">
-        <tr>
-          <td>SUBTOTAL 15%</td>
-          <td class="val">$${Number(subtotal15).toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td>SUBTOTAL 0%</td>
-          <td class="val">$0.00</td>
-        </tr>
+        ${totalImpuestosList.length > 0 ? totalImpuestosList.map(t => {
+          let labelSubtotal = 'SUBTOTAL ' + t.codigoPorcentaje + '%';
+          let labelIva = 'IVA ' + t.codigoPorcentaje + '%';
+          if (t.codigoPorcentaje === '4') { labelSubtotal = 'SUBTOTAL 15%'; labelIva = 'IVA 15%'; }
+          else if (t.codigoPorcentaje === '5') { labelSubtotal = 'SUBTOTAL 5%'; labelIva = 'IVA 5%'; }
+          else if (t.codigoPorcentaje === '8') { labelSubtotal = 'SUBTOTAL 8%'; labelIva = 'IVA 8%'; }
+          else if (t.codigoPorcentaje === '2') { labelSubtotal = 'SUBTOTAL 12%'; labelIva = 'IVA 12%'; }
+          else if (t.codigoPorcentaje === '3') { labelSubtotal = 'SUBTOTAL 14%'; labelIva = 'IVA 14%'; }
+          else if (t.codigoPorcentaje === '0') { labelSubtotal = 'SUBTOTAL 0%'; labelIva = 'IVA 0%'; }
+          else if (t.codigoPorcentaje === '6') { labelSubtotal = 'SUBTOTAL NO OBJETO'; labelIva = null; }
+          else if (t.codigoPorcentaje === '7') { labelSubtotal = 'SUBTOTAL EXENTO'; labelIva = null; }
+
+          return `
+            <tr>
+              <td>${labelSubtotal}</td>
+              <td class="val">$${t.baseImponible.toFixed(2)}</td>
+            </tr>
+            ${labelIva ? `
+            <tr>
+              <td>${labelIva}</td>
+              <td class="val">$${t.valor.toFixed(2)}</td>
+            </tr>` : ''}`;
+        }).join('') : `
+          <tr>
+            <td>SUBTOTAL SIN IMPUESTOS</td>
+            <td class="val">$${Number(totalSinImpuestos).toFixed(2)}</td>
+          </tr>
+        `}
         <tr>
           <td>SUBTOTAL SIN IMPUESTOS</td>
           <td class="val">$${Number(totalSinImpuestos).toFixed(2)}</td>
@@ -363,10 +394,6 @@ export function generateSriRideHtml(params: SriRideParams): string {
         <tr>
           <td>TOTAL DESCUENTO</td>
           <td class="val">$${Number(totalDescuento).toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td>IVA 15%</td>
-          <td class="val">$${Number(valorIva).toFixed(2)}</td>
         </tr>
         <tr class="grand-total">
           <td>VALOR TOTAL</td>

@@ -1,9 +1,25 @@
-import forge from 'node-forge';
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { execSync } from 'child_process';
-import { SriFactura, SriDetalleFactura, SriPago } from '../types';
+import forge from 'node-forge';
+
+// Helper: Get YYYY-MM-DD formatted date in Ecuador local timezone (America/Guayaquil, UTC-5)
+export function getEcuadorLocalDate(dateInput?: Date | string): string {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guayaquil',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d);
+
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const day = parts.find((p) => p.type === 'day')?.value;
+
+  return `${year}-${month}-${day}`;
+}
 
 // Modulo 11 check digit calculation for SRI Ecuador
 export function calcularDigitoVerificador(clave48: string): string {
@@ -64,6 +80,26 @@ function escapeXml(unsafe: string): string {
   });
 }
 
+export function getSriTaxCodeAndRate(tarifaIva: string | number): { codigoPorcentaje: string; tarifaIvaValor: number } {
+  if (tarifaIva === 'NoObjeto') return { codigoPorcentaje: '6', tarifaIvaValor: 0 };
+  if (tarifaIva === 'Exento') return { codigoPorcentaje: '7', tarifaIvaValor: 0 };
+
+  const numRate = typeof tarifaIva === 'number'
+    ? tarifaIva
+    : parseFloat(String(tarifaIva).replace('%', '').trim());
+
+  const rate = isNaN(numRate) ? 15 : numRate;
+
+  if (rate === 0) return { codigoPorcentaje: '0', tarifaIvaValor: 0 };
+  if (rate === 5) return { codigoPorcentaje: '5', tarifaIvaValor: 5 };
+  if (rate === 8) return { codigoPorcentaje: '8', tarifaIvaValor: 8 };
+  if (rate === 12) return { codigoPorcentaje: '2', tarifaIvaValor: 12 };
+  if (rate === 14) return { codigoPorcentaje: '3', tarifaIvaValor: 14 };
+  if (rate === 15) return { codigoPorcentaje: '4', tarifaIvaValor: 15 };
+
+  return { codigoPorcentaje: '10', tarifaIvaValor: rate };
+}
+
 // Generates raw SRI XML for Factura (v1.1.0)
 export function generarFacturaXml(factura: SriFactura, claveAcceso: string, ambiente: '1' | '2'): string {
   const emisor = factura.emisor;
@@ -73,87 +109,50 @@ export function generarFacturaXml(factura: SriFactura, claveAcceso: string, ambi
   const parts = factura.fechaEmision.split('-');
   const fechaEmisionFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
 
-  // Calculate totals
+  // Calculate totals by tax group
+  const taxGroupsMap = new Map<string, { codigoPorcentaje: string; baseImponible: number; valor: number }>();
+
   let totalSinImpuestos = 0;
   let totalDescuento = 0;
-  let subtotal15 = 0; // Tarifa 15%
-  let subtotal5 = 0;  // Tarifa 5%
-  let subtotal0 = 0;  // Tarifa 0%
-  let subtotalNoObjeto = 0;
-  let subtotalExento = 0;
+  let totalIvaFactura = 0;
 
   factura.detalles.forEach((det) => {
     const subtotalItem = Number((det.cantidad * det.precioUnitario).toFixed(2));
-    const descItem = Number(det.descuento.toFixed(2));
+    const descItem = Number((det.descuento || 0).toFixed(2));
     const finalSubtotal = Number((subtotalItem - descItem).toFixed(2));
 
     totalSinImpuestos += finalSubtotal;
     totalDescuento += descItem;
 
-    if (det.tarifaIva === '15') {
-      subtotal15 += finalSubtotal;
-    } else if (det.tarifaIva === '5') {
-      subtotal5 += finalSubtotal;
-    } else if (det.tarifaIva === '0') {
-      subtotal0 += finalSubtotal;
-    } else if (det.tarifaIva === 'NoObjeto') {
-      subtotalNoObjeto += finalSubtotal;
-    } else if (det.tarifaIva === 'Exento') {
-      subtotalExento += finalSubtotal;
+    const { codigoPorcentaje, tarifaIvaValor } = getSriTaxCodeAndRate(det.tarifaIva);
+    const valorIvaItem = Number((finalSubtotal * (tarifaIvaValor / 100)).toFixed(2));
+    totalIvaFactura += valorIvaItem;
+
+    if (!taxGroupsMap.has(codigoPorcentaje)) {
+      taxGroupsMap.set(codigoPorcentaje, {
+        codigoPorcentaje,
+        baseImponible: 0,
+        valor: 0,
+      });
     }
+    const group = taxGroupsMap.get(codigoPorcentaje)!;
+    group.baseImponible = Number((group.baseImponible + finalSubtotal).toFixed(2));
+    group.valor = Number((group.valor + valorIvaItem).toFixed(2));
   });
 
-  const valorIva15 = Number((subtotal15 * 0.15).toFixed(2));
-  const valorIva5 = Number((subtotal5 * 0.05).toFixed(2));
-  const importeTotal = Number((totalSinImpuestos + valorIva15 + valorIva5).toFixed(2));
+  const importeTotal = Number((totalSinImpuestos + totalIvaFactura).toFixed(2));
 
   // Build XML blocks
   let totalImpuestosXml = '';
-  if (subtotal15 > 0) {
+  taxGroupsMap.forEach((group) => {
     totalImpuestosXml += `
             <totalImpuesto>
                 <codigo>2</codigo>
-                <codigoPorcentaje>4</codigoPorcentaje>
-                <baseImponible>${subtotal15.toFixed(2)}</baseImponible>
-                <valor>${valorIva15.toFixed(2)}</valor>
+                <codigoPorcentaje>${group.codigoPorcentaje}</codigoPorcentaje>
+                <baseImponible>${group.baseImponible.toFixed(2)}</baseImponible>
+                <valor>${group.valor.toFixed(2)}</valor>
             </totalImpuesto>`;
-  }
-  if (subtotal5 > 0) {
-    totalImpuestosXml += `
-            <totalImpuesto>
-                <codigo>2</codigo>
-                <codigoPorcentaje>5</codigoPorcentaje>
-                <baseImponible>${subtotal5.toFixed(2)}</baseImponible>
-                <valor>${valorIva5.toFixed(2)}</valor>
-            </totalImpuesto>`;
-  }
-  if (subtotal0 > 0) {
-    totalImpuestosXml += `
-            <totalImpuesto>
-                <codigo>2</codigo>
-                <codigoPorcentaje>0</codigoPorcentaje>
-                <baseImponible>${subtotal0.toFixed(2)}</baseImponible>
-                <valor>0.00</valor>
-            </totalImpuesto>`;
-  }
-  if (subtotalNoObjeto > 0) {
-    totalImpuestosXml += `
-            <totalImpuesto>
-                <codigo>2</codigo>
-                <codigoPorcentaje>6</codigoPorcentaje>
-                <baseImponible>${subtotalNoObjeto.toFixed(2)}</baseImponible>
-                <valor>0.00</valor>
-            </totalImpuesto>`;
-  }
-  if (subtotalExento > 0) {
-    totalImpuestosXml += `
-            <totalImpuesto>
-                <codigo>2</codigo>
-                <codigoPorcentaje>7</codigoPorcentaje>
-                <baseImponible>${subtotalExento.toFixed(2)}</baseImponible>
-                <valor>0.00</valor>
-            </totalImpuesto>`;
-  }
+  });
 
   // Payments block
   let pagosXml = '';
@@ -171,32 +170,15 @@ export function generarFacturaXml(factura: SriFactura, claveAcceso: string, ambi
   let detallesXml = '';
   factura.detalles.forEach((det) => {
     const subtotalItem = Number((det.cantidad * det.precioUnitario).toFixed(2));
-    const finalSubtotal = Number((subtotalItem - det.descuento).toFixed(2));
+    const descItem = Number((det.descuento || 0).toFixed(2));
+    const finalSubtotal = Number((subtotalItem - descItem).toFixed(2));
     
-    let codigoPorcentaje = '0';
-    let tarifaIvaValor = 0;
-    if (det.tarifaIva === '15') {
-      codigoPorcentaje = '4';
-      tarifaIvaValor = 15;
-    } else if (det.tarifaIva === '5') {
-      codigoPorcentaje = '5';
-      tarifaIvaValor = 5;
-    } else if (det.tarifaIva === '0') {
-      codigoPorcentaje = '0';
-      tarifaIvaValor = 0;
-    } else if (det.tarifaIva === 'NoObjeto') {
-      codigoPorcentaje = '6';
-      tarifaIvaValor = 0;
-    } else if (det.tarifaIva === 'Exento') {
-      codigoPorcentaje = '7';
-      tarifaIvaValor = 0;
-    }
-
+    const { codigoPorcentaje, tarifaIvaValor } = getSriTaxCodeAndRate(det.tarifaIva);
     const valorIvaItem = Number((finalSubtotal * (tarifaIvaValor / 100)).toFixed(2));
 
     const cantidadStr = det.cantidad % 1 === 0 ? det.cantidad.toString() : det.cantidad.toFixed(2);
     const precioUnitarioStr = det.precioUnitario % 1 === 0 || (det.precioUnitario * 100) % 1 === 0 ? det.precioUnitario.toFixed(2) : det.precioUnitario.toFixed(6);
-    const descuentoStr = det.descuento === 0 ? '0' : det.descuento.toFixed(2);
+    const descuentoStr = descItem === 0 ? '0' : descItem.toFixed(2);
 
     detallesXml += `
         <detalle>

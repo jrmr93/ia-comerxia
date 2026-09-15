@@ -11761,6 +11761,7 @@ export async function getSriConfig(userId: number = 1) {
         id: state.nextId?.sriConfigs || 1,
         userId,
         ruc: '1700000000001',
+        estadoRuc: 'ACTIVO',
         razonSocial: 'COMERXIA E-COMMERCE S.A.',
         nombreComercial: 'COMERXIA ECUADOR',
         estab: '001',
@@ -11773,6 +11774,12 @@ export async function getSriConfig(userId: number = 1) {
         p12Base64: null,
         p12Password: null,
         p12Filename: null,
+        lastFacturaSecuencial: 0,
+        lastNotaCreditoSecuencial: 0,
+        lastNotaDebitoSecuencial: 0,
+        lastGuiaRemisionSecuencial: 0,
+        lastRetencionSecuencial: 0,
+        lastLiquidacionSecuencial: 0,
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -11816,6 +11823,7 @@ export async function getSriConfig(userId: number = 1) {
         .values({
           userId: targetUserId,
           ruc: '1700000000001',
+          estadoRuc: 'ACTIVO',
           razonSocial: 'COMERXIA E-COMMERCE S.A.',
           nombreComercial: 'COMERXIA ECUADOR',
           estab: '001',
@@ -11824,6 +11832,12 @@ export async function getSriConfig(userId: number = 1) {
           obligadoContabilidad: 'NO',
           regimenRimpe: 'NO',
           ambiente: '1',
+          lastFacturaSecuencial: 0,
+          lastNotaCreditoSecuencial: 0,
+          lastNotaDebitoSecuencial: 0,
+          lastGuiaRemisionSecuencial: 0,
+          lastRetencionSecuencial: 0,
+          lastLiquidacionSecuencial: 0,
           isActive: true,
         })
         .returning();
@@ -11841,6 +11855,7 @@ export async function getSriConfig(userId: number = 1) {
       id: localConfig?.id || 1,
       userId,
       ruc: localConfig?.ruc || '1700000000001',
+      estadoRuc: localConfig?.estadoRuc || 'ACTIVO',
       razonSocial: localConfig?.razonSocial || 'COMERXIA E-COMMERCE S.A.',
       nombreComercial: localConfig?.nombreComercial || 'COMERXIA ECUADOR',
       estab: localConfig?.estab || '001',
@@ -11852,6 +11867,12 @@ export async function getSriConfig(userId: number = 1) {
       p12Base64: localConfig?.p12Base64 || null,
       p12Password: localConfig?.p12Password || null,
       p12Filename: localConfig?.p12Filename || null,
+      lastFacturaSecuencial: localConfig?.lastFacturaSecuencial || 0,
+      lastNotaCreditoSecuencial: localConfig?.lastNotaCreditoSecuencial || 0,
+      lastNotaDebitoSecuencial: localConfig?.lastNotaDebitoSecuencial || 0,
+      lastGuiaRemisionSecuencial: localConfig?.lastGuiaRemisionSecuencial || 0,
+      lastRetencionSecuencial: localConfig?.lastRetencionSecuencial || 0,
+      lastLiquidacionSecuencial: localConfig?.lastLiquidacionSecuencial || 0,
       isActive: localConfig?.isActive !== false,
       hasP12Certificate: Boolean(localConfig?.p12Base64 && localConfig.p12Base64.length > 0),
     };
@@ -11869,6 +11890,7 @@ export async function saveSriConfig(userId: number = 1, data: any) {
       id: state.nextId?.sriConfigs ? state.nextId.sriConfigs++ : 1,
       userId,
       ruc: data.ruc || '1700000000001',
+      estadoRuc: data.estadoRuc || 'ACTIVO',
       razonSocial: data.razonSocial || 'COMERXIA E-COMMERCE S.A.',
       nombreComercial: data.nombreComercial || 'COMERXIA ECUADOR',
       estab: data.estab || '001',
@@ -11881,6 +11903,12 @@ export async function saveSriConfig(userId: number = 1, data: any) {
       p12Base64: data.p12Base64 !== undefined ? data.p12Base64 : null,
       p12Password: data.p12Password !== undefined ? data.p12Password : null,
       p12Filename: data.p12Filename !== undefined ? data.p12Filename : null,
+      lastFacturaSecuencial: data.lastFacturaSecuencial !== undefined ? Number(data.lastFacturaSecuencial) : 0,
+      lastNotaCreditoSecuencial: data.lastNotaCreditoSecuencial !== undefined ? Number(data.lastNotaCreditoSecuencial) : 0,
+      lastNotaDebitoSecuencial: data.lastNotaDebitoSecuencial !== undefined ? Number(data.lastNotaDebitoSecuencial) : 0,
+      lastGuiaRemisionSecuencial: data.lastGuiaRemisionSecuencial !== undefined ? Number(data.lastGuiaRemisionSecuencial) : 0,
+      lastRetencionSecuencial: data.lastRetencionSecuencial !== undefined ? Number(data.lastRetencionSecuencial) : 0,
+      lastLiquidacionSecuencial: data.lastLiquidacionSecuencial !== undefined ? Number(data.lastLiquidacionSecuencial) : 0,
       isActive: data.isActive !== undefined ? data.isActive : true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -11888,6 +11916,7 @@ export async function saveSriConfig(userId: number = 1, data: any) {
     state.sriConfigs.push(localConfig);
   } else {
     if (data.ruc) localConfig.ruc = data.ruc;
+    if (data.estadoRuc) localConfig.estadoRuc = data.estadoRuc;
     if (data.razonSocial) localConfig.razonSocial = data.razonSocial;
     if (data.nombreComercial) localConfig.nombreComercial = data.nombreComercial;
     if (data.estab) localConfig.estab = data.estab;
@@ -11900,6 +11929,12 @@ export async function saveSriConfig(userId: number = 1, data: any) {
     if (data.p12Base64 !== undefined) localConfig.p12Base64 = data.p12Base64;
     if (data.p12Password !== undefined) localConfig.p12Password = data.p12Password;
     if (data.p12Filename !== undefined) localConfig.p12Filename = data.p12Filename;
+    if (data.lastFacturaSecuencial !== undefined) localConfig.lastFacturaSecuencial = Number(data.lastFacturaSecuencial);
+    if (data.lastNotaCreditoSecuencial !== undefined) localConfig.lastNotaCreditoSecuencial = Number(data.lastNotaCreditoSecuencial);
+    if (data.lastNotaDebitoSecuencial !== undefined) localConfig.lastNotaDebitoSecuencial = Number(data.lastNotaDebitoSecuencial);
+    if (data.lastGuiaRemisionSecuencial !== undefined) localConfig.lastGuiaRemisionSecuencial = Number(data.lastGuiaRemisionSecuencial);
+    if (data.lastRetencionSecuencial !== undefined) localConfig.lastRetencionSecuencial = Number(data.lastRetencionSecuencial);
+    if (data.lastLiquidacionSecuencial !== undefined) localConfig.lastLiquidacionSecuencial = Number(data.lastLiquidacionSecuencial);
     if (data.isActive !== undefined) localConfig.isActive = data.isActive;
     localConfig.updatedAt = new Date().toISOString();
   }
@@ -11917,6 +11952,7 @@ export async function saveSriConfig(userId: number = 1, data: any) {
         .update(sriConfigs)
         .set({
           ruc: data.ruc || existing.ruc,
+          estadoRuc: data.estadoRuc || existing.estadoRuc,
           razonSocial: data.razonSocial || existing.razonSocial,
           nombreComercial: data.nombreComercial || existing.nombreComercial,
           estab: data.estab || existing.estab,
@@ -11929,6 +11965,12 @@ export async function saveSriConfig(userId: number = 1, data: any) {
           p12Base64: data.p12Base64 !== undefined ? data.p12Base64 : existing.p12Base64,
           p12Password: data.p12Password !== undefined ? data.p12Password : existing.p12Password,
           p12Filename: data.p12Filename !== undefined ? data.p12Filename : existing.p12Filename,
+          lastFacturaSecuencial: data.lastFacturaSecuencial !== undefined ? Number(data.lastFacturaSecuencial) : existing.lastFacturaSecuencial,
+          lastNotaCreditoSecuencial: data.lastNotaCreditoSecuencial !== undefined ? Number(data.lastNotaCreditoSecuencial) : existing.lastNotaCreditoSecuencial,
+          lastNotaDebitoSecuencial: data.lastNotaDebitoSecuencial !== undefined ? Number(data.lastNotaDebitoSecuencial) : existing.lastNotaDebitoSecuencial,
+          lastGuiaRemisionSecuencial: data.lastGuiaRemisionSecuencial !== undefined ? Number(data.lastGuiaRemisionSecuencial) : existing.lastGuiaRemisionSecuencial,
+          lastRetencionSecuencial: data.lastRetencionSecuencial !== undefined ? Number(data.lastRetencionSecuencial) : existing.lastRetencionSecuencial,
+          lastLiquidacionSecuencial: data.lastLiquidacionSecuencial !== undefined ? Number(data.lastLiquidacionSecuencial) : existing.lastLiquidacionSecuencial,
           isActive: data.isActive !== undefined ? data.isActive : existing.isActive,
           updatedAt: new Date(),
         })
@@ -11945,6 +11987,7 @@ export async function saveSriConfig(userId: number = 1, data: any) {
       .values({
         userId,
         ruc: data.ruc || '1700000000001',
+        estadoRuc: data.estadoRuc || 'ACTIVO',
         razonSocial: data.razonSocial || 'COMERXIA E-COMMERCE S.A.',
         nombreComercial: data.nombreComercial || 'COMERXIA ECUADOR',
         estab: data.estab || '001',
@@ -11957,6 +12000,12 @@ export async function saveSriConfig(userId: number = 1, data: any) {
         p12Base64: data.p12Base64 || null,
         p12Password: data.p12Password || null,
         p12Filename: data.p12Filename || null,
+        lastFacturaSecuencial: Number(data.lastFacturaSecuencial || 0),
+        lastNotaCreditoSecuencial: Number(data.lastNotaCreditoSecuencial || 0),
+        lastNotaDebitoSecuencial: Number(data.lastNotaDebitoSecuencial || 0),
+        lastGuiaRemisionSecuencial: Number(data.lastGuiaRemisionSecuencial || 0),
+        lastRetencionSecuencial: Number(data.lastRetencionSecuencial || 0),
+        lastLiquidacionSecuencial: Number(data.lastLiquidacionSecuencial || 0),
         isActive: data.isActive !== undefined ? data.isActive : true,
       })
       .returning();
@@ -11968,26 +12017,49 @@ export async function saveSriConfig(userId: number = 1, data: any) {
   }
 }
 
-export async function getNextSriSecuencial(userId: number = 1): Promise<string> {
+export async function getNextSriSecuencial(docType: string = '01', userId: number = 1): Promise<string> {
+  const config = await getSriConfig(userId);
+  let baseConfigSec = 0;
+
+  if (docType === '01') baseConfigSec = Number(config?.lastFacturaSecuencial || 0);
+  else if (docType === '04') baseConfigSec = Number(config?.lastNotaCreditoSecuencial || 0);
+  else if (docType === '05') baseConfigSec = Number(config?.lastNotaDebitoSecuencial || 0);
+  else if (docType === '06') baseConfigSec = Number(config?.lastGuiaRemisionSecuencial || 0);
+  else if (docType === '07') baseConfigSec = Number(config?.lastRetencionSecuencial || 0);
+  else if (docType === '03') baseConfigSec = Number(config?.lastLiquidacionSecuencial || 0);
+
   const state = storage.getState();
   if (!state.sriInvoices) state.sriInvoices = [];
 
-  let count = 0;
+  let highestInDb = 0;
   if (!isPostgresConfigured()) {
-    count = state.sriInvoices.filter((inv: any) => inv.userId === userId).length;
+    state.sriInvoices.forEach((inv: any) => {
+      if (inv.userId === userId && inv.secuencial) {
+        const secParts = String(inv.secuencial).split('-');
+        const num = parseInt(secParts[secParts.length - 1], 10);
+        if (!isNaN(num) && num > highestInDb) highestInDb = num;
+      }
+    });
   } else {
     try {
       const records = await db
-        .select({ id: sriInvoices.id })
+        .select({ secuencial: sriInvoices.secuencial })
         .from(sriInvoices)
         .where(eq(sriInvoices.userId, userId));
-      count = records.length;
+
+      records.forEach((r: any) => {
+        if (r.secuencial) {
+          const secParts = String(r.secuencial).split('-');
+          const num = parseInt(secParts[secParts.length - 1], 10);
+          if (!isNaN(num) && num > highestInDb) highestInDb = num;
+        }
+      });
     } catch {
-      count = state.sriInvoices.length;
+      highestInDb = state.sriInvoices.length;
     }
   }
 
-  const nextSec = count + 1;
+  const nextSec = Math.max(baseConfigSec, highestInDb) + 1;
   return nextSec.toString().padStart(9, '0');
 }
 

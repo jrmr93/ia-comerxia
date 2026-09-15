@@ -752,6 +752,7 @@ export interface SriConfig {
   id?: number;
   userId?: number;
   ruc: string;
+  estadoRuc?: string;
   razonSocial: string;
   nombreComercial: string;
   estab: string; // '001'
@@ -766,6 +767,12 @@ export interface SriConfig {
   p12Password?: string;
   hasP12Certificate?: boolean;
   p12Filename?: string;
+  lastFacturaSecuencial?: number | string;
+  lastNotaCreditoSecuencial?: number | string;
+  lastNotaDebitoSecuencial?: number | string;
+  lastGuiaRemisionSecuencial?: number | string;
+  lastRetencionSecuencial?: number | string;
+  lastLiquidacionSecuencial?: number | string;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -799,7 +806,7 @@ export interface SriDetalleFactura {
   cantidad: number;
   precioUnitario: number;
   descuento: number;
-  tarifaIva: '0' | '15' | '5' | 'NoObjeto' | 'Exento';
+  tarifaIva: '0' | '5' | '8' | '12' | '14' | '15' | 'NoObjeto' | 'Exento' | string;
 }
 
 export interface SriPago {

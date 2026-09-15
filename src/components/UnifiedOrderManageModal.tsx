@@ -183,8 +183,16 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   // Facturación Electrónica SRI State
   const [sriEmitting, setSriEmitting] = useState(false);
   const [sriInvoiceRecord, setSriInvoiceRecord] = useState<any | null>(null);
+  const [sriEmissionResult, setSriEmissionResult] = useState<{
+    estado: string;
+    motivo?: string;
+    autorizado: boolean;
+    devuelto: boolean;
+    emisorUsado?: any;
+  } | null>(null);
 
   useEffect(() => {
+    setSriEmissionResult(null);
     if (order && order.id) {
       fetch('/api/sri/facturas')
         .then((res) => res.json())
@@ -207,6 +215,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     }
 
     setSriEmitting(true);
+    setSriEmissionResult(null);
     try {
       const res = await fetch(`/api/sri/emitir/${order.id}`, {
         method: 'POST',
@@ -214,14 +223,35 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         body: JSON.stringify({ forceSimulated: false }),
       });
       const data = await res.json();
-      if (res.ok && data.success) {
+      if (data.invoice) {
         setSriInvoiceRecord(data.invoice);
-        showToast(`✓ Factura Electrónica SRI #${data.invoice.secuencial} procesada exitosamente`);
+      }
+
+      const isAuth = Boolean(data.success || data.autorizado || data.estado === 'AUTORIZADO');
+      const resultObj = {
+        estado: data.estado || (isAuth ? 'AUTORIZADO' : 'DEVUELTO'),
+        motivo: data.motivo || data.error || '',
+        autorizado: isAuth,
+        devuelto: !isAuth,
+        emisorUsado: data.emisorUsado,
+      };
+
+      setSriEmissionResult(resultObj);
+
+      if (isAuth) {
+        showToast(`✓ Factura Electrónica SRI #${data.invoice?.secuencial || ''} AUTORIZADA exitosamente`);
       } else {
-        showToast(`⚠️ ${data.error || 'Error al emitir factura en el SRI'}`);
+        const errorMsg = data.motivo || data.error || 'Factura DEVUELTA por el SRI';
+        showToast(`❌ Factura SRI DEVUELTA: ${errorMsg}`);
       }
     } catch (err: any) {
       console.error('Error emitting SRI invoice:', err);
+      setSriEmissionResult({
+        estado: 'ERROR DE CONEXION',
+        motivo: err.message || 'Error al conectar con el web service del SRI',
+        autorizado: false,
+        devuelto: true,
+      });
       showToast('⚠️ Error de conexión al comunicarse con el SRI');
     } finally {
       setSriEmitting(false);
@@ -1510,6 +1540,41 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
         {/* ================= MODAL SCROLLABLE BODY (SINGLE TAB / VIEW) ================= */}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 text-xs bg-slate-50/60">
+          {/* Banner de Resultado de Emisión SRI */}
+          {sriEmissionResult && (
+            <div className={`p-4 rounded-2xl border text-xs space-y-2 shadow-xl ${
+              sriEmissionResult.autorizado
+                ? 'bg-emerald-950/90 border-emerald-500/60 text-emerald-100'
+                : 'bg-rose-950/90 border-rose-500/60 text-rose-100'
+            }`}>
+              <div className="flex items-center justify-between font-black text-sm flex-wrap gap-2">
+                <span className="flex items-center gap-2">
+                  {sriEmissionResult.autorizado ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                  )}
+                  ESTADO SRI: {sriEmissionResult.autorizado ? '✓ AUTORIZADO' : '❌ DEVUELTO / NO AUTORIZADO'}
+                </span>
+                {sriEmissionResult.emisorUsado && (
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-900/80 border border-slate-700 font-mono text-slate-300">
+                    RUC: {sriEmissionResult.emisorUsado.ruc} | Est: {sriEmissionResult.emisorUsado.estab}-{sriEmissionResult.emisorUsado.ptoEmi} | Sec: #{sriEmissionResult.emisorUsado.secuencial}
+                  </span>
+                )}
+              </div>
+
+              {sriEmissionResult.motivo ? (
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-medium space-y-1">
+                  <div className="font-bold text-slate-300 uppercase tracking-wide text-[10px]">
+                    Motivo / Respuesta del SRI:
+                  </div>
+                  <div className="text-slate-200 font-mono leading-relaxed">
+                    {sriEmissionResult.motivo}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
           {/* Lock notice if order is in terminal or confirmed state */}
           {isLockedFromEdit && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between gap-3 shadow-2xs">

@@ -8,9 +8,10 @@ import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { optionalAuth, requireAuth, requireAdmin, AuthRequest } from './src/middleware/auth.ts';
 import { ensureTablesCreated, getDatabaseRuntimeInfo, testDatabaseConnection } from './src/db/index.ts';
-import { generarClaveAcceso, generarFacturaXml, firmarFacturaXml, generarFirmaSimuladaXml } from './src/utils/sri-signer.ts';
+import { generarClaveAcceso, generarFacturaXml, firmarFacturaXml, generarFirmaSimuladaXml, getEcuadorLocalDate } from './src/utils/sri-signer.ts';
 import { postSoapRequest, parseSriMensajes, SRI_ENDPOINTS } from './src/utils/sri-soap.ts';
 import { generateSriRideHtml } from './src/utils/sri-ride.ts';
+import { extractItemTaxPercent } from './src/utils/ecuadorTaxCalculator.ts';
 import {
   validateUserCredentials,
   verifyUserPasswordById,
@@ -889,6 +890,7 @@ async function startServer() {
           id: cfg.id,
           userId: cfg.userId,
           ruc: cfg.ruc,
+          estadoRuc: cfg.estadoRuc || 'ACTIVO',
           razonSocial: cfg.razonSocial,
           nombreComercial: cfg.nombreComercial,
           estab: cfg.estab,
@@ -898,6 +900,12 @@ async function startServer() {
           contribuyenteEspecial: cfg.contribuyenteEspecial || '',
           regimenRimpe: cfg.regimenRimpe || 'NO',
           ambiente: cfg.ambiente || '1',
+          lastFacturaSecuencial: cfg.lastFacturaSecuencial ?? 0,
+          lastNotaCreditoSecuencial: cfg.lastNotaCreditoSecuencial ?? 0,
+          lastNotaDebitoSecuencial: cfg.lastNotaDebitoSecuencial ?? 0,
+          lastGuiaRemisionSecuencial: cfg.lastGuiaRemisionSecuencial ?? 0,
+          lastRetencionSecuencial: cfg.lastRetencionSecuencial ?? 0,
+          lastLiquidacionSecuencial: cfg.lastLiquidacionSecuencial ?? 0,
           hasP12Certificate: Boolean(cfg.p12Base64 && cfg.p12Base64.length > 0),
           p12Filename: cfg.p12Filename || '',
           isActive: cfg.isActive !== false,
@@ -913,6 +921,7 @@ async function startServer() {
     try {
       const {
         ruc,
+        estadoRuc,
         razonSocial,
         nombreComercial,
         estab,
@@ -925,11 +934,18 @@ async function startServer() {
         p12Base64,
         p12Password,
         p12Filename,
+        lastFacturaSecuencial,
+        lastNotaCreditoSecuencial,
+        lastNotaDebitoSecuencial,
+        lastGuiaRemisionSecuencial,
+        lastRetencionSecuencial,
+        lastLiquidacionSecuencial,
         isActive,
       } = req.body;
 
       const updated = await saveSriConfig(req.dbUserId || 1, {
         ruc,
+        estadoRuc,
         razonSocial,
         nombreComercial,
         estab,
@@ -942,6 +958,12 @@ async function startServer() {
         p12Base64,
         p12Password,
         p12Filename,
+        lastFacturaSecuencial,
+        lastNotaCreditoSecuencial,
+        lastNotaDebitoSecuencial,
+        lastGuiaRemisionSecuencial,
+        lastRetencionSecuencial,
+        lastLiquidacionSecuencial,
         isActive,
       });
 
@@ -953,6 +975,12 @@ async function startServer() {
           ruc: updated.ruc,
           razonSocial: updated.razonSocial,
           ambiente: updated.ambiente,
+          lastFacturaSecuencial: updated.lastFacturaSecuencial,
+          lastNotaCreditoSecuencial: updated.lastNotaCreditoSecuencial,
+          lastNotaDebitoSecuencial: updated.lastNotaDebitoSecuencial,
+          lastGuiaRemisionSecuencial: updated.lastGuiaRemisionSecuencial,
+          lastRetencionSecuencial: updated.lastRetencionSecuencial,
+          lastLiquidacionSecuencial: updated.lastLiquidacionSecuencial,
           hasP12Certificate: Boolean(updated.p12Base64 && updated.p12Base64.length > 0),
         },
       });
@@ -1081,24 +1109,41 @@ async function startServer() {
         ];
       }
 
+      const userInventoryItems = await getInventoryItems(req.dbUserId || 1);
+
       const detalles: any[] = orderItems.map((item: any, idx: number) => {
         const cant = Number(item.quantity || item.qty || 1);
         const price = Number(item.price || item.unitPrice || item.salePrice || 0);
         const desc = Number(item.discount || 0);
 
+        const itemId = item.inventoryItemId || item.id;
+        const matchedInvItem = userInventoryItems.find((inv: any) =>
+          (itemId && inv.id === Number(itemId)) ||
+          (item.sku && inv.sku === item.sku) ||
+          (item.name && inv.name === item.name)
+        );
+
+        let tarifaIvaStr = '15';
+        if (item.tarifaIva === 'NoObjeto' || item.tarifaIva === 'Exento') {
+          tarifaIvaStr = item.tarifaIva;
+        } else {
+          const taxPct = extractItemTaxPercent(item, 15, matchedInvItem);
+          tarifaIvaStr = String(taxPct);
+        }
+
         return {
-          codigoPrincipal: item.sku || `PROD-${idx + 1}`,
-          descripcion: item.name || item.productName || `Producto #${idx + 1}`,
+          codigoPrincipal: item.sku || (matchedInvItem ? matchedInvItem.sku : `PROD-${idx + 1}`),
+          descripcion: item.name || item.productName || (matchedInvItem ? matchedInvItem.name : `Producto #${idx + 1}`),
           cantidad: cant,
           precioUnitario: price,
           descuento: desc,
-          tarifaIva: '15' as const, // Tax standard Ecuador 15%
+          tarifaIva: tarifaIvaStr,
         };
       });
 
       // Sequential and date
-      const secuencial = await getNextSriSecuencial(req.dbUserId || 1);
-      const fechaEmision = new Date().toISOString().split('T')[0];
+      const secuencial = await getNextSriSecuencial('01', req.dbUserId || 1);
+      const fechaEmision = req.body?.fechaEmision ? getEcuadorLocalDate(req.body.fechaEmision) : getEcuadorLocalDate();
       const codigoNumerico = Math.floor(10000000 + Math.random() * 90000000).toString();
 
       const emisor = {
@@ -1240,8 +1285,33 @@ async function startServer() {
         }
       }
 
-      // Save SRI Invoice Record
+      // Determine overall authorization status and motif
+      const isAutorizado = estadoAutorizacion === 'AUTORIZADO' || estadoAutorizacion === 'SIMULADO_OK';
+      const isDevuelto = estadoRecepcion === 'DEVUELTA' || estadoAutorizacion === 'DEVUELTA' || estadoAutorizacion === 'NO AUTORIZADO' || estadoRecepcion === 'ERROR';
+
+      const statusLabel = isAutorizado
+        ? 'AUTORIZADO'
+        : isDevuelto
+        ? 'DEVUELTO'
+        : estadoAutorizacion || estadoRecepcion || 'DESCONOCIDO';
+
       const allMessages = [...mensajesRecepcion, ...mensajesAutorizacion];
+      let motivoDetalle = '';
+
+      if (allMessages.length > 0) {
+        motivoDetalle = allMessages
+          .map((m: any) => {
+            const parts = [];
+            if (m.identificador) parts.push(`Código [${m.identificador}]`);
+            if (m.mensaje) parts.push(m.mensaje);
+            if (m.informacionAdicional) parts.push(`(${m.informacionAdicional})`);
+            return parts.join(': ');
+          })
+          .join(' | ');
+      } else if (!isAutorizado) {
+        motivoDetalle = `El comprobante fue rechazado/devuelto por el SRI con estado: ${estadoAutorizacion || estadoRecepcion}`;
+      }
+
       const invoiceRecord = await createSriInvoice({
         userId: req.dbUserId || 1,
         orderId: order.id,
@@ -1261,11 +1331,37 @@ async function startServer() {
         mensajesSri: JSON.stringify(allMessages),
       });
 
+      // Update lastFacturaSecuencial in sriConfig
+      const secNum = parseInt(secuencial, 10);
+      if (!isNaN(secNum) && secNum > Number(cfg.lastFacturaSecuencial || 0)) {
+        await saveSriConfig(req.dbUserId || 1, { lastFacturaSecuencial: secNum });
+      }
+
       res.json({
-        success: true,
-        message: `Factura Electrónica SRI #${secuencial} procesada exitosamente`,
+        success: isAutorizado,
+        estado: statusLabel,
+        estadoAutorizacion,
+        estadoRecepcion,
+        autorizado: isAutorizado,
+        devuelto: isDevuelto,
+        motivo: motivoDetalle,
+        message: isAutorizado
+          ? `✓ Factura SRI #${secuencial} AUTORIZADA exitosamente`
+          : `❌ Factura SRI #${secuencial} DEVUELTA / NO AUTORIZADA: ${motivoDetalle}`,
+        emisorUsado: {
+          ruc: emisor.ruc,
+          razonSocial: emisor.razonSocial,
+          nombreComercial: emisor.nombreComercial,
+          estab: emisor.estab,
+          ptoEmi: emisor.ptoEmi,
+          secuencial: emisor.secuencial,
+          dirMatriz: emisor.dirMatriz,
+          obligadoContabilidad: emisor.obligadoContabilidad,
+          ambiente,
+        },
         simulated: useSimulation,
         invoice: invoiceRecord,
+        mensajesSri: allMessages,
       });
     } catch (error: any) {
       console.error('Error emitting SRI invoice:', error);
