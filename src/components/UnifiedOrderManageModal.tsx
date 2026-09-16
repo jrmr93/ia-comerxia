@@ -186,6 +186,9 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     const clean = (customerCi || '').trim();
     if (clean === '9999999999999' || clean.toUpperCase() === 'CONSUMIDOR FINAL') {
       setDocType('07');
+      if (!customerPhone || customerPhone.trim() === '') {
+        setCustomerPhone('0000000000');
+      }
     } else if (clean.length === 13) {
       setDocType('04');
     } else if (clean.length === 10) {
@@ -199,12 +202,16 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     setDocType(newType);
     if (newType === '07') {
       setCustomerCi('9999999999999');
+      setCustomerPhone('0000000000');
       if (!customerName.trim() || customerName.trim().toUpperCase() === 'CONSUMIDOR FINAL') {
         setCustomerName('CONSUMIDOR FINAL');
       }
     } else {
       if (customerCi.trim() === '9999999999999') {
         setCustomerCi('');
+      }
+      if (customerPhone === '0000000000') {
+        setCustomerPhone('');
       }
       if (customerName.trim().toUpperCase() === 'CONSUMIDOR FINAL') {
         setCustomerName('');
@@ -477,7 +484,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const isDelivered = orderStatus === 'delivered';
   const isCancelled = orderStatus === 'cancelled';
   const isPartial = order ? isOrderPartiallyDelivered(order) : false;
-  const isLockedFromEdit = !isCreateMode && (isConfirmed || isShipped || isDelivered || isCancelled || isPartial);
+  // Las pre-facturas (pedidos en estado 'pending') son SIEMPRE editables hasta que se confirman.
+  const isLockedFromEdit = !isCreateMode && orderStatus !== 'pending' && (isConfirmed || isShipped || isDelivered || isCancelled || isPartial);
 
   // Guard session initialization to prevent background polling or re-renders from wiping user inputs
   const initializedSessionRef = useRef<string | null>(null);
@@ -889,10 +897,21 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     return calculateInvoiceTotals(calculatedItems, { shippingFee: 0 });
   }, [items, products]);
 
-  // Payphone API Helpers & Card Payment Detection
-  const isCardPaymentMethod = useMemo(() => {
+  const productsSubtotal = invoiceTotals.subtotalNoTax;
+  const totalDiscountAmount = invoiceTotals.totalDiscount;
+  const salesTaxAmount = invoiceTotals.totalTax;
+  const shippingFee = invoiceTotals.shippingFee;
+  const totalOrderAmount = invoiceTotals.totalInvoiceAmount;
+
+  const isConsumidorFinal = docType === '07' || customerCi.trim() === '9999999999999';
+  const isExceedingConsumidorFinalLimit = useMemo(() => {
+    return isConsumidorFinal && totalOrderAmount > 199.99;
+  }, [isConsumidorFinal, totalOrderAmount]);
+
+  // Payphone API Helpers & Payphone Payment Detection (ONLY when Payphone option is explicitly selected)
+  const isPayphonePaymentMethod = useMemo(() => {
     const m = (paymentMethod || '').toLowerCase().trim();
-    return m.includes('tarjeta') || m.includes('card') || m.includes('visa') || m.includes('mastercard') || m.includes('payphone');
+    return m === 'payphone' || m.includes('payphone');
   }, [paymentMethod]);
 
   const handleGeneratePayphoneLink = async () => {
@@ -975,12 +994,6 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       setPayphoneSendingEmail(false);
     }
   };
-
-  const productsSubtotal = invoiceTotals.subtotalNoTax;
-  const totalDiscountAmount = invoiceTotals.totalDiscount;
-  const salesTaxAmount = invoiceTotals.totalTax;
-  const shippingFee = invoiceTotals.shippingFee;
-  const totalOrderAmount = invoiceTotals.totalInvoiceAmount;
 
   // Cash payment detection
   const isCash = useMemo(() => {
@@ -1123,6 +1136,12 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         return;
       }
     }
+    if (isConsumidorFinal && totalOrderAmount > 199.99) {
+      const err = 'Por normativa fiscal del SRI en Ecuador, las ventas superiores a $199.99 no pueden ser emitidas a Consumidor Final. Ingrese Cédula o RUC del cliente.';
+      showToast(`⚠️ ${err}`);
+      return;
+    }
+
     if (items.length === 0) {
       showToast('⚠️ Agrega al menos 1 producto al detalle del pedido');
       return;
@@ -1261,6 +1280,13 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     }
 
     const ciToValidate = customerCi.trim();
+    if (isConsumidorFinal && totalOrderAmount > 199.99) {
+      const err = 'Por normativa fiscal del SRI en Ecuador, las ventas superiores a $199.99 no pueden ser emitidas a Consumidor Final. Ingrese Cédula o RUC del cliente.';
+      setVoucherError(err);
+      showToast(`⚠️ ${err}`);
+      return;
+    }
+
     if (ciToValidate) {
       const val = validateEcuadorId(ciToValidate, true);
       if (!val.isValid) {
@@ -1320,17 +1346,24 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           ci: ciToValidate || undefined,
           customerAddress: finalDest,
           clientAddress: customerFiscalAddress.trim() || undefined,
+          customerFiscalAddress: customerFiscalAddress.trim() || undefined,
           shippingAddress: !isPick ? finalDest : undefined,
           deliveryType,
           trackingCarrier: !isPick ? (trackingCarrier.trim() || undefined) : undefined,
           trackingNumber: !isPick ? (trackingNumber.trim() || undefined) : undefined,
+          trackingNotes: !isPick ? (trackingNotes.trim() || undefined) : undefined,
+          shippingCost: !isPick ? shippingFee : 0,
           paymentMethod: paymentMethod || 'whatsapp',
           bankOrAccount: selectedBank,
           status: 'confirmed',
           paymentVoucher: voucherToSave,
           notes: finalNotes || undefined,
           items: items,
-          totalAmount: totalOrderAmount,
+          subtotalAmount: productsSubtotal.toFixed(2),
+          taxAmount: salesTaxAmount.toFixed(2),
+          applySaleTax,
+          saleTaxPercent,
+          totalAmount: totalOrderAmount.toFixed(2),
           decrementStock: true,
         };
 
@@ -1385,7 +1418,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           onClose();
         }
       } else if (order) {
-        // CONFIRM EXISTING ORDER
+        // CONFIRM EXISTING ORDER - First save 100% of current modal changes
         if (onUpdateOrder) {
           await onUpdateOrder(order.id, {
             customerName: cleanName,
@@ -1395,17 +1428,24 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             ci: ciToValidate || null,
             customerAddress: finalDest,
             clientAddress: customerFiscalAddress.trim() || null,
-            shippingAddress: finalDest,
+            customerFiscalAddress: customerFiscalAddress.trim() || null,
+            shippingAddress: !isPick ? finalDest : (storeConfig.address || 'Retiro en Local'),
             deliveryType,
             trackingCarrier: isPick ? null : (trackingCarrier.trim() || null),
             trackingNumber: isPick ? null : (trackingNumber.trim() || null),
             trackingNotes: isPick ? null : (trackingNotes.trim() || null),
+            shippingCost: isPick ? 0 : shippingFee,
             paymentMethod,
             bankOrAccount: selectedBank,
             paymentVoucher: voucherToSave,
             notes: finalNotes || null,
             items: items as any,
+            subtotalAmount: productsSubtotal.toFixed(2),
+            taxAmount: salesTaxAmount.toFixed(2),
+            applySaleTax,
+            saleTaxPercent,
             totalAmount: totalOrderAmount.toFixed(2),
+            status: 'confirmed',
           } as any);
         }
 
@@ -1648,54 +1688,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           </div>
 
           <div className="flex items-center gap-2">
-            {/* SRI Electronic Invoice Emission & RIDE Button */}
-            {!isCreateMode && (
-              sriInvoiceRecord ? (
-                <div className="flex items-center gap-1.5">
-                  <a
-                    href={`/api/sri/facturas/${sriInvoiceRecord.id}/ride`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/40 hover:bg-emerald-500/60 text-emerald-100 text-xs font-bold transition cursor-pointer border border-emerald-400/40 shadow-2xs"
-                    title={`Ver e imprimir RIDE oficial de la Factura #${sriInvoiceRecord.secuencial}`}
-                  >
-                    <Printer className="w-3.5 h-3.5 text-emerald-300" />
-                    <span>RIDE SRI #{sriInvoiceRecord.secuencial}</span>
-                  </a>
-                  <a
-                    href={`/api/sri/facturas/${sriInvoiceRecord.id}/xml`}
-                    download={`Factura_${sriInvoiceRecord.claveAcceso}.xml`}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-sky-600/40 hover:bg-sky-500/60 text-sky-100 text-xs font-bold transition cursor-pointer border border-sky-400/40 shadow-2xs"
-                    title="Descargar XML oficial"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>XML</span>
-                  </a>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={sriEmitting || items.length === 0}
-                  onClick={handleEmitSriInvoice}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-bold transition cursor-pointer border border-sky-400/40 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-                  title="Emitir y firmar Factura Electrónica oficialmente en el SRI"
-                >
-                  {sriEmitting ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-200" />
-                      <span>Firmando SRI...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Receipt className="w-3.5 h-3.5 text-sky-200" />
-                      <span>Facturar en SRI</span>
-                    </>
-                  )}
-                </button>
-              )
-            )}
-
-            {/* Direct Print Actions for both modes */}
+            {/* Direct Print Actions */}
             <button
               type="button"
               disabled={items.length === 0}
@@ -1707,27 +1700,29 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 }
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition cursor-pointer border border-white/20 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-              title="Imprimir vista previa de venta"
+              title="Imprimir prefactura"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir Venta</span>
+              <span>Imprimir prefactura</span>
             </button>
-            <button
-              type="button"
-              disabled={items.length === 0}
-              onClick={() => {
-                if (onOpenShippingTicket) {
-                  onOpenShippingTicket(currentOrderForTicket);
-                } else {
-                  directPrintShippingTicket({ order: currentOrderForTicket, storeConfig, currency, showToast });
-                }
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/30 hover:bg-sky-500/50 text-white text-xs font-bold transition cursor-pointer border border-sky-300/30 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
-              title="Imprimir ticket térmico de rotulado"
-            >
-              <Truck className="w-3.5 h-3.5 text-sky-200" />
-              <span>Imprimir Ticket Rotulado</span>
-            </button>
+            {deliveryType === 'shipping' && (
+              <button
+                type="button"
+                disabled={items.length === 0}
+                onClick={() => {
+                  if (onOpenShippingTicket) {
+                    onOpenShippingTicket(currentOrderForTicket);
+                  } else {
+                    directPrintShippingTicket({ order: currentOrderForTicket, storeConfig, currency, showToast });
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/30 hover:bg-sky-500/50 text-white text-xs font-bold transition cursor-pointer border border-sky-300/30 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                title="Imprimir ticket de envío"
+              >
+                <Truck className="w-3.5 h-3.5 text-sky-200" />
+                <span>Imprimir Ticket de envio</span>
+              </button>
+            )}
 
             <button
               onClick={onClose}
@@ -1836,11 +1831,24 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               )}
             </div>
 
-            {/* 4 Clean Columns: CI, Name, Phone, Email */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* 1. Cédula / RUC con autocompletado y validación */}
-              <div className="relative flex flex-col justify-start">
-                <div className="flex items-center justify-between mb-1.5">
+            {/* SRI Warning Banner if Consumidor Final exceeds $199.99 limit */}
+            {isExceedingConsumidorFinalLimit && (
+              <div className="p-3 rounded-xl bg-rose-50 border-2 border-rose-300 text-rose-900 flex items-start gap-2.5 shadow-xs animate-in fade-in duration-200">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <strong className="font-bold text-rose-950 block text-xs sm:text-sm">⚠️ Alerta Normativa SRI Ecuador (Límite Consumidor Final $199.99 USD):</strong>
+                  <span className="leading-relaxed">
+                    El total de la pre-factura actual es <strong>${totalOrderAmount.toFixed(2)} USD</strong>. Por disposición legal del SRI, las facturas superiores a <strong>$199.99 USD</strong> no pueden emitirse a Consumidor Final. Seleccione el tipo de documento Cédula (05) o RUC (04) e ingrese los datos del cliente.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 4 Columns with Proportional Widths: CI (4 cols), Name (3 cols), Phone (3 cols), Email (2 cols) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+              {/* 1. Cédula / RUC con autocompletado y validación (4 Columns) */}
+              <div className="lg:col-span-4 relative flex flex-col justify-start">
+                <div className="h-6 flex items-center justify-between mb-1.5">
                   <label className="text-slate-700 font-bold text-xs flex items-center gap-1">
                     <span>Documento SRI:</span>
                   </label>
@@ -1872,11 +1880,12 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                   </select>
 
                   <div className="relative flex-1">
-                    <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
+                    <CreditCard className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
                     <input
                       type="text"
                       value={customerCi}
                       disabled={docType === '07'}
+                      title={customerCi || 'Número de Identificación Cédula/RUC'}
                       onChange={(e) => {
                         setCustomerCi(e.target.value);
                         if (e.target.value.trim().length >= 2) {
@@ -1889,7 +1898,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                         }
                       }}
                       placeholder={docType === '07' ? '9999999999999' : docType === '04' ? 'Ej. 1790000000001' : 'Ej. 1712345678'}
-                      className={`w-full h-10 pl-9 pr-8 rounded-xl font-mono text-xs focus:outline-none font-semibold transition ${
+                      className={`w-full h-10 pl-8 pr-7 rounded-xl font-mono text-xs sm:text-sm focus:outline-none font-semibold transition ${
                         docType === '07'
                           ? 'bg-purple-50/80 border border-purple-300 text-purple-900 font-bold'
                           : customerCi.trim()
@@ -1907,7 +1916,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           setMatchedCustomerInfo(null);
                           setShowCustomerDropdown(false);
                         }}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1 rounded-full hover:bg-slate-200 transition cursor-pointer"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1 rounded-full hover:bg-slate-200 transition cursor-pointer"
                         title="Borrar"
                       >
                         ✕
@@ -1951,7 +1960,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                   </div>
                 )}
 
-                <div className="h-5 mt-1">
+                <div className="min-h-[22px] flex items-center mt-1">
                   {ecuadorApiStatus?.loading ? (
                     <div className="text-[10px] text-teal-700 flex items-center gap-1 font-semibold truncate animate-pulse">
                       <Loader2 className="w-3 h-3 text-teal-600 animate-spin shrink-0" />
@@ -1985,29 +1994,32 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               </div>
 
-              {/* 2. Nombre o Razón Social */}
-              <div className="flex flex-col justify-start">
-                <label className="block text-slate-700 font-bold mb-1.5 text-xs">
-                  Nombre o Razón Social:
-                </label>
+              {/* 2. Nombre o Razón Social (3 Columns) */}
+              <div className="lg:col-span-3 flex flex-col justify-start">
+                <div className="h-6 flex items-center justify-between mb-1.5">
+                  <label className="text-slate-700 font-bold text-xs">
+                    Nombre o Razón Social:
+                  </label>
+                </div>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     value={customerName}
+                    title={customerName || 'Nombre o Razón Social'}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Ej. María Gómez"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-medium"
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-medium"
                   />
                 </div>
-                <div className="h-5 mt-1">
+                <div className="min-h-[22px] flex items-center mt-1">
                   <p className="text-[10px] text-slate-400">Titular de la factura o ticket</p>
                 </div>
               </div>
 
-              {/* 3. Teléfono / WhatsApp */}
-              <div className="flex flex-col justify-start">
-                <div className="flex items-center justify-between mb-1.5">
+              {/* 3. Teléfono / WhatsApp (3 Columns) */}
+              <div className="lg:col-span-3 flex flex-col justify-start">
+                <div className="h-6 flex items-center justify-between mb-1.5">
                   <label className="text-slate-700 font-bold text-xs">
                     Teléfono / WhatsApp: <span className="text-rose-500 font-bold">*</span>
                   </label>
@@ -2032,12 +2044,13 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     type="text"
                     required
                     value={customerPhone}
+                    title={customerPhone || 'Número de contacto WhatsApp'}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="Ej. 0983302390"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition"
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition"
                   />
                 </div>
-                <div className="h-5 mt-1">
+                <div className="min-h-[22px] flex items-center mt-1">
                   {customerPhone.trim() ? (
                     phoneValidation?.isValid ? (
                       <div className="text-[10px] text-emerald-700 flex items-center gap-1 font-mono font-medium truncate">
@@ -2053,29 +2066,32 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               </div>
 
-              {/* 4. Correo Electrónico */}
-              <div className="flex flex-col justify-start">
-                <label className="block text-slate-700 font-bold mb-1.5 text-xs">
-                  Correo Electrónico:
-                </label>
+              {/* 4. Correo Electrónico (2 Columns) */}
+              <div className="lg:col-span-2 flex flex-col justify-start">
+                <div className="h-6 flex items-center justify-between mb-1.5">
+                  <label className="text-slate-700 font-bold text-xs">
+                    Correo Electrónico:
+                  </label>
+                </div>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="email"
                     value={customerEmail}
+                    title={customerEmail || 'Correo Electrónico'}
                     onChange={(e) => setCustomerEmail(e.target.value)}
                     placeholder="cliente@ejemplo.com"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-medium"
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-medium"
                   />
                 </div>
-                <div className="h-5 mt-1">
-                  <p className="text-[10px] text-slate-400">Opcional para recibo o factura digital</p>
+                <div className="min-h-[22px] flex items-center mt-1">
+                  <p className="text-[10px] text-slate-400">Opcional</p>
                 </div>
               </div>
             </div>
 
             {/* Dirección Residencial / Fiscal (Opcional) en Datos del Cliente */}
-            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
               <div className="flex items-center gap-1.5 shrink-0">
                 <MapPin className="w-3.5 h-3.5 text-emerald-600" />
                 <label className="text-xs font-bold text-slate-700">
@@ -2085,9 +2101,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               <input
                 type="text"
                 value={customerFiscalAddress}
+                title={customerFiscalAddress || 'Dirección residencial o fiscal del cliente'}
                 onChange={(e) => setCustomerFiscalAddress(e.target.value)}
                 placeholder="Domicilio fiscal o residencial del cliente para facturación o registro en CRM..."
-                className="flex-1 h-9 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 font-medium transition"
+                className="flex-1 h-10 px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 font-medium transition"
               />
             </div>
           </div>
@@ -2323,9 +2340,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                       <input
                         type="text"
                         value={province}
+                        title={province || 'Provincia'}
                         onChange={(e) => setProvince(e.target.value)}
                         placeholder="Ej. Pichincha, Guayas..."
-                        className="w-full h-8 px-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:border-sky-500 focus:bg-white"
+                        className="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-sky-500 focus:bg-white transition"
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -2333,9 +2351,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                       <input
                         type="text"
                         value={canton}
+                        title={canton || 'Cantón / Ciudad'}
                         onChange={(e) => setCanton(e.target.value)}
                         placeholder="Ej. Quito, Guayaquil..."
-                        className="w-full h-8 px-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:border-sky-500 focus:bg-white"
+                        className="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-sky-500 focus:bg-white transition"
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -2343,9 +2362,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                       <input
                         type="text"
                         value={parish}
+                        title={parish || 'Parroquia / Sector'}
                         onChange={(e) => setParish(e.target.value)}
                         placeholder="Ej. Iñaquito, Cumbayá..."
-                        className="w-full h-8 px-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:border-sky-500 focus:bg-white"
+                        className="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-sky-500 focus:bg-white transition"
                       />
                     </div>
                     <div className="sm:col-span-4">
@@ -2353,9 +2373,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                       <input
                         type="text"
                         value={exactAddress}
+                        title={exactAddress || 'Dirección Exacta'}
                         onChange={(e) => setExactAddress(e.target.value)}
                         placeholder="Ej. Av. Amazonas N24-102 y República, Edif. Torre Azul, Dpto 4B"
-                        className="w-full h-8 px-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:border-sky-500 focus:bg-white"
+                        className="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-sky-500 focus:bg-white transition"
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -2363,9 +2384,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                       <input
                         type="text"
                         value={reference}
+                        title={reference || 'Referencia de Entrega'}
                         onChange={(e) => setReference(e.target.value)}
                         placeholder="Ej. Frente al parque / Enviar a Agencia"
-                        className="w-full h-8 px-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:border-sky-500 focus:bg-white"
+                        className="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-sky-500 focus:bg-white transition"
                       />
                     </div>
                   </div>
@@ -2599,7 +2621,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                         {/* 5. Precio sin IVA ($) */}
                         <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
                           <span className="text-[10px] text-slate-500 font-bold lg:hidden">Precio sin IVA:</span>
-                          <div className="relative flex items-center" title={`Precio de venta unitario sin IVA`}>
+                          <div className="relative flex items-center" title={`Precio de venta unitario sin IVA: $${Number(it.salePrice || 0).toFixed(2)}`}>
                             <span className="text-xs text-purple-600 font-bold absolute left-2 pointer-events-none">$</span>
                             <input
                               type="number"
@@ -2615,7 +2637,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 }
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, salePrice: newP, marginPercent: newMargin } : item)));
                               }}
-                              className="w-20 h-7 pl-5 pr-1 rounded-lg bg-purple-50/40 border border-purple-200 text-right font-mono font-bold text-purple-950 text-xs focus:outline-none focus:bg-white focus:border-purple-600"
+                              className="w-24 h-8 pl-5 pr-1.5 rounded-lg bg-purple-50/40 border border-purple-200 text-right font-mono font-bold text-purple-950 text-xs focus:outline-none focus:bg-white focus:border-purple-600 transition"
                             />
                           </div>
                         </div>
@@ -2623,8 +2645,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                         {/* 6. Descuento ($) */}
                         <div className="col-span-1 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
                           <span className="text-[10px] text-slate-500 font-bold lg:hidden">Descuento:</span>
-                          <div className="relative flex items-center">
-                            <span className="text-xs text-slate-400 font-bold absolute left-1.5 pointer-events-none">$</span>
+                          <div className="relative flex items-center" title={`Descuento aplicado: $${Number(it.discount || 0).toFixed(2)}`}>
+                            <span className="text-xs text-slate-400 font-bold absolute left-2 pointer-events-none">$</span>
                             <input
                               type="number"
                               step="0.01"
@@ -2634,7 +2656,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 const newDisc = Math.max(0, Number(e.target.value) || 0);
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, discount: newDisc } : item)));
                               }}
-                              className="w-14 h-7 pl-3.5 pr-1 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-purple-500"
+                              className="w-20 h-8 pl-4 pr-1.5 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-purple-500 transition"
                             />
                           </div>
                         </div>
@@ -2803,11 +2825,36 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     <span className="text-[10px] text-slate-500 line-clamp-1 block">Cobro en entrega</span>
                   </div>
                 </button>
+
+                {/* Dedicated Payphone API Option */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod('Payphone');
+                    setBankOrAccount('Payphone API / Pasarela Online');
+                  }}
+                  className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
+                    isPayphonePaymentMethod
+                      ? 'bg-orange-50/90 border-orange-500 shadow-xs ring-2 ring-orange-200'
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-orange-100 border border-orange-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
+                    <CreditCard className="w-4 h-4 text-orange-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-xs text-slate-900 truncate">Payphone</span>
+                      {isPayphonePaymentMethod && <Check className="w-3.5 h-3.5 text-orange-600 shrink-0" />}
+                    </div>
+                    <span className="text-[10px] text-slate-500 line-clamp-1 block">Pasarela Enlace API</span>
+                  </div>
+                </button>
               </div>
             </div>
 
-            {/* Bloque Integración Payphone API (Solo cuando se selecciona tarjeta y el switch de Payphone está activo) */}
-            {isCardPaymentMethod && payphoneConfig?.isActive && (
+            {/* Bloque Integración Payphone API (Solo cuando se selecciona el método de pago Payphone) */}
+            {isPayphonePaymentMethod && payphoneConfig?.isActive && (
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-950 via-slate-900 to-indigo-950 text-white space-y-3 shadow-md border border-orange-500/30">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
@@ -2909,21 +2956,24 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             {/* Account in Treasury & Voucher Input */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
-                <label className="block text-slate-700 font-bold mb-1 text-xs">Cuenta Receptora en Tesorería:</label>
+                <div className="h-5 flex items-center justify-between mb-1">
+                  <label className="text-slate-700 font-bold text-xs">Cuenta Receptora en Tesorería:</label>
+                </div>
                 <div className="relative">
                   <Wallet className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     value={bankOrAccount}
+                    title={bankOrAccount || 'Cuenta Receptora en Tesorería'}
                     onChange={(e) => setBankOrAccount(e.target.value)}
                     placeholder="Ej. Banco Pichincha Ahorros / Caja"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-emerald-500 focus:bg-white"
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm font-semibold focus:outline-none focus:border-emerald-500 focus:bg-white transition"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="h-5 flex items-center justify-between mb-1">
                   <label className="text-slate-700 font-bold text-xs">
                     N° de Comprobante / Transacción: {!isCash && <span className="text-rose-500 font-bold">*</span>}
                   </label>
@@ -2934,12 +2984,13 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                   <input
                     type="text"
                     value={voucherInput}
+                    title={voucherInput || 'Número de Comprobante / Transacción'}
                     onChange={(e) => {
                       setVoucherInput(e.target.value);
                       if (voucherError) setVoucherError(null);
                     }}
                     placeholder={isCash ? 'EFECTIVO - CONTRAENTREGA' : 'Ej. 004829148'}
-                    className={`w-full h-10 pl-9 pr-3 rounded-xl font-mono text-xs font-bold focus:outline-none transition ${
+                    className={`w-full h-10 pl-9 pr-3 rounded-xl font-mono text-xs sm:text-sm font-bold focus:outline-none transition ${
                       voucherInput.trim()
                         ? 'bg-emerald-50/50 border border-emerald-400 text-slate-900 focus:border-emerald-600'
                         : isCash
@@ -3078,10 +3129,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 {/* Botón: Guardar Pre-Factura */}
                 <button
                   type="button"
-                  disabled={isSaving || isConfirming || items.length === 0 || !customerPhone.trim()}
+                  disabled={isSaving || isConfirming || items.length === 0 || !customerPhone.trim() || isExceedingConsumidorFinalLimit}
                   onClick={() => handleSaveOrder(false, false)}
                   className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs"
-                  title="Guarda la pre-factura sin emitir la factura comercial"
+                  title={isExceedingConsumidorFinalLimit ? "Venta mayor a $199.99 no permite Consumidor Final" : "Guarda la pre-factura sin emitir la factura comercial"}
                 >
                   <Check className="w-4 h-4 text-emerald-400" />
                   <span>{isSaving ? 'Guardando...' : 'Guardar Pre-Factura'}</span>
@@ -3090,10 +3141,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 {/* Botón: Emitir y Confirmar Factura */}
                 <button
                   type="button"
-                  disabled={isSaving || isConfirming || items.length === 0 || !customerPhone.trim()}
+                  disabled={isSaving || isConfirming || items.length === 0 || !customerPhone.trim() || isExceedingConsumidorFinalLimit}
                   onClick={() => handleConfirmOrder(false)}
                   className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm ring-2 ring-emerald-200"
-                  title="Valida la pre-factura y emite la factura comercial confirmada"
+                  title={isExceedingConsumidorFinalLimit ? "Venta mayor a $199.99 no permite Consumidor Final" : "Valida la pre-factura y emite la factura comercial confirmada"}
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>{isConfirming ? 'Emitiendo Factura...' : '✓ Emitir y Confirmar Factura'}</span>

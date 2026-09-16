@@ -506,8 +506,8 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
   let notesStr = '';
 
   if (isSale && order) {
-    documentTitle = 'PEDIDO DE VENTA';
-    documentSubtitle = 'Orden de Venta y Despacho a Cliente';
+    documentTitle = 'PREFACTURA';
+    documentSubtitle = 'Pre-Factura con Desglose Fiscal Ecuador (SRI)';
     orderNumberStr = String(order.orderNumber || order.id || '');
     const rawOrderDate = order.createdAt ? new Date(order.createdAt) : (order as any).date ? new Date((order as any).date) : new Date();
     const safeOrderDate = isNaN(rawOrderDate.getTime()) ? new Date() : rawOrderDate;
@@ -1506,7 +1506,7 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
       <tr>
         <td style="width: 52%;">
           ${
-            notesStr
+            !isSale && notesStr
               ? `
             <div class="notes-box">
               <strong>Observaciones / Notas del Pedido:</strong><br>
@@ -1515,7 +1515,7 @@ export const OrderPrintA4Modal: React.FC<OrderPrintA4ModalProps> = ({
           `
               : `
             <div style="font-size: 9px; color: #64748b; font-style: italic;">
-              * Este comprobante en formato A4 certifica la orden de ${isSale ? 'venta' : 'compra'} especificada en el sistema ERP.
+              * Este comprobante en formato A4 certifica la ${isSale ? 'prefactura' : 'orden de compra'} especificada en el sistema ERP.
             </div>
           `
           }

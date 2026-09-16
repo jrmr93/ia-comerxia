@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -10,6 +10,10 @@ import {
   Trash2,
   Lock,
   AlertCircle,
+  Loader2,
+  BadgeCheck,
+  X,
+  Download,
 } from 'lucide-react';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
 import {
@@ -93,6 +97,91 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
   // Comprobar si el pedido tiene número de guía ingresado
   const hasTrackingNumber = Boolean(ord.trackingNumber && String(ord.trackingNumber).trim().length > 0);
 
+  // Facturación Electrónica SRI State & Modals
+  const [sriEmitting, setSriEmitting] = useState(false);
+  const [sriInvoiceRecord, setSriInvoiceRecord] = useState<any | null>(null);
+  const [showSriConfirmModal, setShowSriConfirmModal] = useState(false);
+  const [showSriResultModal, setShowSriResultModal] = useState(false);
+  const [sriEmissionResultData, setSriEmissionResultData] = useState<{
+    autorizado: boolean;
+    estado: string;
+    motivo?: string;
+    secuencial?: string;
+    claveAcceso?: string;
+    invoiceId?: number | string;
+    emisorUsado?: any;
+  } | null>(null);
+
+  useEffect(() => {
+    if (ord && ord.id) {
+      fetch('/api/sri/facturas')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.invoices) {
+            const match = data.invoices.find((inv: any) => inv.orderId === ord.id);
+            if (match) setSriInvoiceRecord(match);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [ord?.id]);
+
+  const handleStartSriInvoice = () => {
+    if (!isPastConfirmation) {
+      showToast('🔒 Facturación SRI disponible solo para ventas confirmadas.');
+      return;
+    }
+    setShowSriConfirmModal(true);
+  };
+
+  const handleConfirmAndEmitSriInvoice = async () => {
+    setSriEmitting(true);
+    try {
+      const res = await fetch(`/api/sri/emitir/${ord.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forceSimulated: false }),
+      });
+      const data = await res.json();
+      if (data.invoice) {
+        setSriInvoiceRecord(data.invoice);
+      }
+      const isAuth = Boolean(data.success || data.autorizado || data.estado === 'AUTORIZADO');
+      const resultObj = {
+        autorizado: isAuth,
+        estado: data.estado || (isAuth ? 'AUTORIZADO' : 'DEVUELTO'),
+        motivo: data.motivo || data.error || '',
+        secuencial: data.invoice?.secuencial || data.secuencial || '',
+        claveAcceso: data.invoice?.claveAcceso || data.claveAcceso || '',
+        invoiceId: data.invoice?.id || sriInvoiceRecord?.id,
+        emisorUsado: data.emisorUsado,
+      };
+
+      setSriEmissionResultData(resultObj);
+      setShowSriConfirmModal(false);
+      setShowSriResultModal(true);
+
+      if (isAuth) {
+        showToast(`✓ Factura Electrónica SRI #${resultObj.secuencial} AUTORIZADA exitosamente`);
+      } else {
+        const errorMsg = resultObj.motivo || 'Factura DEVUELTA por el SRI';
+        showToast(`❌ Factura SRI DEVUELTA: ${errorMsg}`);
+      }
+    } catch (err: any) {
+      console.error('Error emitting SRI invoice:', err);
+      setSriEmissionResultData({
+        autorizado: false,
+        estado: 'ERROR DE CONEXION',
+        motivo: err.message || 'Error al conectar con los servidores del SRI de Ecuador',
+      });
+      setShowSriConfirmModal(false);
+      setShowSriResultModal(true);
+      showToast('⚠️ Error de conexión al comunicarse con el SRI');
+    } finally {
+      setSriEmitting(false);
+    }
+  };
+
   // 1. Manejo de la acción dinámica del Botón 1 (Ciclo de Confirmación, Bodega, Guía y Entrega)
   const handlePrimaryAction = () => {
     // 1. Estado Pendiente -> Confirmar Pedido
@@ -173,12 +262,7 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
     window.open(url, '_blank');
   };
 
-  // 3. Facturar (sin acción por ahora, para futura implementación)
-  const handleFacturar = () => {
-    showToast('ℹ️ Módulo de facturación: Acción reservada para futura implementación.');
-  };
-
-  // 4. Imprimir Pedido (Siempre imprime sin importar el estado del pedido)
+  // 3. Imprimir Pedido (Siempre imprime sin importar el estado del pedido)
   const handlePrintOrder = () => {
     if (onOpenPrintA4Order) {
       onOpenPrintA4Order(ord);
@@ -193,7 +277,7 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
     }
   };
 
-  // 5. Eliminar pedido
+  // 4. Eliminar pedido
   const handleDeleteOrder = () => {
     if (isPastConfirmation) {
       showToast('🔒 Integridad ERP: Los pedidos confirmados o entregados no se pueden eliminar.');
@@ -276,7 +360,58 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
         <span>{primaryBtnConfig.label}</span>
       </button>
 
-      {/* 2. Abrir chat con cliente */}
+      {/* 2. Facturar en SRI (Ubicado SOBRE Abrir chat con cliente e Imprimir Venta) */}
+      {sriInvoiceRecord ? (
+        <button
+          type="button"
+          onClick={() => {
+            setSriEmissionResultData({
+              autorizado: true,
+              estado: 'AUTORIZADO',
+              secuencial: sriInvoiceRecord.secuencial,
+              claveAcceso: sriInvoiceRecord.claveAcceso,
+              invoiceId: sriInvoiceRecord.id,
+            });
+            setShowSriResultModal(true);
+          }}
+          className={`${btnStyle} bg-sky-700 hover:bg-sky-800 text-white border border-sky-800 shadow-xs`}
+          title={`Ver e imprimir RIDE oficial de la Factura SRI #${sriInvoiceRecord.secuencial}`}
+        >
+          <Receipt className="w-3.5 h-3.5 text-sky-200 flex-shrink-0" />
+          <span>RIDE SRI #{sriInvoiceRecord.secuencial}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          id={`btn-sri-invoice-${ord.id}`}
+          disabled={!isPastConfirmation || sriEmitting}
+          onClick={handleStartSriInvoice}
+          className={`${btnStyle} ${
+            !isPastConfirmation
+              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+              : 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white border border-sky-700 shadow-xs'
+          }`}
+          title={
+            !isPastConfirmation
+              ? 'Facturación SRI disponible solo para ventas confirmadas'
+              : 'Emitir y firmar Factura Electrónica oficialmente en el SRI'
+          }
+        >
+          {sriEmitting ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-200 flex-shrink-0" />
+              <span>Firmando SRI...</span>
+            </>
+          ) : (
+            <>
+              <Receipt className="w-3.5 h-3.5 text-sky-200 flex-shrink-0" />
+              <span>Facturar en SRI</span>
+            </>
+          )}
+        </button>
+      )}
+
+      {/* 3. Abrir chat con cliente */}
       <button
         type="button"
         id={`btn-chat-client-${ord.id}`}
@@ -288,28 +423,16 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
         <span>Abrir chat con cliente</span>
       </button>
 
-      {/* 3. Facturar */}
-      <button
-        type="button"
-        id={`btn-invoice-order-${ord.id}`}
-        onClick={handleFacturar}
-        className={`${btnStyle} bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300`}
-        title="Facturar pedido (Para futura implementación)"
-      >
-        <Receipt className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-        <span>Facturar</span>
-      </button>
-
-      {/* 4. Imprimir Pedido (SIEMPRE visible sin importar el estado del pedido, ubicado debajo de Facturar) */}
+      {/* 4. Imprimir Pedido */}
       <button
         type="button"
         id={`btn-print-order-${ord.id}`}
         onClick={handlePrintOrder}
         className={`${btnStyle} bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300`}
-        title="Imprimir venta"
+        title="Imprimir prefactura"
       >
         <Printer className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
-        <span>Imprimir Venta</span>
+        <span>Imprimir Prefactura</span>
       </button>
 
       {/* 5. Eliminar pedido */}
@@ -332,6 +455,198 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
         )}
         <span>Eliminar pedido</span>
       </button>
+
+      {/* ================= MODAL UI 1: CONFIRMACIÓN DE EMISIÓN SRI ================= */}
+      {showSriConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200 my-auto text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-100 border border-purple-200 text-purple-700 flex items-center justify-center shrink-0">
+                  <BadgeCheck className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 tracking-tight">
+                    Confirmar Facturación SRI
+                  </h3>
+                  <p className="text-[11px] text-slate-500">SRI Ecuador • Emisión Electrónica Directa</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSriConfirmModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Datos del Pedido a Facturar */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="font-bold">N° Pedido:</span>
+                <span className="font-mono font-bold text-slate-900">#{ord.orderNumber || ord.id}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="font-bold">Cliente:</span>
+                <span className="font-medium text-slate-900 truncate max-w-[200px]">{ord.customerName || 'Cliente'}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="font-bold">Cédula / RUC:</span>
+                <span className="font-mono font-bold text-slate-900">{ord.customerCi || ord.ci || 'Consumidor Final'}</span>
+              </div>
+              <div className="flex justify-between items-center text-purple-950 pt-1.5 border-t border-slate-200">
+                <span className="font-bold">Total a Facturar:</span>
+                <span className="font-mono font-extrabold text-sm text-purple-700">${Number(ord.totalAmount || 0).toFixed(2)} USD</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>¿Estás seguro de emitir esta factura?</span>
+              </p>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Al confirmar, se generará la firma electrónica legal y se transmitirá oficialmente el comprobante tributario al Servicio de Rentas Internas (SRI).
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={sriEmitting}
+                onClick={() => setShowSriConfirmModal(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={sriEmitting}
+                onClick={handleConfirmAndEmitSriInvoice}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 disabled:opacity-50 text-white text-xs font-black transition cursor-pointer shadow-md flex items-center gap-2"
+              >
+                {sriEmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Transmitiendo a SRI...</span>
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="w-4 h-4 text-white" />
+                    <span>Sí, Emitir Factura en SRI</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL UI 2: RESULTADO DE EMISIÓN SRI ================= */}
+      {showSriResultModal && sriEmissionResultData && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200 my-auto text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                  sriEmissionResultData.autorizado
+                    ? 'bg-emerald-100 border-emerald-200 text-emerald-700'
+                    : 'bg-rose-100 border-rose-200 text-rose-700'
+                }`}>
+                  {sriEmissionResultData.autorizado ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-rose-600" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 tracking-tight">
+                    Resultado de Emisión SRI
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Servicio de Rentas Internas de Ecuador</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSriResultModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {sriEmissionResultData.autorizado ? (
+              <div className="p-4 rounded-xl bg-emerald-950 text-white border border-emerald-500/50 space-y-3 shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-sm text-emerald-400 flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    ✓ AUTORIZADO EN EL SRI
+                  </span>
+                  {sriEmissionResultData.secuencial && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-900 border border-emerald-600 text-emerald-200 font-bold">
+                      Secuencial #{sriEmissionResultData.secuencial}
+                    </span>
+                  )}
+                </div>
+
+                {sriEmissionResultData.claveAcceso && (
+                  <div className="p-2.5 rounded-lg bg-slate-900 border border-emerald-800 text-[11px] font-mono space-y-1">
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Clave de Acceso SRI:</span>
+                    <p className="text-emerald-300 break-all select-all leading-tight">{sriEmissionResultData.claveAcceso}</p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <a
+                    href={`/api/sri/facturas/${sriEmissionResultData.invoiceId || sriInvoiceRecord?.id}/ride`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+                  >
+                    <Printer className="w-4 h-4 text-emerald-200" />
+                    <span>Ver / Imprimir RIDE (PDF)</span>
+                  </a>
+                  {sriEmissionResultData.invoiceId && (
+                    <a
+                      href={`/api/sri/facturas/${sriEmissionResultData.invoiceId}/xml`}
+                      download={`Factura_${sriEmissionResultData.claveAcceso || 'SRI'}.xml`}
+                      className="py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>XML</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-rose-950 text-white border border-rose-500/50 space-y-2.5 shadow-md">
+                <div className="font-black text-sm text-rose-400 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                  <span>❌ DEVUELTO / NO AUTORIZADO POR EL SRI</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-900 border border-rose-800 text-xs space-y-1">
+                  <span className="font-bold text-slate-300 text-[10px] uppercase tracking-wider block">Respuesta / Motivo del SRI:</span>
+                  <p className="font-mono text-rose-200 leading-relaxed text-[11px]">
+                    {sriEmissionResultData.motivo || 'El servidor del SRI rechazó el comprobante electrónico.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowSriResultModal(false)}
+                className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

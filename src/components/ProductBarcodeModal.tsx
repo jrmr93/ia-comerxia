@@ -311,47 +311,52 @@ export const ProductBarcodeModal: React.FC<ProductBarcodeModalProps> = ({
           @page {
             ${
               isSheet
-                ? 'size: A4 portrait; margin: 10mm 8mm;'
+                ? 'size: A4 portrait; margin: 8mm 6mm;'
                 : `size: ${widthMm}mm ${heightMm}mm; margin: 0;`
             }
           }
-          * {
-            box-sizing: border-box;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+          *, *::before, *::after {
+            box-sizing: border-box !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          body {
-            margin: 0;
-            padding: ${isSheet ? '0' : '0'};
+          html, body {
+            width: ${isSheet ? 'auto' : `${widthMm}mm`};
+            margin: 0 !important;
+            padding: 0 !important;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: #fff;
             color: #000;
-            display: ${isSheet ? 'block' : 'flex'};
-            flex-direction: column;
-            align-items: center;
+            overflow: hidden !important;
           }
 
-          /* Roll Mode: Each label is its own page */
+          /* Roll Mode: Each label is strictly 1 page without splitting */
           ${
             !isSheet
               ? `
               .labels-wrapper {
                 display: block;
                 width: ${widthMm}mm;
+                margin: 0;
+                padding: 0;
               }
               .label-card {
-                width: ${widthMm}mm;
-                height: ${heightMm}mm;
-                page-break-after: always;
-                page-break-inside: avoid;
-                padding: 1.8mm 2.2mm;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                align-items: center;
-                text-align: center;
-                overflow: hidden;
-                background: #fff;
+                width: ${widthMm}mm !important;
+                height: ${heightMm}mm !important;
+                max-height: ${heightMm}mm !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                padding: 1mm 1.5mm !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                text-align: center !important;
+                overflow: hidden !important;
+                background: #fff !important;
+                flex-shrink: 0 !important;
               }
             `
               : `
@@ -359,54 +364,58 @@ export const ProductBarcodeModal: React.FC<ProductBarcodeModalProps> = ({
               .labels-wrapper {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 3mm 3mm;
+                gap: 2mm 2mm;
                 justify-content: flex-start;
               }
               .label-card {
-                width: ${widthMm}mm;
-                height: ${heightMm}mm;
-                padding: 1.8mm 2.2mm;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                align-items: center;
-                text-align: center;
-                overflow: hidden;
+                width: ${widthMm}mm !important;
+                height: ${heightMm}mm !important;
+                max-height: ${heightMm}mm !important;
+                padding: 1mm 1.5mm !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                text-align: center !important;
+                overflow: hidden !important;
                 border: 0.5px dashed #ccc;
-                border-radius: 1.5mm;
-                background: #fff;
-                page-break-inside: avoid;
+                border-radius: 1mm;
+                background: #fff !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
               }
             `
           }
 
           .store-name {
-            font-size: 6.5pt;
+            font-size: 6pt;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.2px;
-            color: #333;
+            color: #222;
             line-height: 1;
-            margin-bottom: 0.5mm;
+            margin-bottom: 0.2mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 100%;
+            flex-shrink: 0;
           }
 
           .product-name {
-            font-size: ${heightMm <= 25 ? '7pt' : '8pt'};
+            font-size: ${heightMm <= 25 ? '6.5pt' : '7.5pt'};
             font-weight: 900;
-            line-height: 1.1;
+            line-height: 1.05;
             color: #000;
-            max-height: ${heightMm <= 25 ? '5mm' : '7.5mm'};
+            max-height: ${heightMm <= 25 ? '4.5mm' : '6.5mm'};
             overflow: hidden;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             text-overflow: ellipsis;
             width: 100%;
-            margin-bottom: 0.5mm;
+            margin-bottom: 0.2mm;
+            flex-shrink: 0;
           }
 
           .barcode-container {
@@ -414,15 +423,19 @@ export const ProductBarcodeModal: React.FC<ProductBarcodeModalProps> = ({
             display: flex;
             justify-content: center;
             align-items: center;
-            margin: 0.5mm 0;
-            flex-grow: 1;
-            max-height: ${heightMm <= 25 ? '10mm' : heightMm <= 30 ? '13mm' : '18mm'};
+            margin: 0.2mm 0;
+            flex-shrink: 1 !important;
+            flex-grow: 0 !important;
+            max-height: ${heightMm <= 25 ? '8.5mm' : heightMm <= 30 ? '11mm' : '15mm'} !important;
+            overflow: hidden !important;
           }
           .barcode-container svg {
-            width: 96%;
-            height: 100%;
-            max-height: 100%;
-            display: block;
+            width: 96% !important;
+            height: 100% !important;
+            max-height: 100% !important;
+            max-width: 100% !important;
+            display: block !important;
+            object-fit: contain !important;
           }
 
           .label-bottom-row {
@@ -430,15 +443,16 @@ export const ProductBarcodeModal: React.FC<ProductBarcodeModalProps> = ({
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 0.5mm;
-            padding: 0 0.5mm;
+            margin-top: 0.2mm;
+            padding: 0 0.2mm;
+            flex-shrink: 0 !important;
           }
 
           .sku-code {
             font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-            font-size: 7.5pt;
+            font-size: 7pt;
             font-weight: 800;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
             color: #000;
             line-height: 1;
           }
@@ -446,12 +460,12 @@ export const ProductBarcodeModal: React.FC<ProductBarcodeModalProps> = ({
           .price-container {
             display: flex;
             align-items: baseline;
-            gap: 1mm;
+            gap: 0.8mm;
             line-height: 1;
           }
 
           .old-price {
-            font-size: 6pt;
+            font-size: 5.5pt;
             text-decoration: line-through;
             color: #666;
             font-weight: 600;
@@ -459,17 +473,18 @@ export const ProductBarcodeModal: React.FC<ProductBarcodeModalProps> = ({
 
           .price-tag {
             font-family: "SFMono-Regular", Consolas, Menlo, monospace;
-            font-size: ${heightMm <= 25 ? '8pt' : '9.5pt'};
+            font-size: ${heightMm <= 25 ? '7.5pt' : '8.5pt'};
             font-weight: 900;
             color: #000;
           }
 
           .category-tag {
-            font-size: 5.5pt;
+            font-size: 5pt;
             font-weight: 700;
             color: #666;
             text-transform: uppercase;
-            margin-top: 0.3mm;
+            margin-top: 0.2mm;
+            flex-shrink: 0;
           }
         </style>
       </head>

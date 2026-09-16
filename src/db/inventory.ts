@@ -4113,6 +4113,34 @@ export async function createCustomerOrder(data: {
   const itemsToDeductInInventory: any[] = [];
 
   const processedItems = rawItems.map((it: any) => {
+    const isShippingLine =
+      it.sku === 'ENVIO-DOMICILIO' ||
+      it.id === -999 ||
+      (it.name && String(it.name).trim().toLowerCase() === 'servicios de entrega');
+
+    if (isShippingLine) {
+      const requestedQty = Math.max(1, Number(it.quantity || 1));
+      const initialShippingDelivered = isDirectlyDelivered ? requestedQty : 0;
+      totalRequestedUnits += requestedQty;
+      totalDeliveredUnits += initialShippingDelivered;
+      return {
+        ...it,
+        id: -999,
+        inventoryItemId: -999,
+        sku: 'ENVIO-DOMICILIO',
+        name: 'Servicios de entrega',
+        quantity: requestedQty,
+        stockAvailable: 0,
+        deficitQuantity: 0,
+        deliveredQuantity: initialShippingDelivered,
+        pendingQuantity: 0,
+        stockDeducted: 0,
+        costPrice: '0.00',
+        salePrice: it.salePrice || '0.00',
+        saleTaxPercent: 0,
+      };
+    }
+
     const isCustom = it.sku === 'CUSTOM';
     const invItem = isCustom
       ? null
@@ -5436,6 +5464,32 @@ export async function updateCustomerOrder(
         let totalAllDeficitUnits = 0;
 
         for (const oItem of updatedOrderItems) {
+          const isShippingLine =
+            oItem.sku === 'ENVIO-DOMICILIO' ||
+            oItem.id === -999 ||
+            (oItem.name && String(oItem.name).trim().toLowerCase() === 'servicios de entrega');
+
+          if (isShippingLine) {
+            const reqQty = Math.max(1, Number(oItem.quantity || 1));
+            const shipDeliveredQty = isOrderDeliveredOrClosed ? reqQty : 0;
+            processedOrderItems.push({
+              ...oItem,
+              id: -999,
+              inventoryItemId: -999,
+              sku: 'ENVIO-DOMICILIO',
+              name: 'Servicios de entrega',
+              quantity: reqQty,
+              deliveredQuantity: shipDeliveredQty,
+              pendingQuantity: 0,
+              stockAvailable: 0,
+              deficitQuantity: 0,
+              costPrice: '0.00',
+              salePrice: oItem.salePrice || '0.00',
+              saleTaxPercent: 0,
+            });
+            continue;
+          }
+
           const isCustom = oItem.sku === 'CUSTOM';
           const invItem = isCustom
             ? null

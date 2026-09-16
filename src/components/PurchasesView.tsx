@@ -418,6 +418,8 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             (item.name && inv.name && item.name.trim().toLowerCase() === inv.name.trim().toLowerCase())
         );
 
+        if (!matchedInv) return item;
+
         const currentCostWithoutTax = getInventoryCostWithoutTax(matchedInv);
         const currentTaxPercent =
           matchedInv.purchaseTaxPercent !== undefined

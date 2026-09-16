@@ -377,6 +377,19 @@ export function extractItemTaxPercent(it: any, defaultTaxPercent: number = 15, m
   const subItem = it && it.item && typeof it.item === 'object' ? it.item : {};
   const match = matchProduct && typeof matchProduct === 'object' ? matchProduct : {};
 
+  // Los servicios de entrega / flete son siempre 0% IVA (subtotal 0%)
+  const isShippingLine =
+    it?.sku === 'ENVIO-DOMICILIO' ||
+    it?.id === -999 ||
+    (it?.name && String(it.name).trim().toLowerCase() === 'servicios de entrega') ||
+    subItem?.sku === 'ENVIO-DOMICILIO' ||
+    subItem?.id === -999 ||
+    (subItem?.name && String(subItem.name).trim().toLowerCase() === 'servicios de entrega');
+
+  if (isShippingLine) {
+    return 0;
+  }
+
   const parseTaxValue = (val: any): number | null => {
     if (val === undefined || val === null || val === '') return null;
     if (typeof val === 'number') return isNaN(val) ? null : val;

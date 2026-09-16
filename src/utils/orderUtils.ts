@@ -97,17 +97,24 @@ export function isOrderPartiallyDelivered(order: any): boolean {
     return true;
   }
 
-  const rawItems = Array.isArray(order.items)
-    ? order.items
-    : typeof order.items === 'string'
-    ? (() => {
-        try {
-          return JSON.parse(order.items);
-        } catch {
-          return [];
-        }
-      })()
-    : [];
+  const rawItems = (
+    Array.isArray(order.items)
+      ? order.items
+      : typeof order.items === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(order.items);
+          } catch {
+            return [];
+          }
+        })()
+      : []
+  ).filter(
+    (it: any) =>
+      it.sku !== 'ENVIO-DOMICILIO' &&
+      it.id !== -999 &&
+      (!it.name || String(it.name).trim().toLowerCase() !== 'servicios de entrega')
+  );
 
   if (rawItems.length > 0) {
     const totalDelivered = rawItems.reduce(

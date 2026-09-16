@@ -924,8 +924,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full shadow-2xl relative max-h-[92vh] flex flex-col text-slate-800 overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full shadow-2xl relative max-h-[94vh] flex flex-col text-slate-800 overflow-hidden">
         {/* Header (Barra superior estática) */}
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-200 flex-shrink-0 bg-white">
           <div className="flex items-center space-x-3">
@@ -2229,6 +2229,156 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             setShowWebImagePicker(false);
           }}
         />
+      )}
+
+      {/* Cotizador de Mercado Ecuador (IA & Google Search Grounding) Drawer / Modal */}
+      {showQuoteDrawer && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full shadow-2xl relative flex flex-col text-slate-800 overflow-hidden animate-fadeIn">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-900 text-white">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400">
+                  <Sparkles className="w-4 h-4 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-white">
+                    Cotizador de Mercado Ecuador (IA)
+                  </h3>
+                  <p className="text-[10px] text-slate-300">
+                    Búsqueda web en vivo de precios minoristas en Ecuador con Gemini IA
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuoteDrawer(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                <span className="font-bold text-slate-900">Producto a Cotizar:</span> {name}
+              </div>
+
+              {isQuotingMarket ? (
+                <div className="py-8 text-center space-y-3">
+                  <Loader2 className="w-8 h-8 text-sky-600 animate-spin mx-auto" />
+                  <p className="text-xs font-bold text-slate-800">
+                    Consultando precios reales en tiendas y marketplaces de Ecuador...
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Google Search Grounding está verificando la oferta en Guayaquil, Quito y tiendas online localizadas.
+                  </p>
+                </div>
+              ) : marketQuoteError ? (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium space-y-2">
+                  <div className="flex items-center space-x-1.5 font-bold">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span>Aviso de Cotización</span>
+                  </div>
+                  <p>{marketQuoteError}</p>
+                </div>
+              ) : marketQuote ? (
+                <div className="space-y-4">
+                  {/* Tarjetas de Precios Promedio y Rango */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-emerald-500/20 border-2 border-emerald-500/60 shadow-xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
+                        Precio PVP Promedio en Ecuador
+                      </span>
+                      <div className="flex items-baseline space-x-1 mt-1">
+                        <span className="text-3xl font-black font-mono text-emerald-700">
+                          ${(marketQuote.avgMarketPrice || marketQuote.suggestedSalePrice || 0).toFixed(2)}
+                        </span>
+                        <span className="text-xs font-bold text-emerald-900">USD</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-800 font-medium block mt-1">
+                        ✓ Promedio minorista verificado en el mercado local
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                          Rango de Precios en Tiendas EC
+                        </span>
+                        <div className="text-sm font-black font-mono text-slate-800 mt-1">
+                          ${(marketQuote.minMarketPrice || 0).toFixed(2)} - ${(marketQuote.maxMarketPrice || 0).toFixed(2)} USD
+                        </div>
+                      </div>
+                      <div className="mt-2 text-[10px] font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 w-fit">
+                        Competitividad: {(marketQuote.competitiveness || 'alta').toUpperCase()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumen del Mercado */}
+                  {marketQuote.marketSummary && (
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                      <span className="font-bold text-slate-900 block text-[11px] uppercase tracking-wider">
+                        Análisis de Mercado Local (Ecuador)
+                      </span>
+                      <p className="text-slate-700 leading-relaxed">
+                        {marketQuote.marketSummary}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Fuentes Consultadas */}
+                  {Array.isArray(marketQuote.sources) && marketQuote.sources.length > 0 && (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                        Fuentes & Marketplace Consultados:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {marketQuote.sources.map((src: any, idx: number) => (
+                          <a
+                            key={idx}
+                            href={src.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 text-[10.5px] font-bold transition"
+                          >
+                            <span>{src.title}</span>
+                            <ExternalLink className="w-2.5 h-2.5 text-sky-600" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botón Principal: Aceptar y Aplicar Precio Promedio */}
+                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetPrice = marketQuote.avgMarketPrice || marketQuote.suggestedSalePrice;
+                        if (targetPrice && targetPrice > 0) {
+                          handleApplySuggestedPrice(targetPrice);
+                          setShowQuoteDrawer(false);
+                        }
+                      }}
+                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-md flex items-center justify-center space-x-2 transition cursor-pointer active:scale-98"
+                    >
+                      <Check className="w-4 h-4 text-white stroke-[3]" />
+                      <span>
+                        Aceptar y Aplicar Precio Promedio (${(marketQuote.avgMarketPrice || marketQuote.suggestedSalePrice || 0).toFixed(2)})
+                      </span>
+                    </button>
+                    <p className="text-[10px] text-center text-slate-500">
+                      Al presionar se actualizará el PVP y se recalcularán automáticamente tus costos, margen y tributos del SRI.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
