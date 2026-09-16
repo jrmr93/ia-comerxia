@@ -133,8 +133,8 @@ export function generateSriRideHtml(params: SriRideParams): string {
   const storeName = storeConfig?.storeName || 'Comerxia Store';
   const logoUrl = storeConfig?.logoDesktopUrl || storeConfig?.logoUrl || null;
   const numSecuencial = invoice.secuencial ? String(invoice.secuencial).padStart(9, '0') : '000000001';
-  const estabStr = (invoice as any).estab || '001';
-  const ptoEmiStr = (invoice as any).ptoEmi || '001';
+  const estabStr = (matchTag('estab') || (invoice as any).estab || sriConfig?.estab || '001').padStart(3, '0');
+  const ptoEmiStr = (matchTag('ptoEmi') || (invoice as any).ptoEmi || sriConfig?.ptoEmi || '001').padStart(3, '0');
   const ambienteText = invoice.ambiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS';
 
   return `<!DOCTYPE html>

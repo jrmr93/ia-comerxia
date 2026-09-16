@@ -36,6 +36,8 @@ export async function generateSriRidePdfBuffer(params: SriPdfParams): Promise<Bu
   const obligadoContabilidad = matchTag('obligadoContabilidad') || sriConfig?.obligadoContabilidad || 'NO';
   const contribuyenteEspecial = matchTag('contribuyenteEspecial') || sriConfig?.contribuyenteEspecial || '';
   const contribuyenteRimpe = matchTag('contribuyenteRimpe') || '';
+  const estabStr = (matchTag('estab') || (invoice as any).estab || sriConfig?.estab || '001').padStart(3, '0');
+  const ptoEmiStr = (matchTag('ptoEmi') || (invoice as any).ptoEmi || sriConfig?.ptoEmi || '001').padStart(3, '0');
 
   const fechaEmision = matchTag('fechaEmision') || (invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('es-EC') : '');
   const razonSocialComprador = matchTag('razonSocialComprador') || invoice.customerName || 'CONSUMIDOR FINAL';
@@ -241,7 +243,7 @@ export async function generateSriRidePdfBuffer(params: SriPdfParams): Promise<Bu
   rY += 5;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text(`No.    001-001-${invoice.secuencial ? String(invoice.secuencial).padStart(9, '0') : '000000001'}`, rightBoxX + 4, rY);
+  doc.text(`No.    ${estabStr}-${ptoEmiStr}-${invoice.secuencial ? String(invoice.secuencial).padStart(9, '0') : '000000001'}`, rightBoxX + 4, rY);
 
   rY += 5;
   doc.setFont('helvetica', 'bold');

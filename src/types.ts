@@ -857,15 +857,20 @@ export interface SriInvoiceRecord {
   ambiente: string;
   customerName: string;
   customerCiRuc: string;
+  customerEmail?: string | null;
+  customerAddress?: string | null;
   totalAmount: string;
+  taxAmount?: string | number | null;
+  estab?: string | null;
+  ptoEmi?: string | null;
   estadoRecepcion: string;
   estadoAutorizacion: string;
-  fechaAutorizacion?: string | null;
+  fechaAutorizacion?: string | Date | null;
   numeroAutorizacion?: string | null;
   xmlGenerado?: string | null;
   xmlFirmado?: string | null;
   mensajesSri?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 

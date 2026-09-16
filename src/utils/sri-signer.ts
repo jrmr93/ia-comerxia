@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { execSync } from 'child_process';
 import forge from 'node-forge';
+import { SriFactura } from '../types.ts';
 
 // Helper: Get YYYY-MM-DD formatted date in Ecuador local timezone (America/Guayaquil, UTC-5)
 export function getEcuadorLocalDate(dateInput?: Date | string): string {
@@ -248,7 +249,7 @@ export function generarFacturaXml(factura: SriFactura, claveAcceso: string, ambi
     <detalles>${detallesXml}
     </detalles>
     <infoAdicional>
-        <campoAdicional nombre="Email">${escapeXml(comprador.correoComprador || 'ventas@comerxia.com')}</campoAdicional>
+        ${comprador.correoComprador && comprador.correoComprador.trim() !== '' && comprador.correoComprador !== 'ventas@comerxia.com' ? `<campoAdicional nombre="Email">${escapeXml(comprador.correoComprador)}</campoAdicional>` : ''}
         ${comprador.direccionComprador ? `<campoAdicional nombre="Direccion">${escapeXml(comprador.direccionComprador)}</campoAdicional>` : ''}
     </infoAdicional>
 </factura>`;

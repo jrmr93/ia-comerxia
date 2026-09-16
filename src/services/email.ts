@@ -644,6 +644,8 @@ export async function sendInvoiceEmail(params: {
   xmlContent: string;
   rideHtml: string;
   userId?: number;
+  estab?: string;
+  ptoEmi?: string;
 }) {
   const storeConfig = await getStoreConfig(params.userId || 1).catch(() => null);
   const storeName = storeConfig?.storeName || 'COMERXIA';
@@ -651,6 +653,10 @@ export async function sendInvoiceEmail(params: {
   const logoHtml = buildStoreLogoHeader(storeName, storeConfig?.logoUrl, attachments);
 
   const cleanSecuencial = params.secuencial.padStart(9, '0');
+  const matchTag = (tag: string) => params.xmlContent?.match(new RegExp(`<${tag}>([^<]+)<\/${tag}>`))?.[1] || '';
+  const estabStr = (matchTag('estab') || params.estab || '001').padStart(3, '0');
+  const ptoEmiStr = (matchTag('ptoEmi') || params.ptoEmi || '001').padStart(3, '0');
+
   const numAuth = params.numeroAutorizacion || params.claveAcceso;
   const formattedTotal = Number(params.totalAmount || 0).toFixed(2);
 
@@ -694,7 +700,7 @@ export async function sendInvoiceEmail(params: {
         <div class="header">
           ${logoHtml}
           <h1>${storeName}</h1>
-          <p>Comprobante Electrónico SRI - Factura N° ${cleanSecuencial}</p>
+          <p>Comprobante Electrónico SRI - Factura N° ${estabStr}-${ptoEmiStr}-${cleanSecuencial}</p>
         </div>
         <div class="content">
           <h2 style="margin-top:0; font-size:18px; color:#0f172a;">Estimado(a) ${params.customerName || 'Cliente'},</h2>
@@ -706,7 +712,7 @@ export async function sendInvoiceEmail(params: {
             <div style="text-align:center; margin-bottom:12px;">
               <span class="badge-authorized">✓ AUTORIZADO POR EL SRI</span>
             </div>
-            <p style="margin:4px 0;"><strong>N° Factura:</strong> 001-001-${cleanSecuencial}</p>
+            <p style="margin:4px 0;"><strong>N° Factura:</strong> ${estabStr}-${ptoEmiStr}-${cleanSecuencial}</p>
             <p style="margin:4px 0;"><strong>Clave de Acceso:</strong> <span style="font-family:monospace; font-size:11px;">${params.claveAcceso}</span></p>
             <p style="margin:4px 0;"><strong>N° Autorización:</strong> <span style="font-family:monospace; font-size:11px;">${numAuth}</span></p>
             <p style="margin:4px 0;"><strong>Monto Total:</strong> <strong style="color:#0284c7; font-size:16px;">$${formattedTotal} USD</strong></p>

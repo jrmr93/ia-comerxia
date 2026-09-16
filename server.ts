@@ -1684,8 +1684,8 @@ async function startServer() {
         ruc: cfg.ruc || '1700000000001',
         razonSocial: cfg.razonSocial || 'COMERXIA E-COMMERCE S.A.',
         nombreComercial: cfg.nombreComercial || 'COMERXIA ECUADOR',
-        estab: cfg.estab || '001',
-        ptoEmi: cfg.ptoEmi || '001',
+        estab: (cfg.estab || '001').padStart(3, '0'),
+        ptoEmi: (cfg.ptoEmi || '001').padStart(3, '0'),
         secuencial,
         dirMatriz: cfg.dirMatriz || 'Quito, Ecuador',
         obligadoContabilidad: (cfg.obligadoContabilidad || 'NO') as 'SI' | 'NO',
@@ -1698,7 +1698,7 @@ async function startServer() {
         razonSocialComprador: order.customerName || 'CONSUMIDOR FINAL',
         identificacionComprador: cleanId,
         direccionComprador: order.customerAddress || 'Ecuador',
-        correoComprador: (order as any).customerEmail || 'ventas@comerxia.com',
+        correoComprador: ((order as any).customerEmail || '').trim(),
       };
 
       const pagos = [
@@ -1871,13 +1871,17 @@ async function startServer() {
         await saveSriConfig(req.dbUserId || 1, { lastFacturaSecuencial: secNum });
       }
 
-      // Auto-send email to customer if invoice is AUTORIZADO
+      // Auto-send email to customer if invoice is AUTORIZADO, NOT Consumidor Final, and has a valid customer email
       let emailEnviado = false;
-      if (isAutorizado && comprador.correoComprador && comprador.correoComprador.includes('@')) {
+      const isConsumidorFinal = tipoId === '07' || cleanId === '9999999999999' || (order.customerName || '').toUpperCase().includes('CONSUMIDOR FINAL');
+      const rawCustomerEmail = comprador.correoComprador;
+      const hasValidCustomerEmail = rawCustomerEmail && rawCustomerEmail.trim() !== '' && rawCustomerEmail.includes('@') && rawCustomerEmail.toLowerCase() !== 'ventas@comerxia.com';
+
+      if (isAutorizado && !isConsumidorFinal && hasValidCustomerEmail) {
         try {
-          const rideHtml = generateSriRideHtml({ invoice: invoiceRecord, sriConfig: cfg });
+          const rideHtml = generateSriRideHtml({ invoice: invoiceRecord as any, sriConfig: cfg });
           await sendInvoiceEmail({
-            to: comprador.correoComprador,
+            to: rawCustomerEmail,
             customerName: comprador.razonSocialComprador,
             secuencial,
             claveAcceso,
@@ -1887,6 +1891,8 @@ async function startServer() {
             xmlContent: xmlFirmado || xmlRaw,
             rideHtml,
             userId: req.dbUserId || 1,
+            estab: emisor.estab,
+            ptoEmi: emisor.ptoEmi,
           });
           emailEnviado = true;
         } catch (emailErr) {
@@ -1962,6 +1968,8 @@ async function startServer() {
         xmlContent: invoice.xmlFirmado || invoice.xmlGenerado || '',
         rideHtml,
         userId,
+        estab: (cfg.estab || '001').padStart(3, '0'),
+        ptoEmi: (cfg.ptoEmi || '001').padStart(3, '0'),
       });
 
       res.json({
