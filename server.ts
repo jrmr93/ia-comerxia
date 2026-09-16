@@ -1865,9 +1865,9 @@ async function startServer() {
         mensajesSri: JSON.stringify(allMessages),
       });
 
-      // Update lastFacturaSecuencial in sriConfig
+      // Update lastFacturaSecuencial in sriConfig ONLY if invoice is AUTORIZADO
       const secNum = parseInt(secuencial, 10);
-      if (!isNaN(secNum) && secNum > Number(cfg.lastFacturaSecuencial || 0)) {
+      if (isAutorizado && !isNaN(secNum) && secNum > Number(cfg.lastFacturaSecuencial || 0)) {
         await saveSriConfig(req.dbUserId || 1, { lastFacturaSecuencial: secNum });
       }
 

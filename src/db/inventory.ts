@@ -12394,7 +12394,6 @@ export async function saveSriConfig(userId: number = 1, data: any) {
         p12Filename: data.p12Filename || null,
         lastFacturaSecuencial: Number(data.lastFacturaSecuencial || 0),
         lastNotaCreditoSecuencial: Number(data.lastNotaCreditoSecuencial || 0),
-        lastNotaDebitoSecuencial: Number(data.lastNotaDebitoSecuencial || 0),
         lastGuiaRemisionSecuencial: Number(data.lastGuiaRemisionSecuencial || 0),
         lastRetencionSecuencial: Number(data.lastRetencionSecuencial || 0),
         lastLiquidacionSecuencial: Number(data.lastLiquidacionSecuencial || 0),
@@ -12427,23 +12426,29 @@ export async function getNextSriSecuencial(docType: string = '01', userId: numbe
   if (!isPostgresConfigured()) {
     state.sriInvoices.forEach((inv: any) => {
       if (inv.userId === userId && inv.secuencial) {
-        const secParts = String(inv.secuencial).split('-');
-        const num = parseInt(secParts[secParts.length - 1], 10);
-        if (!isNaN(num) && num > highestInDb) highestInDb = num;
+        const isAuth = inv.estadoAutorizacion === 'AUTORIZADO' || inv.estadoAutorizacion === 'SIMULADO_OK';
+        if (isAuth) {
+          const secParts = String(inv.secuencial).split('-');
+          const num = parseInt(secParts[secParts.length - 1], 10);
+          if (!isNaN(num) && num > highestInDb) highestInDb = num;
+        }
       }
     });
   } else {
     try {
       const records = await db
-        .select({ secuencial: sriInvoices.secuencial })
+        .select({ secuencial: sriInvoices.secuencial, estadoAutorizacion: sriInvoices.estadoAutorizacion })
         .from(sriInvoices)
         .where(eq(sriInvoices.userId, userId));
 
       records.forEach((r: any) => {
         if (r.secuencial) {
-          const secParts = String(r.secuencial).split('-');
-          const num = parseInt(secParts[secParts.length - 1], 10);
-          if (!isNaN(num) && num > highestInDb) highestInDb = num;
+          const isAuth = r.estadoAutorizacion === 'AUTORIZADO' || r.estadoAutorizacion === 'SIMULADO_OK';
+          if (isAuth) {
+            const secParts = String(r.secuencial).split('-');
+            const num = parseInt(secParts[secParts.length - 1], 10);
+            if (!isNaN(num) && num > highestInDb) highestInDb = num;
+          }
         }
       });
     } catch {
@@ -12461,12 +12466,12 @@ export async function createSriInvoice(data: {
   orderNumber?: string | null;
   secuencial: string;
   claveAcceso: string;
-  ambiente: string;
+  ambiente?: string;
   customerName: string;
   customerCiRuc: string;
   totalAmount: string;
-  estadoRecepcion: string;
-  estadoAutorizacion: string;
+  estadoRecepcion?: string;
+  estadoAutorizacion?: string;
   fechaAutorizacion?: string | null;
   numeroAutorizacion?: string | null;
   xmlGenerado?: string | null;
@@ -12548,7 +12553,9 @@ export async function getSriInvoiceByOrderId(orderId: number) {
   if (!state.sriInvoices) state.sriInvoices = [];
 
   if (!isPostgresConfigured()) {
-    return state.sriInvoices.find((inv: any) => inv.orderId === orderId) || null;
+    const orderInvoices = state.sriInvoices.filter((inv: any) => inv.orderId === orderId);
+    const auth = orderInvoices.find((inv: any) => inv.estadoAutorizacion === 'AUTORIZADO' || inv.estadoAutorizacion === 'SIMULADO_OK');
+    return auth || (orderInvoices.length > 0 ? orderInvoices[0] : null);
   }
 
   try {
@@ -12556,11 +12563,16 @@ export async function getSriInvoiceByOrderId(orderId: number) {
       .select()
       .from(sriInvoices)
       .where(eq(sriInvoices.orderId, orderId))
-      .limit(1);
-    return records.length > 0 ? records[0] : null;
+      .orderBy(desc(sriInvoices.id));
+
+    if (records.length === 0) return null;
+    const auth = records.find((inv: any) => inv.estadoAutorizacion === 'AUTORIZADO' || inv.estadoAutorizacion === 'SIMULADO_OK');
+    return auth || records[0];
   } catch (error) {
     console.warn('Error fetching SRI invoice by orderId from SQL:', error);
-    return state.sriInvoices.find((inv: any) => inv.orderId === orderId) || null;
+    const orderInvoices = state.sriInvoices.filter((inv: any) => inv.orderId === orderId);
+    const auth = orderInvoices.find((inv: any) => inv.estadoAutorizacion === 'AUTORIZADO' || inv.estadoAutorizacion === 'SIMULADO_OK');
+    return auth || (orderInvoices.length > 0 ? orderInvoices[0] : null);
   }
 }
 

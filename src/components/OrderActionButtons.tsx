@@ -118,8 +118,8 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
         .then((res) => res.json())
         .then((data) => {
           if (data.invoices) {
-            const match = data.invoices.find((inv: any) => inv.orderId === ord.id);
-            if (match) setSriInvoiceRecord(match);
+            const match = data.invoices.find((inv: any) => inv.orderId === ord.id && (inv.estadoAutorizacion === 'AUTORIZADO' || inv.estadoAutorizacion === 'SIMULADO_OK'));
+            setSriInvoiceRecord(match || null);
           }
         })
         .catch(() => {});
@@ -143,10 +143,10 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
         body: JSON.stringify({ forceSimulated: false }),
       });
       const data = await res.json();
-      if (data.invoice) {
+      const isAuth = Boolean(data.success || data.autorizado || data.estado === 'AUTORIZADO');
+      if (data.invoice && isAuth) {
         setSriInvoiceRecord(data.invoice);
       }
-      const isAuth = Boolean(data.success || data.autorizado || data.estado === 'AUTORIZADO');
       const resultObj = {
         autorizado: isAuth,
         estado: data.estado || (isAuth ? 'AUTORIZADO' : 'DEVUELTO'),
