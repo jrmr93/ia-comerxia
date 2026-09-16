@@ -446,6 +446,16 @@ export interface AccountsPayableItem {
   paymentsCount: number;
   lastPaymentDate?: string;
   returns?: PurchaseReturnRecord[];
+  items?: any[];
+  taxBreakdown?: {
+    subtotal0: number;
+    subtotal15: number;
+    subtotal5: number;
+    subtotalSinImpuesto: number;
+    iva15: number;
+    iva5: number;
+    grandTotal: number;
+  };
 }
 
 export interface TreasuryAccountBreakdown {

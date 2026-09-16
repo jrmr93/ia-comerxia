@@ -1947,7 +1947,6 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       const unitCost = Number(it.costPrice || 0);
       const qty = Number(it.quantity || 1);
       const discount = Number(it.discount || 0);
-      const lineBase = Math.max(0, unitCost * qty - discount);
       totalDiscount += discount;
 
       const taxPercent =
@@ -1958,6 +1957,18 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           : (it as any).hasPurchaseTax === false
           ? 0
           : 15;
+
+      const baseUnitCost = Number(
+        it.costPrice !== undefined && it.costPrice !== null && Number(it.costPrice) > 0
+          ? it.costPrice
+          : (it as any).costWithoutTax !== undefined && (it as any).costWithoutTax !== null && Number((it as any).costWithoutTax) > 0
+          ? (it as any).costWithoutTax
+          : (it as any).baseCostPrice !== undefined && (it as any).baseCostPrice !== null && Number((it as any).baseCostPrice) > 0
+          ? (it as any).baseCostPrice
+          : 0
+      );
+
+      const lineBase = Math.max(0, baseUnitCost * qty - discount);
 
       if (taxPercent === 0) {
         subtotal0 += lineBase;
@@ -3190,13 +3201,8 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
 
     (purchase.items || []).forEach((item) => {
       const qty = Number(item.quantity) || 1;
-      const unitCost = Number(
-        (item as any).costWithoutTax !== undefined && (item as any).costWithoutTax !== null && Number((item as any).costWithoutTax) > 0
-          ? (item as any).costWithoutTax
-          : item.costPrice || 0
-      );
+      const unitCost = Number(item.costPrice || 0);
       const discount = Number(item.discount || 0);
-      const lineSubtotal = Math.max(0, unitCost * qty - discount);
 
       const taxPercent =
         item.taxPercent !== undefined
@@ -3206,6 +3212,18 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
           : (item as any).hasPurchaseTax === false
           ? 0
           : 15;
+
+      const baseUnitCost = Number(
+        item.costPrice !== undefined && item.costPrice !== null && Number(item.costPrice) > 0
+          ? item.costPrice
+          : (item as any).costWithoutTax !== undefined && (item as any).costWithoutTax !== null && Number((item as any).costWithoutTax) > 0
+          ? (item as any).costWithoutTax
+          : (item as any).baseCostPrice !== undefined && (item as any).baseCostPrice !== null && Number((item as any).baseCostPrice) > 0
+          ? (item as any).baseCostPrice
+          : 0
+      );
+
+      const lineSubtotal = Math.max(0, baseUnitCost * qty - discount);
 
       if (taxPercent === 0) {
         subtotal0 += lineSubtotal;

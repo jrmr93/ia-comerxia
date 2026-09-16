@@ -4641,7 +4641,7 @@ export async function updateCustomerOrderStatus(
         });
       }
 
-      const deliveredQty = status === 'delivered' ? qty : (it.deliveredQuantity !== undefined ? Number(it.deliveredQuantity) : targetDeduct);
+      const deliveredQty = status === 'delivered' ? qty : Number(it.deliveredQuantity || 0);
       const pendingQty = status === 'delivered' ? 0 : Math.max(0, qty - deliveredQty);
 
       return {
@@ -5628,12 +5628,26 @@ export async function updateCustomerOrder(
               });
             }
 
+            const itemTaxRate =
+              oItem.taxPercent !== undefined && !isNaN(Number(oItem.taxPercent))
+                ? Number(oItem.taxPercent)
+                : oItem.purchaseTaxPercent !== undefined && !isNaN(Number(oItem.purchaseTaxPercent))
+                ? Number(oItem.purchaseTaxPercent)
+                : invItem?.purchaseTaxPercent !== undefined && !isNaN(Number(invItem.purchaseTaxPercent))
+                ? Number(invItem.purchaseTaxPercent)
+                : (invItem as any)?.taxRate !== undefined && !isNaN(Number((invItem as any).taxRate))
+                ? Number((invItem as any).taxRate)
+                : invItem?.hasPurchaseTax === false || oItem.hasPurchaseTax === false
+                ? 0
+                : 15;
+
             deficitItemsBySupplier.get(groupKey)!.items.push({
               inventoryItemId: invItem ? invItem.id : (isCustom ? undefined : (oItem.inventoryItemId || oItem.id)),
               name: oItem.name || invItem?.name || 'Producto bajo pedido',
               sku: oItem.sku || invItem?.sku || '',
               barcode: oItem.barcode || (invItem as any)?.barcode || undefined,
               costPrice: itemCostPrice.toFixed(2),
+              costWithoutTax: itemCostPrice.toFixed(2),
               salePrice: oItem.salePrice,
               quantity: missingQty, // CANTIDAD EXACTA FALTANTE PARA ESTE PROVEEDOR
               requestedInOrder: requestedQty,
@@ -5644,6 +5658,9 @@ export async function updateCustomerOrder(
               customerOrderId: id,
               orderNumber: existingOrder.orderNumber,
               customerName: data.customerName || existingOrder.customerName,
+              taxPercent: itemTaxRate,
+              purchaseTaxPercent: itemTaxRate,
+              hasPurchaseTax: itemTaxRate > 0,
             });
           }
         }
@@ -8082,12 +8099,19 @@ export function normalizePurchaseRecord(p: any) {
     parsedReturns = typeof p.returns === 'string' ? JSON.parse(p.returns) : (Array.isArray(p.returns) ? p.returns : []);
   } catch {}
 
-  return {
+  const record = {
     ...p,
     items: parsedItems,
     receptions: parsedReceptions,
     returns: parsedReturns,
   };
+
+  const sriBreakdown = calculatePurchaseSriBreakdown(record);
+  if (sriBreakdown && sriBreakdown.grandTotal > 0) {
+    record.totalCost = sriBreakdown.grandTotal;
+  }
+
+  return record;
 }
 
 export async function getPurchases(
@@ -9334,12 +9358,26 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
       ? 0
       : (it.stockAvailable !== undefined ? Number(it.stockAvailable) : Math.max(0, requestedQty - missingQty));
 
+    const itemTaxRate =
+      it.taxPercent !== undefined && !isNaN(Number(it.taxPercent))
+        ? Number(it.taxPercent)
+        : it.purchaseTaxPercent !== undefined && !isNaN(Number(it.purchaseTaxPercent))
+        ? Number(it.purchaseTaxPercent)
+        : invItem?.purchaseTaxPercent !== undefined && !isNaN(Number(invItem.purchaseTaxPercent))
+        ? Number(invItem.purchaseTaxPercent)
+        : (invItem as any)?.taxRate !== undefined && !isNaN(Number((invItem as any).taxRate))
+        ? Number((invItem as any).taxRate)
+        : invItem?.hasPurchaseTax === false || it.hasPurchaseTax === false
+        ? 0
+        : 15;
+
     const pItem = {
       inventoryItemId: invItem ? invItem.id : (isCustom ? undefined : (it.inventoryItemId || it.id)),
       name: it.name || invItem?.name || 'Producto bajo pedido',
       sku: it.sku || invItem?.sku || '',
       barcode: it.barcode || (invItem as any)?.barcode || undefined,
       costPrice: itemCostPrice.toFixed(2),
+      costWithoutTax: itemCostPrice.toFixed(2),
       salePrice: it.salePrice,
       quantity: missingQty, // EXACT DEFICIT ONLY! SOLO LA DIFERENCIA FALTANTE
       requestedInOrder: requestedQty,
@@ -9350,6 +9388,9 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
       customerOrderId: order.id,
       orderNumber: order.orderNumber,
       customerName: order.customerName,
+      taxPercent: itemTaxRate,
+      purchaseTaxPercent: itemTaxRate,
+      hasPurchaseTax: itemTaxRate > 0,
     };
 
     const groupKey = finalSupplierName.trim().toLowerCase();
@@ -11666,10 +11707,20 @@ export async function autoReconcileLedger(userId?: number) {
 }
 
 /**
- * Calculates total purchase amount for a supplier purchase order including SRI taxes (IVA 15%/5%/0%)
+ * Calculates itemized SRI tax breakdown (subtotals per 0%, 5%, 15% rate and IVA amounts) for a purchase order
  */
-export function getPurchaseGrandTotal(po: any): number {
-  if (!po) return 0;
+export function calculatePurchaseSriBreakdown(po: any) {
+  if (!po) {
+    return {
+      subtotal0: 0,
+      subtotal15: 0,
+      subtotal5: 0,
+      subtotalSinImpuesto: 0,
+      iva15: 0,
+      iva5: 0,
+      grandTotal: 0,
+    };
+  }
 
   const items = Array.isArray(po.items)
     ? po.items
@@ -11683,59 +11734,71 @@ export function getPurchaseGrandTotal(po: any): number {
       })()
     : [];
 
-  if (items && items.length > 0) {
-    let subtotal0 = 0;
-    let subtotal15 = 0;
-    let subtotal5 = 0;
+  let subtotal0 = 0;
+  let subtotal15 = 0;
+  let subtotal5 = 0;
 
+  if (items && items.length > 0) {
     items.forEach((item: any) => {
-      const qty = Number(item.quantity) || 1;
-      const discount = Number(item.discount || 0);
+      const normalized = normalizeItemTaxesAndPrices(item);
+      const qty = Number(normalized.quantity) || 1;
+      const discount = Number(normalized.discount || 0);
 
       const taxPercent =
-        item.taxPercent !== undefined
-          ? Number(item.taxPercent)
-          : item.purchaseTaxPercent !== undefined
-          ? Number(item.purchaseTaxPercent)
-          : item.hasPurchaseTax === false
+        normalized.purchaseTaxPercent !== undefined && !isNaN(Number(normalized.purchaseTaxPercent))
+          ? Number(normalized.purchaseTaxPercent)
+          : normalized.taxPercent !== undefined && !isNaN(Number(normalized.taxPercent))
+          ? Number(normalized.taxPercent)
+          : normalized.hasPurchaseTax === false
           ? 0
           : 15;
 
-      let unitCost = Number(
-        item.costWithoutTax !== undefined && item.costWithoutTax !== null && Number(item.costWithoutTax) > 0
-          ? item.costWithoutTax
-          : item.baseCostPrice !== undefined && item.baseCostPrice !== null && Number(item.baseCostPrice) > 0
-          ? item.baseCostPrice
-          : item.costPrice || 0
+      const costWithoutTax = Number(
+        item.costPrice !== undefined && item.costPrice !== null && Number(item.costPrice) > 0
+          ? item.costPrice
+          : normalized.costWithoutTax !== undefined && normalized.costWithoutTax !== null && Number(normalized.costWithoutTax) > 0
+          ? normalized.costWithoutTax
+          : normalized.baseCostPrice !== undefined && normalized.baseCostPrice !== null && Number(normalized.baseCostPrice) > 0
+          ? normalized.baseCostPrice
+          : 0
       );
 
-      // If unitCost is around 11.50 (already includes 15% IVA tax), extract the net base cost (10.00)
-      if (taxPercent === 15 && unitCost > 11.0 && unitCost < 12.0) {
-        unitCost = Math.round((unitCost / 1.15) * 100) / 100;
-      }
-
-      const lineSubtotal = Math.max(0, unitCost * qty - discount);
+      const lineBase = Math.max(0, costWithoutTax * qty - discount);
 
       if (taxPercent === 0) {
-        subtotal0 += lineSubtotal;
+        subtotal0 += lineBase;
       } else if (taxPercent === 5) {
-        subtotal5 += lineSubtotal;
+        subtotal5 += lineBase;
       } else {
-        subtotal15 += lineSubtotal;
+        subtotal15 += lineBase;
       }
     });
-
-    const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
-    const iva15 = subtotal15 * 0.15;
-    const iva5 = subtotal5 * 0.05;
-    const grandTotal = subtotalSinImpuesto + iva15 + iva5;
-
-    if (grandTotal > 0) {
-      return Math.round(grandTotal * 100) / 100;
-    }
   }
 
-  return Math.round(Number(po.totalCost || po.grandTotal || po.totalInvoice || 0) * 100) / 100;
+  const subtotal0Rounded = Math.round(subtotal0 * 100) / 100;
+  const subtotal15Rounded = Math.round(subtotal15 * 100) / 100;
+  const subtotal5Rounded = Math.round(subtotal5 * 100) / 100;
+  const subtotalSinImpuesto = Math.round((subtotal0Rounded + subtotal15Rounded + subtotal5Rounded) * 100) / 100;
+  const iva15 = Math.round(subtotal15Rounded * 0.15 * 100) / 100;
+  const iva5 = Math.round(subtotal5Rounded * 0.05 * 100) / 100;
+  const grandTotal = Math.round((subtotalSinImpuesto + iva15 + iva5) * 100) / 100;
+
+  return {
+    subtotal0: subtotal0Rounded,
+    subtotal15: subtotal15Rounded,
+    subtotal5: subtotal5Rounded,
+    subtotalSinImpuesto,
+    iva15,
+    iva5,
+    grandTotal: grandTotal > 0 ? grandTotal : Math.round(Number(po.totalCost || 0) * 100) / 100,
+  };
+}
+
+/**
+ * Calculates total purchase amount for a supplier purchase order including SRI taxes (IVA 15%/5%/0%)
+ */
+export function getPurchaseGrandTotal(po: any): number {
+  return calculatePurchaseSriBreakdown(po).grandTotal;
 }
 
 /**
@@ -11800,7 +11863,8 @@ export async function getAccountsPayable(userId?: number) {
   const allPayments = await getPayments(userId, { status: 'completed' });
 
   return purchasesList.map((po: any) => {
-    const totalCost = getPurchaseGrandTotal(po);
+    const taxBreakdown = calculatePurchaseSriBreakdown(po);
+    const totalCost = taxBreakdown.grandTotal;
     const returns = Array.isArray(po.returns) ? po.returns : [];
     const totalReturned = returns.reduce((acc: number, ret: any) => acc + Number(ret.refundAmount || 0), 0);
     const netCost = Math.max(0, totalCost - totalReturned);
@@ -11828,6 +11892,18 @@ export async function getAccountsPayable(userId?: number) {
 
     const lastPayment = poOutflows.length > 0 ? poOutflows[0].paymentDate : (poRefunds.length > 0 ? poRefunds[0].paymentDate : undefined);
 
+    const parsedItems = Array.isArray(po.items)
+      ? po.items
+      : typeof po.items === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(po.items);
+          } catch {
+            return [];
+          }
+        })()
+      : [];
+
     return {
       purchaseId: po.id,
       purchaseNumber: po.purchaseNumber,
@@ -11846,6 +11922,8 @@ export async function getAccountsPayable(userId?: number) {
       lastPaymentDate: lastPayment,
       payments: [...poOutflows, ...poRefunds],
       returns,
+      items: parsedItems,
+      taxBreakdown,
     };
   });
 }

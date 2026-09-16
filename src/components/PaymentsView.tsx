@@ -1359,8 +1359,21 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                           </td>
 
                           {/* Costo Total */}
-                          <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
-                            ${item.totalCost.toFixed(2)}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="font-mono font-bold text-slate-900">${item.totalCost.toFixed(2)}</div>
+                            {item.taxBreakdown && (
+                              <div className="text-[10px] text-slate-500 font-mono space-y-0.5 mt-0.5">
+                                {item.taxBreakdown.subtotal15 > 0 && (
+                                  <div>Sub 15%: ${item.taxBreakdown.subtotal15.toFixed(2)} | IVA 15%: ${item.taxBreakdown.iva15.toFixed(2)}</div>
+                                )}
+                                {item.taxBreakdown.subtotal5 > 0 && (
+                                  <div>Sub 5%: ${item.taxBreakdown.subtotal5.toFixed(2)} | IVA 5%: ${item.taxBreakdown.iva5.toFixed(2)}</div>
+                                )}
+                                {item.taxBreakdown.subtotal0 > 0 && (
+                                  <div>Sub 0%: ${item.taxBreakdown.subtotal0.toFixed(2)}</div>
+                                )}
+                              </div>
+                            )}
                           </td>
 
                           {/* Total Pagado */}

@@ -125,9 +125,7 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
 
     (purchase.items || []).forEach((item) => {
       const qty = Number(item.quantity) || 1;
-      const unitCost = Number(item.costPrice || 0);
       const discount = Number(item.discount || 0);
-      const lineSubtotal = Math.max(0, unitCost * qty - discount);
       totalDiscount += discount;
 
       const taxPercent =
@@ -138,6 +136,18 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
           : (item as any).hasPurchaseTax === false
           ? 0
           : 15;
+
+      const baseUnitCost = Number(
+        item.costPrice !== undefined && item.costPrice !== null && Number(item.costPrice) > 0
+          ? item.costPrice
+          : (item as any).costWithoutTax !== undefined && (item as any).costWithoutTax !== null && Number((item as any).costWithoutTax) > 0
+          ? (item as any).costWithoutTax
+          : (item as any).baseCostPrice !== undefined && (item as any).baseCostPrice !== null && Number((item as any).baseCostPrice) > 0
+          ? (item as any).baseCostPrice
+          : 0
+      );
+
+      const lineSubtotal = Math.max(0, baseUnitCost * qty - discount);
 
       if (taxPercent === 0) {
         subtotal0 += lineSubtotal;
@@ -151,19 +161,19 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
     const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
     const iva15 = subtotal15 * 0.15;
     const iva5 = subtotal5 * 0.05;
-    const grandTotal = subtotalSinImpuesto + iva15 + iva5;
+    const grandTotal = Math.round((subtotalSinImpuesto + iva15 + iva5) * 100) / 100;
 
     return {
-      subtotal0,
-      subtotal15,
-      subtotal5,
-      subtotalSinImpuesto,
-      totalDiscount,
-      iva15,
-      iva5,
-      grandTotal: grandTotal > 0 ? grandTotal : Number(purchase.totalCost || 0),
+      subtotal0: Math.round(subtotal0 * 100) / 100,
+      subtotal15: Math.round(subtotal15 * 100) / 100,
+      subtotal5: Math.round(subtotal5 * 100) / 100,
+      subtotalSinImpuesto: Math.round(subtotalSinImpuesto * 100) / 100,
+      totalDiscount: Math.round(totalDiscount * 100) / 100,
+      iva15: Math.round(iva15 * 100) / 100,
+      iva5: Math.round(iva5 * 100) / 100,
+      grandTotal,
     };
-  }, [purchase.items, purchase.totalCost]);
+  }, [purchase.items]);
 
   // Standardized button style matching sales action buttons (same height, font, padding and alignment)
   const btnPurchaseStyle =
@@ -231,6 +241,7 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
                 <th className="p-3 text-center">Cant. Pedida</th>
                 <th className="p-3 text-center">En Bodega</th>
                 <th className="p-3 text-center">Pendiente</th>
+                <th className="p-3 text-center">IVA (%)</th>
                 <th className="p-3 text-right">Costo Unit.</th>
                 <th className="p-3 text-right">Total</th>
               </tr>
@@ -244,6 +255,14 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
                   const unitCost = Number(item.costPrice || 0);
                   const discount = Number(item.discount || 0);
                   const lineSubtotal = Math.max(0, unitCost * ordered - discount);
+                  const itemTaxPercent =
+                    item.taxPercent !== undefined
+                      ? Number(item.taxPercent)
+                      : (item as any).purchaseTaxPercent !== undefined
+                      ? Number((item as any).purchaseTaxPercent)
+                      : (item as any).hasPurchaseTax === false
+                      ? 0
+                      : 15;
 
                   return (
                     <tr key={idx} className="hover:bg-slate-50/80 transition">
@@ -268,6 +287,19 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
                       <td className="p-3 text-center font-mono font-bold text-slate-900">{ordered} u.</td>
                       <td className="p-3 text-center font-mono font-bold text-emerald-700 bg-emerald-50/60">{rec} u.</td>
                       <td className="p-3 text-center font-mono font-bold text-amber-700 bg-amber-50/60">{pending} u.</td>
+                      <td className="p-3 text-center font-mono font-bold">
+                        <span
+                          className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${
+                            itemTaxPercent === 15
+                              ? 'bg-purple-100 text-purple-800 border-purple-200'
+                              : itemTaxPercent === 5
+                              ? 'bg-blue-100 text-blue-800 border-blue-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          {itemTaxPercent}%
+                        </span>
+                      </td>
                       <td className="p-3 text-right font-mono font-bold text-slate-800">${unitCost.toFixed(2)}</td>
                       <td className="p-3 text-right font-mono font-black text-indigo-700">${lineSubtotal.toFixed(2)}</td>
                     </tr>
@@ -282,7 +314,7 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
                 <td className="p-3 text-center font-mono text-slate-900">{totalOrderedCount} u.</td>
                 <td className="p-3 text-center font-mono text-emerald-800">{totalReceivedCount} u.</td>
                 <td className="p-3 text-center font-mono text-amber-800">{totalPendingCount} u.</td>
-                <td className="p-3 text-right text-slate-600 uppercase font-sans text-[11px]">Total Compra:</td>
+                <td colSpan={2} className="p-3 text-right text-slate-600 uppercase font-sans text-[11px]">Total Compra:</td>
                 <td className="p-3 text-right font-mono font-black text-sm sm:text-base text-indigo-900">${sriBreakdown.grandTotal.toFixed(2)}</td>
               </tr>
             </tfoot>

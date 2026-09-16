@@ -5665,9 +5665,23 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+    const indexHtmlPath = fs.existsSync(path.join(distPath, 'index.html'))
+      ? path.join(distPath, 'index.html')
+      : fs.existsSync(path.join(distPath, 'client', 'index.html'))
+      ? path.join(distPath, 'client', 'index.html')
+      : null;
+
     app.use(express.static(distPath));
+    if (fs.existsSync(path.join(distPath, 'client'))) {
+      app.use(express.static(path.join(distPath, 'client')));
+    }
+
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      if (indexHtmlPath && fs.existsSync(indexHtmlPath)) {
+        res.sendFile(indexHtmlPath);
+      } else {
+        res.status(404).send('Servidor ejecutándose. Ejecuta npm run build si falta la interfaz.');
+      }
     });
   }
 
