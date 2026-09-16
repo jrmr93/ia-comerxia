@@ -166,63 +166,68 @@ export async function generateSriRidePdfBuffer(params: SriPdfParams): Promise<Bu
     }
   }
 
-  // Header Left Box (Emisor)
+  // 1. Header Layout (A4 Width = 210mm)
   const leftBoxX = margin;
   const leftBoxW = 92;
-  const leftBoxY = y;
+  const rightBoxX = 108;
+  const rightBoxW = 92;
+  const headerHeight = 68;
 
-  doc.setLineWidth(0.3);
-  doc.rect(leftBoxX, leftBoxY, leftBoxW, 58, 'S');
-
+  // Render Logo on top-left
+  let logoYOffset = 0;
   if (logoDataUri) {
     try {
       const imgFmt = logoDataUri.includes('data:image/jpeg') || logoDataUri.includes('data:image/jpg') ? 'JPEG' : 'PNG';
-      doc.addImage(logoDataUri, imgFmt, leftBoxX + 3, leftBoxY + 3, 45, 14, undefined, 'FAST');
+      doc.addImage(logoDataUri, imgFmt, leftBoxX, y, 45, 20, undefined, 'FAST');
+      logoYOffset = 23;
     } catch (e) {
       console.warn('Could not render image on jsPDF:', e);
     }
   }
-  let curY = leftBoxY + (logoDataUri ? 22 : 6);
 
+  // Emisor Box (below logo on left)
+  const emisorBoxY = y + logoYOffset;
+  const emisorBoxH = headerHeight - logoYOffset;
+  doc.setLineWidth(0.3);
+  doc.rect(leftBoxX, emisorBoxY, leftBoxW, emisorBoxH, 'S');
+
+  let curY = emisorBoxY + 5;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   doc.text(razonSocial.substring(0, 42), leftBoxX + 3, curY);
 
-  curY += 6;
+  curY += 5;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.text('Dirección Matriz:', leftBoxX + 3, curY);
   doc.setFont('helvetica', 'normal');
-  const dirLines = doc.splitTextToSize(dirMatriz, leftBoxW - 32);
-  doc.text(dirLines, leftBoxX + 28, curY);
+  const dirLines = doc.splitTextToSize(dirMatriz, leftBoxW - 30);
+  doc.text(dirLines, leftBoxX + 27, curY);
 
-  curY += Math.max(5, dirLines.length * 3.5 + 1);
+  curY += Math.max(4.5, dirLines.length * 3 + 1);
   doc.setFont('helvetica', 'bold');
   doc.text('Dirección Sucursal:', leftBoxX + 3, curY);
   doc.setFont('helvetica', 'normal');
-  const dirSucLines = doc.splitTextToSize(dirMatriz, leftBoxW - 32);
-  doc.text(dirSucLines, leftBoxX + 30, curY);
+  const dirSucLines = doc.splitTextToSize(dirMatriz, leftBoxW - 30);
+  doc.text(dirSucLines, leftBoxX + 29, curY);
 
-  curY += Math.max(5, dirSucLines.length * 3.5 + 1);
+  curY += Math.max(4.5, dirSucLines.length * 3 + 1);
   if (contribuyenteRimpe) {
     doc.setFont('helvetica', 'bold');
     doc.text('Régimen:', leftBoxX + 3, curY);
     doc.setFont('helvetica', 'normal');
-    doc.text(contribuyenteRimpe.substring(0, 30), leftBoxX + 20, curY);
-    curY += 5;
+    doc.text(contribuyenteRimpe.substring(0, 30), leftBoxX + 18, curY);
+    curY += 4.5;
   }
 
   doc.setFont('helvetica', 'bold');
   doc.text('OBLIGADO A LLEVAR CONTABILIDAD:', leftBoxX + 3, curY);
   doc.setFont('helvetica', 'normal');
-  doc.text(obligadoContabilidad, leftBoxX + 78, curY);
+  doc.text(obligadoContabilidad, leftBoxX + 75, curY);
 
-  // Header Right Box (Comprobante SRI)
-  const rightBoxX = 108;
-  const rightBoxW = 92;
-  const rightBoxY = leftBoxY;
-
-  doc.rect(rightBoxX, rightBoxY, rightBoxW, 58, 'S');
+  // Right Box (Comprobante SRI)
+  const rightBoxY = y;
+  doc.rect(rightBoxX, rightBoxY, rightBoxW, headerHeight, 'S');
   let rY = rightBoxY + 6;
 
   doc.setFont('helvetica', 'bold');
@@ -236,7 +241,7 @@ export async function generateSriRidePdfBuffer(params: SriPdfParams): Promise<Bu
   rY += 5;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text(`No.    001-001-${invoice.secuencial.padStart(9, '0')}`, rightBoxX + 4, rY);
+  doc.text(`No.    001-001-${invoice.secuencial ? String(invoice.secuencial).padStart(9, '0') : '000000001'}`, rightBoxX + 4, rY);
 
   rY += 5;
   doc.setFont('helvetica', 'bold');
@@ -248,30 +253,30 @@ export async function generateSriRidePdfBuffer(params: SriPdfParams): Promise<Bu
   doc.text(invoice.numeroAutorizacion || invoice.claveAcceso, rightBoxX + 4, rY);
 
   rY += 5;
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   doc.text('FECHA Y HORA DE AUTORIZACIÓN:', rightBoxX + 4, rY);
   doc.setFont('helvetica', 'normal');
-  doc.text(invoice.fechaAutorizacion ? new Date(invoice.fechaAutorizacion).toLocaleString('es-EC') : fechaEmision, rightBoxX + 55, rY);
+  doc.text(invoice.fechaAutorizacion ? new Date(invoice.fechaAutorizacion).toLocaleString('es-EC') : fechaEmision, rightBoxX + 53, rY);
 
   rY += 4.5;
   doc.setFont('helvetica', 'bold');
   doc.text('AMBIENTE:', rightBoxX + 4, rY);
   doc.setFont('helvetica', 'normal');
-  doc.text(invoice.ambiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS', rightBoxX + 35, rY);
+  doc.text(invoice.ambiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS', rightBoxX + 32, rY);
 
   rY += 4.5;
   doc.setFont('helvetica', 'bold');
   doc.text('EMISIÓN:', rightBoxX + 4, rY);
   doc.setFont('helvetica', 'normal');
-  doc.text('NORMAL', rightBoxX + 35, rY);
+  doc.text('NORMAL', rightBoxX + 32, rY);
 
   rY += 4.5;
   doc.setFont('helvetica', 'bold');
   doc.text('CLAVE DE ACCESO', rightBoxX + 4, rY);
 
   rY += 3;
-  // Simulated visual barcode lines
+  // Visual barcode simulation lines
   doc.setFillColor(0, 0, 0);
   for (let i = 0; i < 75; i++) {
     const lineW = (i % 3 === 0) ? 0.6 : 0.3;
@@ -282,7 +287,7 @@ export async function generateSriRidePdfBuffer(params: SriPdfParams): Promise<Bu
   doc.setFontSize(6.5);
   doc.text(invoice.claveAcceso, rightBoxX + 4, rY);
 
-  y = leftBoxY + 62;
+  y = rightBoxY + headerHeight + 4;
 
   // 2. Comprador Box
   const compW = 190;

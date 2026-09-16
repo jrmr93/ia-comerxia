@@ -181,23 +181,6 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [matchedCustomerInfo, setMatchedCustomerInfo] = useState<any | null>(null);
   const [ecuadorApiStatus, setEcuadorApiStatus] = useState<{ loading: boolean; source?: string; message?: string } | null>(null);
 
-  // Auto-sync document type with CI input
-  useEffect(() => {
-    const clean = (customerCi || '').trim();
-    if (clean === '9999999999999' || clean.toUpperCase() === 'CONSUMIDOR FINAL') {
-      setDocType('07');
-      if (!customerPhone || customerPhone.trim() === '') {
-        setCustomerPhone('0000000000');
-      }
-    } else if (clean.length === 13) {
-      setDocType('04');
-    } else if (clean.length === 10) {
-      setDocType('05');
-    } else if (clean.length > 0) {
-      setDocType('06');
-    }
-  }, [customerCi]);
-
   const handleSelectDocType = (newType: '05' | '04' | '07' | '06') => {
     setDocType(newType);
     if (newType === '07') {
@@ -215,6 +198,18 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       }
       if (customerName.trim().toUpperCase() === 'CONSUMIDOR FINAL') {
         setCustomerName('');
+      }
+
+      if (customerCi) {
+        let formatted = customerCi.trim();
+        if (newType === '05') {
+          formatted = formatted.replace(/\D/g, '').slice(0, 10);
+        } else if (newType === '04') {
+          formatted = formatted.replace(/\D/g, '').slice(0, 13);
+        } else if (newType === '06') {
+          formatted = formatted.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 20);
+        }
+        setCustomerCi(formatted);
       }
     }
   };
@@ -350,13 +345,42 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
           if (name) {
             setCustomerName(name);
-            if (data.data.address && !customerFiscalAddress) {
-              setCustomerFiscalAddress(data.data.address);
+            const resolvedAddress = data.data.address ? data.data.address.trim() : '';
+            if (resolvedAddress && !customerFiscalAddress) {
+              setCustomerFiscalAddress(resolvedAddress);
             }
+
+            // Auto-save customer to CRM DB immediately even if prefactura is not saved
+            try {
+              const saveRes = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: name,
+                  fullName: name,
+                  ci: cleanDigits,
+                  phone: (customerPhone || '').trim() || '0000000000',
+                  address: resolvedAddress || undefined,
+                  notes: 'Registrado automáticamente desde consulta Ecuador API',
+                }),
+              });
+              if (saveRes.ok) {
+                const savedCust = await saveRes.json();
+                setMatchedCustomerInfo({
+                  ci: cleanDigits,
+                  name: name,
+                  phone: savedCust?.phone || customerPhone || '0000000000',
+                  source: 'Ecuador API (Guardado en CRM)',
+                });
+              }
+            } catch (saveErr) {
+              console.warn('Error auto-saving customer from Ecuador API:', saveErr);
+            }
+
             setEcuadorApiStatus({
               loading: false,
               source: 'Ecuador API',
-              message: `✓ ${isRuc ? 'Razón Social' : 'Nombre'} autocompletado por Ecuador API`,
+              message: `✓ ${isRuc ? 'Razón Social' : 'Nombre'} autocompletado y guardado en CRM`,
             });
           } else {
             setEcuadorApiStatus(null);
@@ -691,12 +715,19 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   // Customer Autocomplete Suggestions
   const matchingCustomerSuggestions = useMemo(() => {
     const q = customerCi.trim().toLowerCase();
-    if (!q || q.length < 2) return [];
+    if (!q || q.length < 2 || docType === '07') return [];
 
     const map = new Map<string, any>();
     // Add from dbCustomers
     (dbCustomers || []).forEach((c: any) => {
       const ci = (c.ci || '').trim();
+      const cleanDigits = ci.replace(/\D/g, '');
+
+      // Strict filter by SRI docType:
+      if (docType === '05' && cleanDigits.length !== 10) return;
+      if (docType === '04' && cleanDigits.length !== 13) return;
+      if (docType === '06' && (cleanDigits.length === 10 || cleanDigits.length === 13)) return;
+
       if (ci && (ci.toLowerCase().includes(q) || (c.fullName || c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q))) {
         map.set(ci.toLowerCase(), {
           ci,
@@ -710,10 +741,22 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     });
 
     return Array.from(map.values()).slice(0, 6);
-  }, [customerCi, dbCustomers]);
+  }, [customerCi, dbCustomers, docType]);
 
   const handleSelectCustomer = (cust: any) => {
-    setCustomerCi(cust.ci || '');
+    const rawCi = (cust.ci || '').trim();
+    setCustomerCi(rawCi);
+    const cleanDigits = rawCi.replace(/\D/g, '');
+    if (rawCi === '9999999999999') {
+      setDocType('07');
+    } else if (cleanDigits.length === 10) {
+      setDocType('05');
+    } else if (cleanDigits.length === 13) {
+      setDocType('04');
+    } else if (rawCi.length > 0) {
+      setDocType('06');
+    }
+
     if (cust.name) setCustomerName(cust.name);
     if (cust.phone) setCustomerPhone(cust.phone);
     if (cust.email) setCustomerEmail(cust.email);
@@ -1019,9 +1062,16 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   // Ecuador ID validation live feedback
   const idValidation = useMemo(() => {
     const trimmed = customerCi.trim();
-    if (!trimmed) return null;
-    return validateEcuadorId(trimmed, true);
-  }, [customerCi]);
+    if (!trimmed || docType === '07' || docType === '06') return null;
+    const res = validateEcuadorId(trimmed, true);
+    if (docType === '05' && res.type !== 'cedula') {
+      return { isValid: false, type: 'cedula', error: 'Se requiere una Cédula de 10 dígitos' };
+    }
+    if (docType === '04' && res.type !== 'ruc') {
+      return { isValid: false, type: 'ruc', error: 'Se requiere un RUC de 13 dígitos' };
+    }
+    return res;
+  }, [customerCi, docType]);
 
   // Phone validation live feedback
   const phoneValidation = useMemo(() => {
@@ -1885,19 +1935,38 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                       type="text"
                       value={customerCi}
                       disabled={docType === '07'}
-                      title={customerCi || 'Número de Identificación Cédula/RUC'}
+                      maxLength={docType === '05' ? 10 : docType === '04' ? 13 : docType === '06' ? 20 : 13}
+                      title={customerCi || 'Número de Identificación Cédula/RUC/Pasaporte'}
                       onChange={(e) => {
-                        setCustomerCi(e.target.value);
-                        if (e.target.value.trim().length >= 2) {
+                        let val = e.target.value;
+                        if (docType === '05') {
+                          val = val.replace(/\D/g, '').slice(0, 10);
+                        } else if (docType === '04') {
+                          val = val.replace(/\D/g, '').slice(0, 13);
+                        } else if (docType === '06') {
+                          val = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 20);
+                        } else if (docType === '07') {
+                          val = '9999999999999';
+                        }
+                        setCustomerCi(val);
+                        if (val.trim().length >= 2 && docType !== '07') {
                           setShowCustomerDropdown(true);
                         }
                       }}
                       onFocus={() => {
-                        if (customerCi.trim().length >= 2 && matchingCustomerSuggestions.length > 0) {
+                        if (customerCi.trim().length >= 2 && matchingCustomerSuggestions.length > 0 && docType !== '07') {
                           setShowCustomerDropdown(true);
                         }
                       }}
-                      placeholder={docType === '07' ? '9999999999999' : docType === '04' ? 'Ej. 1790000000001' : 'Ej. 1712345678'}
+                      placeholder={
+                        docType === '07'
+                          ? '9999999999999'
+                          : docType === '04'
+                          ? '13 dígitos (RUC)'
+                          : docType === '06'
+                          ? 'Pasaporte (Alfanumérico)'
+                          : '10 dígitos (Cédula)'
+                      }
                       className={`w-full h-10 pl-8 pr-7 rounded-xl font-mono text-xs sm:text-sm focus:outline-none font-semibold transition ${
                         docType === '07'
                           ? 'bg-purple-50/80 border border-purple-300 text-purple-900 font-bold'

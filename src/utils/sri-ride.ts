@@ -18,9 +18,10 @@ export function generateSriRideHtml(params: SriRideParams): string {
   };
 
   const razonSocial = matchTag('razonSocial') || sriConfig?.razonSocial || 'COMERXIA E-COMMERCE S.A.';
-  const nombreComercial = matchTag('nombreComercial') || sriConfig?.nombreComercial || 'COMERXIA ECUADOR';
+  const nombreComercial = matchTag('nombreComercial') || sriConfig?.nombreComercial || storeConfig?.storeName || 'COMERXIA ECUADOR';
   const ruc = matchTag('ruc') || sriConfig?.ruc || '1700000000001';
   const dirMatriz = matchTag('dirMatriz') || sriConfig?.dirMatriz || 'Quito, Ecuador';
+  const dirSucursal = matchTag('dirEstablecimiento') || dirMatriz;
   const obligadoContabilidad = matchTag('obligadoContabilidad') || sriConfig?.obligadoContabilidad || 'NO';
   const contribuyenteEspecial = matchTag('contribuyenteEspecial') || sriConfig?.contribuyenteEspecial || '';
   const contribuyenteRimpe = matchTag('contribuyenteRimpe') || '';
@@ -37,10 +38,14 @@ export function generateSriRideHtml(params: SriRideParams): string {
 
   // Parse items from XML
   const detallesList: Array<{
-    codigo: string;
-    descripcion: string;
+    codigoPrincipal: string;
+    codigoAuxiliar: string;
     cantidad: string;
+    descripcion: string;
+    detalleAdicional: string;
     precioUnitario: string;
+    subsidio: string;
+    precioSinSubsidio: string;
     descuento: string;
     precioTotalSinImpuesto: string;
   }> = [];
@@ -50,13 +55,25 @@ export function generateSriRideHtml(params: SriRideParams): string {
   while ((match = detalleRegex.exec(xmlContent)) !== null) {
     const block = match[1];
     const getSub = (subTag: string) => block.match(new RegExp(`<${subTag}>([^<]+)<\/${subTag}>`))?.[1] || '';
+    const codP = getSub('codigoPrincipal') || 'PROD';
+    const codA = getSub('codigoAuxiliar') || '';
+    const desc = getSub('descripcion') || 'Producto';
+    const cant = getSub('cantidad') || '1.00';
+    const pUnit = getSub('precioUnitario') || '0.00';
+    const descVal = getSub('descuento') || '0.00';
+    const pTot = getSub('precioTotalSinImpuesto') || '0.00';
+
     detallesList.push({
-      codigo: getSub('codigoPrincipal') || 'PROD',
-      descripcion: getSub('descripcion') || 'Producto',
-      cantidad: getSub('cantidad') || '1',
-      precioUnitario: getSub('precioUnitario') || '0.00',
-      descuento: getSub('descuento') || '0.00',
-      precioTotalSinImpuesto: getSub('precioTotalSinImpuesto') || '0.00',
+      codigoPrincipal: codP,
+      codigoAuxiliar: codA,
+      descripcion: desc,
+      cantidad: cant,
+      precioUnitario: pUnit,
+      subsidio: '0.00',
+      precioSinSubsidio: '0.00',
+      descuento: descVal,
+      precioTotalSinImpuesto: pTot,
+      detalleAdicional: '',
     });
   }
 
@@ -74,25 +91,61 @@ export function generateSriRideHtml(params: SriRideParams): string {
     });
   }
 
-  const totalSinImpuestos = matchTag('totalSinImpuestos') || invoice.totalAmount || '0.00';
-  const totalDescuento = matchTag('totalDescuento') || '0.00';
-  const importeTotal = matchTag('importeTotal') || invoice.totalAmount || '0.00';
+  const totalSinImpuestosVal = Number(matchTag('totalSinImpuestos') || invoice.totalAmount || 0);
+  const totalDescuentoVal = Number(matchTag('totalDescuento') || 0);
+  const importeTotalVal = Number(matchTag('importeTotal') || invoice.totalAmount || 0);
 
-  const ambienteText = invoice.ambiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS';
-  const estadoText = invoice.estadoAutorizacion || 'AUTORIZADO';
+  // Compute subtotal breakdown
+  let subtotal15 = 0;
+  let subtotal12 = 0;
+  let subtotal0 = 0;
+  let subtotalNoObjeto = 0;
+  let subtotalExento = 0;
+  let iva15 = 0;
+  let iva12 = 0;
+
+  if (totalImpuestosList.length > 0) {
+    totalImpuestosList.forEach(imp => {
+      if (imp.codigoPorcentaje === '4') {
+        subtotal15 += imp.baseImponible;
+        iva15 += imp.valor;
+      } else if (imp.codigoPorcentaje === '2') {
+        subtotal12 += imp.baseImponible;
+        iva12 += imp.valor;
+      } else if (imp.codigoPorcentaje === '0') {
+        subtotal0 += imp.baseImponible;
+      } else if (imp.codigoPorcentaje === '6') {
+        subtotalNoObjeto += imp.baseImponible;
+      } else if (imp.codigoPorcentaje === '7') {
+        subtotalExento += imp.baseImponible;
+      }
+    });
+  } else {
+    const taxAmt = Number(invoice.taxAmount || 0);
+    if (taxAmt > 0) {
+      subtotal15 = totalSinImpuestosVal;
+      iva15 = taxAmt;
+    } else {
+      subtotal0 = totalSinImpuestosVal;
+    }
+  }
 
   const storeName = storeConfig?.storeName || 'Comerxia Store';
   const logoUrl = storeConfig?.logoDesktopUrl || storeConfig?.logoUrl || null;
+  const numSecuencial = invoice.secuencial ? String(invoice.secuencial).padStart(9, '0') : '000000001';
+  const estabStr = (invoice as any).estab || '001';
+  const ptoEmiStr = (invoice as any).ptoEmi || '001';
+  const ambienteText = invoice.ambiente === '2' ? 'PRODUCCIÓN' : 'PRUEBAS';
 
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>RIDE Factura Electrónica SRI #${invoice.secuencial}</title>
+  <title>RIDE Factura Electrónica SRI #${numSecuencial}</title>
   <style>
     @page {
       size: A4 portrait;
-      margin: 10mm;
+      margin: 8mm;
     }
     * {
       box-sizing: border-box;
@@ -101,152 +154,208 @@ export function generateSriRideHtml(params: SriRideParams): string {
       font-family: Arial, Helvetica, sans-serif;
     }
     body {
-      background: #f8fafc;
-      color: #0f172a;
-      padding: 15px;
-      font-size: 11px;
-      line-height: 1.3;
+      background: #ffffff;
+      color: #000000;
+      padding: 10px;
+      font-size: 9.5px;
+      line-height: 1.25;
     }
     .ride-container {
       max-width: 800px;
       margin: 0 auto;
       background: #ffffff;
-      padding: 20px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-bottom: 15px;
-    }
-    .box {
-      border: 1px solid #94a3b8;
-      border-radius: 6px;
       padding: 10px;
-      background: #ffffff;
+    }
+    .header-flex {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 12px;
+      align-items: stretch;
+    }
+    .header-left-col {
+      width: 48%;
+      display: flex;
+      flex-direction: column;
     }
     .logo-container {
+      min-height: 100px;
+      max-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
       margin-bottom: 10px;
-      text-align: center;
     }
     .logo-container img {
-      max-height: 55px;
+      max-height: 110px;
       max-width: 100%;
       object-fit: contain;
     }
-    .title-emisor {
+    .box-emisor {
+      border: 1px solid #000000;
+      border-radius: 8px;
+      padding: 10px 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: #ffffff;
+    }
+    .emisor-title {
+      font-size: 10.5px;
+      font-weight: bold;
+      color: #000000;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      word-break: break-word;
+    }
+    .emisor-row {
+      margin-bottom: 6px;
+      font-size: 9px;
+    }
+    .box-sri {
+      width: 52%;
+      border: 1px solid #000000;
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: #ffffff;
+    }
+    .sri-ruc-title {
       font-size: 13px;
       font-weight: bold;
-      color: #0f172a;
-      margin-bottom: 4px;
-    }
-    .label-bold {
-      font-weight: bold;
-      color: #334155;
-    }
-    .header-sri-title {
-      font-size: 14px;
-      font-weight: 900;
-      color: #0284c7;
-      text-transform: uppercase;
+      color: #000000;
       margin-bottom: 6px;
-      border-bottom: 2px solid #0284c7;
-      padding-bottom: 4px;
     }
-    .clave-box {
+    .sri-doc-type {
+      font-size: 14px;
+      font-weight: bold;
+      color: #000000;
+      margin-bottom: 10px;
+    }
+    .sri-row {
+      margin-bottom: 4px;
+      font-size: 9px;
+    }
+    .sri-bold {
+      font-weight: bold;
+      color: #000000;
+    }
+    .barcode-section {
       margin-top: 8px;
-      background: #f1f5f9;
-      padding: 6px;
-      border-radius: 4px;
       text-align: center;
     }
     .barcode-svg {
       width: 100%;
-      max-height: 45px;
+      max-height: 42px;
       margin: 4px 0;
     }
     .clave-text {
       font-family: monospace;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: bold;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.2px;
       word-break: break-all;
     }
-    .table-info {
+    .box-customer {
+      border: 1px solid #000000;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      background: #ffffff;
+    }
+    .customer-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 15px;
     }
-    .table-info th, .table-info td {
-      border: 1px solid #cbd5e1;
-      padding: 6px 8px;
-      text-align: left;
-    }
-    .table-info th {
-      background: #f1f5f9;
-      font-size: 10px;
-      font-weight: bold;
-      color: #334155;
-      text-transform: uppercase;
+    .customer-table td {
+      padding: 3px 0;
+      font-size: 9.5px;
+      vertical-align: top;
     }
     .table-items {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 15px;
+      margin-bottom: 12px;
     }
     .table-items th {
-      background: #0f172a;
-      color: #ffffff;
-      padding: 7px 8px;
-      font-size: 10px;
-      text-transform: uppercase;
+      border: 1px solid #000000;
+      background: #ffffff;
+      color: #000000;
+      padding: 5px 4px;
+      font-size: 8.5px;
+      font-weight: bold;
+      text-align: center;
     }
     .table-items td {
-      border: 1px solid #e2e8f0;
-      padding: 6px 8px;
+      border: 1px solid #000000;
+      padding: 4px 5px;
+      font-size: 9px;
+      vertical-align: middle;
     }
-    .table-items tr:nth-child(even) {
-      background: #f8fafc;
+    .footer-flex {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
     }
-    .totals-grid {
-      display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 15px;
+    .footer-left-col {
+      width: 58%;
+      flex-shrink: 0;
+    }
+    .footer-right-col {
+      width: 42%;
+      flex-grow: 1;
+    }
+    .box-info-adicional {
+      border: 1px solid #000000;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      background: #ffffff;
+    }
+    .info-header {
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 6px;
+      font-size: 9.5px;
+    }
+    .table-pagos {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000000;
+    }
+    .table-pagos th {
+      border: 1px solid #000000;
+      background: #ffffff;
+      padding: 4px;
+      font-size: 9px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .table-pagos td {
+      border: 1px solid #000000;
+      padding: 4px;
+      font-size: 9px;
     }
     .totals-table {
       width: 100%;
       border-collapse: collapse;
+      border: 1px solid #000000;
     }
     .totals-table td {
-      border: 1px solid #cbd5e1;
-      padding: 5px 8px;
+      border: 1px solid #000000;
+      padding: 3.5px 6px;
+      font-size: 9px;
+    }
+    .totals-table td.lbl {
+      font-weight: bold;
+      color: #000000;
     }
     .totals-table td.val {
       text-align: right;
       font-family: monospace;
       font-weight: bold;
     }
-    .grand-total {
-      background: #e0f2fe;
-      color: #0369a1;
-      font-size: 12px;
-      font-weight: 900;
-    }
-    .badge-status {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-weight: bold;
-      font-size: 10px;
-      background: #dcfce7;
-      color: #15803d;
-      border: 1px solid #86efac;
-    }
     .actions-bar {
-      margin-bottom: 15px;
+      margin-bottom: 12px;
       display: flex;
       justify-content: flex-end;
       gap: 10px;
@@ -270,147 +379,190 @@ export function generateSriRideHtml(params: SriRideParams): string {
 </head>
 <body>
 
-  <div className="actions-bar" style="max-width:800px; margin:0 auto 15px auto; display:flex; justify-content:flex-end;">
+  <div class="actions-bar" style="max-width:800px; margin:0 auto 12px auto; display:flex; justify-content:flex-end;">
     <button onclick="window.print()" class="btn-print">🖨️ Imprimir RIDE / PDF</button>
   </div>
 
   <div class="ride-container">
-    {/* Grid Header 2 columnas SRI */}
-    <div class="grid-2">
-      {/* Columna Izquierda: Emisor */}
-      <div class="box">
-        ${logoUrl ? `<div class="logo-container"><img src="${logoUrl}" alt="${storeName}"></div>` : ''}
-        <div class="title-emisor">${razonSocial}</div>
-        <div style="font-size:11px; color:#475569; margin-bottom:8px;"><strong>${nombreComercial}</strong></div>
-        <p><span class="label-bold">Dirección Matriz:</span> ${dirMatriz}</p>
-        <p><span class="label-bold">Obligado a Llevar Contabilidad:</span> ${obligadoContabilidad}</p>
-        ${contribuyenteEspecial ? `<p><span class="label-bold">Contribuyente Especial N°:</span> ${contribuyenteEspecial}</p>` : ''}
-        ${contribuyenteRimpe ? `<p><span class="label-bold">Régimen Tributario:</span> ${contribuyenteRimpe}</p>` : ''}
+    <div class="header-flex">
+      <div class="header-left-col">
+        <div class="logo-container">
+          ${logoUrl ? `<img src="${logoUrl}" alt="${storeName}">` : `<div style="font-size:18px; font-weight:bold; color:#000;">${storeName}</div>`}
+        </div>
+
+        <div class="box-emisor">
+          <div class="emisor-title">${razonSocial}</div>
+          <div class="emisor-row"><span class="sri-bold">Dirección Matriz:</span> ${dirMatriz}</div>
+          <div class="emisor-row"><span class="sri-bold">Dirección Sucursal:</span> ${dirSucursal}</div>
+          <div class="emisor-row" style="margin-top:8px; display:flex; justify-content:space-between;"><span class="sri-bold">OBLIGADO A LLEVAR CONTABILIDAD</span> <span>${obligadoContabilidad}</span></div>
+          ${contribuyenteEspecial ? `<div class="emisor-row"><span class="sri-bold">Contribuyente Especial Nro:</span> ${contribuyenteEspecial}</div>` : ''}
+          ${contribuyenteRimpe ? `<div class="emisor-row"><span class="sri-bold">Régimen Tributario:</span> ${contribuyenteRimpe}</div>` : ''}
+        </div>
       </div>
 
-      {/* Columna Derecha: Datos Tributarios Factura */}
-      <div class="box">
-        <div class="header-sri-title">R.U.C.: ${ruc}</div>
-        <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:6px;">FACTURA</div>
-        <p><span class="label-bold">No.:</span> ${(invoice as any).estab || '001'}-${(invoice as any).ptoEmi || '001'}-${invoice.secuencial}</p>
-        <p><span class="label-bold">Número de Autorización:</span></p>
-        <p style="font-family:monospace; font-size:10px; word-break:break-all; font-weight:bold;">${invoice.numeroAutorizacion || invoice.claveAcceso}</p>
-        <p style="margin-top:4px;"><span class="label-bold">Fecha y Hora de Autorización:</span> ${invoice.fechaAutorizacion ? new Date(invoice.fechaAutorizacion).toLocaleString('es-EC') : fechaEmision}</p>
-        <p><span class="label-bold">Ambiente:</span> ${ambienteText}</p>
-        <p><span class="label-bold">Emisión:</span> NORMAL</p>
-        <p><span class="label-bold">Estado:</span> <span class="badge-status">${estadoText}</span></p>
-
-        <div class="clave-box">
-          <div style="font-size:9px; font-weight:bold; color:#475569; uppercase">CLAVE DE ACCESO</div>
+      <div class="box-sri">
+        <div class="sri-ruc-title">R.U.C.: &nbsp;&nbsp;&nbsp;&nbsp; ${ruc}</div>
+        <div class="sri-doc-type">FACTURA</div>
+        <div class="sri-row"><span class="sri-bold">No.</span> &nbsp;&nbsp;&nbsp;&nbsp; ${estabStr}-${ptoEmiStr}-${numSecuencial}</div>
+        <div class="sri-row" style="margin-top:6px;"><span class="sri-bold">NÚMERO DE AUTORIZACIÓN</span></div>
+        <div class="clave-text" style="font-size:9.5px; margin-bottom:6px;">${invoice.numeroAutorizacion || invoice.claveAcceso}</div>
+        <div class="sri-row"><span class="sri-bold">FECHA Y HORA DE AUTORIZACIÓN:</span> &nbsp;&nbsp; ${invoice.fechaAutorizacion ? new Date(invoice.fechaAutorizacion).toLocaleString('es-EC') : fechaEmision}</div>
+        <div class="sri-row"><span class="sri-bold">AMBIENTE:</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${ambienteText}</div>
+        <div class="sri-row"><span class="sri-bold">EMISIÓN:</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; NORMAL</div>
+        
+        <div class="barcode-section">
+          <div class="sri-bold" style="font-size:9px; text-transform:uppercase; text-align:left; margin-bottom:2px;">CLAVE DE ACCESO</div>
           <svg id="barcode-svg" class="barcode-svg"></svg>
           <div class="clave-text">${invoice.claveAcceso}</div>
         </div>
       </div>
     </div>
 
-    {/* Datos del Comprador */}
-    <table class="table-info">
-      <tr>
-        <td style="width:65%;"><span class="label-bold">Razón Social / Nombres y Apellidos:</span> ${razonSocialComprador}</td>
-        <td><span class="label-bold">Identificación:</span> ${identificacionComprador}</td>
-      </tr>
-      <tr>
-        <td><span class="label-bold">Fecha de Emisión:</span> ${fechaEmision}</td>
-        <td><span class="label-bold">Guía de Remisión:</span> N/A</td>
-      </tr>
-      <tr>
-        <td colspan="2"><span class="label-bold">Dirección:</span> ${direccionComprador}</td>
-      </tr>
-    </table>
+    <div class="box-customer">
+      <table class="customer-table">
+        <tr>
+          <td colspan="2"><span class="sri-bold">Razón Social / Nombres y Apellidos:</span> &nbsp;&nbsp;&nbsp;&nbsp; ${razonSocialComprador}</td>
+        </tr>
+        <tr>
+          <td style="width:40%;"><span class="sri-bold">Identificación</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${identificacionComprador}</td>
+          <td>
+            <span style="margin-right:50px;"><span class="sri-bold">Placa / Matrícula:</span></span>
+            <span><span class="sri-bold">Guía</span></span>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2"><span class="sri-bold">Fecha</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${fechaEmision}</td>
+        </tr>
+        <tr>
+          <td colspan="2"><span class="sri-bold">Direccion:</span></td>
+        </tr>
+        <tr>
+          <td colspan="2" style="padding-left:12px;">${direccionComprador}</td>
+        </tr>
+      </table>
+    </div>
 
-    {/* Tabla Detalle de Productos */}
     <table class="table-items">
       <thead>
         <tr>
-          <th style="width:12%;">Cod. Principal</th>
+          <th style="width:9%;">Cod. Principal</th>
+          <th style="width:8%;">Cod. Auxiliar</th>
+          <th style="width:7%;">Cantidad</th>
           <th>Descripción</th>
-          <th style="width:10%; text-align:center;">Cantidad</th>
-          <th style="width:14%; text-align:right;">Precio Unitario</th>
-          <th style="width:12%; text-align:right;">Descuento</th>
-          <th style="width:14%; text-align:right;">Precio Total</th>
+          <th style="width:12%;">Detalle Adicional</th>
+          <th style="width:10%;">Precio Unitario</th>
+          <th style="width:7%;">Subsidio</th>
+          <th style="width:9%;">Precio sin Subsidio</th>
+          <th style="width:8%;">Descuento</th>
+          <th style="width:10%;">Precio Total</th>
         </tr>
       </thead>
       <tbody>
         ${detallesList.length > 0 ? detallesList.map(item => `
           <tr>
-            <td style="font-family:monospace; font-weight:bold;">${item.codigo}</td>
+            <td style="font-family:monospace; text-align:center;">${item.codigoPrincipal}</td>
+            <td style="font-family:monospace; text-align:center;">${item.codigoAuxiliar}</td>
+            <td style="text-align:right;">${item.cantidad}</td>
             <td>${item.descripcion}</td>
-            <td style="text-align:center;">${item.cantidad}</td>
-            <td style="text-align:right; font-family:monospace;">$${Number(item.precioUnitario).toFixed(2)}</td>
-            <td style="text-align:right; font-family:monospace;">$${Number(item.descuento).toFixed(2)}</td>
-            <td style="text-align:right; font-family:monospace; font-weight:bold;">$${Number(item.precioTotalSinImpuesto).toFixed(2)}</td>
+            <td></td>
+            <td style="text-align:right; font-family:monospace;">${Number(item.precioUnitario).toFixed(2)}</td>
+            <td style="text-align:right; font-family:monospace;">0.00</td>
+            <td style="text-align:right; font-family:monospace;">0.00</td>
+            <td style="text-align:right; font-family:monospace;">${Number(item.descuento).toFixed(2)}</td>
+            <td style="text-align:right; font-family:monospace; font-weight:bold;">${Number(item.precioTotalSinImpuesto).toFixed(2)}</td>
           </tr>
         `).join('') : `
           <tr>
-            <td style="font-family:monospace;">PROD-001</td>
+            <td style="font-family:monospace; text-align:center;">001049</td>
+            <td></td>
+            <td style="text-align:right;">1.00</td>
             <td>Venta de Mercadería / Servicio Comercial</td>
-            <td style="text-align:center;">1</td>
-            <td style="text-align:right;">$${Number(invoice.totalAmount || 0).toFixed(2)}</td>
-            <td style="text-align:right;">$0.00</td>
-            <td style="text-align:right; font-weight:bold;">$${Number(invoice.totalAmount || 0).toFixed(2)}</td>
+            <td></td>
+            <td style="text-align:right; font-family:monospace;">${Number(totalSinImpuestosVal).toFixed(2)}</td>
+            <td style="text-align:right;">0.00</td>
+            <td style="text-align:right;">0.00</td>
+            <td style="text-align:right;">0.00</td>
+            <td style="text-align:right; font-weight:bold; font-family:monospace;">${Number(totalSinImpuestosVal).toFixed(2)}</td>
           </tr>
         `}
       </tbody>
     </table>
 
-    {/* Grid Totales e Info Adicional */}
-    <div class="totals-grid">
-      <div class="box">
-        <div style="font-weight:bold; text-transform:uppercase; color:#0284c7; margin-bottom:6px; border-bottom:1px solid #e2e8f0; padding-bottom:3px;">Información Adicional & Pagos</div>
-        <p style="margin-bottom:4px;"><span class="label-bold">Email:</span> ${correoComprador}</p>
-        <p style="margin-bottom:4px;"><span class="label-bold">Dirección:</span> ${direccionComprador}</p>
-        <p style="margin-bottom:4px;"><span class="label-bold">Sistema:</span> IA-Comerxia ERP Ecuador</p>
-        <p style="margin-bottom:4px;"><span class="label-bold">Forma de Pago:</span> Sin utilización del sistema financiero</p>
-        <p style="margin-bottom:4px;"><span class="label-bold">Total Pago:</span> $${Number(importeTotal).toFixed(2)}</p>
+    <div class="footer-flex">
+      <div class="footer-left-col">
+        <div class="box-info-adicional">
+          <div class="info-header">Información Adicional</div>
+          <div style="font-size:9px;"><span class="sri-bold">Email:</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${correoComprador}</div>
+        </div>
+
+        <table class="table-pagos">
+          <thead>
+            <tr>
+              <th style="width:70%;">Forma de pago</th>
+              <th style="width:30%;">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>01 - SIN UTILIZACION DEL SISTEMA FINANCIERO</td>
+              <td style="text-align:right; font-family:monospace; font-weight:bold;">${importeTotalVal.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <table class="totals-table">
-        ${totalImpuestosList.length > 0 ? totalImpuestosList.map(t => {
-          let labelSubtotal = 'SUBTOTAL ' + t.codigoPorcentaje + '%';
-          let labelIva = 'IVA ' + t.codigoPorcentaje + '%';
-          if (t.codigoPorcentaje === '4') { labelSubtotal = 'SUBTOTAL 15%'; labelIva = 'IVA 15%'; }
-          else if (t.codigoPorcentaje === '5') { labelSubtotal = 'SUBTOTAL 5%'; labelIva = 'IVA 5%'; }
-          else if (t.codigoPorcentaje === '8') { labelSubtotal = 'SUBTOTAL 8%'; labelIva = 'IVA 8%'; }
-          else if (t.codigoPorcentaje === '2') { labelSubtotal = 'SUBTOTAL 12%'; labelIva = 'IVA 12%'; }
-          else if (t.codigoPorcentaje === '3') { labelSubtotal = 'SUBTOTAL 14%'; labelIva = 'IVA 14%'; }
-          else if (t.codigoPorcentaje === '0') { labelSubtotal = 'SUBTOTAL 0%'; labelIva = 'IVA 0%'; }
-          else if (t.codigoPorcentaje === '6') { labelSubtotal = 'SUBTOTAL NO OBJETO'; labelIva = null; }
-          else if (t.codigoPorcentaje === '7') { labelSubtotal = 'SUBTOTAL EXENTO'; labelIva = null; }
-
-          return `
-            <tr>
-              <td>${labelSubtotal}</td>
-              <td class="val">$${t.baseImponible.toFixed(2)}</td>
-            </tr>
-            ${labelIva ? `
-            <tr>
-              <td>${labelIva}</td>
-              <td class="val">$${t.valor.toFixed(2)}</td>
-            </tr>` : ''}`;
-        }).join('') : `
+      <div class="footer-right-col">
+        <table class="totals-table">
           <tr>
-            <td>SUBTOTAL SIN IMPUESTOS</td>
-            <td class="val">$${Number(totalSinImpuestos).toFixed(2)}</td>
+            <td class="lbl">SUBTOTAL ${subtotal12 > 0 ? '12%' : '15%'}</td>
+            <td class="val">${(subtotal15 || subtotal12).toFixed(2)}</td>
           </tr>
-        `}
-        <tr>
-          <td>SUBTOTAL SIN IMPUESTOS</td>
-          <td class="val">$${Number(totalSinImpuestos).toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td>TOTAL DESCUENTO</td>
-          <td class="val">$${Number(totalDescuento).toFixed(2)}</td>
-        </tr>
-        <tr class="grand-total">
-          <td>VALOR TOTAL</td>
-          <td class="val">$${Number(importeTotal).toFixed(2)}</td>
-        </tr>
-      </table>
+          <tr>
+            <td class="lbl">SUBTOTAL NO OBJETO DE IVA</td>
+            <td class="val">${subtotalNoObjeto.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">SUBTOTAL EXENTO DE IVA</td>
+            <td class="val">${subtotalExento.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">SUBTOTAL SIN IMPUESTOS</td>
+            <td class="val">${totalSinImpuestosVal.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">TOTAL DESCUENTO</td>
+            <td class="val">${totalDescuentoVal.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">ICE</td>
+            <td class="val">0.00</td>
+          </tr>
+          <tr>
+            <td class="lbl">IVA ${subtotal12 > 0 ? '12%' : '15%'}</td>
+            <td class="val">${(iva15 || iva12).toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">IRBPNR</td>
+            <td class="val">0.00</td>
+          </tr>
+          <tr>
+            <td class="lbl">PROPINA</td>
+            <td class="val">0.00</td>
+          </tr>
+          <tr style="font-weight:bold; background:#ffffff;">
+            <td class="lbl">VALOR TOTAL</td>
+            <td class="val">${importeTotalVal.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">VALOR TOTAL SIN SUBSIDIO</td>
+            <td class="val">0.00</td>
+          </tr>
+          <tr>
+            <td class="lbl" style="font-size:8px;">AHORRO POR SUBSIDIO:<br><span style="font-weight:normal;">(Incluye IVA cuando corresponda)</span></td>
+            <td class="val" style="vertical-align:bottom;">0.00</td>
+          </tr>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -419,10 +571,10 @@ export function generateSriRideHtml(params: SriRideParams): string {
     try {
       JsBarcode("#barcode-svg", "${invoice.claveAcceso}", {
         format: "CODE128",
-        width: 1.2,
-        height: 40,
+        width: 1.1,
+        height: 38,
         displayValue: false,
-        margin: 2
+        margin: 1
       });
     } catch(e) {}
   </script>
