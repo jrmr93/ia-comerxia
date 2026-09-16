@@ -88,6 +88,7 @@ import { OrdersCardsView } from './OrdersCardsView.tsx';
 import { PartialDeliveryModal } from './PartialDeliveryModal.tsx';
 import { ShippingTicketModal, directPrintShippingTicket } from './ShippingTicketModal.tsx';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
+import { calculateLineItem, extractBaseUnitPriceWithoutTax, extractItemTaxPercent } from '../utils/ecuadorTaxCalculator.ts';
 import { OrderPrintA4Modal } from './OrderPrintA4Modal.tsx';
 import { RequestShippingDataModal } from './RequestShippingDataModal.tsx';
 import { ManageShippingGuideModal } from './ManageShippingGuideModal.tsx';
@@ -1460,7 +1461,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  const [deliveryType, setDeliveryType] = useState<'shipping' | 'pickup'>('shipping');
+  const [deliveryType, setDeliveryType] = useState<'shipping' | 'pickup'>('pickup');
   const [paymentMethod, setPaymentMethod] = useState<string>('whatsapp');
   const [orderNotes, setOrderNotes] = useState('');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
@@ -3513,11 +3514,34 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }
   };
 
-  // Helper to compute effective item sale price factoring discountPercent
+  // Helper to compute real item total (PVP final with IVA SRI & discount)
   const getItemEffectivePrice = (item: InventoryItem): number => {
-    const regular = Number(item.salePrice) || 0;
-    const disc = Math.max(0, Math.min(100, Number(item.discountPercent) || 0));
-    return disc > 0 ? regular * (1 - disc / 100) : regular;
+    const unitCost = Number(item.costWithoutTax ?? item.costPrice ?? 0);
+    const rawSale = Number(item.salePrice || 0);
+    const prodTaxPercent = extractItemTaxPercent(item, 15);
+    const prodApplyTax = prodTaxPercent > 0;
+    const basePriceInfo = extractBaseUnitPriceWithoutTax({
+      rawSalePrice: rawSale,
+      costWithoutTax: unitCost,
+      pricingMode: prodApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX',
+      applySaleTax: prodApplyTax,
+      saleTaxPercent: prodTaxPercent,
+      marginPercent: (item as any).marginPercent !== undefined ? Number((item as any).marginPercent) : undefined,
+    });
+    const sPrice = basePriceInfo.unitPriceWithoutTax;
+    let discVal = 0;
+    if (item.discountPercent && item.discountPercent > 0) {
+      discVal = Math.round((sPrice * item.discountPercent / 100) * 100) / 100;
+    }
+    const calculated = calculateLineItem({
+      costWithoutTax: unitCost,
+      unitSalePrice: sPrice,
+      discount: discVal,
+      quantity: 1,
+      applySaleTax: prodApplyTax,
+      saleTaxPercent: prodTaxPercent,
+    });
+    return calculated.lineTotal;
   };
 
     // Cart operations
@@ -3529,8 +3553,9 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     return cart.reduce((acc, it) => acc + getItemEffectivePrice(it.item) * it.quantity, 0);
   }, [cart]);
 
-  const deliveryFee = deliveryType === 'shipping' ? Number(storeConfig.deliveryFee || 0) : 0;
-  const cartTotal = cartSubtotal + deliveryFee;
+  // Online Store shipping fee is initial $0.00 (A coordinar por WhatsApp)
+  const deliveryFee = 0;
+  const cartTotal = cartSubtotal;
 
   const handleAddToCart = (item: InventoryItem, qty: number = 1) => {
     if (isCustomerView && storeConfig.isActive === false) {
@@ -3657,8 +3682,8 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
       return;
     }
 
-    // Buyer info is completely optional!
-    const resolvedName = customerName.trim() || 'Cliente WhatsApp';
+    // Buyer info is optional - defaults to Consumidor Final (9999999999999)
+    const resolvedName = customerName.trim() || 'Consumidor Final';
     let resolvedPhone = 'Coordinar por WhatsApp';
     if (customerPhone.trim()) {
       const phoneNorm = normalizeEcuadorPhone(customerPhone.trim());
@@ -3670,30 +3695,61 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
     setIsSubmittingOrder(true);
     try {
-      // 1. Register order in database automatically
+      // 1. Register order in database automatically with Consumidor Final as default
       const result = await onCreateOrder({
         customerName: resolvedName,
         customerPhone: resolvedPhone,
         customerAddress: resolvedAddress,
         deliveryType: deliveryType,
         items: cart.map((ci) => {
-          const effectivePrice = getItemEffectivePrice(ci.item);
+          const prod = ci.item;
+          const cPrice = Number(prod.costWithoutTax ?? prod.costPrice ?? 0);
+          const rawSale = Number(prod.salePrice || 0);
+          const prodTaxPercent = extractItemTaxPercent(prod, 15);
+          const prodApplyTax = prodTaxPercent > 0;
+
+          const basePriceInfo = extractBaseUnitPriceWithoutTax({
+            rawSalePrice: rawSale,
+            costWithoutTax: cPrice,
+            pricingMode: prodApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX',
+            applySaleTax: prodApplyTax,
+            saleTaxPercent: prodTaxPercent,
+            marginPercent: (prod as any).marginPercent !== undefined ? Number((prod as any).marginPercent) : undefined,
+          });
+          const sPrice = basePriceInfo.unitPriceWithoutTax;
+          const marginPct = basePriceInfo.marginPercent;
+          let discVal = 0;
+          if (prod.discountPercent && prod.discountPercent > 0) {
+            discVal = Math.round((sPrice * prod.discountPercent / 100) * 100) / 100;
+          } else if ((prod as any).discount) {
+            discVal = Number((prod as any).discount || 0);
+          }
+
           return {
-            id: ci.item.id,
-            name: ci.item.name,
-            sku: ci.item.sku,
-            salePrice: effectivePrice,
+            id: prod.id,
+            inventoryItemId: prod.id,
+            name: prod.name,
+            sku: prod.sku || '',
+            barcode: prod.barcode || undefined,
+            costPrice: cPrice,
+            marginPercent: marginPct,
+            supplierName: (prod as any).supplier || (prod as any).supplierName || undefined,
+            salePrice: sPrice,
+            discount: discVal,
+            discountPercent: prod.discountPercent || 0,
             quantity: ci.quantity,
-            imageUrl: ci.item.imageUrl,
+            saleTaxPercent: prodTaxPercent,
+            imageUrl: prod.imageUrl || null,
           };
         }),
         totalAmount: cartTotal,
+        shippingCost: '0',
         paymentMethod: paymentMethod || 'whatsapp',
         notes: orderNotes.trim() || 'Compra directa vía Tienda Online WhatsApp',
         isOnlineStore: true,
         source: 'online_store',
-        customerCi: '',
-        ci: '',
+        customerCi: '9999999999999',
+        ci: '9999999999999',
       });
 
       const orderNumber = result.orderNumber || result.order?.orderNumber || `PED-${Date.now().toString().slice(-6)}`;

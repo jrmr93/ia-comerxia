@@ -192,7 +192,7 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
       const itemTaxPct = extractItemTaxPercent(it, orderTaxPct, matchingProduct);
       const itemApplyTax = itemTaxPct > 0;
       const pricingMode = hasItemSalePrice
-        ? 'EXCLUDING_TAX'
+        ? (it.pricingMode ? it.pricingMode : (itemApplyTax && matchingProduct?.salePrice && Math.abs(rawSale - Number(matchingProduct.salePrice)) < 0.01 ? 'INCLUDING_TAX' : 'EXCLUDING_TAX'))
         : (itemApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX');
 
       const basePriceInfo = extractBaseUnitPriceWithoutTax({

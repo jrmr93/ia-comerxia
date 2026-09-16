@@ -622,13 +622,20 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         const targetId = isShippingLine ? -999 : (it.inventoryItemId || it.id);
         const matchingProduct = isShippingLine ? null : products.find((p) => p.id === targetId || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
         const cPrice = isShippingLine ? 0 : Number(it.costPrice ?? matchingProduct?.costWithoutTax ?? matchingProduct?.costPrice ?? 0);
+        const hasItemSalePrice = (it.salePrice !== undefined && it.salePrice !== null && !isNaN(Number(it.salePrice))) ||
+                                 (it.item?.salePrice !== undefined && it.item?.salePrice !== null && !isNaN(Number(it.item.salePrice)));
         const rawSale = Number(it.salePrice || it.item?.salePrice || matchingProduct?.salePrice || 0);
         const itemTaxPct = isShippingLine ? 0 : extractItemTaxPercent(it, orderTaxPct, matchingProduct);
         const itemApplyTax = itemTaxPct > 0;
+        const pricingMode = isShippingLine
+          ? 'EXCLUDING_TAX'
+          : (hasItemSalePrice
+              ? (it.pricingMode ? it.pricingMode : (itemApplyTax && matchingProduct?.salePrice && Math.abs(rawSale - Number(matchingProduct.salePrice)) < 0.01 ? 'INCLUDING_TAX' : 'EXCLUDING_TAX'))
+              : (itemApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX'));
         const basePriceInfo = extractBaseUnitPriceWithoutTax({
           rawSalePrice: rawSale,
           costWithoutTax: cPrice,
-          pricingMode: itemApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX',
+          pricingMode,
           applySaleTax: itemApplyTax,
           saleTaxPercent: itemTaxPct,
           marginPercent: it.marginPercent !== undefined ? Number(it.marginPercent) : (matchingProduct as any)?.marginPercent,
@@ -693,9 +700,11 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         if (!isNaN(explicitShip) && (order as any).shippingCost !== undefined && (order as any).shippingCost !== null) {
           setShippingCost(String(explicitShip));
         } else {
+          const isStore = isOnlineStoreOrder(order);
           const orderTotal = Number(order.totalAmount || 0);
           const derivedShip = Math.max(0, orderTotal - itemsTotalWithTax);
-          setShippingCost(derivedShip > 0 ? derivedShip.toFixed(2) : '0');
+          // For online store orders or negligible differences, keep shipping cost at 0
+          setShippingCost(!isStore && derivedShip >= 0.05 ? derivedShip.toFixed(2) : '0');
         }
       }
 
@@ -2542,6 +2551,47 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                   {filteredCatalogProducts.map((prod) => {
                     const isAlreadyIn = items.some((it) => it.id === prod.id || (prod.sku && it.sku === prod.sku));
                     const stock = Math.max(0, Number(prod.stock || 0));
+
+                    // Desglose Tributario Ecuador SRI para Búsqueda
+                    const unitCost = Number(prod.costWithoutTax ?? prod.costPrice ?? 0);
+                    const rawSale = Number(prod.salePrice || 0);
+                    const prodTaxPercent = extractItemTaxPercent(prod, 15);
+                    const prodApplyTax = prodTaxPercent > 0;
+
+                    const basePriceInfo = extractBaseUnitPriceWithoutTax({
+                      rawSalePrice: rawSale,
+                      costWithoutTax: unitCost,
+                      pricingMode: prodApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX',
+                      applySaleTax: prodApplyTax,
+                      saleTaxPercent: prodTaxPercent,
+                      marginPercent: (prod as any).marginPercent !== undefined ? Number((prod as any).marginPercent) : undefined,
+                    });
+
+                    const sPrice = basePriceInfo.unitPriceWithoutTax;
+                    let discVal = 0;
+                    if (prod.discountPercent && prod.discountPercent > 0) {
+                      discVal = Math.round((sPrice * prod.discountPercent / 100) * 100) / 100;
+                    } else if ((prod as any).discount) {
+                      discVal = Number((prod as any).discount || 0);
+                    }
+
+                    const calculated = calculateLineItem({
+                      id: prod.id,
+                      name: prod.name,
+                      sku: prod.sku,
+                      costWithoutTax: unitCost,
+                      unitSalePrice: sPrice,
+                      discount: discVal,
+                      quantity: 1,
+                      applySaleTax: prodApplyTax,
+                      saleTaxPercent: prodTaxPercent,
+                    });
+
+                    const pvpMarcado = rawSale;
+                    const subtotalSinIva = calculated.netUnitPrice;
+                    const pvpFinal = calculated.lineTotal;
+                    const taxRate = calculated.lineTaxPercent;
+
                     return (
                       <button
                         key={prod.id}
@@ -2565,8 +2615,20 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="font-mono font-bold text-purple-700 text-xs">${Number(prod.salePrice || 0).toFixed(2)}</span>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <div className="text-right flex flex-col items-end">
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
+                              <span title="PVP Marcado de lista (Catálogo)">PVP Marcado: <strong className="text-slate-700">${pvpMarcado.toFixed(2)}</strong></span>
+                              <span>•</span>
+                              <span title="Subtotal sin IVA (Base Imponible)">Subtotal: <strong className="text-slate-700">${subtotalSinIva.toFixed(2)}</strong></span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="font-mono font-extrabold text-purple-700 text-xs">${pvpFinal.toFixed(2)}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-purple-100 text-purple-800">
+                                PVP Final ({taxRate > 0 ? `IVA ${taxRate}%` : 'IVA 0%'})
+                              </span>
+                            </div>
+                          </div>
                           {isAlreadyIn ? (
                             <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">En pedido</span>
                           ) : (

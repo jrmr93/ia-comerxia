@@ -3722,7 +3722,7 @@ async function startServer() {
       }
 
       const isStoreOrder = Boolean(isOnlineStore || source === 'online_store');
-      const resolvedCustomerName = (customerName && String(customerName).trim()) || (isStoreOrder ? 'Cliente WhatsApp' : 'Cliente General');
+      const resolvedCustomerName = (customerName && String(customerName).trim()) || (isStoreOrder ? 'Consumidor Final' : 'Cliente General');
       const resolvedCustomerPhone = (customerPhone && String(customerPhone).trim()) || (isStoreOrder ? 'Coordinar por WhatsApp' : 'N/A');
 
       let orderNotes = notes || '';
@@ -3730,19 +3730,19 @@ async function startServer() {
         orderNotes = orderNotes ? `[Tienda Online] ${orderNotes}` : '[Tienda Online] Pedido realizado desde la Tienda Online';
       }
 
-      // Validación de cédula o RUC ecuatoriano
-      const rawCandidateCi = (customerCi || ci || '').toString().trim();
-      let finalCiToCreate: string | undefined = undefined;
+      // Validación de cédula o RUC ecuatoriano (por defecto Consumidor Final '9999999999999' para Tienda Online)
+      const rawCandidateCi = (customerCi || ci || (isStoreOrder ? '9999999999999' : '')).toString().trim();
+      let finalCiToCreate: string | undefined = isStoreOrder ? '9999999999999' : undefined;
 
       if (rawCandidateCi) {
         const ciVal = validateEcuadorId(rawCandidateCi, true);
         if (ciVal.isValid) {
           finalCiToCreate = rawCandidateCi;
-        } else if (!isStoreOrder) {
+        } else if (isStoreOrder) {
+          finalCiToCreate = '9999999999999';
+        } else {
           return res.status(400).json({ error: `Cédula o RUC ecuatoriano inválido: ${ciVal.error}` });
         }
-        // En pedidos de tienda online, si la cédula es inválida o no existe, permanece undefined
-        // para no guardar al cliente hasta que el vendedor o comprador proporcione una cédula válida
       }
 
       const orderResult = await createCustomerOrder({
