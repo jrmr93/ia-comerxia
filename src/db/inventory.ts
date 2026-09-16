@@ -10033,7 +10033,7 @@ export async function getFinancialSummary(userId?: number, period: string = 'all
   let totalPurchasesCount = 0;
 
   for (const p of filteredPurchases) {
-    const cost = Number(p.totalCost || 0);
+    const cost = getPurchaseGrandTotal(p);
     if (p.status === 'received' || p.paymentStatus === 'paid') {
       totalPurchasesCost += cost;
       totalPurchasesCount++;
@@ -10121,7 +10121,7 @@ export async function getFinancialSummary(userId?: number, period: string = 'all
   }
 
   for (const p of filteredPurchases.slice(0, 15)) {
-    const cost = Number(p.totalCost || 0);
+    const cost = getPurchaseGrandTotal(p);
     recentTransactions.push({
       type: 'purchase',
       id: p.id,
@@ -11608,16 +11608,17 @@ export async function autoReconcileLedger(userId?: number) {
     // Auto-reconcile supplier purchases
     for (const po of purchasesList) {
       if (po.status === 'cancelled') continue;
-      const hasDisbursement = existingPayments.some(
+      const poPayments = existingPayments.filter(
         (p) => Number(p.purchaseId) === Number(po.id) && p.type === 'outflow' && p.status !== 'voided'
       );
-      if (!hasDisbursement && (po.paymentStatus === 'paid' || po.receiptVoucher || po.status === 'received')) {
-        const costAmount = Number(po.totalCost || 0);
-        if (costAmount > 0) {
+      const grandTotalAmount = getPurchaseGrandTotal(po);
+
+      if (poPayments.length === 0 && (po.paymentStatus === 'paid' || po.receiptVoucher || po.status === 'received')) {
+        if (grandTotalAmount > 0) {
           await createPayment(validUserId, {
             type: 'outflow',
             category: 'supplier_purchase',
-            amount: costAmount,
+            amount: grandTotalAmount,
             paymentMethod: 'transferencia_bancaria',
             bankOrAccount: 'Banco Pichincha',
             referenceNumber: po.receiptVoucher || `AUTO-COM-${po.purchaseNumber}`,
@@ -11629,6 +11630,23 @@ export async function autoReconcileLedger(userId?: number) {
             supplierName: po.supplierName,
           });
         }
+      } else {
+        // Auto-heal existing payment records created without IVA tax
+        for (const existingPayment of poPayments) {
+          if (
+            grandTotalAmount > 0 &&
+            Math.abs(Number(existingPayment.amount) - grandTotalAmount) > 0.01 &&
+            (!existingPayment.notes || !existingPayment.notes.includes('manual_amount_override'))
+          ) {
+            try {
+              await updatePayment(existingPayment.id, {
+                amount: grandTotalAmount,
+              });
+            } catch (healErr) {
+              console.warn('Failed to heal payment amount for purchase:', healErr);
+            }
+          }
+        }
       }
     }
   } catch (err) {
@@ -11636,6 +11654,70 @@ export async function autoReconcileLedger(userId?: number) {
   } finally {
     isAutoReconciling = false;
   }
+}
+
+/**
+ * Calculates total purchase amount for a supplier purchase order including SRI taxes (IVA 15%/5%/0%)
+ */
+export function getPurchaseGrandTotal(po: any): number {
+  if (!po) return 0;
+  if (po.grandTotal && Number(po.grandTotal) > 0) {
+    return Math.round(Number(po.grandTotal) * 100) / 100;
+  }
+  if (po.totalInvoice && Number(po.totalInvoice) > 0) {
+    return Math.round(Number(po.totalInvoice) * 100) / 100;
+  }
+
+  const items = Array.isArray(po.items)
+    ? po.items
+    : typeof po.items === 'string'
+    ? (() => {
+        try {
+          return JSON.parse(po.items);
+        } catch {
+          return [];
+        }
+      })()
+    : [];
+
+  if (!items || items.length === 0) {
+    return Math.round(Number(po.totalCost || 0) * 100) / 100;
+  }
+
+  let subtotal0 = 0;
+  let subtotal15 = 0;
+  let subtotal5 = 0;
+
+  items.forEach((item: any) => {
+    const qty = Number(item.quantity) || 1;
+    const unitCost = Number(item.costPrice || item.salePrice || 0);
+    const discount = Number(item.discount || 0);
+    const lineSubtotal = Math.max(0, unitCost * qty - discount);
+
+    const taxPercent =
+      item.taxPercent !== undefined
+        ? Number(item.taxPercent)
+        : item.purchaseTaxPercent !== undefined
+        ? Number(item.purchaseTaxPercent)
+        : item.hasPurchaseTax === false
+        ? 0
+        : 15;
+
+    if (taxPercent === 0) {
+      subtotal0 += lineSubtotal;
+    } else if (taxPercent === 5) {
+      subtotal5 += lineSubtotal;
+    } else {
+      subtotal15 += lineSubtotal;
+    }
+  });
+
+  const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
+  const iva15 = subtotal15 * 0.15;
+  const iva5 = subtotal5 * 0.05;
+  const grandTotal = subtotalSinImpuesto + iva15 + iva5;
+
+  return grandTotal > 0 ? Math.round(grandTotal * 100) / 100 : Math.round(Number(po.totalCost || 0) * 100) / 100;
 }
 
 /**
@@ -11700,7 +11782,7 @@ export async function getAccountsPayable(userId?: number) {
   const allPayments = await getPayments(userId, { status: 'completed' });
 
   return purchasesList.map((po: any) => {
-    const totalCost = Number(po.totalCost || 0);
+    const totalCost = getPurchaseGrandTotal(po);
     const returns = Array.isArray(po.returns) ? po.returns : [];
     const totalReturned = returns.reduce((acc: number, ret: any) => acc + Number(ret.refundAmount || 0), 0);
     const netCost = Math.max(0, totalCost - totalReturned);
@@ -11955,16 +12037,17 @@ export async function syncPaymentsFromOrdersAndPurchases(userId?: number) {
   // Sync purchase orders
   for (const po of purchasesList) {
     if (po.status === 'cancelled') continue;
-    const hasDisbursement = existingPayments.some(
+    const poPayments = existingPayments.filter(
       (p) => Number(p.purchaseId) === Number(po.id) && p.type === 'outflow' && p.status !== 'voided'
     );
-    if (!hasDisbursement && (po.paymentStatus === 'paid' || po.receiptVoucher || po.status === 'received')) {
-      const costAmount = Number(po.totalCost || 0);
-      if (costAmount > 0) {
+    const grandTotalAmount = getPurchaseGrandTotal(po);
+
+    if (poPayments.length === 0 && (po.paymentStatus === 'paid' || po.receiptVoucher || po.status === 'received')) {
+      if (grandTotalAmount > 0) {
         await createPayment(validUserId, {
           type: 'outflow',
           category: 'supplier_purchase',
-          amount: costAmount,
+          amount: grandTotalAmount,
           paymentMethod: 'transferencia_bancaria',
           bankOrAccount: 'Banco Pichincha',
           referenceNumber: po.receiptVoucher || `AUTO-COM-${po.purchaseNumber}`,
@@ -11976,6 +12059,23 @@ export async function syncPaymentsFromOrdersAndPurchases(userId?: number) {
           supplierName: po.supplierName,
         });
         syncedOutflows++;
+      }
+    } else {
+      // Auto-heal existing payments whose amount was stored without SRI taxes (IVA)
+      for (const existingPayment of poPayments) {
+        if (
+          grandTotalAmount > 0 &&
+          Math.abs(Number(existingPayment.amount) - grandTotalAmount) > 0.01 &&
+          (!existingPayment.notes || !existingPayment.notes.includes('manual_amount_override'))
+        ) {
+          try {
+            await updatePayment(existingPayment.id, {
+              amount: grandTotalAmount,
+            });
+          } catch (healErr) {
+            console.warn('Failed to heal payment amount for purchase in sync:', healErr);
+          }
+        }
       }
     }
   }
