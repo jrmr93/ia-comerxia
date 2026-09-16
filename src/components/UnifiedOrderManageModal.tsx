@@ -30,6 +30,7 @@ import {
   User,
   Wallet,
   X,
+  XCircle,
 } from 'lucide-react';
 import { CustomerOrder, StoreConfig, InventoryItem, CourierPartner, PaymentMethodPartner } from '../types.ts';
 import {
@@ -500,6 +501,18 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [payphoneUrl, setPayphoneUrl] = useState<string | null>(null);
   const [payphoneGenerating, setPayphoneGenerating] = useState(false);
   const [payphoneSendingEmail, setPayphoneSendingEmail] = useState(false);
+  const [lastPayphoneClientTxId, setLastPayphoneClientTxId] = useState<string | null>(null);
+  const [payphoneVerifying, setPayphoneVerifying] = useState(false);
+  const [payphoneResultModal, setPayphoneResultModal] = useState<{
+    open: boolean;
+    status: 'APPROVED' | 'REJECTED' | 'PENDING';
+    transactionId?: string;
+    authorizationCode?: string;
+    amount?: number;
+    cardType?: string;
+    isTestMode?: boolean;
+    message?: string;
+  }>({ open: false, status: 'PENDING' });
 
   // Order status
   const orderStatus = order?.status || 'pending';
@@ -992,6 +1005,9 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
       if (res.ok && data.success && data.payUrl) {
         setPayphoneUrl(data.payUrl);
+        if (data.clientTransactionId) {
+          setLastPayphoneClientTxId(data.clientTransactionId);
+        }
         if (!voucherInput.trim()) {
           setVoucherInput(data.payUrl);
         }
@@ -1005,6 +1021,69 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       showToast('⚠️ Error de conexión con el servidor al generar link Payphone');
     } finally {
       setPayphoneGenerating(false);
+    }
+  };
+
+  const handleVerifyPayphoneTransaction = async (overrideTxId?: string) => {
+    const inputVal = voucherInput && !voucherInput.startsWith('http') ? voucherInput.trim() : '';
+    const txToVerify = overrideTxId || inputVal || lastPayphoneClientTxId;
+    if (!txToVerify) {
+      showToast('⚠️ Genera primero un enlace de pago Payphone o ingresa el ID de recibo / transacción');
+      return;
+    }
+    setPayphoneVerifying(true);
+    try {
+      const res = await fetch('/api/payphone/verify-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientTransactionId: txToVerify, id: txToVerify }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setPayphoneResultModal({
+          open: true,
+          status: 'REJECTED',
+          isTestMode: Boolean(data?.isTestMode),
+          message: data.error || data.message || 'No se pudo verificar la transacción con Payphone API',
+        });
+        return;
+      }
+
+      if (data.transactionStatus === 'APPROVED') {
+        const confirmCode = String(data.transactionId || data.numericId || data.authorizationCode || txToVerify);
+        setVoucherInput(confirmCode);
+        if (!bankOrAccount || bankOrAccount.trim() === '') {
+          setBankOrAccount('Pasarela Payphone');
+        }
+        setPayphoneResultModal({
+          open: true,
+          status: 'APPROVED',
+          transactionId: confirmCode,
+          authorizationCode: data.authorizationCode,
+          amount: data.amount || invoiceTotals.totalInvoiceAmount,
+          cardType: data.cardType,
+          isTestMode: Boolean(data.isTestMode),
+          message: data.message || '¡El pago fue realizado correctamente a través de la pasarela Payphone!',
+        });
+        showToast(`✓ Pago Payphone Aprobado${data.isTestMode ? ' (Modo Prueba)' : ''}. Comprobante #${confirmCode} asignado automáticamente`);
+      } else {
+        setPayphoneResultModal({
+          open: true,
+          status: data.transactionStatus === 'REJECTED' ? 'REJECTED' : 'PENDING',
+          isTestMode: Boolean(data.isTestMode),
+          message: data.message || 'No se realizó el pago o la transacción no fue completada en Payphone.',
+        });
+        showToast('⚠️ No se realizó el pago con Payphone');
+      }
+    } catch (err: any) {
+      console.error('Error enviando verificación a Payphone:', err);
+      setPayphoneResultModal({
+        open: true,
+        status: 'REJECTED',
+        message: err.message || 'Error de conexión al verificar con Payphone API',
+      });
+    } finally {
+      setPayphoneVerifying(false);
     }
   };
 
@@ -3077,6 +3156,26 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                             )}
                           </button>
                         </div>
+
+                        {/* Botón de Verificación de Estado de Pago Payphone */}
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyPayphoneTransaction()}
+                          disabled={payphoneVerifying}
+                          className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md disabled:opacity-60"
+                        >
+                          {payphoneVerifying ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                              <span>Verificando Pago en Payphone...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                              <span>Verificar Estado de Pago PayPhone (Confirmar Comprobante)</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     )}
                   </div>
@@ -3307,6 +3406,100 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           onClose={() => setShowPrintA4Modal(false)}
           showToast={showToast}
         />
+      )}
+
+      {/* Modal Emergente de Notificación de Resultado de Pago PayPhone */}
+      {payphoneResultModal.open && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 text-center relative overflow-hidden">
+            {payphoneResultModal.status === 'APPROVED' ? (
+              <>
+                {payphoneResultModal.isTestMode && (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[10px] font-black uppercase tracking-wider mx-auto">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>🧪 MODO PRUEBA / SANDBOX (PAYPHONE API)</span>
+                  </div>
+                )}
+                <div className="mx-auto w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-emerald-400">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-black text-white">
+                    {payphoneResultModal.isTestMode ? '¡Pago de Prueba Realizado Correctamente!' : '¡Pago Realizado Correctamente!'}
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    {payphoneResultModal.message || 'El pago fue procesado con éxito por la pasarela Payphone.'}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-800/80 border border-emerald-500/30 text-left space-y-2 text-xs">
+                  <div className="flex justify-between items-center border-b border-slate-700/50 pb-2">
+                    <span className="text-slate-400">N° de Comprobante:</span>
+                    <span className="font-mono font-bold text-emerald-400 text-sm">{payphoneResultModal.transactionId}</span>
+                  </div>
+                  {payphoneResultModal.authorizationCode && (
+                    <div className="flex justify-between items-center border-b border-slate-700/50 pb-2">
+                      <span className="text-slate-400">Código Autorización:</span>
+                      <span className="font-mono font-bold text-slate-200">{payphoneResultModal.authorizationCode}</span>
+                    </div>
+                  )}
+                  {payphoneResultModal.amount !== undefined && (
+                    <div className="flex justify-between items-center border-b border-slate-700/50 pb-2">
+                      <span className="text-slate-400">Monto Cobrado:</span>
+                      <span className="font-bold text-white text-sm">${payphoneResultModal.amount.toFixed(2)} USD</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Método:</span>
+                    <span className="font-bold text-orange-400">Payphone ({payphoneResultModal.cardType || 'Visa/Mastercard'})</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] text-center font-medium">
+                  ✓ El número de comprobante ha sido colocado automáticamente en la casilla de confirmación.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPayphoneResultModal({ ...payphoneResultModal, open: false })}
+                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm transition cursor-pointer shadow-lg shadow-emerald-900/30"
+                >
+                  Aceptar y Continuar
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="mx-auto w-16 h-16 rounded-full bg-rose-500/20 border-2 border-rose-500 flex items-center justify-center text-rose-400">
+                  <XCircle className="w-10 h-10" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-black text-white">No se realizó el pago</h3>
+                  <p className="text-xs text-slate-300">
+                    {payphoneResultModal.message || 'La transacción de Payphone no pudo ser completada o fue rechazada.'}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-800/80 border border-rose-500/30 text-left space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Estado de Pasarela:</span>
+                    <span className="font-bold text-rose-400 uppercase tracking-wider">{payphoneResultModal.status}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Verifique si el cliente completó la transacción en su tarjeta o intente generar un nuevo enlace de cobro.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPayphoneResultModal({ ...payphoneResultModal, open: false })}
+                  className="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition cursor-pointer border border-slate-700"
+                >
+                  Cerrar Ventana
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

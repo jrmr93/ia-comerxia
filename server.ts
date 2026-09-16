@@ -991,6 +991,10 @@ async function startServer() {
       const refText = (reference || `Pedido #${orderNumber || orderId || 'Venta'} - ${customerName}`).slice(0, 100);
       const extraData = (additionalData || `Pago de venta ${customerName}`).slice(0, 250);
 
+      const host = req.get('host');
+      const protocol = req.protocol || 'http';
+      const responseUrl = `${protocol}://${host}/api/payphone/response`;
+
       const payphonePayload: any = {
         amount: totalAmt,
         amountWithoutTax: amtWithoutTax,
@@ -1005,6 +1009,7 @@ async function startServer() {
         oneTime: true,
         expireIn: 0,
         isAmountEditable: false,
+        responseUrl,
       };
 
       if (cfg.storeId && cfg.storeId.trim().length > 0) {
@@ -1070,6 +1075,67 @@ async function startServer() {
     }
   });
 
+  // Endpoint Callback de Redirección Payphone
+  app.get('/api/payphone/response', async (req: Request, res: Response) => {
+    try {
+      const { id, clientTransactionId, statusCode } = req.query;
+      console.log('[Payphone Response Callback] Params:', req.query);
+
+      const cfg = await getPayphoneConfig(1);
+      if (cfg.hasToken && cfg.token && id) {
+        const numericId = Number(id);
+        if (!isNaN(numericId) && numericId > 0) {
+          const confirmPayload: any = { id: numericId };
+          if (clientTransactionId) confirmPayload.clientTxId = String(clientTransactionId);
+
+          const confirmRes = await fetch('https://pay.payphonetodoesposible.com/api/button/V2/Confirm', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${cfg.token.trim()}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(confirmPayload),
+          });
+          const confirmData = await confirmRes.json().catch(() => ({}));
+          console.log('[Payphone Response Callback] Auto-Confirm Result:', confirmData);
+        }
+      }
+
+      const isApproved = String(statusCode) === '3';
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Payphone - Estado de Pago</title>
+          <style>
+            body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+            .card { background: #1e293b; border-radius: 16px; padding: 32px; max-width: 440px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+            .icon { font-size: 48px; margin-bottom: 16px; }
+            h1 { margin: 0 0 12px; font-size: 22px; color: ${isApproved ? '#34d399' : '#f87171'}; }
+            p { color: #94a3b8; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+            .btn { background: #ff6b00; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+            .receipt { font-family: monospace; font-size: 18px; color: #fbbf24; background: #0f172a; padding: 8px 16px; border-radius: 6px; margin: 12px 0; border: 1px dashed #475569; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon">${isApproved ? '✅' : '⚠️'}</div>
+            <h1>${isApproved ? '¡Pago Procesado Con Éxito!' : 'Pago No Completado'}</h1>
+            ${id ? `<div class="receipt">Comprobante #${id}</div>` : ''}
+            <p>${isApproved ? 'Tu pago en Payphone ha sido registrado correctamente. Puedes cerrar esta ventana o volver a la tienda.' : 'El pago no se pudo completar o fue cancelado.'}</p>
+            <button class="btn" onclick="window.close()">Cerrar Ventana</button>
+          </div>
+        </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error('[Payphone Response Callback] Error:', error);
+      res.status(500).send('Error procesando respuesta de Payphone');
+    }
+  });
+
   app.post('/api/payphone/send-email-link', optionalAuth, async (req: AuthRequest, res: Response) => {
     try {
       const { to, customerName, orderNumber, totalAmount, payUrl, itemsSummary } = req.body;
@@ -1098,6 +1164,253 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error sending Payphone payment link email:', error);
       res.status(500).json({ error: error.message || 'Error al enviar enlace de pago por correo' });
+    }
+  });
+
+  app.post('/api/payphone/verify-transaction', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const cfg = await getPayphoneConfig(req.dbUserId || 1);
+      if (!cfg.hasToken || !cfg.token) {
+        return res.status(400).json({
+          error: 'El Token de Payphone no está configurado en la Configuración del Sistema (Payphone API).',
+        });
+      }
+
+      const { id, clientTransactionId } = req.body;
+      const rawId = String(id || '').trim();
+      const rawClientTxId = String(clientTransactionId || '').trim();
+
+      if (!rawId && !rawClientTxId) {
+        return res.status(400).json({
+          error: 'Proporciona el ID de transacción o el clientTransactionId para verificar el pago.',
+        });
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${cfg.token.trim()}`,
+        'Content-Type': 'application/json',
+      };
+
+      let resultData: any = null;
+      let apiResOk = false;
+
+      // Paso 1: Si rawId o rawClientTxId es un ID numérico entero de recibo Payphone (ej. 1045920)
+      const numericId = !isNaN(Number(rawId)) && Number(rawId) > 0 
+        ? Number(rawId) 
+        : (!isNaN(Number(rawClientTxId)) && Number(rawClientTxId) > 0 ? Number(rawClientTxId) : 0);
+
+      if (numericId > 0) {
+        try {
+          console.log(`[Payphone Verify] Paso 1: Intentando Confirm por N° de recibo numérico #${numericId}...`);
+          const confirmPayload: any = { id: numericId };
+          if (rawClientTxId && isNaN(Number(rawClientTxId))) confirmPayload.clientTxId = rawClientTxId;
+
+          const res1 = await fetch('https://pay.payphonetodoesposible.com/api/button/V2/Confirm', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(confirmPayload),
+          });
+          const text1 = await res1.text();
+          try { resultData = JSON.parse(text1); } catch { resultData = { raw: text1 }; }
+          apiResOk = res1.ok;
+          console.log('[Payphone Verify] Paso 1 resultado:', res1.status, resultData);
+        } catch (e) {
+          console.error('Error en Payphone Paso 1 confirm directo:', e);
+        }
+      }
+
+      // Paso 1b: Si numericId > 0 pero Confirm no aprobó o devolvió error, consultar GET /api/Sale/{numericId}
+      const isApprovedStep1 = apiResOk && (Number(resultData?.statusCode) === 3 || String(resultData?.transactionStatus).toUpperCase() === 'APPROVED');
+      if (!isApprovedStep1 && numericId > 0) {
+        try {
+          console.log(`[Payphone Verify] Paso 1b: Consultando GET /api/Sale/${numericId}...`);
+          const res1b = await fetch(`https://pay.payphonetodoesposible.com/api/Sale/${numericId}`, {
+            method: 'GET',
+            headers,
+          });
+          const text1b = await res1b.text();
+          let data1b: any = null;
+          try { data1b = JSON.parse(text1b); } catch {}
+          if (res1b.ok && data1b && typeof data1b === 'object') {
+            resultData = data1b;
+            apiResOk = true;
+            console.log('[Payphone Verify] Paso 1b resultado:', data1b);
+          }
+        } catch (e) {
+          console.error('Error en Payphone Paso 1b:', e);
+        }
+      }
+
+      // Paso 2: Si clientTransactionId es string (ej. TX-PED-...)
+      const targetClientTxId = rawClientTxId || (isNaN(Number(rawId)) ? rawId : '');
+      const isApprovedNow = apiResOk && (Number(resultData?.statusCode) === 3 || String(resultData?.transactionStatus).toUpperCase() === 'APPROVED');
+
+      if (!isApprovedNow && targetClientTxId) {
+        try {
+          console.log(`[Payphone Verify] Paso 2: Consultando ClientTransaction para '${targetClientTxId}'...`);
+          const res2 = await fetch('https://pay.payphonetodoesposible.com/api/Sale/ClientTransaction', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ clientTransactionId: targetClientTxId, clientTxId: targetClientTxId }),
+          });
+          const text2 = await res2.text();
+          let data2: any = null;
+          try { data2 = JSON.parse(text2); } catch {}
+
+          if (!res2.ok || !data2) {
+            try {
+              const res2Get = await fetch(`https://pay.payphonetodoesposible.com/api/Sale/ClientTransaction/${encodeURIComponent(targetClientTxId)}`, {
+                method: 'GET',
+                headers,
+              });
+              const text2Get = await res2Get.text();
+              try { data2 = JSON.parse(text2Get); } catch {}
+            } catch {}
+          }
+
+          if (data2) {
+            const item2 = Array.isArray(data2) ? data2[0] : data2;
+            if (item2 && typeof item2 === 'object') {
+              const foundNumericId = Number(item2?.id || item2?.transactionId || 0);
+              if (foundNumericId > 0) {
+                console.log(`[Payphone Verify] Paso 2: Encontrado N° recibo #${foundNumericId}. Confirmando...`);
+                const res3 = await fetch('https://pay.payphonetodoesposible.com/api/button/V2/Confirm', {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({ id: foundNumericId, clientTxId: targetClientTxId }),
+                });
+                const text3 = await res3.text();
+                try {
+                  const data3 = JSON.parse(text3);
+                  resultData = data3;
+                  apiResOk = res3.ok;
+                } catch {
+                  resultData = item2;
+                  apiResOk = true;
+                }
+              } else {
+                resultData = item2;
+                apiResOk = true;
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Error en Payphone Paso 2 ClientTransaction fallback:', e);
+        }
+      }
+
+      // Paso 3: Consulta en listado de ventas recientes del comercio GET /api/Sale
+      const isApprovedStep2 = apiResOk && (Number(resultData?.statusCode) === 3 || String(resultData?.transactionStatus).toUpperCase() === 'APPROVED');
+      if (!isApprovedStep2 && targetClientTxId) {
+        try {
+          console.log(`[Payphone Verify] Paso 3: Buscando en ventas de la tienda GET /api/Sale '${targetClientTxId}'...`);
+          const resStoreSales = await fetch('https://pay.payphonetodoesposible.com/api/Sale', {
+            method: 'GET',
+            headers,
+          });
+          if (resStoreSales.ok) {
+            const salesList = await resStoreSales.json();
+            if (Array.isArray(salesList)) {
+              const matchedSale = salesList.find((s: any) => 
+                String(s.clientTransactionId || s.clientTxId || '') === targetClientTxId ||
+                String(s.id || s.transactionId || '') === targetClientTxId
+              );
+              if (matchedSale) {
+                console.log('[Payphone Verify] Paso 3: Venta encontrada:', matchedSale);
+                const foundNumericId = Number(matchedSale.id || matchedSale.transactionId || 0);
+                if (foundNumericId > 0) {
+                  const resConfirmStore = await fetch('https://pay.payphonetodoesposible.com/api/button/V2/Confirm', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ id: foundNumericId, clientTxId: targetClientTxId }),
+                  });
+                  const confirmData = await resConfirmStore.json().catch(() => null);
+                  if (resConfirmStore.ok && confirmData) {
+                    resultData = confirmData;
+                    apiResOk = true;
+                  } else {
+                    resultData = matchedSale;
+                    apiResOk = true;
+                  }
+                } else {
+                  resultData = matchedSale;
+                  apiResOk = true;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Error en Payphone Paso 3 tienda sales query:', e);
+        }
+      }
+
+      // Paso 4: Intento final de confirmación con clientTxId
+      if (!resultData && targetClientTxId) {
+        try {
+          console.log(`[Payphone Verify] Paso 4: Confirmación final con clientTxId '${targetClientTxId}'...`);
+          const res4 = await fetch('https://pay.payphonetodoesposible.com/api/button/V2/Confirm', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ id: 0, clientTxId: targetClientTxId }),
+          });
+          const text4 = await res4.text();
+          try { resultData = JSON.parse(text4); } catch {}
+          apiResOk = res4.ok;
+        } catch {}
+      }
+
+      if (!resultData) {
+        return res.status(400).json({
+          success: false,
+          transactionStatus: 'REJECTED',
+          error: 'No se obtuvo respuesta válida de Payphone API. Verifica el token o el ID de recibo.',
+        });
+      }
+
+      const statusCode = Number(resultData?.statusCode ?? resultData?.status ?? 0);
+      const rawStatus = String(resultData?.transactionStatus || resultData?.status || '').toUpperCase();
+      const isApproved = statusCode === 3 || rawStatus === 'APPROVED' || rawStatus === 'APPROVEDTRANSACTION' || rawStatus === 'APROBADA' || Boolean(resultData?.email);
+      const isRejected = statusCode === 2 || rawStatus === 'CANCELED' || rawStatus === 'REJECTED' || rawStatus === 'CANCELADA';
+
+      const numericReceiptId = resultData?.id || resultData?.transactionId || (numericId > 0 ? numericId : 0);
+      const transactionId = String(numericReceiptId || resultData?.clientTransactionId || targetClientTxId || rawId || '');
+      const authorizationCode = String(resultData?.authorizationCode || '');
+      const amountInCents = Number(resultData?.amount || resultData?.total || 0);
+      const amount = amountInCents > 0 ? amountInCents / 100 : undefined;
+      const cardType = resultData?.cardType || resultData?.cardBrand || 'Tarjeta';
+      const isTestMode = cfg.environment === 'sandbox' || Boolean(resultData?.isTest) || String(resultData?.environment).toLowerCase() === 'sandbox';
+
+      if (isApproved) {
+        return res.json({
+          success: true,
+          transactionStatus: 'APPROVED',
+          transactionId: String(transactionId),
+          numericId: numericReceiptId ? Number(numericReceiptId) : undefined,
+          clientTransactionId: targetClientTxId || String(transactionId),
+          authorizationCode,
+          amount,
+          cardType,
+          isTestMode,
+          environment: cfg.environment || 'production',
+          message: isTestMode
+            ? '¡Pago de prueba realizado correctamente en Payphone (Modo Sandbox)!'
+            : '¡Pago realizado correctamente en Payphone!',
+          details: resultData,
+        });
+      } else {
+        return res.json({
+          success: true,
+          transactionStatus: isRejected ? 'REJECTED' : 'PENDING',
+          transactionId: String(transactionId),
+          isTestMode,
+          environment: cfg.environment || 'production',
+          message: resultData?.message || (isRejected ? 'El pago fue rechazado o cancelado en Payphone.' : 'El pago aún está pendiente de procesar por el cliente.'),
+          details: resultData,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error verifying Payphone transaction:', error);
+      res.status(500).json({ error: error.message || 'Error al verificar la transacción en Payphone' });
     }
   });
 
