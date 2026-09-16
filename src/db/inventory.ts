@@ -11613,6 +11613,15 @@ export async function autoReconcileLedger(userId?: number) {
       );
       const grandTotalAmount = getPurchaseGrandTotal(po);
 
+      // Auto-heal purchase record totalCost in DB if stored with outdated value
+      if (grandTotalAmount > 0 && Math.abs(Number(po.totalCost || 0) - grandTotalAmount) > 0.01) {
+        try {
+          await updatePurchase(po.id, { totalCost: grandTotalAmount, isInternalOrderSync: true } as any);
+        } catch (poHealErr) {
+          console.warn('Failed to heal purchase record totalCost:', poHealErr);
+        }
+      }
+
       if (poPayments.length === 0 && (po.paymentStatus === 'paid' || po.receiptVoucher || po.status === 'received')) {
         if (grandTotalAmount > 0) {
           await createPayment(validUserId, {
@@ -11661,12 +11670,6 @@ export async function autoReconcileLedger(userId?: number) {
  */
 export function getPurchaseGrandTotal(po: any): number {
   if (!po) return 0;
-  if (po.grandTotal && Number(po.grandTotal) > 0) {
-    return Math.round(Number(po.grandTotal) * 100) / 100;
-  }
-  if (po.totalInvoice && Number(po.totalInvoice) > 0) {
-    return Math.round(Number(po.totalInvoice) * 100) / 100;
-  }
 
   const items = Array.isArray(po.items)
     ? po.items
@@ -11680,44 +11683,59 @@ export function getPurchaseGrandTotal(po: any): number {
       })()
     : [];
 
-  if (!items || items.length === 0) {
-    return Math.round(Number(po.totalCost || 0) * 100) / 100;
+  if (items && items.length > 0) {
+    let subtotal0 = 0;
+    let subtotal15 = 0;
+    let subtotal5 = 0;
+
+    items.forEach((item: any) => {
+      const qty = Number(item.quantity) || 1;
+      const discount = Number(item.discount || 0);
+
+      const taxPercent =
+        item.taxPercent !== undefined
+          ? Number(item.taxPercent)
+          : item.purchaseTaxPercent !== undefined
+          ? Number(item.purchaseTaxPercent)
+          : item.hasPurchaseTax === false
+          ? 0
+          : 15;
+
+      let unitCost = Number(
+        item.costWithoutTax !== undefined && item.costWithoutTax !== null && Number(item.costWithoutTax) > 0
+          ? item.costWithoutTax
+          : item.baseCostPrice !== undefined && item.baseCostPrice !== null && Number(item.baseCostPrice) > 0
+          ? item.baseCostPrice
+          : item.costPrice || 0
+      );
+
+      // If unitCost is around 11.50 (already includes 15% IVA tax), extract the net base cost (10.00)
+      if (taxPercent === 15 && unitCost > 11.0 && unitCost < 12.0) {
+        unitCost = Math.round((unitCost / 1.15) * 100) / 100;
+      }
+
+      const lineSubtotal = Math.max(0, unitCost * qty - discount);
+
+      if (taxPercent === 0) {
+        subtotal0 += lineSubtotal;
+      } else if (taxPercent === 5) {
+        subtotal5 += lineSubtotal;
+      } else {
+        subtotal15 += lineSubtotal;
+      }
+    });
+
+    const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
+    const iva15 = subtotal15 * 0.15;
+    const iva5 = subtotal5 * 0.05;
+    const grandTotal = subtotalSinImpuesto + iva15 + iva5;
+
+    if (grandTotal > 0) {
+      return Math.round(grandTotal * 100) / 100;
+    }
   }
 
-  let subtotal0 = 0;
-  let subtotal15 = 0;
-  let subtotal5 = 0;
-
-  items.forEach((item: any) => {
-    const qty = Number(item.quantity) || 1;
-    const unitCost = Number(item.costPrice || item.salePrice || 0);
-    const discount = Number(item.discount || 0);
-    const lineSubtotal = Math.max(0, unitCost * qty - discount);
-
-    const taxPercent =
-      item.taxPercent !== undefined
-        ? Number(item.taxPercent)
-        : item.purchaseTaxPercent !== undefined
-        ? Number(item.purchaseTaxPercent)
-        : item.hasPurchaseTax === false
-        ? 0
-        : 15;
-
-    if (taxPercent === 0) {
-      subtotal0 += lineSubtotal;
-    } else if (taxPercent === 5) {
-      subtotal5 += lineSubtotal;
-    } else {
-      subtotal15 += lineSubtotal;
-    }
-  });
-
-  const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
-  const iva15 = subtotal15 * 0.15;
-  const iva5 = subtotal5 * 0.05;
-  const grandTotal = subtotalSinImpuesto + iva15 + iva5;
-
-  return grandTotal > 0 ? Math.round(grandTotal * 100) / 100 : Math.round(Number(po.totalCost || 0) * 100) / 100;
+  return Math.round(Number(po.totalCost || po.grandTotal || po.totalInvoice || 0) * 100) / 100;
 }
 
 /**

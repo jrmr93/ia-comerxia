@@ -3183,7 +3183,48 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
       !isLinkedOrderConfirmed
   );
 
-  const initialAmount = Number(purchase.totalCost || 0).toFixed(2);
+  const computedGrandTotal = useMemo(() => {
+    let subtotal0 = 0;
+    let subtotal15 = 0;
+    let subtotal5 = 0;
+
+    (purchase.items || []).forEach((item) => {
+      const qty = Number(item.quantity) || 1;
+      const unitCost = Number(
+        (item as any).costWithoutTax !== undefined && (item as any).costWithoutTax !== null && Number((item as any).costWithoutTax) > 0
+          ? (item as any).costWithoutTax
+          : item.costPrice || 0
+      );
+      const discount = Number(item.discount || 0);
+      const lineSubtotal = Math.max(0, unitCost * qty - discount);
+
+      const taxPercent =
+        item.taxPercent !== undefined
+          ? Number(item.taxPercent)
+          : (item as any).purchaseTaxPercent !== undefined
+          ? Number((item as any).purchaseTaxPercent)
+          : (item as any).hasPurchaseTax === false
+          ? 0
+          : 15;
+
+      if (taxPercent === 0) {
+        subtotal0 += lineSubtotal;
+      } else if (taxPercent === 5) {
+        subtotal5 += lineSubtotal;
+      } else {
+        subtotal15 += lineSubtotal;
+      }
+    });
+
+    const subtotalSinImpuesto = subtotal0 + subtotal15 + subtotal5;
+    const iva15 = subtotal15 * 0.15;
+    const iva5 = subtotal5 * 0.05;
+    const grandTotal = subtotalSinImpuesto + iva15 + iva5;
+
+    return grandTotal > 0 ? Math.round(grandTotal * 100) / 100 : Number(purchase.totalCost || 0);
+  }, [purchase]);
+
+  const initialAmount = computedGrandTotal.toFixed(2);
   const [amount, setAmount] = useState<string>(initialAmount);
   const [paymentMethod, setPaymentMethod] = useState<string>('transferencia_bancaria');
   const [bankOrAccount, setBankOrAccount] = useState<string>('Banco Pichincha');
@@ -3259,11 +3300,10 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
         console.warn('Warning updating purchase after payment:', putErr);
       }
 
-      showToast(`✓ ¡Compra #${purchase.purchaseNumber} confirmada y registrada en Pago a Proveedores exitosamente!`);
-      await onSuccess();
-    } catch (err) {
-      console.error('Error confirming purchase with payment:', err);
-      showToast('❌ Error de conexión al registrar el pago al proveedor');
+      showToast(`✓ ¡Pago a proveedor por $${numAmount.toFixed(2)} registrado y compra #${purchase.purchaseNumber} confirmada!`);
+      onSuccess();
+    } catch (err: any) {
+      showToast(`❌ Error inesperado al procesar pago: ${err.message || 'Inténtalo de nuevo'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -3271,12 +3311,12 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 space-y-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 space-y-4">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shadow-xs">
-              <CreditCard className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center font-black">
+              <DollarSign className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base font-black text-slate-900">
@@ -3306,7 +3346,7 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
           </div>
           <div className="text-right">
             <div className="font-mono font-black text-lg text-amber-950">
-              ${Number(purchase.totalCost || 0).toFixed(2)}{' '}
+              ${computedGrandTotal.toFixed(2)}{' '}
               <span className="text-xs font-semibold text-amber-700">{currency}</span>
             </div>
           </div>
