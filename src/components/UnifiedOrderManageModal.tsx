@@ -1008,9 +1008,6 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         if (data.clientTransactionId) {
           setLastPayphoneClientTxId(data.clientTransactionId);
         }
-        if (!voucherInput.trim()) {
-          setVoucherInput(data.payUrl);
-        }
         showToast('✓ Link de pago Payphone generado exitosamente');
       } else {
         const msg = data.error || 'Error al generar enlace de pago en Payphone';
@@ -1023,6 +1020,47 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       setPayphoneGenerating(false);
     }
   };
+
+  // Rastreo Automático de Estado Payphone en Segundo Plano (Auto-Polling)
+  useEffect(() => {
+    if (!lastPayphoneClientTxId || !payphoneUrl || payphoneResultModal.status === 'APPROVED') {
+      return;
+    }
+
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch('/api/payphone/verify-transaction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientTransactionId: lastPayphoneClientTxId, id: lastPayphoneClientTxId }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.transactionStatus === 'APPROVED') {
+          const confirmCode = String(data.transactionId || data.numericId || data.authorizationCode || lastPayphoneClientTxId);
+          setVoucherInput(confirmCode);
+          if (!bankOrAccount || bankOrAccount.trim() === '') {
+            setBankOrAccount('Pasarela Payphone');
+          }
+          setPayphoneResultModal({
+            open: true,
+            status: 'APPROVED',
+            transactionId: confirmCode,
+            authorizationCode: data.authorizationCode,
+            amount: data.amount || invoiceTotals.totalInvoiceAmount,
+            cardType: data.cardType,
+            isTestMode: Boolean(data.isTestMode),
+            message: data.message || '¡El pago fue realizado correctamente a través de la pasarela Payphone!',
+          });
+          showToast(`✓ ¡Pago Payphone Aprobado en Tiempo Real! Comprobante #${confirmCode} asignado automáticamente`);
+          clearInterval(timer);
+        }
+      } catch (e) {
+        // Ignorar errores temporales durante el polling automático
+      }
+    }, 10000);
+
+    return () => clearInterval(timer);
+  }, [lastPayphoneClientTxId, payphoneUrl, payphoneResultModal.status, bankOrAccount, invoiceTotals.totalInvoiceAmount, showToast]);
 
   const handleVerifyPayphoneTransaction = async (overrideTxId?: string) => {
     const inputVal = voucherInput && !voucherInput.startsWith('http') ? voucherInput.trim() : '';

@@ -1007,7 +1007,7 @@ async function startServer() {
         clientTransactionId,
         additionalData: extraData,
         oneTime: true,
-        expireIn: 0,
+        expireIn: 30,
         isAmountEditable: false,
         responseUrl,
       };
