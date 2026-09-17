@@ -4662,7 +4662,7 @@ export async function updateCustomerOrderStatus(
     if (status !== 'delivered') {
       try {
         const allPurchases = await getPurchases(existingOrder.userId);
-        let linkedP = allPurchases.find((p) => {
+        const linkedPurchasesList = allPurchases.filter((p) => {
           if (p.status === 'cancelled') return false;
           const matchId = (p.linkedCustomerOrderId !== undefined && p.linkedCustomerOrderId !== null) &&
             (p.linkedCustomerOrderId == id || String(p.linkedCustomerOrderId) === String(id));
@@ -4673,26 +4673,15 @@ export async function updateCustomerOrderStatus(
           return Boolean(matchId || matchNumber || matchLinkedId || matchLinkedNumber || matchNotes);
         });
 
-        if (linkedP && linkedP.status === 'pending') {
-          const confirmedPurchase = await updatePurchase(linkedP.id, {
-            status: 'ordered',
-            paymentStatus: 'paid',
-            notes: (linkedP.notes ? linkedP.notes + '\n' : '') + `[Confirmación Automática] Compra #${linkedP.purchaseNumber} confirmada y procesada con el proveedor al confirmarse la Venta #${existingOrder.orderNumber}.`,
-          });
-          if (confirmedPurchase) {
-            updatePayload.linkedPurchaseId = confirmedPurchase.id;
-            updatePayload.linkedPurchaseNumber = confirmedPurchase.purchaseNumber;
-            updatePayload.fulfillmentStatus = totalDeductedUnits > 0 ? 'partial_delivered' : 'supplier_ordered';
-            const autoConfirmNote = `✓ [Venta Confirmada] Compra a proveedor #${confirmedPurchase.purchaseNumber} procesada y confirmada automáticamente. Stock en bodega (${totalDeductedUnits} un.) reservado para entrega inmediata.`;
-            updatePayload.notes = (existingOrder.notes ? existingOrder.notes + '\n' : '') + autoConfirmNote;
+        if (linkedPurchasesList.length > 0) {
+          const firstP = linkedPurchasesList[0];
+          const allPNumbers = linkedPurchasesList.map((p) => p.purchaseNumber || `OC-${p.id}`).filter(Boolean).join(', ');
+          updatePayload.linkedPurchaseId = firstP.id;
+          updatePayload.linkedPurchaseNumber = allPNumbers;
+          if (!updatePayload.fulfillmentStatus || updatePayload.fulfillmentStatus === 'supplier_pending') {
+            updatePayload.fulfillmentStatus = totalDeductedUnits > 0 ? 'partial_delivered' : 'supplier_pending';
           }
-        } else if (linkedP && (linkedP.status === 'ordered' || linkedP.status === 'in_transit')) {
-          updatePayload.linkedPurchaseId = linkedP.id;
-          updatePayload.linkedPurchaseNumber = linkedP.purchaseNumber;
-          if (!existingOrder.fulfillmentStatus || existingOrder.fulfillmentStatus === 'supplier_pending') {
-            updatePayload.fulfillmentStatus = totalDeductedUnits > 0 ? 'partial_delivered' : 'supplier_ordered';
-          }
-        } else if (!linkedP) {
+        } else {
           // Si no existe compra previa y el pedido tiene productos con faltante en bodega, generar orden de compra a proveedor
           const hasMissingStock = rawItems.some((it: any) => {
             const reqQty = Number(it.quantity || 1);
@@ -5814,31 +5803,28 @@ export async function updateCustomerOrder(
     if (newStatus === 'confirmed' && prevStatus !== 'confirmed') {
       try {
         const allPurchases = await getPurchases(existingOrder.userId);
-        let linkedP = existingOrder.linkedPurchaseId
-          ? allPurchases.find((p) => p.id === existingOrder.linkedPurchaseId)
-          : null;
-        if (!linkedP) {
-          linkedP = allPurchases.find(
-            (p) => p.linkedCustomerOrderId === id && p.status !== 'received' && p.status !== 'cancelled'
-          );
-        }
+        const linkedPurchasesList = allPurchases.filter((p) => {
+          if (p.status === 'cancelled') return false;
+          const matchId = (p.linkedCustomerOrderId !== undefined && p.linkedCustomerOrderId !== null) &&
+            (p.linkedCustomerOrderId == id || String(p.linkedCustomerOrderId) === String(id));
+          const matchNumber = Boolean(p.linkedCustomerOrderNumber && existingOrder.orderNumber && p.linkedCustomerOrderNumber.trim() === existingOrder.orderNumber.trim());
+          const matchLinkedId = Boolean(existingOrder.linkedPurchaseId && (p.id == existingOrder.linkedPurchaseId || String(p.id) === String(existingOrder.linkedPurchaseId)));
+          const matchLinkedNumber = Boolean(existingOrder.linkedPurchaseNumber && p.purchaseNumber && String(existingOrder.linkedPurchaseNumber).includes(p.purchaseNumber));
+          const matchNotes = Boolean(p.notes && existingOrder.orderNumber && p.notes.includes(existingOrder.orderNumber));
+          return Boolean(matchId || matchNumber || matchLinkedId || matchLinkedNumber || matchNotes);
+        });
 
-        if (linkedP && linkedP.status === 'pending') {
-          const confirmedPurchase = await updatePurchase(linkedP.id, {
-            status: 'ordered',
-            paymentStatus: 'paid',
-            notes: (linkedP.notes ? linkedP.notes + '\n' : '') + `[Confirmación Automática] Compra #${linkedP.purchaseNumber} confirmada con el proveedor al confirmarse el Pedido de Venta #${existingOrder.orderNumber}.`,
-          });
-          if (confirmedPurchase) {
-            updatePayload.linkedPurchaseId = confirmedPurchase.id;
-            updatePayload.linkedPurchaseNumber = confirmedPurchase.purchaseNumber;
-            if (!updatePayload.fulfillmentStatus || updatePayload.fulfillmentStatus === 'supplier_pending') {
-              updatePayload.fulfillmentStatus = 'supplier_ordered';
-            }
+        if (linkedPurchasesList.length > 0) {
+          const firstP = linkedPurchasesList[0];
+          const allPNumbers = linkedPurchasesList.map((p) => p.purchaseNumber || `OC-${p.id}`).filter(Boolean).join(', ');
+          updatePayload.linkedPurchaseId = firstP.id;
+          updatePayload.linkedPurchaseNumber = allPNumbers;
+          if (!updatePayload.fulfillmentStatus || updatePayload.fulfillmentStatus === 'supplier_pending') {
+            updatePayload.fulfillmentStatus = 'supplier_pending';
           }
         }
       } catch (autoConfirmErr) {
-        console.warn('Could not auto-confirm purchase in updateCustomerOrder:', autoConfirmErr);
+        console.warn('Could not sync linked purchases in updateCustomerOrder:', autoConfirmErr);
       }
     }
 
