@@ -9304,10 +9304,6 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
       continue;
     }
 
-    const itemCostPrice = invItem
-      ? Number(invItem.costPrice || (Number(invItem.salePrice || 0) * 0.7) || 0)
-      : Number(it.costPrice || (Number(it.salePrice || 0) * 0.7) || 0);
-
     // Determine supplier name for this individual item
     let rawSupplier = '';
     if (it.supplierName && it.supplierName.trim()) {
@@ -9357,6 +9353,17 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
         ? 0
         : 15;
 
+    const baseCostVal = invItem?.costWithoutTax !== undefined && invItem?.costWithoutTax !== null && Number(invItem.costWithoutTax) > 0
+      ? Number(invItem.costWithoutTax)
+      : it?.costWithoutTax !== undefined && it?.costWithoutTax !== null && Number(it.costWithoutTax) > 0
+      ? Number(it.costWithoutTax)
+      : invItem
+      ? Number(invItem.costPrice || (Number(invItem.salePrice || 0) * 0.7) || 0)
+      : Number(it.costPrice || (Number(it.salePrice || 0) * 0.7) || 0);
+
+    const itemCostPrice = baseCostVal;
+    const itemCostWithTax = baseCostVal * (1 + itemTaxRate / 100);
+
     const pItem = {
       inventoryItemId: invItem ? invItem.id : (isCustom ? undefined : (it.inventoryItemId || it.id)),
       name: it.name || invItem?.name || 'Producto bajo pedido',
@@ -9364,6 +9371,7 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
       barcode: it.barcode || (invItem as any)?.barcode || undefined,
       costPrice: itemCostPrice.toFixed(2),
       costWithoutTax: itemCostPrice.toFixed(2),
+      costWithTax: itemCostWithTax.toFixed(2),
       salePrice: it.salePrice,
       quantity: missingQty, // EXACT DEFICIT ONLY! SOLO LA DIFERENCIA FALTANTE
       requestedInOrder: requestedQty,
@@ -9429,10 +9437,11 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
   for (const group of deficitItemsBySupplier.values()) {
     const groupItems = group.items;
     const groupUnits = groupItems.reduce((acc, it) => acc + Number(it.quantity || 1), 0);
-    const groupCost = groupItems.reduce(
-      (acc, it) => acc + (Number(it.costPrice || 0) * Number(it.quantity || 1)),
-      0
-    );
+    const groupBreakdown = calculatePurchaseSriBreakdown({ items: groupItems });
+    const groupGrandTotal = groupBreakdown.grandTotal > 0
+      ? groupBreakdown.grandTotal
+      : groupItems.reduce((acc, it) => acc + (Number(it.costPrice || 0) * Number(it.quantity || 1)), 0);
+
     totalAllMissingUnits += groupUnits;
     totalAllMissingItemsCount += groupItems.length;
 
@@ -9456,7 +9465,7 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
         supplierName: group.supplierName,
         supplierContact: group.supplierContact || existingForSupplier.supplierContact || '',
         items: groupItems,
-        totalCost: groupCost.toFixed(2),
+        totalCost: groupGrandTotal.toFixed(2),
         notes: `Orden de Compra para ${group.supplierName} vinculada al Pedido #${order.orderNumber} (${order.customerName} - ${order.customerPhone}) - Surtido de ${groupUnits} unidades faltantes`,
         isInternalOrderSync: true,
       } as any);
@@ -9466,7 +9475,7 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
         supplierName: group.supplierName,
         supplierContact: group.supplierContact || '',
         items: groupItems,
-        totalCost: groupCost.toFixed(2),
+        totalCost: groupGrandTotal.toFixed(2),
         status: 'pending',
         paymentStatus: 'unpaid',
         linkedCustomerOrderId: order.id,
@@ -11739,15 +11748,23 @@ export function calculatePurchaseSriBreakdown(po: any) {
           ? 0
           : 15;
 
-      const costWithoutTax = Number(
-        item.costPrice !== undefined && item.costPrice !== null && Number(item.costPrice) > 0
-          ? item.costPrice
-          : normalized.costWithoutTax !== undefined && normalized.costWithoutTax !== null && Number(normalized.costWithoutTax) > 0
-          ? normalized.costWithoutTax
-          : normalized.baseCostPrice !== undefined && normalized.baseCostPrice !== null && Number(normalized.baseCostPrice) > 0
-          ? normalized.baseCostPrice
-          : 0
-      );
+      let costWithoutTax = 0;
+      const rawCostPrice = item.costPrice !== undefined && item.costPrice !== null ? Number(item.costPrice) : 0;
+      const rawCostWithoutTax = item.costWithoutTax !== undefined && item.costWithoutTax !== null ? Number(item.costWithoutTax) : 0;
+      const normCostWithoutTax = normalized.costWithoutTax !== undefined && normalized.costWithoutTax !== null ? Number(normalized.costWithoutTax) : 0;
+
+      if (rawCostWithoutTax > 0) {
+        costWithoutTax = rawCostWithoutTax;
+      } else if (rawCostPrice > 0) {
+        const totalPoCost = Number(po?.totalCost || 0);
+        if (taxPercent > 0 && totalPoCost > 0 && Math.abs(rawCostPrice * qty - totalPoCost) < 0.05) {
+          costWithoutTax = rawCostPrice / (1 + taxPercent / 100);
+        } else {
+          costWithoutTax = rawCostPrice;
+        }
+      } else if (normCostWithoutTax > 0) {
+        costWithoutTax = normCostWithoutTax;
+      }
 
       const lineBase = Math.max(0, costWithoutTax * qty - discount);
 

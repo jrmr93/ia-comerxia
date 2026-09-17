@@ -137,15 +137,23 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
           ? 0
           : 15;
 
-      const baseUnitCost = Number(
-        item.costPrice !== undefined && item.costPrice !== null && Number(item.costPrice) > 0
-          ? item.costPrice
-          : (item as any).costWithoutTax !== undefined && (item as any).costWithoutTax !== null && Number((item as any).costWithoutTax) > 0
-          ? (item as any).costWithoutTax
-          : (item as any).baseCostPrice !== undefined && (item as any).baseCostPrice !== null && Number((item as any).baseCostPrice) > 0
-          ? (item as any).baseCostPrice
-          : 0
-      );
+      let baseUnitCost = 0;
+      const rawCostPrice = item.costPrice !== undefined && item.costPrice !== null ? Number(item.costPrice) : 0;
+      const rawCostWithoutTax = (item as any).costWithoutTax !== undefined && (item as any).costWithoutTax !== null ? Number((item as any).costWithoutTax) : 0;
+      const rawBaseCost = (item as any).baseCostPrice !== undefined && (item as any).baseCostPrice !== null ? Number((item as any).baseCostPrice) : 0;
+
+      if (rawCostWithoutTax > 0) {
+        baseUnitCost = rawCostWithoutTax;
+      } else if (rawCostPrice > 0) {
+        const totalPoCost = Number(purchase?.totalCost || 0);
+        if (taxPercent > 0 && totalPoCost > 0 && Math.abs(rawCostPrice * qty - totalPoCost) < 0.05) {
+          baseUnitCost = rawCostPrice / (1 + taxPercent / 100);
+        } else {
+          baseUnitCost = rawCostPrice;
+        }
+      } else if (rawBaseCost > 0) {
+        baseUnitCost = rawBaseCost;
+      }
 
       const lineSubtotal = Math.max(0, baseUnitCost * qty - discount);
 
