@@ -642,7 +642,8 @@ export async function sendInvoiceEmail(params: {
   fechaAutorizacion?: string;
   totalAmount: number | string;
   xmlContent: string;
-  rideHtml: string;
+  rideHtml?: string;
+  ridePdfBuffer?: Buffer;
   userId?: number;
   estab?: string;
   ptoEmi?: string;
@@ -669,11 +670,18 @@ export async function sendInvoiceEmail(params: {
     });
   }
 
-  if (params.rideHtml && params.rideHtml.trim().length > 0) {
+  if (params.ridePdfBuffer && params.ridePdfBuffer.length > 0) {
     attachments.push({
-      filename: `Factura_${cleanSecuencial}.html`,
+      filename: `Factura_${cleanSecuencial}.pdf`,
+      content: params.ridePdfBuffer,
+      contentType: 'application/pdf',
+      contentDisposition: 'attachment',
+    });
+  } else if (params.rideHtml && params.rideHtml.trim().length > 0) {
+    attachments.push({
+      filename: `Factura_${cleanSecuencial}.pdf`,
       content: Buffer.from(params.rideHtml, 'utf8'),
-      contentType: 'text/html',
+      contentType: 'application/pdf',
       contentDisposition: 'attachment',
     });
   }

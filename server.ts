@@ -11,6 +11,7 @@ import { ensureTablesCreated, getDatabaseRuntimeInfo, testDatabaseConnection } f
 import { generarClaveAcceso, generarFacturaXml, firmarFacturaXml, generarFirmaSimuladaXml, getEcuadorLocalDate } from './src/utils/sri-signer.ts';
 import { postSoapRequest, parseSriMensajes, SRI_ENDPOINTS } from './src/utils/sri-soap.ts';
 import { generateSriRideHtml } from './src/utils/sri-ride.ts';
+import { generateSriRidePdfBuffer } from './src/utils/sri-ride-pdf.ts';
 import { extractItemTaxPercent } from './src/utils/ecuadorTaxCalculator.ts';
 import {
   validateUserCredentials,
@@ -1879,7 +1880,9 @@ async function startServer() {
 
       if (isAutorizado && !isConsumidorFinal && hasValidCustomerEmail) {
         try {
-          const rideHtml = generateSriRideHtml({ invoice: invoiceRecord as any, sriConfig: cfg });
+          const storeCfg = await getStoreConfig(req.dbUserId || 1).catch(() => null);
+          const rideHtml = generateSriRideHtml({ invoice: invoiceRecord as any, sriConfig: cfg, storeConfig: storeCfg as any });
+          const ridePdfBuffer = await generateSriRidePdfBuffer({ invoice: invoiceRecord as any, sriConfig: cfg, storeConfig: storeCfg as any });
           await sendInvoiceEmail({
             to: rawCustomerEmail,
             customerName: comprador.razonSocialComprador,
@@ -1890,6 +1893,7 @@ async function startServer() {
             totalAmount: order.totalAmount,
             xmlContent: xmlFirmado || xmlRaw,
             rideHtml,
+            ridePdfBuffer,
             userId: req.dbUserId || 1,
             estab: emisor.estab,
             ptoEmi: emisor.ptoEmi,
@@ -1955,7 +1959,9 @@ async function startServer() {
       }
 
       const cfg = await getSriConfig(userId);
-      const rideHtml = generateSriRideHtml({ invoice, sriConfig: cfg });
+      const storeCfg = await getStoreConfig(userId).catch(() => null);
+      const rideHtml = generateSriRideHtml({ invoice, sriConfig: cfg, storeConfig: storeCfg as any });
+      const ridePdfBuffer = await generateSriRidePdfBuffer({ invoice, sriConfig: cfg, storeConfig: storeCfg as any });
 
       await sendInvoiceEmail({
         to: targetEmail,
@@ -1967,6 +1973,7 @@ async function startServer() {
         totalAmount: invoice.totalAmount || 0,
         xmlContent: invoice.xmlFirmado || invoice.xmlGenerado || '',
         rideHtml,
+        ridePdfBuffer,
         userId,
         estab: (cfg.estab || '001').padStart(3, '0'),
         ptoEmi: (cfg.ptoEmi || '001').padStart(3, '0'),
