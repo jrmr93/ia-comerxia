@@ -21,6 +21,9 @@ import {
   Building2,
   Receipt,
   FileText,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { PurchaseOrder, StoreConfig, CustomerOrder } from '../types.ts';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
@@ -230,11 +233,21 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
             {purchase.supplierContact && (
               <span className="text-xs text-slate-400 font-mono">({purchase.supplierContact})</span>
             )}
+
+            {/* Fecha de Compra */}
+            <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 bg-slate-800/90 px-2.5 py-0.5 rounded-lg border border-slate-700/80 shadow-2xs ml-1">
+              <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>
+                Fecha: <strong className="text-white font-bold">{new Date(purchase.purchaseDate || purchase.createdAt).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+              </span>
+            </span>
           </div>
 
-          <div className="font-mono font-black text-sm sm:text-base text-emerald-400">
-            Total Factura: ${sriBreakdown.grandTotal.toFixed(2)}{' '}
-            <span className="text-xs font-bold text-emerald-200">{currency}</span>
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="font-mono font-black text-sm sm:text-base text-emerald-400">
+              Total Factura: ${sriBreakdown.grandTotal.toFixed(2)}{' '}
+              <span className="text-xs font-bold text-emerald-200">{currency}</span>
+            </div>
           </div>
         </div>
 
@@ -747,20 +760,23 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
               </span>
 
               {/* Proveedor */}
-              <span className="text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded-md flex items-center gap-1.5 shadow-2xs">
-                <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>
+              <span className="text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded-md flex items-center gap-1.5 shadow-2xs max-w-xs truncate" title={`Proveedor: ${purchase.supplierName}`}>
+                <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span className="truncate">
                   Proveedor: <strong className="text-slate-900">{purchase.supplierName}</strong>
                 </span>
               </span>
 
-              {/* Fecha */}
-              <span className="text-[11px] text-slate-500">
-                {new Date(purchase.purchaseDate || purchase.createdAt).toLocaleDateString('es-EC', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: 'numeric',
-                })}
+              {/* Fecha de Compra */}
+              <span className="text-[11px] font-bold text-slate-800 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded-md flex items-center gap-1.5 shadow-2xs">
+                <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>
+                  Fecha: <strong className="text-slate-900">{new Date(purchase.purchaseDate || purchase.createdAt).toLocaleDateString('es-EC', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}</strong>
+                </span>
               </span>
 
               {/* Venta vinculada con Botón "Ver Venta" exclusivo (en compras individuales; en grupos el encabezado ya incluye Ver Venta) */}
@@ -806,7 +822,7 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
               )}
             </div>
 
-            {/* Costo Total */}
+            {/* Costo Total & Collapse button */}
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <div className="text-[10px] text-slate-500 font-medium">Costo Total</div>

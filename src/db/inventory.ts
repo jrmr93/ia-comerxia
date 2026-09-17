@@ -6723,19 +6723,20 @@ export async function createCustomer(data: {
   reference?: string | null;
   notes?: string | null;
 }) {
-  const phoneNorm = normalizeEcuadorPhone(data.phone);
-  const cleanPhone = phoneNorm.formattedInternational || phoneNorm.e164 || data.phone.trim();
-  const cleanCi = data.ci ? data.ci.trim() : null;
+  const phoneNorm = normalizeEcuadorPhone(data.phone || '');
+  const cleanPhone = phoneNorm.formattedInternational || phoneNorm.e164 || (data.phone ? data.phone.trim() : '');
+  const rawCi = data.ci ? data.ci.trim() : null;
 
-  if (!cleanCi) {
+  if (!rawCi) {
     throw new Error('El número de cédula o RUC es obligatorio para registrar un cliente.');
   }
 
-  const ciValidation = validateEcuadorId(cleanCi);
+  const ciValidation = validateEcuadorId(rawCi);
   if (!ciValidation.isValid) {
     throw new Error(`Cédula ecuatoriana inválida: ${ciValidation.error}`);
   }
 
+  const canonicalCi = ciValidation.cleaned || rawCi;
   const targetUserId = await resolveValidUserId(data.userId);
   const now = new Date().toISOString();
   const resolvedName = (data.fullName || data.name || 'Cliente').trim();
@@ -6758,31 +6759,65 @@ export async function createCustomer(data: {
     if (!state.customers) state.customers = [];
 
     // Deduplication by CI (Cédula de Identidad)
-    if (cleanCi) {
+    if (canonicalCi) {
       const existingIdx = state.customers.findIndex(
-        (c) => c.ci && c.ci.trim().toLowerCase() === cleanCi.toLowerCase()
+        (c) => c.ci && (c.ci.trim().toLowerCase() === canonicalCi.toLowerCase() || c.ci.replace(/\D/g, '') === canonicalCi.replace(/\D/g, ''))
       );
       if (existingIdx !== -1) {
         const existing = state.customers[existingIdx];
-        existing.name = resolvedName || existing.name;
-        existing.fullName = resolvedName || existing.fullName || existing.name;
-        if (cleanPhone) existing.phone = cleanPhone;
-        if (data.email !== undefined) existing.email = data.email ? data.email.trim() : null;
-        if (clientAddress !== null) {
+        let changed = false;
+
+        if (resolvedName && (existing.name !== resolvedName || existing.fullName !== resolvedName)) {
+          existing.name = resolvedName;
+          existing.fullName = resolvedName;
+          changed = true;
+        }
+        if (cleanPhone && existing.phone !== cleanPhone) {
+          existing.phone = cleanPhone;
+          changed = true;
+        }
+        if (data.email !== undefined) {
+          const eVal = data.email ? data.email.trim() : null;
+          if (existing.email !== eVal) { existing.email = eVal; changed = true; }
+        }
+        if (clientAddress !== null && existing.address !== clientAddress) {
           existing.address = clientAddress;
+          changed = true;
         }
-        if (shippingAddress !== null) {
+        if (shippingAddress !== null && existing.fullAddress !== shippingAddress) {
           existing.fullAddress = shippingAddress;
+          changed = true;
         }
-        if (data.province !== undefined) existing.province = data.province?.trim() || null;
-        if (data.canton !== undefined) existing.canton = data.canton?.trim() || null;
-        if (data.parish !== undefined) existing.parish = data.parish?.trim() || null;
-        if (data.exactAddress !== undefined) existing.exactAddress = data.exactAddress?.trim() || null;
-        if (data.reference !== undefined) existing.reference = data.reference?.trim() || null;
-        if (data.notes !== undefined) existing.notes = data.notes?.trim() || null;
-        existing.updatedAt = now;
-        storage.save();
-        return { ...existing, alreadyExisted: true };
+        if (data.province !== undefined) {
+          const pVal = data.province?.trim() || null;
+          if (existing.province !== pVal) { existing.province = pVal; changed = true; }
+        }
+        if (data.canton !== undefined) {
+          const cVal = data.canton?.trim() || null;
+          if (existing.canton !== cVal) { existing.canton = cVal; changed = true; }
+        }
+        if (data.parish !== undefined) {
+          const paVal = data.parish?.trim() || null;
+          if (existing.parish !== paVal) { existing.parish = paVal; changed = true; }
+        }
+        if (data.exactAddress !== undefined) {
+          const exVal = data.exactAddress?.trim() || null;
+          if (existing.exactAddress !== exVal) { existing.exactAddress = exVal; changed = true; }
+        }
+        if (data.reference !== undefined) {
+          const rVal = data.reference?.trim() || null;
+          if (existing.reference !== rVal) { existing.reference = rVal; changed = true; }
+        }
+        if (data.notes !== undefined) {
+          const nVal = data.notes?.trim() || null;
+          if (existing.notes !== nVal) { existing.notes = nVal; changed = true; }
+        }
+
+        if (changed) {
+          existing.updatedAt = now;
+          storage.save();
+        }
+        return { ...existing, alreadyExisted: true, updated: changed };
       }
     }
 
@@ -6795,7 +6830,7 @@ export async function createCustomer(data: {
       name: resolvedName,
       fullName: resolvedName,
       phone: cleanPhone,
-      ci: cleanCi,
+      ci: canonicalCi,
       email: data.email ? data.email.trim() : null,
       address: clientAddress || null,
       fullAddress: shippingAddress || null,
@@ -6818,42 +6853,77 @@ export async function createCustomer(data: {
   }
 
   try {
-    // Deduplication by CI (Cédula de Identidad) in PostgreSQL
-    if (cleanCi) {
+    // Deduplication by CI in PostgreSQL
+    if (canonicalCi) {
       const existing = await db
         .select()
         .from(customers)
-        .where(ilike(customers.ci, cleanCi))
+        .where(or(ilike(customers.ci, canonicalCi), ilike(customers.ci, rawCi)))
         .limit(1);
 
       if (existing.length > 0) {
         const current = existing[0];
-        const updatePayload: Record<string, any> = {
-          name: resolvedName || current.name,
-          phone: cleanPhone || current.phone,
-          updatedAt: new Date(),
-        };
-        if (data.email !== undefined) updatePayload.email = data.email ? data.email.trim() : null;
-        if (clientAddress !== null) updatePayload.address = clientAddress;
-        if (data.province !== undefined) updatePayload.province = data.province?.trim() || null;
-        if (data.canton !== undefined) updatePayload.canton = data.canton?.trim() || null;
-        if (data.parish !== undefined) updatePayload.parish = data.parish?.trim() || null;
-        if (shippingAddress !== null) updatePayload.exactAddress = shippingAddress;
-        if (data.reference !== undefined) updatePayload.reference = data.reference?.trim() || null;
-        if (data.notes !== undefined) updatePayload.notes = data.notes?.trim() || null;
+        const updatePayload: Record<string, any> = {};
+        let changed = false;
 
-        const result = await db
-          .update(customers)
-          .set(updatePayload)
-          .where(eq(customers.id, current.id))
-          .returning();
+        if (resolvedName && current.name !== resolvedName) {
+          updatePayload.name = resolvedName;
+          changed = true;
+        }
+        if (cleanPhone && current.phone !== cleanPhone) {
+          updatePayload.phone = cleanPhone;
+          changed = true;
+        }
+        if (data.email !== undefined) {
+          const eVal = data.email ? data.email.trim() : null;
+          if (current.email !== eVal) { updatePayload.email = eVal; changed = true; }
+        }
+        if (clientAddress !== null && current.address !== clientAddress) {
+          updatePayload.address = clientAddress;
+          changed = true;
+        }
+        if (data.province !== undefined) {
+          const pVal = data.province?.trim() || null;
+          if (current.province !== pVal) { updatePayload.province = pVal; changed = true; }
+        }
+        if (data.canton !== undefined) {
+          const cVal = data.canton?.trim() || null;
+          if (current.canton !== cVal) { updatePayload.canton = cVal; changed = true; }
+        }
+        if (data.parish !== undefined) {
+          const paVal = data.parish?.trim() || null;
+          if (current.parish !== paVal) { updatePayload.parish = paVal; changed = true; }
+        }
+        if (shippingAddress !== null && current.exactAddress !== shippingAddress) {
+          updatePayload.exactAddress = shippingAddress;
+          changed = true;
+        }
+        if (data.reference !== undefined) {
+          const rVal = data.reference?.trim() || null;
+          if (current.reference !== rVal) { updatePayload.reference = rVal; changed = true; }
+        }
+        if (data.notes !== undefined) {
+          const nVal = data.notes?.trim() || null;
+          if (current.notes !== nVal) { updatePayload.notes = nVal; changed = true; }
+        }
 
-        const updated = result[0];
+        let updatedCustomerObj = current;
+        if (changed) {
+          updatePayload.updatedAt = new Date();
+          const result = await db
+            .update(customers)
+            .set(updatePayload)
+            .where(eq(customers.id, current.id))
+            .returning();
+          updatedCustomerObj = result[0];
+        }
+
         const enriched = {
-          ...updated,
-          fullName: updated.name,
-          fullAddress: updated.exactAddress || updated.address,
+          ...updatedCustomerObj,
+          fullName: updatedCustomerObj.name,
+          fullAddress: updatedCustomerObj.exactAddress || updatedCustomerObj.address,
           alreadyExisted: true,
+          updated: changed,
         };
 
         const state = storage.getState();
@@ -6875,7 +6945,7 @@ export async function createCustomer(data: {
         userId: targetUserId,
         name: resolvedName,
         phone: cleanPhone,
-        ci: cleanCi,
+        ci: canonicalCi,
         email: data.email ? data.email.trim() : null,
         address: clientAddress || null,
         province: data.province?.trim() || null,
@@ -6907,25 +6977,40 @@ export async function createCustomer(data: {
     if (!state.customers) state.customers = [];
 
     // Fallback deduplication by CI
-    if (cleanCi) {
+    if (canonicalCi) {
       const existingIdx = state.customers.findIndex(
-        (c) => c.ci && c.ci.trim().toLowerCase() === cleanCi.toLowerCase()
+        (c) => c.ci && (c.ci.trim().toLowerCase() === canonicalCi.toLowerCase() || c.ci.replace(/\D/g, '') === canonicalCi.replace(/\D/g, ''))
       );
       if (existingIdx !== -1) {
         const existing = state.customers[existingIdx];
-        existing.name = resolvedName || existing.name;
-        existing.fullName = resolvedName || existing.fullName || existing.name;
-        if (cleanPhone) existing.phone = cleanPhone;
-        if (data.email !== undefined) existing.email = data.email ? data.email.trim() : null;
-        if (clientAddress !== null) {
+        let changed = false;
+
+        if (resolvedName && (existing.name !== resolvedName || existing.fullName !== resolvedName)) {
+          existing.name = resolvedName;
+          existing.fullName = resolvedName;
+          changed = true;
+        }
+        if (cleanPhone && existing.phone !== cleanPhone) {
+          existing.phone = cleanPhone;
+          changed = true;
+        }
+        if (data.email !== undefined) {
+          const eVal = data.email ? data.email.trim() : null;
+          if (existing.email !== eVal) { existing.email = eVal; changed = true; }
+        }
+        if (clientAddress !== null && existing.address !== clientAddress) {
           existing.address = clientAddress;
+          changed = true;
         }
-        if (shippingAddress !== null) {
+        if (shippingAddress !== null && existing.fullAddress !== shippingAddress) {
           existing.fullAddress = shippingAddress;
+          changed = true;
         }
-        existing.updatedAt = now;
-        storage.save();
-        return { ...existing, alreadyExisted: true };
+        if (changed) {
+          existing.updatedAt = now;
+          storage.save();
+        }
+        return { ...existing, alreadyExisted: true, updated: changed };
       }
     }
 
@@ -6938,7 +7023,7 @@ export async function createCustomer(data: {
       name: resolvedName,
       fullName: resolvedName,
       phone: cleanPhone,
-      ci: cleanCi,
+      ci: canonicalCi,
       email: data.email ? data.email.trim() : null,
       address: clientAddress || null,
       fullAddress: shippingAddress || null,

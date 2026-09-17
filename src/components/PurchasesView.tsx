@@ -37,6 +37,7 @@ import {
   ShieldCheck,
   History,
   Calendar,
+  CalendarRange,
   Eye,
   CreditCard,
   Building2,
@@ -178,6 +179,276 @@ export function getInventoryCostWithoutTax(inv: InventoryItem | any): number {
   return costWithTax;
 }
 
+const SinglePurchaseCardBlock: React.FC<{
+  purchase: PurchaseOrder;
+  isFirst: boolean;
+  blockKey: string;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  currency: string;
+  renderPurchaseCard: (purchase: PurchaseOrder, isInGroup: boolean, isFirstRecord?: boolean) => React.ReactNode;
+}> = ({ purchase, isFirst, blockKey, isCollapsed, onToggleCollapse, currency, renderPurchaseCard }) => {
+  if (isCollapsed) {
+    return (
+      <div
+        key={blockKey}
+        id={isFirst ? 'purchases-first-record' : `purchase-record-${purchase.id}`}
+        className="w-full rounded-2xl border transition-all px-3 sm:px-4 py-2.5 shadow-2xs hover:shadow-xs flex flex-wrap items-center justify-between gap-2.5 bg-white border-slate-200 border-l-4 border-l-indigo-500"
+      >
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0 flex-1">
+          <div className="inline-flex items-center space-x-1.5 border px-2.5 py-0.5 rounded-xl font-mono font-black text-xs bg-slate-100 text-slate-800 border-slate-200">
+            <span>#{purchase.purchaseNumber}</span>
+          </div>
+
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wide border shrink-0 bg-slate-100 text-slate-700 border-slate-200">
+            {purchase.status}
+          </span>
+
+          <span className="text-xs font-bold text-slate-800 shrink-0 max-w-[200px] truncate" title={purchase.supplierName}>
+            Prov: <strong className="text-slate-900">{purchase.supplierName}</strong>
+          </span>
+
+          <span className="text-[11px] text-slate-500 shrink-0 hidden sm:inline">
+            {new Date(purchase.purchaseDate || purchase.createdAt).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </span>
+
+          <span className="text-[11px] text-slate-600 font-semibold shrink-0">
+            ({purchase.items?.length || 0} ítems)
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="text-right">
+            <span className="font-mono font-black text-xs sm:text-sm text-indigo-900">
+              ${Number(purchase.totalCost || 0).toFixed(2)} {currency}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+            title="Desplegar registro completo de la compra"
+          >
+            <span className="hidden xs:inline">Desplegar</span>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div key={blockKey} className="w-full relative">
+      <div className="absolute top-3 right-3 z-10">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+          title="Encojer registro a una sola fila"
+        >
+          <span className="hidden xs:inline">Encojer</span>
+          <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
+        </button>
+      </div>
+      {renderPurchaseCard(purchase, false, isFirst)}
+    </div>
+  );
+};
+
+const GroupedPurchaseCardBlock: React.FC<{
+  group: {
+    type: 'group';
+    key: string;
+    orderNumber: string;
+    customerOrderId?: number;
+    customerName?: string;
+    purchases: PurchaseOrder[];
+  };
+  isFirst: boolean;
+  isGroupCollapsed: boolean;
+  onToggleCollapse: () => void;
+  currency: string;
+  onGoToStoreOrders?: (orderNumber?: string) => void;
+  renderPurchaseCard: (purchase: PurchaseOrder, isInGroup: boolean, isFirstRecord?: boolean) => React.ReactNode;
+}> = ({ group, isFirst, isGroupCollapsed, onToggleCollapse, currency, onGoToStoreOrders, renderPurchaseCard }) => {
+  const groupTotalCost = group.purchases.reduce((sum, p) => sum + (Number(p.totalCost) || 0), 0);
+  const uniqueGroupSuppliers = Array.from(new Set(group.purchases.map((p) => p.supplierName).filter(Boolean)));
+  const allGroupReceived = group.purchases.every((p) => p.status === 'received');
+  const hasGroupPending = group.purchases.some((p) => p.status === 'pending' || p.status === 'ordered');
+
+  if (isGroupCollapsed) {
+    return (
+      <div
+        key={group.key}
+        id={isFirst ? 'purchases-first-record' : undefined}
+        className="rounded-2xl border-2 border-indigo-200/90 bg-gradient-to-b from-indigo-50/70 via-slate-50/40 to-slate-50/90 p-3 sm:p-3.5 shadow-2xs transition-all hover:border-indigo-300/90 flex flex-wrap items-center justify-between gap-2.5"
+      >
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0 flex-1">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+            <Layers className="w-4 h-4" />
+          </div>
+
+          <span className="text-xs font-black uppercase tracking-wide text-indigo-950 bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 shadow-2xs shrink-0">
+            <ShoppingBag className="w-3.5 h-3.5 text-indigo-700" />
+            Pedido #{group.orderNumber}
+          </span>
+
+          {group.customerName && (
+            <span className="text-xs font-bold text-slate-800 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0 max-w-[180px] truncate" title={group.customerName}>
+              Cliente: <span className="text-indigo-950 font-black">{group.customerName}</span>
+            </span>
+          )}
+
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs shrink-0">
+            <Sparkles className="w-3 h-3 text-amber-600" />
+            {group.purchases.length} {group.purchases.length === 1 ? 'Compra Proveedor' : 'Compras Proveedores'}
+          </span>
+
+          {allGroupReceived ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1 shrink-0">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              Todas en Bodega
+            </span>
+          ) : hasGroupPending ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-300 flex items-center gap-1 shrink-0">
+              <Truck className="w-3 h-3 text-sky-600" />
+              En Abastecimiento
+            </span>
+          ) : null}
+
+          <span className="text-xs text-slate-600 font-medium truncate max-w-xs hidden md:inline">
+            Prov: <strong className="text-slate-900">{uniqueGroupSuppliers.join(', ') || 'Sin asignar'}</strong>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="text-right">
+            <div className="text-[9px] uppercase font-bold text-slate-500">Costo Combinado</div>
+            <div className="font-mono font-black text-xs sm:text-sm text-indigo-950">
+              ${groupTotalCost.toFixed(2)} <span className="text-[10px] text-slate-500">{currency}</span>
+            </div>
+          </div>
+
+          {onGoToStoreOrders && (
+            <button
+              type="button"
+              onClick={() => onGoToStoreOrders(group.orderNumber)}
+              className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-xl transition cursor-pointer shadow-2xs flex items-center gap-1 shrink-0"
+              title="Ver este pedido en la sección de ventas"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span className="hidden xs:inline">Ver Venta</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+            title="Desplegar compra agrupada completa"
+          >
+            <span className="hidden xs:inline">Desplegar</span>
+            <ChevronDown className="w-3.5 h-3.5 text-white" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      key={group.key}
+      id={isFirst ? 'purchases-first-record' : undefined}
+      className="rounded-2xl border-2 border-indigo-200/90 bg-gradient-to-b from-indigo-50/70 via-slate-50/40 to-slate-50/90 p-4 sm:p-5 shadow-xs space-y-3.5 transition-all hover:border-indigo-300/90"
+    >
+      {/* Visual Group Banner Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100/90">
+        <div className="flex items-start space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0 mt-0.5">
+            <Layers className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wide text-indigo-950 bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 shadow-2xs">
+                <ShoppingBag className="w-3.5 h-3.5 text-indigo-700" />
+                Pedido de Venta #{group.orderNumber}
+              </span>
+              {group.customerName && (
+                <span className="text-xs font-bold text-slate-800 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                  Cliente: <span className="text-indigo-950 font-black">{group.customerName}</span>
+                </span>
+              )}
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                <Sparkles className="w-3 h-3 text-amber-600" />
+                {group.purchases.length} {group.purchases.length === 1 ? 'Compra generada por proveedor' : 'Compras separadas por proveedor'}
+              </span>
+              {allGroupReceived ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  Todas en Bodega
+                </span>
+              ) : hasGroupPending ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-300 flex items-center gap-1">
+                  <Truck className="w-3 h-3 text-sky-600" />
+                  En Abastecimiento
+                </span>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-3 text-xs text-slate-600 font-medium mt-1 flex-wrap">
+              <span>Proveedores involucrados: <strong className="text-slate-900">{uniqueGroupSuppliers.join(', ') || 'Sin asignar'}</strong></span>
+              {group.purchases[0] && (
+                <>
+                  <span className="text-slate-300 font-bold">•</span>
+                  <span className="flex items-center gap-1.5 text-slate-800 font-bold bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                    <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Fecha: <strong className="text-slate-900">{new Date(group.purchases[0].purchaseDate || group.purchases[0].createdAt).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Group Combined Cost & Action */}
+        <div className="flex items-center gap-3 self-end sm:self-center">
+          <div className="text-right">
+            <div className="text-[10px] uppercase font-bold text-slate-500">Costo Combinado ({group.purchases.length} {group.purchases.length === 1 ? 'OC' : 'OCs'})</div>
+            <div className="font-mono font-black text-sm sm:text-base text-slate-900">
+              ${groupTotalCost.toFixed(2)} <span className="text-xs text-slate-500">{currency}</span>
+            </div>
+          </div>
+          {onGoToStoreOrders && (
+            <button
+              type="button"
+              onClick={() => onGoToStoreOrders(group.orderNumber)}
+              className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl transition cursor-pointer shadow-2xs flex items-center gap-1.5"
+              title="Ver este pedido en la sección de ventas"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Ver Venta</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+            title="Encojer compra agrupada"
+          >
+            <span className="hidden xs:inline">Encojer</span>
+            <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
+          </button>
+        </div>
+      </div>
+
+      {/* List of Supplier Purchases under this sales order */}
+      <div className="space-y-3 pl-0 sm:pl-3 border-l-0 sm:border-l-2 sm:border-indigo-300/80">
+        {group.purchases.map((purchase) => renderPurchaseCard(purchase, true))}
+      </div>
+    </div>
+  );
+};
+
 export const PurchasesView: React.FC<PurchasesViewProps> = ({
   purchases = [],
   inventoryItems = [],
@@ -207,6 +478,46 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
+  const [dateFilterPreset, setDateFilterPreset] = useState<'all' | 'today' | '7days' | 'this_month' | '30days' | 'custom'>('all');
+  const [collapsedBlockKeys, setCollapsedBlockKeys] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = window.localStorage.getItem('comerxia_purchases_collapsed_keys');
+        if (saved) return new Set(JSON.parse(saved));
+      } catch {}
+    }
+    return new Set();
+  });
+
+  const updateCollapsedBlockKeys = (newSet: Set<string>) => {
+    setCollapsedBlockKeys(newSet);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('comerxia_purchases_collapsed_keys', JSON.stringify(Array.from(newSet)));
+      } catch {}
+    }
+  };
+
+  const handleToggleBlockCollapse = (key: string) => {
+    const next = new Set(collapsedBlockKeys);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    updateCollapsedBlockKeys(next);
+  };
+
+  const handleCollapseAllPurchases = () => {
+    const allKeys = new Set(groupedPurchaseBlocks.map((b) => b.key));
+    updateCollapsedBlockKeys(allKeys);
+  };
+
+  const handleExpandAllPurchases = () => {
+    updateCollapsedBlockKeys(new Set());
+  };
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [groupByOrder, setGroupByOrder] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
     if (typeof window !== 'undefined') {
@@ -511,6 +822,42 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       if (supplierFilter !== 'all' && p.supplierName !== supplierFilter) {
         return false;
       }
+      // Date filter
+      if (dateFilterPreset !== 'all') {
+        const dateVal = p.purchaseDate || p.createdAt;
+        if (!dateVal) return false;
+
+        const pDate = new Date(dateVal);
+        if (isNaN(pDate.getTime())) return false;
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const pDay = new Date(pDate.getFullYear(), pDate.getMonth(), pDate.getDate());
+
+        if (dateFilterPreset === 'today') {
+          if (pDay.getTime() !== today.getTime()) return false;
+        } else if (dateFilterPreset === '7days') {
+          const sevenDaysAgo = new Date(today);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+          if (pDay < sevenDaysAgo || pDay > today) return false;
+        } else if (dateFilterPreset === '30days') {
+          const thirtyDaysAgo = new Date(today);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+          if (pDay < thirtyDaysAgo || pDay > today) return false;
+        } else if (dateFilterPreset === 'this_month') {
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          if (pDay < startOfMonth || pDay > today) return false;
+        } else if (dateFilterPreset === 'custom') {
+          if (startDate) {
+            const start = new Date(startDate + 'T00:00:00');
+            if (pDay < start) return false;
+          }
+          if (endDate) {
+            const end = new Date(endDate + 'T23:59:59');
+            if (pDay > end) return false;
+          }
+        }
+      }
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -536,7 +883,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       }
       return true;
     });
-  }, [normalizedPurchases, statusFilter, supplierFilter, searchQuery]);
+  }, [normalizedPurchases, statusFilter, supplierFilter, dateFilterPreset, startDate, endDate, searchQuery]);
 
   // Grouping logic: Visually group automatically generated purchases by their customer sales order
   const groupedPurchaseBlocks = useMemo(() => {
@@ -686,6 +1033,37 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       totalCount: normalizedPurchases.length,
     };
   }, [normalizedPurchases]);
+
+  // Filtered Period KPI Metrics
+  const periodMetrics = useMemo(() => {
+    let totalFilteredVolume = 0;
+    let invoicedVolume = 0;
+    let invoicedCount = 0;
+    let pendingInvoiceVolume = 0;
+    let pendingInvoiceCount = 0;
+
+    filteredPurchases.forEach((p) => {
+      if (!p) return;
+      const cost = Number(p.totalCost || 0);
+      totalFilteredVolume += cost;
+      if (p.hasInvoice || (p as any).preFacturaNumber || (p as any).facturaNumber) {
+        invoicedVolume += cost;
+        invoicedCount++;
+      } else {
+        pendingInvoiceVolume += cost;
+        pendingInvoiceCount++;
+      }
+    });
+
+    return {
+      totalFilteredVolume,
+      invoicedVolume,
+      invoicedCount,
+      pendingInvoiceVolume,
+      pendingInvoiceCount,
+      count: filteredPurchases.length,
+    };
+  }, [filteredPurchases]);
 
   // Confirm Purchase with Supplier Execution (Unidirectional State Machine: pending -> ordered/confirmado)
   const executeConfirmPurchase = async (purchase: PurchaseOrder) => {
@@ -892,93 +1270,211 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         </div>
       </div>
 
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <div className="bg-white border border-slate-200 hover:border-emerald-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-h-[124px]">
-            <div className="flex items-start justify-between gap-2 min-h-[34px]">
-              <span className="text-xs font-bold text-slate-700 leading-snug" title="Inversión en Compras">
-                Inversión en Compras
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
-                <DollarSign className="w-4 h-4" />
-              </div>
+      {/* DATE RANGE FILTER & FINANCIAL PURCHASES SUMMARY BAR */}
+      <div className="bg-white border border-slate-300 rounded-2xl shadow-sm transition-all overflow-hidden">
+        {/* Header row (always visible) */}
+        <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200">
+          <div className="flex items-center justify-between sm:justify-start gap-3 flex-1 min-w-0">
+            <div className="flex items-center space-x-2 text-xs font-black text-slate-900 shrink-0">
+              <Calendar className="w-4 h-4 text-indigo-600" />
+              <span>Filtrar Compras por Fecha / Período:</span>
             </div>
-            <div className="mt-2">
-              <div
-                className={`font-mono text-slate-900 leading-tight whitespace-nowrap ${getMetricFontSizeClass(formatSmartCurrency(metrics.totalInvested, currency))}`}
-                title={`Valor exacto: ${formatExactCurrency(metrics.totalInvested, currency)}`}
+            <p className="text-[11px] text-slate-600 font-medium hidden md:block truncate">
+              Consulta los egresos, compras acumuladas y balances por fecha o rango personalizado.
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setDateFilterPreset('all')}
+                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
+                  dateFilterPreset === 'all'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
+                }`}
               >
-                {formatSmartCurrency(metrics.totalInvested, currency)}
-              </div>
-              <p className="text-[11px] font-medium text-slate-500 mt-1 leading-tight">
-                Pagado / Recibido en bodega
-              </p>
-            </div>
-          </div>
+                Todo el Historial
+              </button>
 
-          <div className="bg-white border border-slate-200 hover:border-amber-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-h-[124px]">
-            <div className="flex items-start justify-between gap-2 min-h-[34px]">
-              <span className="text-xs font-bold text-slate-700 leading-snug" title="Pedidos en Camino">
-                Pedidos en Camino
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0">
-                <Truck className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-2">
-              <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 tracking-tight whitespace-nowrap">
-                {metrics.pendingCount}
-                <span className="text-xs font-semibold text-slate-400 ml-1">órdenes</span>
-              </div>
-              <p
-                className="text-[11px] font-medium text-slate-500 mt-1 leading-tight"
-                title={`Comprometido: ${formatExactCurrency(metrics.pendingPurchasesCost, currency)}`}
+              <button
+                type="button"
+                onClick={() => setDateFilterPreset('today')}
+                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
+                  dateFilterPreset === 'today'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
+                }`}
               >
-                {formatSmartCurrency(metrics.pendingPurchasesCost, currency)} comprometidos
-              </p>
-            </div>
-          </div>
+                <Clock className="w-3.5 h-3.5" />
+                <span>Hoy</span>
+              </button>
 
-          <div className="bg-white border border-slate-200 hover:border-sky-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-h-[124px]">
-            <div className="flex items-start justify-between gap-2 min-h-[34px]">
-              <span className="text-xs font-bold text-slate-700 leading-snug" title="Recibidas en Bodega">
-                Recibidas en Bodega
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-2">
-              <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 tracking-tight whitespace-nowrap">
-                {metrics.receivedCount}
-                <span className="text-xs font-semibold text-slate-400 ml-1">completadas</span>
-              </div>
-              <p className="text-[11px] font-medium text-slate-500 mt-1 leading-tight">
-                Stock sumado al catálogo
-              </p>
-            </div>
-          </div>
+              <button
+                type="button"
+                onClick={() => setDateFilterPreset('this_month')}
+                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
+                  dateFilterPreset === 'this_month'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Este Mes</span>
+              </button>
 
-          <div className="bg-white border border-slate-200 hover:border-purple-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-h-[124px]">
-            <div className="flex items-start justify-between gap-2 min-h-[34px]">
-              <span className="text-xs font-bold text-slate-700 leading-snug" title="Ventas Bajo Pedido">
-                Ventas Bajo Pedido
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center shrink-0">
-                <ShoppingBag className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-2">
-              <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 tracking-tight whitespace-nowrap">
-                {metrics.customerLinkedCount}
-                <span className="text-xs font-semibold text-slate-400 ml-1">pedidos</span>
-              </div>
-              <p className="text-[11px] font-medium text-slate-500 mt-1 leading-tight">
-                Originados por clientes online
-              </p>
+              <button
+                type="button"
+                onClick={() => setDateFilterPreset('custom')}
+                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
+                  dateFilterPreset === 'custom'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
+                }`}
+              >
+                <CalendarRange className="w-3.5 h-3.5" />
+                <span>Personalizada</span>
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Panel Body */}
+        <div className="p-4 sm:p-5 pt-0 space-y-4">
+          {/* Custom Date Inputs if Custom is selected */}
+          {dateFilterPreset === 'custom' && (
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-300 flex flex-wrap items-center gap-3 text-xs mt-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-700 font-bold">Desde:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-indigo-500 shadow-xs font-bold"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-slate-700 font-bold">Hasta:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-900 font-mono focus:outline-none focus:border-indigo-500 shadow-xs font-bold"
+                />
+              </div>
+
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-[11px] font-bold transition cursor-pointer"
+                >
+                  Limpiar Rango
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Financial Summary Highlight Banner */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
+            {/* Card 1: Total Compras */}
+            <div className="bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-h-[116px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate" title="Compras Período">
+                  Compras ({dateFilterPreset === 'today' ? 'Hoy' : dateFilterPreset === 'this_month' ? 'Este Mes' : dateFilterPreset === 'custom' ? 'Rango' : 'Total'})
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div
+                  className={`font-mono text-slate-900 leading-tight whitespace-nowrap ${getMetricFontSizeClass(formatSmartCurrency(periodMetrics.totalFilteredVolume, currency))}`}
+                  title={`Valor exacto: ${formatExactCurrency(periodMetrics.totalFilteredVolume, currency)}`}
+                >
+                  {formatSmartCurrency(periodMetrics.totalFilteredVolume, currency)}
+                </div>
+                <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+                  {periodMetrics.count} orden(es) en el filtro
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2: Con Factura (SRI) */}
+            <div className="bg-white border border-slate-200 hover:border-emerald-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-h-[116px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate" title="Con Factura SRI">
+                  Con Factura SRI
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                  <Receipt className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div
+                  className={`font-mono text-emerald-900 leading-tight whitespace-nowrap ${getMetricFontSizeClass(formatSmartCurrency(periodMetrics.invoicedVolume, currency))}`}
+                  title={`Valor exacto: ${formatExactCurrency(periodMetrics.invoicedVolume, currency)}`}
+                >
+                  {formatSmartCurrency(periodMetrics.invoicedVolume, currency)}
+                  <span className="text-xs font-semibold text-emerald-700 ml-1">({periodMetrics.invoicedCount})</span>
+                </div>
+                <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+                  Respaldado fiscalmente
+                </p>
+              </div>
+            </div>
+
+            {/* Card 3: Pendiente Facturación */}
+            <div className="bg-white border border-slate-200 hover:border-amber-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-h-[116px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate" title="Pendiente Facturar">
+                  Pendiente Facturar
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div
+                  className={`font-mono text-amber-900 leading-tight whitespace-nowrap ${getMetricFontSizeClass(formatSmartCurrency(periodMetrics.pendingInvoiceVolume, currency))}`}
+                  title={`Valor exacto: ${formatExactCurrency(periodMetrics.pendingInvoiceVolume, currency)}`}
+                >
+                  {formatSmartCurrency(periodMetrics.pendingInvoiceVolume, currency)}
+                  <span className="text-xs font-semibold text-amber-700 ml-1">({periodMetrics.pendingInvoiceCount})</span>
+                </div>
+                <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+                  Por emisión de pre-factura
+                </p>
+              </div>
+            </div>
+
+            {/* Card 4: Recibidas en Bodega */}
+            <div className="bg-white border border-slate-200 hover:border-sky-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between min-h-[116px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate" title="Recibidas en Bodega">
+                  Recibidas en Bodega
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 tracking-tight whitespace-nowrap">
+                  {metrics.receivedCount}
+                  <span className="text-xs font-semibold text-slate-400 ml-1">completadas</span>
+                </div>
+                <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+                  Stock ingresado a catálogo
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Toolbar & Filters (Dos Barras Horizontales Estáticas) */}
       <div
@@ -1126,6 +1622,43 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             </>
           )}
 
+          {/* Date Filter */}
+          <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <select
+              value={dateFilterPreset}
+              onChange={(e) => setDateFilterPreset(e.target.value as any)}
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer shrink-0"
+            >
+              <option value="all">📅 Todas las Fechas</option>
+              <option value="today">📅 Hoy</option>
+              <option value="7days">📅 Últimos 7 Días</option>
+              <option value="this_month">📅 Este Mes</option>
+              <option value="30days">📅 Últimos 30 Días</option>
+              <option value="custom">📅 Rango Personalizado...</option>
+            </select>
+
+            {dateFilterPreset === 'custom' && (
+              <div className="flex items-center gap-1 shrink-0">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-2 py-0.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  title="Fecha Inicial"
+                />
+                <span className="text-[10px] text-slate-400 font-bold">a</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-2 py-0.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  title="Fecha Final"
+                />
+              </div>
+            )}
+          </div>
+
           {/* Indicador de filtro exclusivo cuando se consulta desde Ventas */}
           {filterOrderNumber && (
             <>
@@ -1148,7 +1681,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
           )}
 
           {/* Botón Restablecer */}
-          {(searchQuery || statusFilter !== 'all' || supplierFilter !== 'all' || filterOrderNumber) && (
+          {(searchQuery || statusFilter !== 'all' || supplierFilter !== 'all' || dateFilterPreset !== 'all' || startDate || endDate || filterOrderNumber) && (
             <>
               <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
               <button
@@ -1157,6 +1690,9 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                   setSearchQuery('');
                   setStatusFilter('all');
                   setSupplierFilter('all');
+                  setDateFilterPreset('all');
+                  setStartDate('');
+                  setEndDate('');
                   if (onClearFilterOrderNumber) onClearFilterOrderNumber();
                 }}
                 className="text-[11px] text-rose-800 hover:text-rose-950 font-bold px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-300 transition cursor-pointer flex items-center space-x-1 shadow-2xs shrink-0 whitespace-nowrap"
@@ -1300,90 +1836,64 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
 
           return (
             <div id="purchases-list-container" className="space-y-4">
+              {groupedPurchaseBlocks.length > 0 && (
+                <div className="flex items-center justify-between gap-2 p-2 sm:p-2.5 bg-slate-50 border border-slate-200/90 rounded-2xl shadow-2xs mb-1 flex-wrap">
+                  <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Registros de Compras ({groupedPurchaseBlocks.length} {groupedPurchaseBlocks.length === 1 ? 'bloque / compra' : 'bloques de compra'})</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCollapseAllPurchases}
+                      className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                      title="Encojer todos los registros de compras a una sola fila"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Encojer Todos</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExpandAllPurchases}
+                      className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                      title="Desplegar todos los registros de compras"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Desplegar Todos</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {groupedPurchaseBlocks.map((block, index) => {
                 const isFirst = index === 0;
                 if (block.type === 'single') {
-                  return renderPurchaseCard(block.purchase, false, isFirst);
+                  return (
+                    <SinglePurchaseCardBlock
+                      key={block.key}
+                      purchase={block.purchase}
+                      isFirst={isFirst}
+                      blockKey={block.key}
+                      isCollapsed={collapsedBlockKeys.has(block.key)}
+                      onToggleCollapse={() => handleToggleBlockCollapse(block.key)}
+                      currency={currency}
+                      renderPurchaseCard={renderPurchaseCard}
+                    />
+                  );
                 }
 
-                const group = block;
-                const groupTotalCost = group.purchases.reduce((sum, p) => sum + (Number(p.totalCost) || 0), 0);
-                const uniqueGroupSuppliers = Array.from(new Set(group.purchases.map((p) => p.supplierName).filter(Boolean)));
-                const allGroupReceived = group.purchases.every((p) => p.status === 'received');
-                const hasGroupPending = group.purchases.some((p) => p.status === 'pending' || p.status === 'ordered');
-
                 return (
-                  <div
-                    key={group.key}
-                    id={isFirst ? 'purchases-first-record' : undefined}
-                    className="rounded-2xl border-2 border-indigo-200/90 bg-gradient-to-b from-indigo-50/70 via-slate-50/40 to-slate-50/90 p-4 sm:p-5 shadow-xs space-y-3.5 transition-all hover:border-indigo-300/90"
-                  >
-                    {/* Visual Group Banner Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100/90">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0 mt-0.5">
-                          <Layers className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-black uppercase tracking-wide text-indigo-950 bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 shadow-2xs">
-                              <ShoppingBag className="w-3.5 h-3.5 text-indigo-700" />
-                              Pedido de Venta #{group.orderNumber}
-                            </span>
-                            {group.customerName && (
-                              <span className="text-xs font-bold text-slate-800 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
-                                Cliente: <span className="text-indigo-950 font-black">{group.customerName}</span>
-                              </span>
-                            )}
-                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
-                              <Sparkles className="w-3 h-3 text-amber-600" />
-                              {group.purchases.length} {group.purchases.length === 1 ? 'Compra generada por proveedor' : 'Compras separadas por proveedor'}
-                            </span>
-                            {allGroupReceived ? (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                Todas en Bodega
-                              </span>
-                            ) : hasGroupPending ? (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-300 flex items-center gap-1">
-                                <Truck className="w-3 h-3 text-sky-600" />
-                                En Abastecimiento
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="text-xs text-slate-600 font-medium mt-1">
-                            Proveedores involucrados: <span className="font-bold text-slate-900">{uniqueGroupSuppliers.join(', ') || 'Sin asignar'}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Group Combined Cost & Action */}
-                      <div className="flex items-center gap-3 self-end sm:self-center">
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase font-bold text-slate-500">Costo Combinado ({group.purchases.length} {group.purchases.length === 1 ? 'OC' : 'OCs'})</div>
-                          <div className="font-mono font-black text-sm sm:text-base text-slate-900">
-                            ${groupTotalCost.toFixed(2)} <span className="text-xs text-slate-500">{currency}</span>
-                          </div>
-                        </div>
-                        {onGoToStoreOrders && (
-                          <button
-                            type="button"
-                            onClick={() => onGoToStoreOrders(group.orderNumber)}
-                            className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl transition cursor-pointer shadow-2xs flex items-center gap-1.5"
-                            title="Ver este pedido en la sección de ventas"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>Ver Venta</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* List of Supplier Purchases under this sales order */}
-                    <div className="space-y-3 pl-0 sm:pl-3 border-l-0 sm:border-l-2 sm:border-indigo-300/80">
-                      {group.purchases.map((purchase) => renderPurchaseCard(purchase, true))}
-                    </div>
-                  </div>
+                  <GroupedPurchaseCardBlock
+                    key={block.key}
+                    group={block}
+                    isFirst={isFirst}
+                    isGroupCollapsed={collapsedBlockKeys.has(block.key)}
+                    onToggleCollapse={() => handleToggleBlockCollapse(block.key)}
+                    currency={currency}
+                    onGoToStoreOrders={onGoToStoreOrders}
+                    renderPurchaseCard={renderPurchaseCard}
+                  />
                 );
               })}
             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   User,
@@ -61,6 +61,8 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [matchedCustomerInfo, setMatchedCustomerInfo] = useState<Customer | null>(null);
   const [ecuadorApiStatus, setEcuadorApiStatus] = useState<{ loading: boolean; message?: string } | null>(null);
+
+  const lastSavedStateRef = useRef<string>('');
 
   useEffect(() => {
     if (!isOpen || customer) return;
@@ -131,6 +133,19 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
       setReference(customer.reference || '');
       setNotes(customer.notes || '');
       setMatchedCustomerInfo(null);
+      lastSavedStateRef.current = JSON.stringify({
+        ci: customer.ci || '',
+        name: customer.fullName || customer.name || '',
+        phone: customer.phone || '',
+        email: customer.email || '',
+        address: customer.address || '',
+        shippingAddress: customer.exactAddress || customer.fullAddress || '',
+        province: customer.province || '',
+        canton: customer.canton || '',
+        parish: customer.parish || '',
+        reference: customer.reference || '',
+        notes: customer.notes || '',
+      });
     } else {
       setCi('');
       setFullName('');
@@ -144,10 +159,53 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
       setReference('');
       setNotes('');
       setMatchedCustomerInfo(null);
+      lastSavedStateRef.current = '';
     }
     setError(null);
     setShowSuggestions(false);
   }, [customer, isOpen]);
+
+  // Real-time auto-sync effect (debounced 500ms)
+  useEffect(() => {
+    if (!isOpen) return;
+    const cleanCi = ci.trim();
+    if (!cleanCi) return;
+    const ciVal = validateEcuadorId(cleanCi);
+    if (!ciVal.isValid) return;
+    if (!fullName.trim() || fullName.trim().length < 2) return;
+
+    const currentPayload = {
+      name: fullName.trim(),
+      fullName: fullName.trim(),
+      ci: ciVal.cleaned || cleanCi,
+      phone: phone.trim(),
+      email: email.trim() || undefined,
+      address: generalAddress.trim() || undefined,
+      fullAddress: shippingAddress.trim() || undefined,
+      exactAddress: shippingAddress.trim() || undefined,
+      province: province.trim() || ciVal.provinceName || undefined,
+      canton: canton.trim() || undefined,
+      parish: parish.trim() || undefined,
+      reference: reference.trim() || undefined,
+      notes: notes.trim() || undefined,
+    };
+
+    const payloadKey = JSON.stringify(currentPayload);
+    if (payloadKey === lastSavedStateRef.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const success = await onSave(currentPayload);
+        if (success) {
+          lastSavedStateRef.current = payloadKey;
+        }
+      } catch (err) {
+        console.warn('Real-time customer auto-sync warning:', err);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, ci, fullName, phone, email, generalAddress, shippingAddress, province, canton, parish, reference, notes, onSave]);
 
   if (!isOpen) return null;
 

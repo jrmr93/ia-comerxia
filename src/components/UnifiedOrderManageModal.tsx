@@ -405,6 +405,71 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const [exactAddress, setExactAddress] = useState<string>('');
   const [reference, setReference] = useState<string>('');
 
+  const lastSavedCustomerRef = useRef<string>('');
+
+  // Real-time customer auto-sync effect (debounced 600ms)
+  useEffect(() => {
+    if (!isOpen || docType === '07') return;
+    const cleanDigits = (customerCi || '').replace(/\D/g, '');
+    if (cleanDigits.length !== 10 && cleanDigits.length !== 13) return;
+    if (cleanDigits === '9999999999999') return;
+    if (!customerName || customerName.trim().length < 2) return;
+
+    const payload = {
+      ci: cleanDigits,
+      name: customerName.trim(),
+      fullName: customerName.trim(),
+      phone: (customerPhone || '').trim(),
+      email: (customerEmail || '').trim() || undefined,
+      address: (customerFiscalAddress || '').trim() || undefined,
+      province: (province || '').trim() || undefined,
+      canton: (canton || '').trim() || undefined,
+      parish: (parish || '').trim() || undefined,
+      exactAddress: (exactAddress || '').trim() || undefined,
+      reference: (reference || '').trim() || undefined,
+    };
+
+    const payloadKey = JSON.stringify(payload);
+    if (payloadKey === lastSavedCustomerRef.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const savedCust = await res.json();
+          lastSavedCustomerRef.current = payloadKey;
+          setMatchedCustomerInfo({
+            ci: cleanDigits,
+            name: customerName.trim(),
+            phone: savedCust?.phone || customerPhone || '',
+            source: 'Actualizado en CRM (Tiempo real)',
+          });
+        }
+      } catch (saveErr) {
+        console.warn('Real-time customer auto-sync warning in OrderModal:', saveErr);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [
+    isOpen,
+    docType,
+    customerCi,
+    customerName,
+    customerPhone,
+    customerEmail,
+    customerFiscalAddress,
+    province,
+    canton,
+    parish,
+    exactAddress,
+    reference,
+  ]);
+
   const [trackingCarrier, setTrackingCarrier] = useState<string>(activeCouriers[0]?.name || 'Servientrega');
   const [trackingNumber, setTrackingNumber] = useState<string>('');
   const [trackingNotes, setTrackingNotes] = useState<string>('');

@@ -8,7 +8,7 @@ export interface DirectOrderPrintParams {
   inventoryItems?: any[];
   storeConfig?: Partial<StoreConfig> | null;
   currency?: string;
-  paperFormat?: 'a4' | 'letter';
+  paperFormat?: 'a4' | 'letter' | '80mm' | '58mm' | '48mm' | '44mm';
   showToast?: (msg: string) => void;
 }
 
@@ -20,10 +20,100 @@ export interface A4PrintItem {
   totalPrice: number;
 }
 
+export interface PaperFormatSpec {
+  id: 'a4' | 'letter' | '80mm' | '58mm' | '48mm' | '44mm';
+  label: string;
+  widthCss: string;
+  isThermal: boolean;
+  padding: string;
+  baseFontSize: string;
+  titleFontSize: string;
+  numFontSize: string;
+  pageSize: string;
+}
+
+export const getPaperFormatSpec = (fmt: 'a4' | 'letter' | '80mm' | '58mm' | '48mm' | '44mm'): PaperFormatSpec => {
+  switch (fmt) {
+    case '44mm':
+      return {
+        id: '44mm',
+        label: '44 mm',
+        widthCss: '44mm',
+        isThermal: true,
+        padding: '2mm 1mm',
+        baseFontSize: '7px',
+        titleFontSize: '8.5px',
+        numFontSize: '8.5px',
+        pageSize: '44mm auto',
+      };
+    case '48mm':
+      return {
+        id: '48mm',
+        label: '48 mm',
+        widthCss: '48mm',
+        isThermal: true,
+        padding: '2mm 1.5mm',
+        baseFontSize: '7.5px',
+        titleFontSize: '9.5px',
+        numFontSize: '9.5px',
+        pageSize: '48mm auto',
+      };
+    case '58mm':
+      return {
+        id: '58mm',
+        label: '58 mm',
+        widthCss: '58mm',
+        isThermal: true,
+        padding: '2.5mm 2mm',
+        baseFontSize: '8.5px',
+        titleFontSize: '10.5px',
+        numFontSize: '10.5px',
+        pageSize: '58mm auto',
+      };
+    case '80mm':
+      return {
+        id: '80mm',
+        label: '80 mm',
+        widthCss: '80mm',
+        isThermal: true,
+        padding: '3mm 2.5mm',
+        baseFontSize: '9.5px',
+        titleFontSize: '12px',
+        numFontSize: '11.5px',
+        pageSize: '80mm auto',
+      };
+    case 'letter':
+      return {
+        id: 'letter',
+        label: 'Carta',
+        widthCss: '215.9mm',
+        isThermal: false,
+        padding: '7mm 10mm',
+        baseFontSize: '9.5px',
+        titleFontSize: '15px',
+        numFontSize: '14.5px',
+        pageSize: 'letter portrait',
+      };
+    case 'a4':
+    default:
+      return {
+        id: 'a4',
+        label: 'A4',
+        widthCss: '210mm',
+        isThermal: false,
+        padding: '7mm 10mm',
+        baseFontSize: '9.5px',
+        titleFontSize: '15px',
+        numFontSize: '14.5px',
+        pageSize: 'a4 portrait',
+      };
+  }
+};
+
 /**
- * Genera el documento HTML completo y auto-contenido, formateado para A4 o Carta en orientación Vertical (Retrato).
- * Incluye encabezado empresarial, datos del cliente/proveedor, tabla detallada de productos con SKU y totales.
- * Diseñado exclusivamente para el gestor de impresión del navegador (sin barras de herramientas ni previsualizaciones del sistema).
+ * Genera el documento HTML completo y auto-contenido adaptado al formato elegido:
+ * - Para A4 / Carta: Formato oficial con desglose completo y firmas.
+ * - Para Rollos Térmicos (44mm, 48mm, 58mm, 80mm): Formato POS de 2 líneas por producto.
  */
 export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
   const {
@@ -37,6 +127,8 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
 
   const isSale = Boolean(order);
   const isPurchase = Boolean(purchase);
+  const spec = getPaperFormatSpec(paperFormat);
+  const isThermal = spec.isThermal;
 
   const curr = currency || storeConfig?.currency || 'USD';
   const currencySymbol = curr === 'USD' ? '$' : curr;
@@ -119,7 +211,6 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
   let documentTitle = '';
   let orderDateStr = '';
   let orderStatusBadge = '';
-  let notesStr = '';
 
   if (isSale && order) {
     const isConfirmedOrder = order.status === 'confirmed' || order.status === 'shipped' || order.status === 'delivered';
@@ -140,15 +231,14 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
 
     orderStatusBadge =
       order.status === 'delivered'
-        ? 'FACTURA ENTREGADA'
+        ? 'ENTREGADO'
         : order.status === 'shipped'
-        ? 'FACTURA EN TRÁNSITO'
+        ? 'EN TRÁNSITO'
         : order.status === 'confirmed'
-        ? 'FACTURA CONFIRMADA'
+        ? 'CONFIRMADO'
         : order.status === 'cancelled'
-        ? 'ANULADA / CANCELADA'
-        : 'PRE-FACTURA PENDIENTE';
-    notesStr = order.notes || '';
+        ? 'CANCELADO'
+        : 'PENDIENTE DE PAGO';
   } else if (isPurchase && purchase) {
     documentTitle = 'ORDEN DE COMPRA';
     orderNumberStr = String(purchase.purchaseNumber || purchase.id || '');
@@ -170,14 +260,12 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
         : purchase.status === 'cancelled'
         ? 'ANULADO'
         : 'PENDIENTE';
-    notesStr = purchase.notes || '';
   }
 
-  // SRI Fiscal Breakdown calculation for Sales and Orders (100% identical to OrdersTableView "Vista Factura")
+  // SRI Fiscal Breakdown calculation for Sales and Orders
   let salesCalculatedItems: any[] = [];
   let invoiceTotals: EcuadorInvoiceTotalsResult | null = null;
   if (isSale && order) {
-    const orderApplyTax = (order as any).applySaleTax !== false;
     const orderTaxPct = Number((order as any).saleTaxPercent || 15);
 
     const parsedItems = rawItems.map((it: any) => {
@@ -292,7 +380,6 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
 
     (rawItems || []).forEach((item: any) => {
       const qty = Number(item.quantity) || 1;
-      const unitCost = Number(item.costPrice || 0);
       const discount = Number(item.discount || 0);
       totalDiscount += discount;
 
@@ -305,16 +392,7 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
           ? 0
           : 15;
 
-      const baseUnitCost = Number(
-        item.costPrice !== undefined && item.costPrice !== null && Number(item.costPrice) > 0
-          ? item.costPrice
-          : (item as any).costWithoutTax !== undefined && (item as any).costWithoutTax !== null && Number((item as any).costWithoutTax) > 0
-          ? (item as any).costWithoutTax
-          : (item as any).baseCostPrice !== undefined && (item as any).baseCostPrice !== null && Number((item as any).baseCostPrice) > 0
-          ? (item as any).baseCostPrice
-          : 0
-      );
-
+      const baseUnitCost = Number(item.costPrice || 0);
       const lineSubtotal = Math.max(0, baseUnitCost * qty - discount);
 
       if (taxPercent === 0) {
@@ -342,8 +420,6 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
       grandTotal,
     };
   }
-
-  // Exact detailed item structures matching horizontal invoice table views
 
   const purchaseFormattedItems = isPurchase && purchase ? (rawItems || []).map((item: any, idx: number) => {
     const ordered = Number(item.quantity) || 1;
@@ -380,8 +456,6 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
   }) : [];
 
   const purchaseTotalOrdered = purchaseFormattedItems.reduce((sum, it) => sum + it.ordered, 0);
-  const purchaseTotalReceived = purchaseFormattedItems.reduce((sum, it) => sum + it.received, 0);
-  const purchaseTotalPending = purchaseFormattedItems.reduce((sum, it) => sum + it.pending, 0);
 
   // Customer / Supplier specifics
   const customerName = order?.customerName || '';
@@ -397,11 +471,6 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
   const supplierName = purchase?.supplierName || '';
   const supplierContact = purchase?.supplierContact || '';
   const paymentStatus = purchase?.paymentStatus === 'paid' ? 'PAGADO' : 'POR PAGAR';
-  const linkedSaleOrder = purchase?.linkedCustomerOrderNumber
-    ? `#${purchase.linkedCustomerOrderNumber}`
-    : purchase?.linkedCustomerOrderId
-    ? `#${purchase.linkedCustomerOrderId}`
-    : null;
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -411,8 +480,8 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
   <title>${documentTitle} #${orderNumberStr} - Comerxia ERP</title>
   <style>
     @page {
-      size: ${paperFormat === 'letter' ? 'letter' : 'a4'} portrait;
-      margin: 10mm 12mm 10mm 12mm;
+      size: ${spec.pageSize};
+      margin: 0mm;
     }
     * {
       box-sizing: border-box;
@@ -425,720 +494,404 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
       background: #ffffff;
       color: #0f172a;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 11.5px;
-      line-height: 1.35;
+      font-size: ${spec.baseFontSize};
+      line-height: 1.3;
+      width: ${spec.widthCss};
     }
     .page-wrapper {
-      width: 100%;
-      max-width: ${paperFormat === 'letter' ? '215.9mm' : '210mm'};
+      width: ${spec.widthCss};
+      max-width: ${spec.widthCss};
       margin: 0 auto;
       background: #ffffff;
-      padding: 0;
+      padding: ${spec.padding};
       box-sizing: border-box;
     }
 
-    /* Encabezado */
-    .header-table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin-bottom: 8px;
-      padding-bottom: 6px;
-      border-bottom: 2px solid #0f172a;
-    }
-    .header-table td {
-      vertical-align: top;
-    }
-    .store-name {
-      font-size: 17px;
-      font-weight: 900;
-      color: #0f172a;
-      text-transform: uppercase;
-      letter-spacing: -0.3px;
-      margin-bottom: 2px;
-      line-height: 1.2;
-    }
-    .store-sub {
-      font-size: 10px;
-      color: #475569;
-      line-height: 1.35;
-    }
-    .doc-badge {
-      display: inline-block;
-      padding: 4px 10px;
-      background: #0f172a;
-      color: #ffffff;
-      font-weight: 900;
-      font-size: 11px;
-      letter-spacing: 0.4px;
-      border-radius: 4px;
-      text-transform: uppercase;
-    }
-    .doc-number {
-      font-size: 17px;
-      font-weight: 900;
-      color: #0284c7;
-      margin-top: 3px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
+    /* Estilos Hoja Completa A4 / Carta */
+    .header-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 8px; border-bottom: 2px solid #0f172a; }
+    .header-table td { vertical-align: top; }
+    .store-name { font-size: 16px; font-weight: 900; color: #0f172a; text-transform: uppercase; margin-bottom: 2px; }
+    .store-sub { font-size: 10px; color: #475569; }
+    .doc-badge { display: inline-block; padding: 3px 9px; background: #0f172a; color: #ffffff; font-weight: 900; font-size: 10.5px; border-radius: 4px; text-transform: uppercase; }
+    .doc-number { font-size: 16px; font-weight: 900; color: #0284c7; margin-top: 3px; font-family: monospace; }
+    .meta-box { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; }
+    .meta-box td { padding: 5px 8px; vertical-align: top; border-right: 1px solid #e2e8f0; width: 50%; }
+    .meta-box td:last-child { border-right: none; }
+    .section-title { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #334155; margin-bottom: 3px; border-bottom: 1px solid #cbd5e1; }
+    .field-row { margin-bottom: 2px; font-size: 10.5px; word-break: break-word; }
+    .field-label { font-weight: 700; color: #475569; display: inline-block; min-width: 80px; }
+    .field-val { color: #0f172a; font-weight: 500; }
+    .items-table { width: 100%; border-collapse: collapse; table-layout: fixed; word-wrap: break-word; margin-top: 4px; margin-bottom: 8px; font-size: 10.5px; }
+    .items-table th { background-color: #f1f5f9; color: #0f172a; font-weight: 800; text-transform: uppercase; font-size: 9.5px; border-top: 1px solid #cbd5e1; border-bottom: 1.5px solid #94a3b8; padding: 5px 7px; text-align: left; }
+    .items-table td { padding: 5px 7px; border-bottom: 1px solid #e2e8f0; color: #1e293b; vertical-align: middle; font-size: 10px; }
+    .sku-code { font-family: monospace; font-weight: 700; color: #0369a1; font-size: 10px; word-break: break-all; }
+    .product-title { font-weight: 600; color: #0f172a; word-break: break-word; }
+    .qty-cell { text-align: center; font-weight: 800; font-size: 11px; }
+    .price-cell { text-align: right; font-family: monospace; font-weight: 600; }
+    .total-cell { text-align: right; font-family: monospace; font-weight: 800; color: #0f172a; }
+    .summary-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 4px; }
+    .totals-box { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+    .totals-box td { padding: 3px 5px; }
+    .totals-label { text-align: right; color: #475569; font-weight: 700; width: 60%; }
+    .totals-val { text-align: right; font-family: monospace; font-weight: 700; color: #0f172a; width: 40%; }
+    .grand-total-row { border-top: 2px solid #0f172a; background-color: #f8fafc; }
+    .grand-total-row td { padding: 5px 6px; font-size: 12px; font-weight: 900; color: #0f172a; }
+    .signatures-section { margin-top: 16px; page-break-inside: avoid; }
+    .signatures-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .signatures-table td { width: 50%; padding: 0 16px; text-align: center; vertical-align: bottom; }
+    .signature-line { border-top: 1px solid #94a3b8; padding-top: 4px; font-size: 9px; font-weight: 700; color: #475569; text-transform: uppercase; }
+    .footer-doc { margin-top: 8px; padding-top: 4px; border-top: 1px dashed #cbd5e1; text-align: center; font-size: 8.5px; color: #64748b; }
 
-    /* Cuadro de Información: Cliente / Proveedor */
-    .meta-box {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin-bottom: 8px;
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-    }
-    .meta-box td {
-      padding: 6px 10px;
-      vertical-align: top;
-      border-right: 1px solid #e2e8f0;
-      width: 50%;
-    }
-    .meta-box td:last-child {
-      border-right: none;
-    }
-    .section-title {
-      font-size: 10px;
-      font-weight: 800;
-      text-transform: uppercase;
-      color: #334155;
-      letter-spacing: 0.4px;
-      margin-bottom: 4px;
-      border-bottom: 1px solid #cbd5e1;
-      padding-bottom: 2px;
-    }
-    .field-row {
-      margin-bottom: 2.5px;
-      font-size: 11px;
-      line-height: 1.4;
-      word-break: break-word;
-    }
-    .field-label {
-      font-weight: 700;
-      color: #475569;
-      display: inline-block;
-      min-width: 85px;
-    }
-    .field-val {
-      color: #0f172a;
-      font-weight: 500;
-    }
-
-    /* Tabla de Productos */
-    .items-table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      word-wrap: break-word;
-      margin-top: 4px;
-      margin-bottom: 8px;
-      font-size: 11px;
-    }
-    .items-table th {
-      background-color: #f1f5f9;
-      color: #0f172a;
-      font-weight: 800;
-      text-transform: uppercase;
-      font-size: 10px;
-      letter-spacing: 0.3px;
-      border-top: 1px solid #cbd5e1;
-      border-bottom: 1.5px solid #94a3b8;
-      padding: 6px 8px;
-      text-align: left;
-    }
-    .items-table th.col-sku { width: 18%; }
-    .items-table th.col-name { width: 44%; }
-    .items-table th.col-qty { width: 12%; text-align: center; }
-    .items-table th.col-unit { width: 13%; text-align: right; }
-    .items-table th.col-total { width: 13%; text-align: right; }
-
-    .items-table td {
-      padding: 6px 8px;
-      border-bottom: 1px solid #e2e8f0;
-      color: #1e293b;
-      vertical-align: middle;
-      font-size: 11px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .items-table tbody tr:nth-child(even) {
-      background-color: #fafbfc;
-    }
-    .sku-code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-weight: 700;
-      color: #0369a1;
-      font-size: 10.5px;
-      word-break: break-all;
-    }
-    .product-title {
-      font-weight: 600;
-      color: #0f172a;
-      line-height: 1.3;
-      word-break: break-word;
-      font-size: 11.5px;
-    }
-    .qty-cell {
-      text-align: center;
-      font-weight: 800;
-      font-size: 12px;
-    }
-    .price-cell {
-      text-align: right;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-weight: 600;
-      font-size: 11.5px;
-    }
-    .total-cell {
-      text-align: right;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-weight: 800;
-      color: #0f172a;
-      font-size: 12px;
-    }
-
-    /* Resumen y Totales */
-    .summary-table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin-top: 4px;
-    }
-    .summary-table td {
-      vertical-align: top;
-    }
-    .notes-box {
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      padding: 7px 10px;
-      font-size: 10.5px;
-      color: #334155;
-      line-height: 1.4;
-    }
-    .totals-box {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
-    }
-    .totals-box td {
-      padding: 3px 6px;
-    }
-    .totals-label {
-      text-align: right;
-      color: #475569;
-      font-weight: 700;
-      width: 58%;
-    }
-    .totals-val {
-      text-align: right;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-weight: 700;
-      color: #0f172a;
-      width: 42%;
-    }
-    .grand-total-row {
-      border-top: 2px solid #0f172a;
-      background-color: #f8fafc;
-    }
-    .grand-total-row td {
-      padding: 6px 8px;
-      font-size: 13px;
-      font-weight: 900;
-      color: #0f172a;
-    }
-
-    /* Firmas y Pie */
-    .signatures-section {
-      margin-top: 18px;
-      page-break-inside: avoid;
-    }
-    .signatures-table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-    }
-    .signatures-table td {
-      width: 50%;
-      padding: 0 18px;
-      text-align: center;
-      vertical-align: bottom;
-    }
-    .signature-line {
-      border-top: 1px solid #94a3b8;
-      padding-top: 5px;
-      font-size: 10px;
-      font-weight: 700;
-      color: #475569;
-      text-transform: uppercase;
-    }
-    .footer-doc {
-      margin-top: 10px;
-      padding-top: 4px;
-      border-top: 1px dashed #cbd5e1;
-      text-align: center;
-      font-size: 9px;
-      color: #64748b;
-    }
-
-    @media screen {
-      body {
-        background: #f1f5f9;
-        padding: 18px 0;
-      }
-      .page-wrapper {
-        background: #ffffff;
-        padding: 10mm 12mm;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-        border-radius: 4px;
-      }
-    }
+    /* Estilos Rollos Térmicos */
+    .thermal-divider { border-bottom: 1px dashed #94a3b8; margin: 4px 0; }
+    .thermal-header { text-align: center; margin-bottom: 4px; }
+    .thermal-title { font-weight: 900; text-transform: uppercase; font-size: ${spec.titleFontSize}; color: #0f172a; }
+    .thermal-item-title { font-weight: 700; color: #0f172a; word-break: break-word; }
+    .thermal-item-sub { display: flex; justify-content: space-between; font-size: 0.9em; color: #475569; margin-top: 1px; }
 
     @media print {
-      body {
-        background: #ffffff !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      .page-wrapper {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 0 !important;
-        box-shadow: none !important;
-        border-radius: 0 !important;
-      }
-      table {
-        page-break-inside: auto;
-      }
-      tr {
-        page-break-inside: avoid !important;
-        page-break-after: auto;
-      }
-      thead {
-        display: table-header-group;
-      }
-      .signatures-section, .footer-doc {
-        page-break-inside: avoid !important;
-      }
-      .print-helper-bar {
-        display: none !important;
-      }
+      .print-helper-bar { display: none !important; }
+      .page-wrapper { width: 100% !important; max-width: 100% !important; padding: ${spec.padding} !important; border: none !important; box-shadow: none !important; }
     }
   </style>
   <script>
     (function() {
       function launchPrint() {
-        try {
-          window.focus();
-          window.print();
-        } catch(e) {
-          console.warn('Auto print error inside print frame:', e);
-        }
+        try { window.focus(); window.print(); } catch(e) {}
       }
-      if (document.readyState === 'complete') {
-        setTimeout(launchPrint, 100);
-      } else {
-        window.addEventListener('load', function() {
-          setTimeout(launchPrint, 100);
-        });
-      }
+      if (document.readyState === 'complete') { setTimeout(launchPrint, 100); }
+      else { window.addEventListener('load', function() { setTimeout(launchPrint, 100); }); }
     })();
   </script>
 </head>
 <body>
-  <div class="print-helper-bar" style="background: #0f172a; color: #f8fafc; padding: 7px 16px; display: flex; align-items: center; justify-content: space-between; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; border-bottom: 1px solid #334155; position: sticky; top: 0; z-index: 9999;">
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <span style="font-size: 15px;">🖨️</span>
-      <span style="font-weight: 700;">Gestor de Impresión: ${documentTitle} #${orderNumberStr}</span>
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <button onclick="window.print()" style="background: #0284c7; color: #ffffff; border: none; padding: 5px 12px; border-radius: 5px; font-weight: 700; font-size: 11.5px; cursor: pointer;">
-        🖨️ Abrir Diálogo de Impresión
-      </button>
-      <button onclick="window.close()" style="background: #334155; color: #cbd5e1; border: none; padding: 5px 10px; border-radius: 5px; font-weight: 600; font-size: 11.5px; cursor: pointer;">
-        Cerrar
-      </button>
-    </div>
-  </div>
   <div class="page-wrapper">
-    <!-- Header Empresa y Documento -->
-    <table class="header-table">
-      <tr>
-        <td style="width: 60%;">
-          ${storeLogo ? `<img src="${storeLogo}" alt="${storeName}" crossOrigin="anonymous" referrerPolicy="no-referrer" style="max-height: 40px; max-width: 160px; object-fit: contain; margin-bottom: 4px;" /><br>` : ''}
-          <div class="store-name">${storeName}</div>
-          ${storeDescription ? `<div class="store-sub">${storeDescription}</div>` : ''}
-          ${storeAddress ? `<div class="store-sub"><strong>Dirección:</strong> ${storeAddress}</div>` : ''}
-          ${storePhone ? `<div class="store-sub"><strong>Teléfono / WhatsApp:</strong> ${storePhone}</div>` : ''}
-        </td>
-        <td style="width: 40%; text-align: right;">
-          <div class="doc-badge">${documentTitle}</div>
-          <div class="doc-number">#${orderNumberStr}</div>
-          <div style="font-size: 9px; color: #475569; margin-top: 3px;">
-            <strong>Fecha de Emisión:</strong><br>${orderDateStr}
-          </div>
-          <div style="margin-top: 4px;">
-            <span style="font-size: 8.5px; font-weight: 800; background: #e2e8f0; color: #1e293b; padding: 2px 6px; border-radius: 3px; display: inline-block;">
-              ESTADO: ${orderStatusBadge}
-            </span>
-          </div>
-        </td>
-      </tr>
-    </table>
+    ${
+      isThermal
+        ? `
+      <!-- TICKET POS TÉRMICO AUTO-AJUSTADO -->
+      <div class="thermal-header">
+        ${storeLogo ? `<img src="${storeLogo}" alt="${storeName}" style="max-height: 28px; max-width: 120px; object-fit: contain; margin-bottom: 2px;" /><br>` : ''}
+        <div class="thermal-title">${storeName}</div>
+        ${storeDescription ? `<div style="font-size: 0.9em; color: #475569;">${storeDescription}</div>` : ''}
+        ${storeAddress ? `<div style="font-size: 0.9em; color: #475569;">${storeAddress}</div>` : ''}
+        ${storePhone ? `<div style="font-size: 0.9em; color: #475569;">Tel: ${storePhone}</div>` : ''}
+      </div>
 
-    <!-- Bloque de Información: Cliente o Proveedor -->
-    <table class="meta-box">
-      <tr>
-        <td>
-          <div class="section-title">${isSale ? 'Datos del Cliente' : 'Datos del Proveedor'}</div>
-          ${
-            isSale
-              ? `
-            <div class="field-row"><span class="field-label">Cliente:</span> <span class="field-val"><strong>${customerName || 'Cliente General'}</strong></span></div>
-            <div class="field-row"><span class="field-label">Cédula / RUC:</span> <span class="field-val">${customerCi || 'Consumidor Final'}</span></div>
-            <div class="field-row"><span class="field-label">Teléfono:</span> <span class="field-val">${customerPhone || '—'}</span></div>
-            ${customerEmail ? `<div class="field-row"><span class="field-label">Correo:</span> <span class="field-val">${customerEmail}</span></div>` : ''}
-            <div class="field-row"><span class="field-label">Dirección:</span> <span class="field-val">${customerAddress || (isPickup ? 'Retiro en Local Comercial' : '—')}</span></div>
-          `
-              : `
-            <div class="field-row"><span class="field-label">Proveedor:</span> <span class="field-val"><strong>${supplierName || 'Proveedor Registrado'}</strong></span></div>
-            <div class="field-row"><span class="field-label">Contacto:</span> <span class="field-val">${supplierContact || '—'}</span></div>
-            <div class="field-row"><span class="field-label">Estado Pago:</span> <span class="field-val">${paymentStatus}</span></div>
-            ${linkedSaleOrder ? `<div class="field-row"><span class="field-label">Venta Vinculada:</span> <span class="field-val">Pedido ${linkedSaleOrder}</span></div>` : ''}
-          `
-          }
-        </td>
-        <td>
-          <div class="section-title">${isSale ? 'Detalles de Despacho y Pago' : 'Condiciones de la Orden'}</div>
-          ${
-            isSale
-              ? `
-            <div class="field-row"><span class="field-label">Modalidad:</span> <span class="field-val"><strong>${isPickup ? 'Retiro en Local' : 'Envío a Domicilio'}</strong></span></div>
-            <div class="field-row"><span class="field-label">Forma de Pago:</span> <span class="field-val">${paymentMethod || 'Acuerdo Comercial'}</span></div>
-            ${order?.trackingCarrier ? `<div class="field-row"><span class="field-label">Courier:</span> <span class="field-val">${order.trackingCarrier}</span></div>` : ''}
-            ${order?.trackingNumber ? `<div class="field-row"><span class="field-label">N° Guía:</span> <span class="field-val">${order.trackingNumber}</span></div>` : ''}
-          `
-              : `
-            <div class="field-row"><span class="field-label">Tipo Compra:</span> <span class="field-val">${linkedSaleOrder ? 'Abastecimiento de Venta (Bajo Pedido)' : 'Reposición de Inventario'}</span></div>
-            <div class="field-row"><span class="field-label">Recepción:</span> <span class="field-val">${purchase?.status === 'received' ? 'Recibido en Bodega Central' : 'Pendiente de Entrega'}</span></div>
-            <div class="field-row"><span class="field-label">Total Ítems:</span> <span class="field-val">${items.length} productos (${totalUnits} unidades)</span></div>
-          `
-          }
-        </td>
-      </tr>
-    </table>
+      <div class="thermal-divider"></div>
 
-    <!-- TABLA PRINCIPAL DE PRODUCTOS TIPO FACTURA HASTA EL DETALLE COMPLETO DE LA VISTA HORIZONTAL -->
-    <table class="items-table">
-      <thead>
+      <div style="text-align: center; margin-bottom: 4px;">
+        <div class="thermal-title">${documentTitle} #${orderNumberStr}</div>
+        <div style="font-size: 0.9em; color: #475569; margin-top: 1px;">${orderDateStr}</div>
+        <div style="font-weight: 800; font-size: 0.85em; margin-top: 2px; color: #1e293b;">[ESTADO: ${orderStatusBadge}]</div>
+      </div>
+
+      <div class="thermal-divider"></div>
+
+      <div style="margin-bottom: 4px; font-size: 0.95em;">
         ${
           isSale
             ? `
-          <tr>
-            <th style="width: 4%; text-align: center;">#</th>
-            <th style="width: 36%;">Producto / Descripción</th>
-            <th style="width: 14%;">SKU / Código</th>
-            <th style="width: 8%; text-align: center;">Cantidad</th>
-            <th style="width: 11%; text-align: right;">Valor Unit. ($)</th>
-            <th style="width: 9%; text-align: right;">Desc. ($)</th>
-            <th style="width: 7%; text-align: center;">IVA (%)</th>
-            <th style="width: 11%; text-align: right;">Subtotal ($)</th>
-          </tr>
+          <div><strong>Cliente:</strong> ${customerName || 'Consumidor Final'}</div>
+          ${customerCi ? `<div><strong>CI/RUC:</strong> ${customerCi}</div>` : ''}
+          ${customerPhone ? `<div><strong>Tel:</strong> ${customerPhone}</div>` : ''}
+          ${customerAddress ? `<div><strong>Dir:</strong> ${customerAddress}</div>` : ''}
+          ${paymentMethod ? `<div><strong>Pago:</strong> ${paymentMethod}</div>` : ''}
         `
             : `
-          <tr>
-            <th style="width: 4%; text-align: center;">#</th>
-            <th style="width: 32%;">Producto / Descripción</th>
-            <th style="width: 15%;">SKU / Código</th>
-            <th style="width: 7%; text-align: center;">Pedida</th>
-            <th style="width: 7%; text-align: center;">Bodega</th>
-            <th style="width: 7%; text-align: center;">Pendiente</th>
-            <th style="width: 10%; text-align: right;">Costo Unit. ($)</th>
-            <th style="width: 7%; text-align: right;">Desc. ($)</th>
-            <th style="width: 5%; text-align: center;">IVA</th>
-            <th style="width: 11%; text-align: right;">Total ($)</th>
-          </tr>
+          <div><strong>Proveedor:</strong> ${supplierName || 'Proveedor Registrado'}</div>
+          ${supplierContact ? `<div><strong>Contacto:</strong> ${supplierContact}</div>` : ''}
+          <div><strong>Estado Pago:</strong> ${paymentStatus}</div>
         `
         }
-      </thead>
-      <tbody>
+      </div>
+
+      <div class="thermal-divider"></div>
+
+      <!-- PRODUCTOS EN 2 LÍNEAS -->
+      <div style="margin-bottom: 4px;">
+        <div style="font-weight: 800; font-size: 0.85em; display: flex; justify-content: space-between; border-bottom: 1px solid #0f172a; padding-bottom: 2px; margin-bottom: 3px;">
+          <span>CANT / PRODUCTO</span>
+          <span>TOTAL</span>
+        </div>
         ${
           isSale
             ? salesCalculatedItems
                 .map(
-                  (it, idx) => `
-              <tr>
-                <td style="text-align: center; font-weight: bold; color: #64748b;">#${idx + 1}</td>
-                <td class="product-title">${it.name}</td>
-                <td class="sku-code">${it.sku || '-'}</td>
-                <td class="qty-cell">${it.quantity} u.</td>
-                <td class="price-cell">${currencySymbol}${it.unitPriceWithoutTax.toFixed(2)}</td>
-                <td class="price-cell" style="color: ${it.unitDiscount > 0 ? '#b45309' : '#64748b'};">${currencySymbol}${(it.unitDiscount * it.quantity).toFixed(2)}</td>
-                <td style="text-align: center; font-weight: bold;">
-                  <span style="display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 9px; ${it.lineTaxPercent > 0 ? 'background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe;' : 'background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;'}">
-                    ${it.lineTaxPercent}%
-                  </span>
-                </td>
-                <td class="total-cell">${currencySymbol}${it.lineSubtotal.toFixed(2)}</td>
-              </tr>
+                  (it) => `
+              <div style="margin-bottom: 3px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 2px;">
+                <div class="thermal-item-title">${it.name}</div>
+                <div class="thermal-item-sub">
+                  <span>${it.quantity} u. x ${currencySymbol}${it.unitPriceWithoutTax.toFixed(2)}${it.unitDiscount > 0 ? ` (-${currencySymbol}${(it.unitDiscount * it.quantity).toFixed(2)})` : ''}</span>
+                  <span style="font-weight: 800; color: #0f172a; font-family: monospace;">${currencySymbol}${it.lineSubtotal.toFixed(2)}</span>
+                </div>
+              </div>
             `
                 )
                 .join('')
             : purchaseFormattedItems
                 .map(
                   (it) => `
-              <tr>
-                <td style="text-align: center; font-weight: bold; color: #64748b;">${it.index}</td>
-                <td class="product-title">${it.name}</td>
-                <td class="sku-code">${it.sku}</td>
-                <td class="qty-cell">${it.ordered} u.</td>
-                <td class="qty-cell" style="color: #15803d;">${it.received} u.</td>
-                <td class="qty-cell" style="color: #b45309;">${it.pending} u.</td>
-                <td class="price-cell">${currencySymbol}${it.unitCost.toFixed(2)}</td>
-                <td class="price-cell" style="color: ${it.discount > 0 ? '#b45309' : '#64748b'};">${currencySymbol}${it.discount.toFixed(2)}</td>
-                <td style="text-align: center; font-weight: bold;">${it.taxPercent}%</td>
-                <td class="total-cell">${currencySymbol}${it.lineSubtotal.toFixed(2)}</td>
-              </tr>
+              <div style="margin-bottom: 3px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 2px;">
+                <div class="thermal-item-title">${it.name}</div>
+                <div class="thermal-item-sub">
+                  <span>${it.ordered} u. x ${currencySymbol}${it.unitCost.toFixed(2)}${it.discount > 0 ? ` (-${currencySymbol}${it.discount.toFixed(2)})` : ''}</span>
+                  <span style="font-weight: 800; color: #0f172a; font-family: monospace;">${currencySymbol}${it.lineSubtotal.toFixed(2)}</span>
+                </div>
+              </div>
             `
                 )
                 .join('')
         }
-      </tbody>
-      <tfoot style="background: #f8fafc; font-weight: bold; border-top: 1.5px solid #cbd5e1; font-size: 8.5px;">
+      </div>
+
+      <div class="thermal-divider"></div>
+
+      <!-- TOTALES -->
+      <div style="font-size: 0.95em;">
         ${
-          isSale
+          isSale && invoiceTotals
             ? `
-          <tr>
-            <td colspan="3" style="padding: 4px 6px; color: #334155;">
-              Desglose de Venta: <strong>${salesCalculatedItems.length} ítems</strong> (${invoiceTotals?.totalUnits || 0} unidades en total)
-            </td>
-            <td style="padding: 4px 6px; text-align: center;">${invoiceTotals?.totalUnits || 0} u.</td>
-            <td colspan="3" style="padding: 4px 6px; text-align: right; text-transform: uppercase;">Total Venta:</td>
-            <td style="padding: 4px 6px; text-align: right; font-weight: 900; color: #0f172a; font-family: ui-monospace, monospace;">${currencySymbol}${invoiceTotals?.totalInvoiceAmount.toFixed(2) || '0.00'}</td>
-          </tr>
+          <div style="display: flex; justify-content: space-between;"><span>Subtotal 0%:</span><span style="font-family: monospace;">${currencySymbol}${invoiceTotals.subtotalZero0.toFixed(2)}</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Subtotal 15%:</span><span style="font-family: monospace;">${currencySymbol}${invoiceTotals.subtotalTaxable15.toFixed(2)}</span></div>
+          ${invoiceTotals.totalDiscount > 0 ? `<div style="display: flex; justify-content: space-between; color: #9a3412;"><span>Desc. Total:</span><span style="font-family: monospace;">-${currencySymbol}${invoiceTotals.totalDiscount.toFixed(2)}</span></div>` : ''}
+          <div style="display: flex; justify-content: space-between;"><span>IVA 15%:</span><span style="font-family: monospace;">${currencySymbol}${invoiceTotals.taxAmount15.toFixed(2)}</span></div>
+          ${invoiceTotals.shippingFee > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Envío:</span><span style="font-family: monospace;">+${currencySymbol}${invoiceTotals.shippingFee.toFixed(2)}</span></div>` : ''}
+          <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 2px solid #0f172a; margin-top: 3px; padding-top: 2px; font-size: ${spec.numFontSize};">
+            <span>TOTAL:</span>
+            <span style="font-family: monospace;">${currencySymbol}${invoiceTotals.totalInvoiceAmount.toFixed(2)}</span>
+          </div>
         `
-            : `
-          <tr>
-            <td colspan="3" style="padding: 4px 6px; color: #334155;">
-              Desglose de Factura: <strong>${purchaseFormattedItems.length} ítems</strong> (${purchaseTotalOrdered} un. pedidas)
-            </td>
-            <td style="padding: 4px 6px; text-align: center;">${purchaseTotalOrdered} u.</td>
-            <td style="padding: 4px 6px; text-align: center; color: #15803d;">${purchaseTotalReceived} u.</td>
-            <td style="padding: 4px 6px; text-align: center; color: #b45309;">${purchaseTotalPending} u.</td>
-            <td colspan="3" style="padding: 4px 6px; text-align: right; text-transform: uppercase;">Total Compra:</td>
-            <td style="padding: 4px 6px; text-align: right; font-weight: 900; color: #0f172a; font-family: ui-monospace, monospace;">${currencySymbol}${purchaseSriBreakdown?.grandTotal.toFixed(2) || '0.00'}</td>
-          </tr>
+            : isPurchase && purchaseSriBreakdown
+            ? `
+          <div style="display: flex; justify-content: space-between;"><span>Subtotal Sin Imp:</span><span style="font-family: monospace;">${currencySymbol}${purchaseSriBreakdown.subtotalSinImpuesto.toFixed(2)}</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>IVA 15%:</span><span style="font-family: monospace;">${currencySymbol}${purchaseSriBreakdown.iva15.toFixed(2)}</span></div>
+          <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 2px solid #0f172a; margin-top: 3px; padding-top: 2px; font-size: ${spec.numFontSize};">
+            <span>TOTAL:</span>
+            <span style="font-family: monospace;">${currencySymbol}${purchaseSriBreakdown.grandTotal.toFixed(2)}</span>
+          </div>
         `
+            : ''
         }
-      </tfoot>
-    </table>
+      </div>
 
-    <!-- TOTALES DEL DOCUMENTO -->
-    <table class="summary-table">
-      <tr>
-        <td style="width: 52%;">
-          ${
-            notesStr
-              ? `
-            <div class="notes-box">
-              <strong>Observaciones / Notas:</strong><br>
-              ${notesStr}
-            </div>
-          `
-              : `
-            <div style="font-size: 9px; color: #64748b; font-style: italic;">
-              * Comprobante oficial de ${isSale ? 'venta' : 'compra'} generado por el sistema Comerxia ERP.
-            </div>
-          `
-          }
-        </td>
-        <td style="width: 48%;">
-          <table class="totals-box">
-            ${
-              isSale && invoiceTotals
-                ? `
-              <tr>
-                <td class="totals-label">Total Unidades:</td>
-                <td class="totals-val">${invoiceTotals.totalUnits} un.</td>
-              </tr>
-              <tr>
-                <td class="totals-label">Subtotal 0%:</td>
-                <td class="totals-val">${currencySymbol}${invoiceTotals.subtotalZero0.toFixed(2)}</td>
-              </tr>
-              <tr>
-                <td class="totals-label">Subtotal 15%:</td>
-                <td class="totals-val">${currencySymbol}${invoiceTotals.subtotalTaxable15.toFixed(2)}</td>
-              </tr>
-              ${
-                invoiceTotals.subtotalTaxable5 > 0
-                  ? `
-                <tr>
-                  <td class="totals-label">Subtotal 5%:</td>
-                  <td class="totals-val">${currencySymbol}${invoiceTotals.subtotalTaxable5.toFixed(2)}</td>
-                </tr>
-              `
-                  : ''
-              }
-              <tr style="border-top: 1px solid #cbd5e1;">
-                <td class="totals-label" style="font-weight: 800; color: #0f172a;">Subtotal Sin Impuestos:</td>
-                <td class="totals-val" style="font-weight: 800;">${currencySymbol}${invoiceTotals.subtotalNoTax.toFixed(2)}</td>
-              </tr>
-              ${
-                invoiceTotals.totalDiscount > 0
-                  ? `
-                <tr>
-                  <td class="totals-label" style="color: #9a3412;">Total Descuento:</td>
-                  <td class="totals-val" style="color: #9a3412;">-${currencySymbol}${invoiceTotals.totalDiscount.toFixed(2)}</td>
-                </tr>
-              `
-                  : ''
-              }
-              <tr>
-                <td class="totals-label">IVA 15%:</td>
-                <td class="totals-val">${currencySymbol}${invoiceTotals.taxAmount15.toFixed(2)}</td>
-              </tr>
-              ${
-                invoiceTotals.taxAmount5 > 0 || invoiceTotals.subtotalTaxable5 > 0
-                  ? `
-                <tr>
-                  <td class="totals-label">IVA 5%:</td>
-                  <td class="totals-val">${currencySymbol}${invoiceTotals.taxAmount5.toFixed(2)}</td>
-                </tr>
-              `
-                  : ''
-              }
-              ${
-                invoiceTotals.shippingFee > 0
-                  ? `
-                <tr>
-                  <td class="totals-label">Valor Envío / Flete:</td>
-                  <td class="totals-val">+${currencySymbol}${invoiceTotals.shippingFee.toFixed(2)}</td>
-                </tr>
-              `
-                  : ''
-              }
-              <tr class="grand-total-row">
-                <td class="totals-label" style="font-size: 10.5px; color: #0f172a; font-weight: 900;">
-                  ${order?.status === 'confirmed' || order?.status === 'shipped' || order?.status === 'delivered' ? 'TOTAL FACTURA SRI:' : 'TOTAL VENTA SRI:'}
-                </td>
-                <td class="totals-val" style="font-size: 12px; color: #0284c7; font-weight: 900;">
-                  ${currencySymbol}${invoiceTotals.totalInvoiceAmount.toFixed(2)}
-                </td>
-              </tr>
-            `
-                : isPurchase && purchaseSriBreakdown
-                ? `
-              <tr>
-                <td class="totals-label">Unidades Pedidas:</td>
-                <td class="totals-val">${purchaseTotalOrdered} un.</td>
-              </tr>
-              <tr>
-                <td class="totals-label">Unidades en Bodega:</td>
-                <td class="totals-val" style="color: #15803d;">${purchaseTotalReceived} un.</td>
-              </tr>
-              ${
-                purchaseTotalPending > 0
-                  ? `
-                <tr>
-                  <td class="totals-label">Unidades Pendientes:</td>
-                  <td class="totals-val" style="color: #b45309;">${purchaseTotalPending} un.</td>
-                </tr>
-              `
-                  : ''
-              }
-              <tr>
-                <td class="totals-label">Subtotal 0%:</td>
-                <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.subtotal0.toFixed(2)}</td>
-              </tr>
-              <tr>
-                <td class="totals-label">Subtotal 15%:</td>
-                <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.subtotal15.toFixed(2)}</td>
-              </tr>
-              ${
-                purchaseSriBreakdown.subtotal5 > 0
-                  ? `
-                <tr>
-                  <td class="totals-label">Subtotal 5%:</td>
-                  <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.subtotal5.toFixed(2)}</td>
-                </tr>
-              `
-                  : ''
-              }
-              <tr style="border-top: 1px solid #cbd5e1;">
-                <td class="totals-label" style="font-weight: 800; color: #0f172a;">Subtotal Sin Impuesto:</td>
-                <td class="totals-val" style="font-weight: 800;">${currencySymbol}${purchaseSriBreakdown.subtotalSinImpuesto.toFixed(2)}</td>
-              </tr>
-              ${
-                purchaseSriBreakdown.totalDiscount > 0
-                  ? `
-                <tr>
-                  <td class="totals-label" style="color: #9a3412;">Total Descuento:</td>
-                  <td class="totals-val" style="color: #9a3412;">-${currencySymbol}${purchaseSriBreakdown.totalDiscount.toFixed(2)}</td>
-                </tr>
-              `
-                  : ''
-              }
-              <tr>
-                <td class="totals-label">IVA COMPRA (15%):</td>
-                <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.iva15.toFixed(2)}</td>
-              </tr>
-              ${
-                purchaseSriBreakdown.iva5 > 0
-                  ? `
-                <tr>
-                  <td class="totals-label">IVA COMPRA (5%):</td>
-                  <td class="totals-val">${currencySymbol}${purchaseSriBreakdown.iva5.toFixed(2)}</td>
-                </tr>
-              `
-                  : ''
-              }
-              <tr class="grand-total-row">
-                <td class="totals-label" style="font-size: 10.5px; color: #0f172a; font-weight: 900;">TOTAL COMPRA SRI:</td>
-                <td class="totals-val" style="font-size: 12px; color: #0284c7; font-weight: 900;">${currencySymbol}${purchaseSriBreakdown.grandTotal.toFixed(2)}</td>
-              </tr>
-            `
-                : ''
-            }
-          </table>
-        </td>
-      </tr>
-    </table>
+      <div class="thermal-divider"></div>
 
-    <!-- FIRMAS DE RESPONSABILIDAD -->
-    <div class="signatures-section">
-      <table class="signatures-table">
+      <div style="text-align: center; font-size: 0.85em; color: #64748b; margin-top: 4px;">
+        <div style="font-weight: 700; color: #0f172a;">¡Gracias por su preferencia!</div>
+        <div>Comerxia ERP • ${new Date().toLocaleDateString('es-EC')}</div>
+      </div>
+    `
+        : `
+      <!-- COMPROBANTE DE HOJA COMPLETA (A4 / CARTA) -->
+      <table class="header-table">
         <tr>
-          <td>
-            <div class="signature-line">
-              Emitido / Autorizado por<br>
-              <span style="font-weight: normal; font-size: 8.5px; color: #64748b;">${storeName}</span>
-            </div>
+          <td style="width: 60%;">
+            ${storeLogo ? `<img src="${storeLogo}" alt="${storeName}" style="max-height: 40px; max-width: 160px; object-fit: contain; margin-bottom: 4px;" /><br>` : ''}
+            <div class="store-name">${storeName}</div>
+            ${storeDescription ? `<div class="store-sub">${storeDescription}</div>` : ''}
+            ${storeAddress ? `<div class="store-sub"><strong>Dirección:</strong> ${storeAddress}</div>` : ''}
+            ${storePhone ? `<div class="store-sub"><strong>Teléfono / WhatsApp:</strong> ${storePhone}</div>` : ''}
           </td>
-          <td>
-            <div class="signature-line">
-              Recibido Conforme<br>
-              <span style="font-weight: normal; font-size: 8.5px; color: #64748b;">${isSale ? customerName || 'Firma de Cliente' : supplierName || 'Firma de Proveedor'}</span>
+          <td style="width: 40%; text-align: right;">
+            <div class="doc-badge">${documentTitle}</div>
+            <div class="doc-number">#${orderNumberStr}</div>
+            <div style="font-size: 9px; color: #475569; margin-top: 3px;">
+              <strong>Fecha de Emisión:</strong><br>${orderDateStr}
+            </div>
+            <div style="margin-top: 4px;">
+              <span style="font-size: 8.5px; font-weight: 800; background: #e2e8f0; color: #1e293b; padding: 2px 6px; border-radius: 3px; display: inline-block;">
+                ESTADO: ${orderStatusBadge}
+              </span>
             </div>
           </td>
         </tr>
       </table>
 
-      <div class="footer-doc">
-        Documento generado el ${new Date().toLocaleString('es-EC')} • Comerxia ERP • Impresión Directa del Navegador
+      <table class="meta-box">
+        <tr>
+          <td>
+            <div class="section-title">${isSale ? 'Datos del Cliente' : 'Datos del Proveedor'}</div>
+            ${
+              isSale
+                ? `
+              <div class="field-row"><span class="field-label">Cliente:</span> <span class="field-val"><strong>${customerName || 'Cliente General'}</strong></span></div>
+              <div class="field-row"><span class="field-label">Cédula / RUC:</span> <span class="field-val">${customerCi || 'Consumidor Final'}</span></div>
+              <div class="field-row"><span class="field-label">Teléfono:</span> <span class="field-val">${customerPhone || '—'}</span></div>
+              ${customerEmail ? `<div class="field-row"><span class="field-label">Correo:</span> <span class="field-val">${customerEmail}</span></div>` : ''}
+              <div class="field-row"><span class="field-label">Dirección:</span> <span class="field-val">${customerAddress || (isPickup ? 'Retiro en Local Comercial' : '—')}</span></div>
+            `
+                : `
+              <div class="field-row"><span class="field-label">Proveedor:</span> <span class="field-val"><strong>${supplierName || 'Proveedor Registrado'}</strong></span></div>
+              <div class="field-row"><span class="field-label">Contacto:</span> <span class="field-val">${supplierContact || '—'}</span></div>
+              <div class="field-row"><span class="field-label">Estado Pago:</span> <span class="field-val">${paymentStatus}</span></div>
+            `
+            }
+          </td>
+          <td>
+            <div class="section-title">${isSale ? 'Detalles de Despacho y Pago' : 'Condiciones de la Orden'}</div>
+            ${
+              isSale
+                ? `
+              <div class="field-row"><span class="field-label">Modalidad:</span> <span class="field-val"><strong>${isPickup ? 'Retiro en Local' : 'Envío a Domicilio'}</strong></span></div>
+              <div class="field-row"><span class="field-label">Forma de Pago:</span> <span class="field-val">${paymentMethod || 'Acuerdo Comercial'}</span></div>
+            `
+                : `
+              <div class="field-row"><span class="field-label">Recepción:</span> <span class="field-val">${purchase?.status === 'received' ? 'Recibido en Bodega Central' : 'Pendiente de Entrega'}</span></div>
+              <div class="field-row"><span class="field-label">Total Ítems:</span> <span class="field-val">${items.length} productos (${totalUnits} unidades)</span></div>
+            `
+            }
+          </td>
+        </tr>
+      </table>
+
+      <table class="items-table">
+        <thead>
+          ${
+            isSale
+              ? `
+            <tr>
+              <th style="width: 4%; text-align: center;">#</th>
+              <th style="width: 36%;">Producto / Descripción</th>
+              <th style="width: 14%;">SKU / Código</th>
+              <th style="width: 8%; text-align: center;">Cantidad</th>
+              <th style="width: 11%; text-align: right;">Valor Unit. ($)</th>
+              <th style="width: 9%; text-align: right;">Desc. ($)</th>
+              <th style="width: 7%; text-align: center;">IVA (%)</th>
+              <th style="width: 11%; text-align: right;">Subtotal ($)</th>
+            </tr>
+          `
+              : `
+            <tr>
+              <th style="width: 4%; text-align: center;">#</th>
+              <th style="width: 32%;">Producto / Descripción</th>
+              <th style="width: 15%;">SKU / Código</th>
+              <th style="width: 7%; text-align: center;">Pedida</th>
+              <th style="width: 7%; text-align: center;">Bodega</th>
+              <th style="width: 7%; text-align: center;">Pendiente</th>
+              <th style="width: 10%; text-align: right;">Costo Unit. ($)</th>
+              <th style="width: 7%; text-align: right;">Desc. ($)</th>
+              <th style="width: 5%; text-align: center;">IVA</th>
+              <th style="width: 11%; text-align: right;">Total ($)</th>
+            </tr>
+          `
+          }
+        </thead>
+        <tbody>
+          ${
+            isSale
+              ? salesCalculatedItems
+                  .map(
+                    (it, idx) => `
+                <tr>
+                  <td style="text-align: center; font-weight: bold; color: #64748b;">#${idx + 1}</td>
+                  <td class="product-title">${it.name}</td>
+                  <td class="sku-code">${it.sku || '-'}</td>
+                  <td class="qty-cell">${it.quantity} u.</td>
+                  <td class="price-cell">${currencySymbol}${it.unitPriceWithoutTax.toFixed(2)}</td>
+                  <td class="price-cell" style="color: ${it.unitDiscount > 0 ? '#b45309' : '#64748b'};">${currencySymbol}${(it.unitDiscount * it.quantity).toFixed(2)}</td>
+                  <td style="text-align: center; font-weight: bold;">
+                    <span style="display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 9px; ${it.lineTaxPercent > 0 ? 'background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe;' : 'background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;'}">
+                      ${it.lineTaxPercent}%
+                    </span>
+                  </td>
+                  <td class="total-cell">${currencySymbol}${it.lineSubtotal.toFixed(2)}</td>
+                </tr>
+              `
+                  )
+                  .join('')
+              : purchaseFormattedItems
+                  .map(
+                    (it) => `
+                <tr>
+                  <td style="text-align: center; font-weight: bold; color: #64748b;">${it.index}</td>
+                  <td class="product-title">${it.name}</td>
+                  <td class="sku-code">${it.sku}</td>
+                  <td class="qty-cell">${it.ordered} u.</td>
+                  <td class="qty-cell" style="color: #15803d;">${it.received} u.</td>
+                  <td class="qty-cell" style="color: #b45309;">${it.pending} u.</td>
+                  <td class="price-cell">${currencySymbol}${it.unitCost.toFixed(2)}</td>
+                  <td class="price-cell" style="color: ${it.discount > 0 ? '#b45309' : '#64748b'};">${currencySymbol}${it.discount.toFixed(2)}</td>
+                  <td style="text-align: center; font-weight: bold;">${it.taxPercent}%</td>
+                  <td class="total-cell">${currencySymbol}${it.lineSubtotal.toFixed(2)}</td>
+                </tr>
+              `
+                  )
+                  .join('')
+          }
+        </tbody>
+      </table>
+
+      <table class="summary-table">
+        <tr>
+          <td style="width: 52%; vertical-align: top;">
+            <div style="font-size: 9px; color: #64748b; font-style: italic;">
+              * Comprobante oficial generado por el sistema Comerxia ERP.
+            </div>
+          </td>
+          <td style="width: 48%;">
+            <table class="totals-box">
+              ${
+                isSale && invoiceTotals
+                  ? `
+                <tr><td class="totals-label">Total Unidades:</td><td class="totals-val">${invoiceTotals.totalUnits} un.</td></tr>
+                <tr><td class="totals-label">Subtotal 0%:</td><td class="totals-val">${currencySymbol}${invoiceTotals.subtotalZero0.toFixed(2)}</td></tr>
+                <tr><td class="totals-label">Subtotal 15%:</td><td class="totals-val">${currencySymbol}${invoiceTotals.subtotalTaxable15.toFixed(2)}</td></tr>
+                <tr style="border-top: 1px solid #cbd5e1;"><td class="totals-label" style="font-weight: 800; color: #0f172a;">Subtotal Sin Impuestos:</td><td class="totals-val" style="font-weight: 800;">${currencySymbol}${invoiceTotals.subtotalNoTax.toFixed(2)}</td></tr>
+                ${invoiceTotals.totalDiscount > 0 ? `<tr><td class="totals-label" style="color: #9a3412;">Total Descuento:</td><td class="totals-val" style="color: #9a3412;">-${currencySymbol}${invoiceTotals.totalDiscount.toFixed(2)}</td></tr>` : ''}
+                <tr><td class="totals-label">IVA 15%:</td><td class="totals-val">${currencySymbol}${invoiceTotals.taxAmount15.toFixed(2)}</td></tr>
+                ${invoiceTotals.shippingFee > 0 ? `<tr><td class="totals-label">Valor Envío:</td><td class="totals-val">+${currencySymbol}${invoiceTotals.shippingFee.toFixed(2)}</td></tr>` : ''}
+                <tr class="grand-total-row">
+                  <td class="totals-label" style="font-size: 10.5px; color: #0f172a; font-weight: 900;">TOTAL VENTA SRI:</td>
+                  <td class="totals-val" style="font-size: 12px; color: #0284c7; font-weight: 900;">${currencySymbol}${invoiceTotals.totalInvoiceAmount.toFixed(2)}</td>
+                </tr>
+              `
+                  : isPurchase && purchaseSriBreakdown
+                  ? `
+                <tr><td class="totals-label">Subtotal Sin Impuesto:</td><td class="totals-val">${currencySymbol}${purchaseSriBreakdown.subtotalSinImpuesto.toFixed(2)}</td></tr>
+                <tr><td class="totals-label">IVA COMPRA (15%):</td><td class="totals-val">${currencySymbol}${purchaseSriBreakdown.iva15.toFixed(2)}</td></tr>
+                <tr class="grand-total-row">
+                  <td class="totals-label" style="font-size: 10.5px; color: #0f172a; font-weight: 900;">TOTAL COMPRA SRI:</td>
+                  <td class="totals-val" style="font-size: 12px; color: #0284c7; font-weight: 900;">${currencySymbol}${purchaseSriBreakdown.grandTotal.toFixed(2)}</td>
+                </tr>
+              `
+                  : ''
+              }
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <div class="signatures-section">
+        <table class="signatures-table">
+          <tr>
+            <td>
+              <div class="signature-line">
+                Emitido / Autorizado por<br>
+                <span style="font-weight: normal; font-size: 8.5px; color: #64748b;">${storeName}</span>
+              </div>
+            </td>
+            <td>
+              <div class="signature-line">
+                Recibido Conforme<br>
+                <span style="font-weight: normal; font-size: 8.5px; color: #64748b;">${isSale ? customerName || 'Firma de Cliente' : supplierName || 'Firma de Proveedor'}</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+        <div class="footer-doc">
+          Documento generado el ${new Date().toLocaleString('es-EC')} • Comerxia ERP
+        </div>
       </div>
-    </div>
+    `
+    }
   </div>
 </body>
 </html>`;
 }
 
 /**
- * Limpia cualquier residuo de estilos o contenedores de impresión previa
- * para evitar que contaminen la escala, fuentes o diseño de la interfaz principal.
+ * Limpia cualquier residuo de estilos o contenedores de impresión previa.
  */
 export function cleanUpLegacyPrintArtifacts(): void {
   try {
@@ -1161,17 +914,12 @@ export function cleanUpLegacyPrintArtifacts(): void {
   }
 }
 
-// Ejecutar limpieza inmediata al cargar el módulo para restaurar la interfaz si estaba contaminada
 if (typeof document !== 'undefined') {
   cleanUpLegacyPrintArtifacts();
 }
 
 /**
  * Realiza la impresión mediante un iframe invisible y completamente aislado.
- * Al usar un documento independiente:
- * 1. La ventana principal, su zoom, viewport y escala NO sufren ninguna modificación.
- * 2. La interfaz de usuario no se hace pequeña ni se aleja la escala de la pantalla.
- * 3. El gestor de impresión del navegador recibe el documento con sus dimensiones y márgenes exactos al 100%.
  */
 function printViaIsolatedIframe(htmlContent: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -1186,13 +934,9 @@ function printViaIsolatedIframe(htmlContent: string): Promise<boolean> {
     iframe.style.width = '0px';
     iframe.style.height = '0px';
     iframe.style.border = 'none';
-    iframe.style.margin = '0';
-    iframe.style.padding = '0';
     iframe.style.opacity = '0';
     iframe.style.pointerEvents = 'none';
     iframe.style.zIndex = '-99999';
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.setAttribute('tabindex', '-1');
 
     let isCleaned = false;
     const cleanUp = () => {
@@ -1205,7 +949,6 @@ function printViaIsolatedIframe(htmlContent: string): Promise<boolean> {
       } catch {}
     };
 
-    // Temporizador de seguridad para remover el iframe si el diálogo se cancela o no reporta
     const safetyTimer = setTimeout(() => {
       cleanUp();
       resolve(true);
@@ -1236,7 +979,6 @@ function printViaIsolatedIframe(htmlContent: string): Promise<boolean> {
             return;
           }
 
-          // Escuchar evento afterprint en el iframe para limpiar de inmediato
           try {
             win.addEventListener('afterprint', () => {
               clearTimeout(safetyTimer);
@@ -1249,14 +991,12 @@ function printViaIsolatedIframe(htmlContent: string): Promise<boolean> {
           win.print();
           resolve(true);
         } catch (err) {
-          console.warn('Error al invocar print en iframe aislado:', err);
           cleanUp();
           clearTimeout(safetyTimer);
           resolve(false);
         }
       };
 
-      // Dar tiempo a cargar imágenes / fuentes antes de abrir el diálogo
       if (iframe.contentWindow.document.readyState === 'complete') {
         setTimeout(execPrint, 250);
       } else {
@@ -1264,7 +1004,6 @@ function printViaIsolatedIframe(htmlContent: string): Promise<boolean> {
         setTimeout(execPrint, 700);
       }
     } catch (err) {
-      console.warn('Fallo escribiendo en iframe de impresión:', err);
       cleanUp();
       clearTimeout(safetyTimer);
       resolve(false);
@@ -1272,11 +1011,6 @@ function printViaIsolatedIframe(htmlContent: string): Promise<boolean> {
   });
 }
 
-/**
- * Abre el documento en una ventana/pestaña aislada mediante Blob URL para invocar
- * window.print() de forma automática. Es el mecanismo más confiable y libre de restricciones
- * cuando la app se encuentra embebida en un iframe (como en la vista previa de AI Studio).
- */
 function triggerPrintViaBlobWindow(htmlContent: string, showToast?: (msg: string) => void): void {
   try {
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
@@ -1285,8 +1019,7 @@ function triggerPrintViaBlobWindow(htmlContent: string, showToast?: (msg: string
     const printWin = window.open(blobUrl, '_blank', 'width=880,height=1120,menubar=0,toolbar=0,location=0,status=0');
 
     if (!printWin) {
-      // Si el navegador bloqueó la ventana emergente, cae de inmediato en el área de impresión in-DOM
-      setupInDomPrintArea(htmlContent);
+      setupInDomPrintArea(htmlContent, 'a4');
       window.print();
       return;
     }
@@ -1295,24 +1028,19 @@ function triggerPrintViaBlobWindow(htmlContent: string, showToast?: (msg: string
       URL.revokeObjectURL(blobUrl);
     }, 60000);
   } catch (err) {
-    console.error('Error abriendo ventana de impresión por Blob:', err);
     try {
-      setupInDomPrintArea(htmlContent);
+      setupInDomPrintArea(htmlContent, 'a4');
       window.print();
     } catch (e) {
       if (showToast) {
-        showToast('⚠️ No se pudo abrir la ventana de impresión directa. Comprueba los permisos de ventanas emergentes.');
+        showToast('⚠️ No se pudo abrir la ventana de impresión.');
       }
     }
   }
 }
 
-/**
- * Respaldo terciario in-DOM ultra seguro:
- * Solo se usa si fallan el iframe aislado y las ventanas emergentes.
- * Estrictamente limitado a @media print para NUNCA alterar la pantalla normal.
- */
-function setupInDomPrintArea(htmlContent: string, paperFormat: 'a4' | 'letter' = 'a4'): void {
+function setupInDomPrintArea(htmlContent: string, paperFormat: 'a4' | 'letter' | '80mm' | '58mm' | '48mm' | '44mm' = 'a4'): void {
+  const spec = getPaperFormatSpec(paperFormat);
   const styleId = 'direct-order-print-styles';
   let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
   if (!styleEl) {
@@ -1336,8 +1064,8 @@ function setupInDomPrintArea(htmlContent: string, paperFormat: 'a4' | 'letter' =
     }
     @media print {
       @page {
-        size: ${paperFormat === 'letter' ? 'letter' : 'a4'} portrait !important;
-        margin: 10mm 12mm 10mm 12mm !important;
+        size: ${spec.pageSize} !important;
+        margin: 0mm !important;
       }
       body > *:not(#direct-order-print-area) {
         display: none !important;
@@ -1347,10 +1075,10 @@ function setupInDomPrintArea(htmlContent: string, paperFormat: 'a4' | 'letter' =
         display: block !important;
         visibility: visible !important;
         position: static !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        width: ${spec.widthCss} !important;
+        max-width: ${spec.widthCss} !important;
+        margin: 0 auto !important;
+        padding: ${spec.padding} !important;
         background: #ffffff !important;
         overflow: visible !important;
       }
@@ -1373,7 +1101,6 @@ function setupInDomPrintArea(htmlContent: string, paperFormat: 'a4' | 'letter' =
   const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
   const bodyInner = bodyMatch ? bodyMatch[1] : htmlContent;
 
-  // Extraer únicamente los estilos y envolverlos dentro de un scope para no contaminar el html/body de la pantalla
   containerEl.innerHTML = bodyInner;
 
   const handleAfterPrint = () => {
@@ -1386,14 +1113,6 @@ function setupInDomPrintArea(htmlContent: string, paperFormat: 'a4' | 'letter' =
 
 /**
  * Invoca directamente el gestor de impresión nativo del navegador para Compras y Ventas.
- * 
- * Solución al problema de escala:
- * 1. Utiliza un iframe aislado como canal principal de impresión, evitando que el documento principal
- *    re-calcule la escala, altere su tamaño de fuente o achique la interfaz de usuario.
- * 2. Si el navegador está en un sandbox que restringe modales en iframe anidados, abre una pestaña
- *    emergente limpia dedicada vía Blob sin tocar la interfaz de la aplicación.
- * 3. En caso de emergencia, recurre a un contenedor in-DOM que se auto-destruye tras imprimir y
- *    nunca aplica estilos en pantalla (@media screen).
  */
 export async function directPrintOrder(params: DirectOrderPrintParams): Promise<void> {
   const { order, purchase, showToast, paperFormat = 'a4' } = params;
@@ -1405,13 +1124,6 @@ export async function directPrintOrder(params: DirectOrderPrintParams): Promise<
   if (showToast) {
     const isConfirmedOrder = order && (order.status === 'confirmed' || order.status === 'shipped' || order.status === 'delivered');
     showToast(`🖨️ Abriendo gestor de impresión para ${isSale ? (isConfirmedOrder ? 'Factura Comercial' : 'Pre-Factura') : 'Orden de Compra'} #${docNum}...`);
-  }
-
-  let isInsideIframe = false;
-  try {
-    isInsideIframe = window.self !== window.top;
-  } catch {
-    isInsideIframe = true;
   }
 
   try {
