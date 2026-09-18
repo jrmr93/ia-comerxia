@@ -76,7 +76,8 @@ export interface UnifiedOrderManageModalProps {
     shippingCost?: string,
     paymentMethod?: string,
     bankOrAccount?: string,
-    customerCi?: string
+    customerCi?: string,
+    cardCommissionPercent?: number | string
   ) => Promise<boolean>;
   showToast: (msg: string) => void;
   onOpenShippingTicket?: (order: CustomerOrder) => void;
@@ -1428,6 +1429,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           trackingCarrier: deliveryType === 'shipping' ? (trackingCarrier.trim() || undefined) : undefined,
           trackingNumber: deliveryType === 'shipping' ? (trackingNumber.trim() || undefined) : undefined,
           paymentMethod: paymentMethod || 'whatsapp',
+          cardCommissionPercent: isCardPaymentMethod ? cardCommissionPercent : 0,
+          isCardPayment: isCardPaymentMethod,
           bankOrAccount: bankOrAccount || deriveBankOrAccountFromMethod(paymentMethod, finalNotes),
           status: 'pending',
           paymentVoucher: voucherInput.trim() || undefined,
@@ -1639,7 +1642,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               isPick ? '0' : String(shippingFee),
               paymentMethod,
               selectedBank,
-              ciToValidate || undefined
+              ciToValidate || undefined,
+              isCardPaymentMethod ? cardCommissionPercent : 0
             );
           }
 
@@ -1691,6 +1695,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             trackingNotes: isPick ? null : (trackingNotes.trim() || null),
             shippingCost: isPick ? 0 : shippingFee,
             paymentMethod,
+            cardCommissionPercent: isCardPaymentMethod ? cardCommissionPercent : 0,
+            isCardPayment: isCardPaymentMethod,
             bankOrAccount: selectedBank,
             paymentVoucher: voucherToSave,
             notes: finalNotes || null,
@@ -1715,7 +1721,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           isPick ? '0' : String(shippingFee),
           paymentMethod,
           selectedBank,
-          ciToValidate || undefined
+          ciToValidate || undefined,
+          isCardPaymentMethod ? cardCommissionPercent : 0
         );
 
         if (ok) {

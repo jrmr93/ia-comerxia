@@ -3987,6 +3987,7 @@ export async function createCustomerOrder(data: {
   items: any[];
   totalAmount: number | string;
   paymentMethod?: string;
+  cardCommissionPercent?: number | string | null;
   status?: string;
   paymentVoucher?: string;
   notes?: string;
@@ -4189,6 +4190,7 @@ export async function createCustomerOrder(data: {
       items: serializedItems,
       totalAmount: cleanTotal,
       paymentMethod: data.paymentMethod || 'whatsapp',
+      cardCommissionPercent: data.cardCommissionPercent != null ? String(data.cardCommissionPercent) : null,
       status: initialStatus,
       paymentVoucher: data.paymentVoucher || null,
       notes: initialNotes,
@@ -4273,6 +4275,7 @@ export async function createCustomerOrder(data: {
         items: serializedItems,
         totalAmount: cleanTotal,
         paymentMethod: data.paymentMethod || 'whatsapp',
+        cardCommissionPercent: data.cardCommissionPercent != null ? String(data.cardCommissionPercent) : null,
         status: initialStatus,
         paymentVoucher: data.paymentVoucher || null,
         notes: initialNotes,
@@ -4473,7 +4476,8 @@ export async function updateCustomerOrderStatus(
   paymentMethod?: string,
   bypassSupplierBlock?: boolean,
   bankOrAccount?: string,
-  customerCi?: string
+  customerCi?: string,
+  cardCommissionPercent?: number | string | null
 ) {
   const updatePayload: Record<string, any> = { status };
   if (paymentVoucher !== undefined) updatePayload.paymentVoucher = paymentVoucher;
@@ -4482,6 +4486,9 @@ export async function updateCustomerOrderStatus(
   if (trackingCarrier !== undefined) updatePayload.trackingCarrier = trackingCarrier;
   if (trackingNotes !== undefined) updatePayload.trackingNotes = trackingNotes;
   if (paymentMethod !== undefined) updatePayload.paymentMethod = paymentMethod;
+  if (cardCommissionPercent !== undefined) {
+    updatePayload.cardCommissionPercent = cardCommissionPercent != null ? String(cardCommissionPercent) : null;
+  }
   if (customerCi !== undefined && customerCi.trim()) {
     updatePayload.customerCi = customerCi.trim();
     updatePayload.ci = customerCi.trim();
@@ -4981,6 +4988,7 @@ export async function updateCustomerOrder(
   returns?: any[];
   totalAmount?: number | string;
   paymentMethod?: string;
+  cardCommissionPercent?: number | string | null;
   status?: string;
   paymentVoucher?: string;
   notes?: string;
@@ -5033,6 +5041,9 @@ export async function updateCustomerOrder(
     updatePayload.totalAmount = cleanNumericString(data.totalAmount, '0.00');
   }
   if (data.paymentMethod !== undefined) updatePayload.paymentMethod = data.paymentMethod;
+  if (data.cardCommissionPercent !== undefined) {
+    updatePayload.cardCommissionPercent = data.cardCommissionPercent != null ? String(data.cardCommissionPercent) : null;
+  }
   if (data.status !== undefined) updatePayload.status = data.status;
   if (data.paymentVoucher !== undefined) updatePayload.paymentVoucher = data.paymentVoucher;
   if (data.notes !== undefined) updatePayload.notes = data.notes;

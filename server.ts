@@ -1724,7 +1724,7 @@ async function startServer() {
 
       const pagos = [
         {
-          formaPago: '01', // Sin utilización del sistema financiero
+          formaPago: isOrderCardPayment ? '19' : '01', // '19' = Tarjeta de Crédito, '01' = Sin utilización del sistema financiero
           total: Number(order.totalAmount || 0),
         },
       ];
@@ -4106,6 +4106,7 @@ async function startServer() {
         items,
         totalAmount: Number(totalAmount) || 0,
         paymentMethod: paymentMethod || 'whatsapp',
+        cardCommissionPercent: req.body.cardCommissionPercent != null ? req.body.cardCommissionPercent : undefined,
         status: status || 'pending',
         paymentVoucher: paymentVoucher || undefined,
         notes: orderNotes || undefined,
@@ -4160,6 +4161,7 @@ async function startServer() {
         items,
         totalAmount,
         paymentMethod,
+        cardCommissionPercent,
         status,
         paymentVoucher,
         notes,
@@ -4189,6 +4191,7 @@ async function startServer() {
         items,
         totalAmount,
         paymentMethod,
+        cardCommissionPercent,
         status,
         paymentVoucher,
         notes,
@@ -4208,7 +4211,7 @@ async function startServer() {
   app.put('/api/orders/:id/status', optionalAuth, async (req: AuthRequest, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const { status, paymentVoucher, notes, trackingNumber, trackingCarrier, trackingNotes, purchaseAction, paymentMethod, bypassSupplierBlock, bankOrAccount, customerCi, ci } = req.body;
+      const { status, paymentVoucher, notes, trackingNumber, trackingCarrier, trackingNotes, purchaseAction, paymentMethod, cardCommissionPercent, bypassSupplierBlock, bankOrAccount, customerCi, ci } = req.body;
       if (isNaN(id) || !status) {
         return res.status(400).json({ error: 'Valid ID and status are required' });
       }
@@ -4233,7 +4236,8 @@ async function startServer() {
         paymentMethod,
         bypassSupplierBlock,
         bankOrAccount,
-        customerCi || ci
+        customerCi || ci,
+        cardCommissionPercent
       );
       res.json(updated);
     } catch (error: any) {

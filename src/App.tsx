@@ -879,13 +879,14 @@ function InventoryApp() {
     purchaseAction?: 'cancel' | 'keep',
     paymentMethod?: string,
     bankOrAccount?: string,
-    customerCi?: string
+    customerCi?: string,
+    cardCommissionPercent?: number | string
   ): Promise<boolean> => {
     try {
       const res = await authFetch(`/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, paymentVoucher, notes, trackingNumber, trackingCarrier, trackingNotes, purchaseAction, paymentMethod, bankOrAccount, customerCi }),
+        body: JSON.stringify({ status, paymentVoucher, notes, trackingNumber, trackingCarrier, trackingNotes, purchaseAction, paymentMethod, bankOrAccount, customerCi, cardCommissionPercent }),
       });
       if (res.ok) {
         setOrders((prev) =>
@@ -895,6 +896,7 @@ function InventoryApp() {
                   ...o,
                   status: status as any,
                   ...(paymentMethod !== undefined ? { paymentMethod } : {}),
+                  ...(cardCommissionPercent !== undefined ? { cardCommissionPercent } : {}),
                   ...(paymentVoucher !== undefined ? { paymentVoucher } : {}),
                   ...(notes !== undefined ? { notes } : {}),
                   ...(trackingNumber !== undefined ? { trackingNumber } : {}),

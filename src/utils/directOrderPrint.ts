@@ -329,6 +329,13 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
       };
     });
 
+    const isCardOrder = Boolean(
+      (order as any).isCardPayment ||
+      (order.paymentMethod && (order.paymentMethod.toLowerCase().includes('tarjeta') || order.paymentMethod.toLowerCase().includes('payphone') || order.paymentMethod.toLowerCase().includes('card'))) ||
+      ((order as any).cardCommissionPercent && Number((order as any).cardCommissionPercent) > 0)
+    );
+    const cardCommissionPct = Number((order as any).cardCommissionPercent || 5.75);
+
     const calculatedItems = parsedItems.map((it: any) => {
       const match = (inventoryItems || []).find(
         (p: any) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase())
@@ -348,6 +355,8 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
         quantity: Number(it.quantity || 1),
         applySaleTax: itemTaxPercent > 0,
         saleTaxPercent: itemTaxPercent,
+        isCardPayment: isCardOrder,
+        cardCommissionPercent: isCardOrder ? cardCommissionPct : 0,
       });
 
       return {

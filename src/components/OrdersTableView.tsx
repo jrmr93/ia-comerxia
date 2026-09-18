@@ -235,6 +235,13 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
         const isLinkedPurchasePending = linkedPurchasesForOrder.some((p: any) => p.status === 'pending');
 
         // Calculated items & invoice totals
+        const isCardOrder = Boolean(
+          (ord as any).isCardPayment ||
+          (ord.paymentMethod && (ord.paymentMethod.toLowerCase().includes('tarjeta') || ord.paymentMethod.toLowerCase().includes('payphone') || ord.paymentMethod.toLowerCase().includes('card'))) ||
+          ((ord as any).cardCommissionPercent && Number((ord as any).cardCommissionPercent) > 0)
+        );
+        const cardCommissionPct = Number((ord as any).cardCommissionPercent || 5.75);
+
         const calculatedItems = parsedItems.map((it: any) => {
           const match = (inventoryItems || []).find(
             (p: any) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase())
@@ -254,6 +261,8 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
             quantity: Number(it.quantity || 1),
             applySaleTax: itemTaxPercent > 0,
             saleTaxPercent: itemTaxPercent,
+            isCardPayment: isCardOrder,
+            cardCommissionPercent: isCardOrder ? cardCommissionPct : 0,
           });
 
           return {
