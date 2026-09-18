@@ -12,7 +12,7 @@ import { generarClaveAcceso, generarFacturaXml, firmarFacturaXml, generarFirmaSi
 import { postSoapRequest, parseSriMensajes, SRI_ENDPOINTS } from './src/utils/sri-soap.ts';
 import { generateSriRideHtml } from './src/utils/sri-ride.ts';
 import { generateSriRidePdfBuffer } from './src/utils/sri-ride-pdf.ts';
-import { extractItemTaxPercent } from './src/utils/ecuadorTaxCalculator.ts';
+import { extractItemTaxPercent, calculateCardSalePrice, calculateLineItem } from './src/utils/ecuadorTaxCalculator.ts';
 import {
   validateUserCredentials,
   verifyUserPasswordById,
@@ -1646,9 +1646,16 @@ async function startServer() {
 
       const userInventoryItems = await getInventoryItems(req.dbUserId || 1);
 
+      const isOrderCardPayment = Boolean(
+        (order as any).isCardPayment ||
+        (order.paymentMethod && ((order.paymentMethod as string).toLowerCase().includes('tarjeta') || (order.paymentMethod as string).toLowerCase().includes('payphone') || (order.paymentMethod as string).toLowerCase().includes('card'))) ||
+        ((order as any).cardCommissionPercent && Number((order as any).cardCommissionPercent) > 0)
+      );
+      const orderCardCommissionPct = Number((order as any).cardCommissionPercent || 5.75);
+
       const detalles: any[] = orderItems.map((item: any, idx: number) => {
         const cant = Number(item.quantity || item.qty || 1);
-        const price = Number(item.price || item.unitPrice || item.salePrice || 0);
+        const rawPrice = Number(item.price || item.unitPrice || item.salePrice || 0);
         const desc = Number(item.discount || 0);
 
         const itemId = item.inventoryItemId || item.id;
@@ -1666,12 +1673,25 @@ async function startServer() {
           tarifaIvaStr = String(taxPct);
         }
 
+        const calculatedRow = calculateLineItem({
+          id: item.id,
+          name: item.name,
+          sku: item.sku,
+          unitSalePrice: rawPrice,
+          discount: desc,
+          quantity: cant,
+          applySaleTax: tarifaIvaStr !== '0' && tarifaIvaStr !== 'NoObjeto' && tarifaIvaStr !== 'Exento',
+          saleTaxPercent: Number(tarifaIvaStr) || 15,
+          isCardPayment: isOrderCardPayment,
+          cardCommissionPercent: isOrderCardPayment ? orderCardCommissionPct : 0,
+        });
+
         return {
           codigoPrincipal: item.sku || (matchedInvItem ? matchedInvItem.sku : `PROD-${idx + 1}`),
           descripcion: item.name || item.productName || (matchedInvItem ? matchedInvItem.name : `Producto #${idx + 1}`),
           cantidad: cant,
-          precioUnitario: price,
-          descuento: desc,
+          precioUnitario: calculatedRow.unitPriceWithoutTax,
+          descuento: calculatedRow.unitDiscount,
           tarifaIva: tarifaIvaStr,
         };
       });

@@ -547,6 +547,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
   // Payment & Treasury
   const [paymentMethod, setPaymentMethod] = useState<string>('whatsapp');
+  const [cardCommissionPercent, setCardCommissionPercent] = useState<number>(5.75);
   const [bankOrAccount, setBankOrAccount] = useState<string>('');
   const [voucherInput, setVoucherInput] = useState<string>('');
   const [notesInput, setNotesInput] = useState<string>('');
@@ -629,6 +630,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       setItems([]);
       setProductSearch('');
       setPaymentMethod(activePaymentPartners[0]?.name || 'whatsapp');
+      setCardCommissionPercent(5.75);
       setBankOrAccount(activePaymentPartners[0]?.name || '');
       setVoucherInput('');
       setNotesInput('');
@@ -788,6 +790,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       // Payment & Notes
       const initialMethod = order.paymentMethod || activePaymentPartners[0]?.name || 'whatsapp';
       setPaymentMethod(initialMethod);
+      setCardCommissionPercent(Number((order as any).cardCommissionPercent || 5.75));
       const derivedBank = deriveBankOrAccountFromMethod(initialMethod, order.notes || (order as any).bankOrAccount);
       setBankOrAccount((order as any).bankOrAccount || derivedBank);
       setVoucherInput(order.paymentVoucher || '');
@@ -1000,6 +1003,12 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     };
   }, [items, products]);
 
+  const isCardPaymentMethod = useMemo(() => {
+    if (!paymentMethod) return false;
+    const pm = paymentMethod.toLowerCase().trim();
+    return pm === 'tarjeta' || pm === 'payphone' || pm.includes('tarjeta') || pm.includes('payphone') || pm.includes('card');
+  }, [paymentMethod]);
+
   // Financial Calculations - SRI Ecuador Central Engine
   const invoiceTotals = useMemo(() => {
     const calculatedItems = items.map((it) => {
@@ -1020,11 +1029,13 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         quantity: Number(it.quantity || 1),
         applySaleTax: itemTaxPercent > 0,
         saleTaxPercent: itemTaxPercent,
+        isCardPayment: isCardPaymentMethod,
+        cardCommissionPercent: isCardPaymentMethod ? cardCommissionPercent : 0,
       });
     });
 
     return calculateInvoiceTotals(calculatedItems, { shippingFee: 0 });
-  }, [items, products]);
+  }, [items, products, isCardPaymentMethod, cardCommissionPercent]);
 
   const productsSubtotal = invoiceTotals.subtotalNoTax;
   const totalDiscountAmount = invoiceTotals.totalDiscount;
@@ -1469,6 +1480,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           trackingNumber: deliveryType === 'shipping' ? (trackingNumber.trim() || null) : null,
           trackingNotes: deliveryType === 'shipping' ? (trackingNotes.trim() || null) : null,
           paymentMethod,
+          cardCommissionPercent: isCardPaymentMethod ? cardCommissionPercent : 0,
+          isCardPayment: isCardPaymentMethod,
           bankOrAccount: bankOrAccount || deriveBankOrAccountFromMethod(paymentMethod, finalNotes),
           paymentVoucher: voucherInput.trim() || null,
           notes: finalNotes || null,
@@ -1594,6 +1607,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           trackingNotes: !isPick ? (trackingNotes.trim() || undefined) : undefined,
           shippingCost: !isPick ? shippingFee : 0,
           paymentMethod: paymentMethod || 'whatsapp',
+          cardCommissionPercent: isCardPaymentMethod ? cardCommissionPercent : 0,
+          isCardPayment: isCardPaymentMethod,
           bankOrAccount: selectedBank,
           status: 'confirmed',
           paymentVoucher: voucherToSave,
@@ -3163,6 +3178,55 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                   </div>
                 </button>
               </div>
+
+            {/* Commission percentage input box (appears ONLY when Tarjeta or PayPhone is selected) */}
+            {isCardPaymentMethod && (
+              <div className="p-3.5 bg-sky-50/90 border border-sky-200 rounded-2xl space-y-2 animate-in fade-in duration-200 shadow-2xs">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-xs font-bold text-sky-950 flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-sky-600" />
+                    <span>Porcentaje de Comisión por Tarjeta / PayPhone (%)</span>
+                  </label>
+                  <span className="text-[10px] text-sky-700 font-mono bg-white px-2 py-0.5 rounded border border-sky-200 font-bold">
+                    Fórmula: Subtotal / (1 - %Comisión)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="99"
+                      value={cardCommissionPercent}
+                      onChange={(e) => setCardCommissionPercent(Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="5.75"
+                      className="w-full h-9 pl-3 pr-7 rounded-xl bg-white border border-sky-300 text-sky-950 font-mono font-bold text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none shadow-2xs"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-sky-600">%</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[5.75, 7.5, 10, 12].map((comm) => (
+                      <button
+                        key={comm}
+                        type="button"
+                        onClick={() => setCardCommissionPercent(comm)}
+                        className={`px-2 py-1 text-[10px] font-mono font-bold rounded-lg border transition cursor-pointer ${
+                          cardCommissionPercent === comm
+                            ? 'bg-sky-600 text-white border-sky-600'
+                            : 'bg-white text-sky-800 border-sky-200 hover:bg-sky-100'
+                        }`}
+                      >
+                        {comm}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[10.5px] text-sky-800 leading-tight">
+                  💡 Al seleccionar este método de pago, los subtotales de cada producto y el desglose fiscal SRI se calcularán con la comisión ({cardCommissionPercent}%).
+                </p>
+              </div>
+            )}
             </div>
 
             {/* Bloque Integración Payphone API (Solo cuando se selecciona el método de pago Payphone) */}

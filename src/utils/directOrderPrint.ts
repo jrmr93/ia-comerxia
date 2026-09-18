@@ -1,6 +1,6 @@
 import { CustomerOrder, PurchaseOrder, StoreConfig } from '../types.ts';
 import { getCustomerCi, getCleanAddress, isPickupDeliveryOrder } from './orderUtils.ts';
-import { calculateLineItem, calculateInvoiceTotals, extractItemTaxPercent, extractBaseUnitPriceWithoutTax, EcuadorInvoiceTotalsResult } from './ecuadorTaxCalculator.ts';
+import { calculateLineItem, calculateInvoiceTotals, extractItemTaxPercent, extractBaseUnitPriceWithoutTax, calculateCardSalePrice, EcuadorInvoiceTotalsResult } from './ecuadorTaxCalculator.ts';
 
 export interface DirectOrderPrintParams {
   order?: CustomerOrder | null;
@@ -169,6 +169,15 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
     }
   }
 
+  const isCardOrder = isSale && Boolean(
+    order && (
+      (order as any).isCardPayment ||
+      (order.paymentMethod && (order.paymentMethod.toLowerCase().includes('tarjeta') || order.paymentMethod.toLowerCase().includes('payphone') || order.paymentMethod.toLowerCase().includes('card'))) ||
+      ((order as any).cardCommissionPercent && Number((order as any).cardCommissionPercent) > 0)
+    )
+  );
+  const cardCommPct = isCardOrder && order ? Number((order as any).cardCommissionPercent || 5.75) : 0;
+
   const items: A4PrintItem[] = rawItems.map((it: any, index: number) => {
     const qty = Number(it.quantity) || 1;
     let unit = 0;
@@ -180,6 +189,9 @@ export function generateOrderPrintHtml(params: DirectOrderPrintParams): string {
     let netUnit = 0;
     if (isSale) {
       unit = Number(it.salePrice ?? subItem.salePrice ?? it.unitPrice ?? it.price ?? subItem.price ?? 0);
+      if (isCardOrder && cardCommPct > 0) {
+        unit = calculateCardSalePrice(unit, cardCommPct);
+      }
       const discount = Number(it.discount ?? subItem.discount ?? 0);
       netUnit = Math.max(0, unit - discount);
       sku = it.sku || subItem.sku || (it.inventoryItemId ? `SKU-${it.inventoryItemId}` : it.id ? `SKU-${it.id}` : `PRD-${index + 1}`);

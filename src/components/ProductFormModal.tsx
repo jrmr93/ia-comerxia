@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CostOption, InventoryItem } from '../types.ts';
+import { calculateCardSalePrice } from '../utils/ecuadorTaxCalculator.ts';
 import {
   AlertTriangle,
   BadgePercent,
@@ -846,6 +847,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           applySaleTax: effectiveHasTax,
           saleTaxPercent: effectiveTaxRate,
           salePrice: String(parseFloat(salePrice) || 0),
+          cardSalePrice: String(calculateCardSalePrice(parseFloat(salePrice) || 0, 5.75)),
           discountPercent: Math.max(0, Math.min(100, Number(discountPercent) || 0)),
           stock: Number(stock),
           imageUrl: effectiveCover,
@@ -1385,6 +1387,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <div className="flex items-center justify-between py-0.5">
                         <span className="text-slate-300 font-medium">8. Subtotal de venta:</span>
                         <span className="font-mono font-bold text-slate-100">${publishedPriceSinIVA.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-0.5 bg-sky-950/40 px-1 rounded border border-sky-800/40">
+                        <span className="text-sky-200 font-medium">8b. Subtotal venta tarjeta (5.75%):</span>
+                        <span className="font-mono font-bold text-sky-300">${calculateCardSalePrice(publishedPriceSinIVA, 5.75).toFixed(2)}</span>
                       </div>
                       <div className="flex items-center justify-between py-0.5">
                         <span className="text-slate-300 font-medium">9. IVA de la venta:</span>

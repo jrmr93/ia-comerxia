@@ -30,6 +30,10 @@ export interface EcuadorTaxLineItemInput {
   
   applySaleTax?: boolean;        // ¿Grava IVA en venta? (true = 15%, false = 0%)
   saleTaxPercent?: number;       // Tarifa de IVA venta (por defecto 15%)
+  
+  isCardPayment?: boolean;       // ¿Pago seleccionado con Tarjeta o PayPhone?
+  cardCommissionPercent?: number;// Porcentaje de comisión por tarjeta (ej. 5.75%)
+  cardSalePrice?: number;        // Subtotal de venta con tarjeta precalculado u opcional
 }
 
 export interface EcuadorTaxLineItemResult {
@@ -48,6 +52,9 @@ export interface EcuadorTaxLineItemResult {
   
   unitPriceWithoutTax: number;   // PVP unitario de lista sin IVA (antes de descuento)
   unitPriceWithTax: number;      // PVP unitario con IVA (antes de descuento)
+  cardSalePrice?: number;        // Subtotal unitario de venta con tarjeta
+  isCardPayment?: boolean;       // Flag si se aplicó cálculo de tarjeta
+  cardCommissionPercent?: number;// % de comisión aplicado
   unitDiscount: number;          // Descuento unitario en $
   netUnitPrice: number;          // Base imponible unitaria (PVP sin IVA - Descuento)
   
@@ -80,6 +87,21 @@ export function roundMonetary(value: number, decimals: number = 2): number {
   if (isNaN(value) || !isFinite(value)) return 0;
   const factor = Math.pow(10, decimals);
   return Math.round((value + Number.EPSILON) * factor) / factor;
+}
+
+/**
+ * Calcula el Subtotal de Venta con Tarjeta aplicando la fórmula:
+ * Subtotal Venta con Tarjeta = Subtotal Venta / (1 - (Porcentaje Comisión / 100))
+ * Ejemplo: $100 con 5.75% -> $100 / (1 - 0.0575) = $106.10
+ */
+export function calculateCardSalePrice(salePrice: number, commissionPercent: number): number {
+  const basePrice = Math.max(0, Number(salePrice) || 0);
+  const commPct = Math.max(0, Number(commissionPercent) || 0);
+  if (commPct <= 0 || commPct >= 100) {
+    return roundMonetary(basePrice);
+  }
+  const decimalCommission = commPct / 100;
+  return roundMonetary(basePrice / (1 - decimalCommission));
 }
 
 /**
@@ -241,6 +263,22 @@ export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLin
     unitPriceWithoutTax = costWithoutTax;
     unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
   }
+
+  // Si se selecciona pago con Tarjeta / PayPhone o se proporciona comisión, recalcular el Subtotal de Venta con Tarjeta
+  // Fórmula: Subtotal Venta con Tarjeta = Subtotal Venta / (1 - (Porcentaje Comisión / 100))
+  let cardSalePriceComputed: number | undefined = undefined;
+  const isCard = Boolean(input.isCardPayment || (input.cardCommissionPercent && input.cardCommissionPercent > 0) || (input.cardSalePrice && input.cardSalePrice > 0));
+  
+  if (isCard) {
+    if (input.cardSalePrice !== undefined && input.cardSalePrice > 0) {
+      cardSalePriceComputed = roundMonetary(input.cardSalePrice);
+      unitPriceWithoutTax = cardSalePriceComputed;
+    } else if (input.cardCommissionPercent !== undefined && input.cardCommissionPercent > 0) {
+      cardSalePriceComputed = calculateCardSalePrice(unitPriceWithoutTax, input.cardCommissionPercent);
+      unitPriceWithoutTax = cardSalePriceComputed;
+    }
+    unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
+  }
   
   // 3. Descuento Unitario ($)
   let unitDiscount = 0;
@@ -278,6 +316,9 @@ export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLin
     totalProfitAmount,
     unitPriceWithoutTax,
     unitPriceWithTax,
+    cardSalePrice: cardSalePriceComputed,
+    isCardPayment: isCard,
+    cardCommissionPercent: input.cardCommissionPercent,
     unitDiscount,
     netUnitPrice,
     lineSubtotal,

@@ -55,6 +55,7 @@ export interface InventoryItem {
   applySaleTax?: boolean;
   saleTaxPercent?: number;
   salePrice: string;
+  cardSalePrice?: string | number | null;
   discountPercent?: number;
   stock: number;
   physicalStock?: number;
@@ -230,6 +231,7 @@ export interface CustomerOrderItem {
   name: string;
   sku: string;
   salePrice: string | number;
+  cardSalePrice?: string | number;
   discount?: string | number;
   discountPercent?: number;
   costPrice?: string | number;
@@ -292,6 +294,8 @@ export interface CustomerOrder {
   saleTaxPercent?: number;
   totalAmount: string;
   paymentMethod: string;
+  cardCommissionPercent?: number | string | null;
+  isCardPayment?: boolean;
   status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   paymentVoucher?: string | null;
   notes: string | null;

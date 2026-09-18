@@ -60,6 +60,7 @@ export const inventoryItems = pgTable('inventory_items', {
   costWithTax: numeric('cost_with_tax', { precision: 12, scale: 2 }),
   taxRate: numeric('tax_rate', { precision: 5, scale: 2 }).default('15.00'),
   salePrice: numeric('sale_price', { precision: 12, scale: 2 }).notNull().default('0.00'),
+  cardSalePrice: numeric('card_sale_price', { precision: 12, scale: 2 }),
   discountPercent: integer('discount_percent').default(0),
   stock: integer('stock').notNull().default(1),
   imageUrl: text('image_url'),
@@ -160,6 +161,7 @@ export const customerOrders = pgTable('customer_orders', {
   items: text('items').notNull().default('[]'), // JSON string array of CartItem details
   totalAmount: numeric('total_amount', { precision: 12, scale: 2 }).notNull().default('0.00'),
   paymentMethod: text('payment_method').default('whatsapp'),
+  cardCommissionPercent: numeric('card_commission_percent', { precision: 5, scale: 2 }),
   status: text('status').notNull().default('pending'), // 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'
   paymentVoucher: text('payment_voucher'),
   notes: text('notes'),
