@@ -70,4 +70,32 @@ describe('Cálculos con Tarjeta de Crédito / PayPhone y Comisión', () => {
     expect(totals.taxAmount15).toBe(31.83); // 212.20 * 0.15 = 31.83
     expect(totals.totalInvoiceAmount).toBe(244.03); // 212.20 + 31.83
   });
+
+  it('no debe inflar la comisión por tarjeta cuando un producto tiene descuento fijado o en dólares', () => {
+    // Producto A: sin descuento $100 -> subtotal neto sin tarjeta = $100 -> con tarjeta (5.75%) = $106.10
+    const noDiscount = calculateLineItem({
+      unitSalePrice: 100,
+      discount: 0,
+      quantity: 1,
+      applySaleTax: true,
+      saleTaxPercent: 15,
+      isCardPayment: true,
+      cardCommissionPercent: 5.75,
+    });
+
+    // Producto B: lista $120, descuento $20 -> subtotal neto sin tarjeta = $100 -> con tarjeta (5.75%) DEBE SER IGUAL A $106.10
+    const withDiscount = calculateLineItem({
+      unitSalePrice: 120,
+      discount: 20,
+      quantity: 1,
+      applySaleTax: true,
+      saleTaxPercent: 15,
+      isCardPayment: true,
+      cardCommissionPercent: 5.75,
+    });
+
+    expect(noDiscount.lineSubtotal).toBe(106.10);
+    expect(withDiscount.lineSubtotal).toBe(106.10);
+    expect(withDiscount.lineTotal).toBe(noDiscount.lineTotal);
+  });
 });

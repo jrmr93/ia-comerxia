@@ -228,8 +228,8 @@ export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLin
     costWithoutTax = deconstructed.priceWithoutTax;
   }
   
-  // 2. Resolver Precio Unitario de Lista (PVP sin IVA = Costo + Utilidad / (1 - Descuento%))
-  let unitPriceWithoutTax = 0;
+  // 2. Resolver Precio Unitario de Lista Base (antes de comisión por tarjeta)
+  let baseUnitPrice = 0;
   let unitPriceWithTax = 0;
   
   const discountPct = input.discountPercent !== undefined && input.discountPercent > 0 ? Number(input.discountPercent) : 0;
@@ -238,18 +238,15 @@ export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLin
   if (input.unitSalePrice !== undefined && Number(input.unitSalePrice) > 0) {
     const rawPrice = Number(input.unitSalePrice);
     if (input.pricingMode === 'INCLUDING_TAX') {
-      unitPriceWithTax = roundMonetary(rawPrice);
-      const deconstructed = deconstructInclusivePrice(unitPriceWithTax, saleTaxPercent);
-      unitPriceWithoutTax = deconstructed.priceWithoutTax;
+      const deconstructed = deconstructInclusivePrice(rawPrice, saleTaxPercent);
+      baseUnitPrice = deconstructed.priceWithoutTax;
     } else {
-      unitPriceWithoutTax = roundMonetary(rawPrice);
-      unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
+      baseUnitPrice = roundMonetary(rawPrice);
     }
   } else if (input.marginPercent !== undefined && Number(input.marginPercent) > 0 && costWithoutTax > 0) {
     const margin = Number(input.marginPercent);
     const targetNetPriceWithoutTax = roundMonetary(costWithoutTax * (1 + margin / 100));
-    unitPriceWithoutTax = discountRate > 0 ? roundMonetary(targetNetPriceWithoutTax / (1 - discountRate)) : targetNetPriceWithoutTax;
-    unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
+    baseUnitPrice = discountRate > 0 ? roundMonetary(targetNetPriceWithoutTax / (1 - discountRate)) : targetNetPriceWithoutTax;
   } else if (input.profitValue !== undefined && input.profitCalculationMode) {
     const fromProfit = calculatePriceFromProfitTarget({
       costWithoutTax,
@@ -257,48 +254,59 @@ export function calculateLineItem(input: EcuadorTaxLineItemInput): EcuadorTaxLin
       mode: input.profitCalculationMode,
     });
     const targetNetPriceWithoutTax = fromProfit.unitPriceWithoutTax;
-    unitPriceWithoutTax = discountRate > 0 ? roundMonetary(targetNetPriceWithoutTax / (1 - discountRate)) : targetNetPriceWithoutTax;
-    unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
+    baseUnitPrice = discountRate > 0 ? roundMonetary(targetNetPriceWithoutTax / (1 - discountRate)) : targetNetPriceWithoutTax;
   } else {
-    unitPriceWithoutTax = costWithoutTax;
-    unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
+    baseUnitPrice = costWithoutTax;
   }
 
-  // Si se selecciona pago con Tarjeta / PayPhone o se proporciona comisión, recalcular el Subtotal de Venta con Tarjeta
-  // Fórmula: Subtotal Venta con Tarjeta = Subtotal Venta / (1 - (Porcentaje Comisión / 100))
+  // 3. Descuento Unitario Base (antes de comisión por tarjeta)
+  let baseDiscount = 0;
+  if (input.discount !== undefined && input.discount > 0) {
+    baseDiscount = roundMonetary(Number(input.discount));
+  } else if (input.discountPercent !== undefined && input.discountPercent > 0) {
+    baseDiscount = roundMonetary(baseUnitPrice * (Number(input.discountPercent) / 100));
+  }
+  baseDiscount = Math.min(baseDiscount, baseUnitPrice); // No exceder PVP base
+
+  // 4. Si se selecciona pago con Tarjeta / PayPhone o se proporciona comisión, recalcular el PVP y el Descuento con la Comisión por Tarjeta
+  // La comisión por tarjeta debe aplicarse a la Venta Neta (Base Imponible) de forma proporcional para no sobreestimar la comisión al otorgar descuentos.
+  // Fórmula de Factor Tarjeta = 1 / (1 - (Porcentaje Comisión / 100))
   let cardSalePriceComputed: number | undefined = undefined;
   const isCard = Boolean(input.isCardPayment || (input.cardCommissionPercent && input.cardCommissionPercent > 0) || (input.cardSalePrice && input.cardSalePrice > 0));
-  
+
+  let unitPriceWithoutTax = baseUnitPrice;
+  let unitDiscount = baseDiscount;
+
   if (isCard) {
     if (input.cardSalePrice !== undefined && input.cardSalePrice > 0) {
       cardSalePriceComputed = roundMonetary(input.cardSalePrice);
       unitPriceWithoutTax = cardSalePriceComputed;
+      if (baseUnitPrice > 0) {
+        const ratio = unitPriceWithoutTax / baseUnitPrice;
+        unitDiscount = roundMonetary(baseDiscount * ratio);
+      }
     } else if (input.cardCommissionPercent !== undefined && input.cardCommissionPercent > 0) {
-      cardSalePriceComputed = calculateCardSalePrice(unitPriceWithoutTax, input.cardCommissionPercent);
-      unitPriceWithoutTax = cardSalePriceComputed;
+      const commPct = Math.max(0, Math.min(99.9, Number(input.cardCommissionPercent)));
+      const cardFactor = 1 / (1 - commPct / 100);
+      unitPriceWithoutTax = roundMonetary(baseUnitPrice * cardFactor);
+      cardSalePriceComputed = unitPriceWithoutTax;
+      unitDiscount = roundMonetary(baseDiscount * cardFactor);
     }
-    unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
   }
-  
-  // 3. Descuento Unitario ($)
-  let unitDiscount = 0;
-  if (input.discount !== undefined && input.discount > 0) {
-    unitDiscount = roundMonetary(Number(input.discount));
-  } else if (input.discountPercent !== undefined && input.discountPercent > 0) {
-    unitDiscount = roundMonetary(unitPriceWithoutTax * (Number(input.discountPercent) / 100));
-  }
-  unitDiscount = Math.min(unitDiscount, unitPriceWithoutTax); // No exceder PVP
-  
-  // 4. Base Imponible Unitaria (Net Unit Price) = (Costo + Utilidad) - Descuento
+
+  unitDiscount = Math.min(unitDiscount, unitPriceWithoutTax);
+  unitPriceWithTax = roundMonetary(unitPriceWithoutTax * (1 + saleTaxPercent / 100));
+
+  // 5. Base Imponible Unitaria (Net Unit Price) = PVP Sin IVA - Descuento
   const netUnitPrice = roundMonetary(Math.max(0, unitPriceWithoutTax - unitDiscount));
-  
-  // 5. Métricas de Utilidad
+
+  // 6. Métricas de Utilidad
   const unitProfitAmount = roundMonetary(netUnitPrice - costWithoutTax);
   const totalProfitAmount = roundMonetary(unitProfitAmount * qty);
   const markupPercent = costWithoutTax > 0 ? roundMonetary(((unitPriceWithoutTax - costWithoutTax) / costWithoutTax) * 100) : 0;
   const marginPercent = unitPriceWithoutTax > 0 ? roundMonetary(((unitPriceWithoutTax - costWithoutTax) / unitPriceWithoutTax) * 100) : 0;
-  
-  // 6. Totales de Línea
+
+  // 7. Totales de Línea
   const lineSubtotal = roundMonetary(netUnitPrice * qty);
   const lineTaxAmount = roundMonetary(lineSubtotal * (saleTaxPercent / 100));
   const lineTotal = roundMonetary(lineSubtotal + lineTaxAmount);

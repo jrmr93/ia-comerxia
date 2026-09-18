@@ -8,6 +8,8 @@ import {
   AlertCircle,
   Package,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { OrderActionButtons } from './OrderActionButtons.tsx';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
@@ -133,9 +135,79 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
   buildWhatsAppLink,
   renderPaymentBadge,
 }) => {
+  const [collapsedOrderIds, setCollapsedOrderIds] = React.useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = window.localStorage.getItem('comerxia_sales_collapsed_ids');
+        if (saved) return new Set(JSON.parse(saved));
+      } catch {}
+    }
+    return new Set();
+  });
+
+  const updateCollapsedOrderIds = (newSet: Set<string>) => {
+    setCollapsedOrderIds(newSet);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('comerxia_sales_collapsed_ids', JSON.stringify(Array.from(newSet)));
+      } catch {}
+    }
+  };
+
+  const handleToggleCardCollapse = (orderId: string | number) => {
+    const key = String(orderId);
+    const next = new Set(collapsedOrderIds);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    updateCollapsedOrderIds(next);
+  };
+
+  const handleCollapseAllSales = () => {
+    const allIds = new Set(orders.map((o) => String(o.id)));
+    updateCollapsedOrderIds(allIds);
+  };
+
+  const handleExpandAllSales = () => {
+    updateCollapsedOrderIds(new Set());
+  };
+
   return (
     <div id="orders-list-container" className="w-full space-y-3">
+      {orders.length > 0 && (
+        <div className="flex items-center justify-between gap-2 p-2 sm:p-2.5 bg-slate-50 border border-slate-200/90 rounded-2xl shadow-2xs mb-1 flex-wrap">
+          <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5 text-sky-600" />
+            <span>Registros de Ventas ({orders.length} {orders.length === 1 ? 'pedido' : 'pedidos'})</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleCollapseAllSales}
+              className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+              title="Encojer todos los registros de ventas a una sola fila"
+            >
+              <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
+              <span>Encojer Todos</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExpandAllSales}
+              className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+              title="Desplegar todos los registros de ventas"
+            >
+              <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+              <span>Desplegar Todos</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {orders.map((ord, index) => {
+        const isCollapsed = collapsedOrderIds.has(String(ord.id));
         const isPickup = isPickupDeliveryOrder(ord);
         const orderApplyTax = (ord as any).applySaleTax !== false;
         const orderTaxPct = Number((ord as any).saleTaxPercent || 15);
@@ -282,8 +354,118 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
           derivedShippingCost = derivedShip > 0 ? derivedShip : 0;
         }
         const fee = isPickup ? 0 : derivedShippingCost;
+        const invoiceTotals = calculateInvoiceTotals(calculatedItems, { shippingFee: fee });
 
-        const invoiceTotals = calculateInvoiceTotals(calculatedItems, { shippingFee: fee });
+        if (isCollapsed) {
+          return (
+            <div
+              key={ord.id}
+              id={index === 0 ? 'orders-first-record' : `order-record-${ord.id}`}
+              className={`w-full rounded-2xl border transition-all px-3 sm:px-4 py-2.5 shadow-2xs hover:shadow-xs flex flex-wrap items-center justify-between gap-2.5 bg-white ${rowStyles.cardBorderClass}`}
+            >
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0 flex-1">
+                <div className="inline-flex items-center space-x-1 border px-2.5 py-0.5 rounded-xl font-mono font-black text-xs bg-slate-100 text-slate-900 border-slate-200">
+                  <span className={`w-2 h-2 rounded-full ${rowStyles.statusDot} mr-1`} />
+                  <span>#{ord.orderNumber}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(ord.orderNumber || '');
+                      showToast('✓ Número de orden copiado');
+                    }}
+                    className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer ml-0.5"
+                    title="Copiar número de orden"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wide border shrink-0 ${rowStyles.badgeColor}`}>
+                  {rowStyles.label}
+                </span>
+
+                <span className="text-xs font-bold text-slate-800 shrink-0 max-w-[200px] truncate" title={ord.customerName}>
+                  Cliente: <strong className="text-slate-900">{ord.customerName || 'Cliente'}</strong>
+                  {customerCi && <span className="font-mono text-slate-500 font-normal ml-1">({customerCi})</span>}
+                </span>
+
+                <span className="text-[11px] text-slate-500 shrink-0 hidden sm:inline-flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-slate-400" />
+                  <span>
+                    {ord.createdAt
+                      ? new Date(ord.createdAt).toLocaleDateString('es-EC', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : 'Reciente'}
+                  </span>
+                </span>
+
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                    isPickup
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                      : 'bg-sky-50 text-sky-800 border border-sky-200'
+                  }`}
+                >
+                  {isPickup ? <Building2 className="w-3 h-3 text-amber-600" /> : <Truck className="w-3 h-3 text-sky-600" />}
+                  {isPickup ? 'Retiro' : 'Envío'}
+                </span>
+
+                <span className="text-[11px] text-slate-600 font-semibold shrink-0">
+                  ({itemsCount} ítems)
+                </span>
+
+                {linkedPurchasesForOrder.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onViewLinkedPurchase) {
+                        if (firstLinkedPurchase?.purchaseNumber) {
+                          onViewLinkedPurchase(firstLinkedPurchase.id || firstLinkedPurchase.purchaseNumber, String(ord.orderNumber));
+                        } else if (firstLinkedPurchase?.id) {
+                          onViewLinkedPurchase(firstLinkedPurchase.id, String(ord.orderNumber));
+                        } else {
+                          onViewLinkedPurchase(String(ord.orderNumber), String(ord.orderNumber));
+                        }
+                      }
+                    }}
+                    title={`Ir a compras y filtrar compras asociadas al Pedido #${ord.orderNumber}`}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100 transition cursor-pointer shrink-0"
+                  >
+                    <Truck className="w-3 h-3 text-indigo-600" />
+                    <span>Ver Compra</span>
+                    {isLinkedPurchasePending && (
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-amber-200 text-amber-950 font-black">
+                        ⏳
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                <div className="text-right">
+                  <span className="font-mono font-black text-xs sm:text-sm text-emerald-800">
+                    ${invoiceTotals.totalInvoiceAmount.toFixed(2)} {currency}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleCardCollapse(ord.id)}
+                  className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs font-sans"
+                  title="Desplegar registro completo de la venta"
+                >
+                  <span className="hidden xs:inline">Desplegar</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+                </button>
+              </div>
+            </div>
+          );
+        }
 
         return (
           <div
@@ -323,6 +505,20 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
                   {customerCi && <span className="font-mono text-slate-400 font-normal">({customerCi})</span>}
                 </span>
 
+                {/* Fecha de la Venta (Ubicación idéntica al registro de compras) */}
+                <span className="text-xs text-slate-300 font-medium shrink-0 hidden sm:inline-flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-slate-400" />
+                  <span>
+                    {ord.createdAt
+                      ? new Date(ord.createdAt).toLocaleDateString('es-EC', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : 'Reciente'}
+                  </span>
+                </span>
+
                 {/* Modalidad de Entrega */}
                 <span
                   className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
@@ -354,7 +550,7 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
                     title={`Ir a compras y filtrar compras asociadas al Pedido #${ord.orderNumber}`}
                     className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-lg bg-indigo-950 text-indigo-200 border border-indigo-700 hover:bg-indigo-900 transition cursor-pointer shadow-2xs"
                   >
-                    <Truck className="w-3.5 h-3.5 text-indigo-400" />
+                    <Truck className="w-3 h-3 text-indigo-400" />
                     <span>
                       {linkedPurchasesForOrder.length > 1
                         ? `Ver Compras (${linkedPurchasesForOrder.length})`
@@ -370,9 +566,20 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
                 )}
               </div>
 
-              <div className="font-mono font-black text-sm sm:text-base text-emerald-400">
-                Total Factura: ${invoiceTotals.totalInvoiceAmount.toFixed(2)}{' '}
-                <span className="text-xs font-bold text-emerald-200">{currency}</span>
+              <div className="flex items-center gap-3 font-mono font-black text-sm sm:text-base text-emerald-400">
+                <span>
+                  Total Factura: ${invoiceTotals.totalInvoiceAmount.toFixed(2)}{' '}
+                  <span className="text-xs font-bold text-emerald-200">{currency}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleCardCollapse(ord.id)}
+                  className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs font-sans"
+                  title="Encojer registro de venta"
+                >
+                  <span className="hidden xs:inline">Encojer</span>
+                  <ChevronUp className="w-3.5 h-3.5 text-sky-400" />
+                </button>
               </div>
             </div>
 
@@ -393,17 +600,16 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {calculatedItems.map((item: any, idx: number) => {
-                    const rawIt = rawItems[idx] || {};
                     return (
                       <tr key={idx} className="hover:bg-slate-50/80 transition">
                         <td className="p-3 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
                         <td className="p-3">
-                          <div className="flex items-center space-x-2.5">
-                            {rawIt.imageUrl || rawIt.item?.imageUrl ? (
+                          <div className="flex items-center gap-2">
+                            {item.imageUrl ? (
                               <img
-                                src={rawIt.imageUrl || rawIt.item?.imageUrl}
+                                src={item.imageUrl}
                                 alt={item.name}
-                                className="w-9 h-9 object-cover rounded-lg border border-slate-200 shrink-0"
+                                className="w-9 h-9 rounded-lg object-cover shrink-0 border border-slate-200 shadow-2xs"
                               />
                             ) : (
                               <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200">

@@ -297,6 +297,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS cost_with_tax NUMERIC(12, 2);
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5, 2) DEFAULT 15.00;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS sale_price NUMERIC(12, 2) DEFAULT 0.00;
+        ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS card_sale_price NUMERIC(12, 2);
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS discount_percent INTEGER DEFAULT 0;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS stock INTEGER DEFAULT 1;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS image_url TEXT;
@@ -352,6 +353,7 @@ export async function ensureTablesCreated() {
           items TEXT NOT NULL DEFAULT '[]',
           total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
           payment_method TEXT DEFAULT 'whatsapp',
+          card_commission_percent NUMERIC(5, 2),
           status TEXT NOT NULL DEFAULT 'pending',
           payment_voucher TEXT,
           notes TEXT,
@@ -374,6 +376,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS items TEXT DEFAULT '[]';
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS total_amount NUMERIC(12, 2) DEFAULT 0.00;
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'whatsapp';
+        ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS card_commission_percent NUMERIC(5, 2);
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS payment_voucher TEXT;
         ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS notes TEXT;
