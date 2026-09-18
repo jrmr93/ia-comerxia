@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import { db, isPostgresConfigured, pool, ensureTablesCreated } from '../db/index.ts';
+import { storage } from '../db/storage.ts';
 import {
   users,
   inventoryItems,
@@ -17,6 +18,10 @@ import {
   purchases,
   payments,
   storeAnalyticsEvents,
+  ecuadorApiConfigs,
+  payphoneConfigs,
+  sriConfigs,
+  sriInvoices,
 } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { getAllUsers } from '../db/users.ts';
@@ -33,6 +38,10 @@ import {
   getPurchases,
   getPayments,
   resolveValidUserId,
+  getEcuadorApiConfig,
+  getPayphoneConfig,
+  getSriConfig,
+  getSriInvoicesByUser,
 } from '../db/inventory.ts';
 import { getEmailConfig } from './email.ts';
 import { ensureUploadsDirExists } from './media-storage.ts';
@@ -53,6 +62,10 @@ export interface FullSystemBackupManifest {
     purchasesCount: number;
     paymentsCount: number;
     telegramMessagesCount: number;
+    ecuadorApiConfigsCount: number;
+    payphoneConfigsCount: number;
+    sriConfigsCount: number;
+    sriInvoicesCount: number;
     mediaFilesCount: number;
     mediaTotalSizeBytes: number;
   };
@@ -72,6 +85,10 @@ export interface FullSystemData {
   serverDomainConfigs: any[];
   aiConfigs: any[];
   emailConfigs: any[];
+  ecuadorApiConfigs: any[];
+  payphoneConfigs: any[];
+  sriConfigs: any[];
+  sriInvoices: any[];
   storeAnalyticsEvents: any[];
 }
 
@@ -131,9 +148,10 @@ function escapeSqlDate(val: any): string {
 }
 
 /**
- * Collects 100% of the Comerxia system data across all 14 tables/collections.
+ * Collects 100% of the Comerxia system data across all 18 tables/collections.
  */
 export async function getFullSystemData(userId?: number): Promise<FullSystemData> {
+  const targetId = userId || 1;
   const [
     allUsers,
     items,
@@ -148,20 +166,28 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     domainCfg,
     aiCfg,
     emailCfg,
+    ecuadorCfg,
+    payphoneCfg,
+    sriCfg,
+    sriInvs,
   ] = await Promise.all([
     getAllUsers(),
     getInventoryItems(userId),
     getTelegramMessages(userId),
-    getTelegramConfig(userId || 1),
+    getTelegramConfig(targetId),
     getCustomers(userId),
     getSuppliers(userId),
     getCustomerOrders(userId),
     getPurchases(userId),
     getPayments(userId),
-    getStoreConfig(userId || 1),
-    getServerDomainConfig(userId || 1),
-    getAiConfig(userId || 1),
-    getEmailConfig(userId || 1),
+    getStoreConfig(targetId),
+    getServerDomainConfig(targetId),
+    getAiConfig(targetId),
+    getEmailConfig(targetId),
+    getEcuadorApiConfig(targetId),
+    getPayphoneConfig(targetId),
+    getSriConfig(targetId),
+    getSriInvoicesByUser(targetId),
   ]);
 
   // Ensure tokens & keys from process.env are captured in configurations if empty
@@ -173,7 +199,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
   } else if (process.env.TELEGRAM_BOT_TOKEN) {
     effectiveTgConfig = {
       id: 1,
-      userId: userId || 1,
+      userId: targetId,
       botToken: process.env.TELEGRAM_BOT_TOKEN.trim(),
       webhookSecret: null,
       supplierName: 'Proveedor Telegram Principal',
@@ -194,7 +220,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
   } else if (process.env.GEMINI_API_KEY) {
     effectiveAiConfig = {
       id: 1,
-      userId: userId || 1,
+      userId: targetId,
       apiKey: process.env.GEMINI_API_KEY.trim(),
       modelName: 'gemini-3.6-flash',
       temperature: '0.20',
@@ -206,6 +232,10 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
   let allAiConfigs: any[] = effectiveAiConfig ? [effectiveAiConfig] : [];
   let allEmailConfigs: any[] = emailCfg ? [emailCfg] : [];
   let allDomainConfigs: any[] = domainCfg ? [domainCfg] : [];
+  let allEcuadorApiConfigs: any[] = ecuadorCfg ? [ecuadorCfg] : [];
+  let allPayphoneConfigs: any[] = payphoneCfg ? [payphoneCfg] : [];
+  let allSriConfigs: any[] = sriCfg ? [sriCfg] : [];
+  let allSriInvoices: any[] = sriInvs ? sriInvs : [];
 
   if (isPostgresConfigured()) {
     try {
@@ -242,13 +272,48 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
       const dbDomains = await db.select().from(serverDomainConfigs);
       if (dbDomains && dbDomains.length > 0) allDomainConfigs = dbDomains;
     } catch {}
+
+    try {
+      const dbEcuador = await db.select().from(ecuadorApiConfigs);
+      if (dbEcuador && dbEcuador.length > 0) allEcuadorApiConfigs = dbEcuador;
+    } catch {}
+
+    try {
+      const dbPayphone = await db.select().from(payphoneConfigs);
+      if (dbPayphone && dbPayphone.length > 0) allPayphoneConfigs = dbPayphone;
+    } catch {}
+
+    try {
+      const dbSri = await db.select().from(sriConfigs);
+      if (dbSri && dbSri.length > 0) allSriConfigs = dbSri;
+    } catch {}
+
+    try {
+      const dbSriInvs = await db.select().from(sriInvoices);
+      if (dbSriInvs && dbSriInvs.length > 0) allSriInvoices = dbSriInvs;
+    } catch {}
+  } else {
+    // Fallback to local storage state if available
+    const localState = storage.getState();
+    if (localState.ecuadorApiConfigs && localState.ecuadorApiConfigs.length > 0) {
+      allEcuadorApiConfigs = localState.ecuadorApiConfigs;
+    }
+    if (localState.payphoneConfigs && localState.payphoneConfigs.length > 0) {
+      allPayphoneConfigs = localState.payphoneConfigs;
+    }
+    if (localState.sriConfigs && localState.sriConfigs.length > 0) {
+      allSriConfigs = localState.sriConfigs;
+    }
+    if (localState.sriInvoices && localState.sriInvoices.length > 0) {
+      allSriInvoices = localState.sriInvoices;
+    }
   }
 
   let analyticsEvents: any[] = [];
   try {
     analyticsEvents = await db.select().from(storeAnalyticsEvents).limit(1000);
   } catch {
-    analyticsEvents = [];
+    analyticsEvents = storage.getState()?.storeAnalyticsEvents || [];
   }
 
   return {
@@ -265,6 +330,10 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     serverDomainConfigs: allDomainConfigs,
     aiConfigs: allAiConfigs,
     emailConfigs: allEmailConfigs,
+    ecuadorApiConfigs: allEcuadorApiConfigs,
+    payphoneConfigs: allPayphoneConfigs,
+    sriConfigs: allSriConfigs,
+    sriInvoices: allSriInvoices,
     storeAnalyticsEvents: analyticsEvents,
   };
 }
@@ -279,8 +348,8 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   let sql = `-- =========================================================================\n`;
   sql += `-- COMERXIA - RESPALDO 100% COMPLETO DE BASE DE DATOS POSTGRESQL\n`;
   sql += `-- Fecha de exportación: ${nowIso}\n`;
-  sql += `-- Incluye esquema completo, tablas maestras, usuarios, inventario, pedidos,\n`;
-  sql += `-- clientes, proveedores, configuraciones y reseteo automático de secuencias.\n`;
+  sql += `-- Incluye esquema completo (18 tablas), usuarios, inventario, pedidos,\n`;
+  sql += `-- clientes, proveedores, facturación SRI, Ecuador API, Payphone y configuraciones.\n`;
   sql += `-- =========================================================================\n\n`;
 
   sql += `SET client_encoding = 'UTF8';\n`;
@@ -312,6 +381,8 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  id SERIAL PRIMARY KEY,\n`;
   sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
   sql += `  bot_token TEXT,\n`;
+  sql += `  bot_username TEXT,\n`;
+  sql += `  bot_first_name TEXT,\n`;
   sql += `  webhook_secret TEXT,\n`;
   sql += `  supplier_name TEXT DEFAULT 'Proveedor Telegram Principal',\n`;
   sql += `  supplier_username TEXT,\n`;
@@ -322,6 +393,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  default_stock_quantity INTEGER DEFAULT 10,\n`;
   sql += `  tax_percent INTEGER DEFAULT 15,\n`;
   sql += `  use_ai BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  is_active BOOLEAN DEFAULT TRUE,\n`;
   sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
   sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
   sql += `);\n\n`;
@@ -337,6 +409,9 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  description TEXT,\n`;
   sql += `  category TEXT NOT NULL DEFAULT 'General',\n`;
   sql += `  cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,\n`;
+  sql += `  cost_without_tax NUMERIC(12, 2),\n`;
+  sql += `  cost_with_tax NUMERIC(12, 2),\n`;
+  sql += `  tax_rate NUMERIC(5, 2) DEFAULT 15.00,\n`;
   sql += `  sale_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,\n`;
   sql += `  discount_percent INTEGER DEFAULT 0,\n`;
   sql += `  stock INTEGER NOT NULL DEFAULT 0,\n`;
@@ -441,6 +516,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  tracking_carrier TEXT,\n`;
   sql += `  tracking_notes TEXT,\n`;
   sql += `  fulfillment_status TEXT DEFAULT 'in_stock',\n`;
+  sql += `  delivery_type TEXT DEFAULT 'shipping',\n`;
   sql += `  linked_purchase_id INTEGER,\n`;
   sql += `  linked_purchase_number TEXT,\n`;
   sql += `  returns TEXT,\n`;
@@ -495,6 +571,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  customer_name TEXT,\n`;
   sql += `  supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,\n`;
   sql += `  supplier_name TEXT,\n`;
+  sql += `  return_id TEXT,\n`;
   sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
   sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
   sql += `);\n\n`;
@@ -517,6 +594,8 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  allow_catalog_browsing BOOLEAN DEFAULT FALSE,\n`;
   sql += `  show_stock BOOLEAN DEFAULT TRUE,\n`;
   sql += `  show_out_of_stock BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  enable_pagination BOOLEAN DEFAULT FALSE,\n`;
+  sql += `  items_per_page INTEGER DEFAULT 12,\n`;
   sql += `  instagram_url TEXT,\n`;
   sql += `  website_url TEXT,\n`;
   sql += `  address TEXT,\n`;
@@ -549,8 +628,10 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  id SERIAL PRIMARY KEY,\n`;
   sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
   sql += `  api_key TEXT,\n`;
+  sql += `  account_email TEXT,\n`;
   sql += `  model_name TEXT DEFAULT 'gemini-3.6-flash',\n`;
   sql += `  temperature NUMERIC(3, 2) DEFAULT 0.20,\n`;
+  sql += `  is_active BOOLEAN DEFAULT TRUE,\n`;
   sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
   sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
   sql += `);\n\n`;
@@ -571,8 +652,86 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
   sql += `);\n\n`;
 
-  // 14. store_analytics_events
-  sql += `-- 14. TABLA: store_analytics_events\n`;
+  // 14. ecuador_api_configs
+  sql += `-- 14. TABLA: ecuador_api_configs\n`;
+  sql += `CREATE TABLE IF NOT EXISTS ecuador_api_configs (\n`;
+  sql += `  id SERIAL PRIMARY KEY,\n`;
+  sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  api_key TEXT,\n`;
+  sql += `  is_active BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
+  sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
+  sql += `);\n\n`;
+
+  // 15. payphone_configs
+  sql += `-- 15. TABLA: payphone_configs\n`;
+  sql += `CREATE TABLE IF NOT EXISTS payphone_configs (\n`;
+  sql += `  id SERIAL PRIMARY KEY,\n`;
+  sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  token TEXT,\n`;
+  sql += `  store_id TEXT,\n`;
+  sql += `  environment TEXT DEFAULT 'production',\n`;
+  sql += `  is_active BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
+  sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
+  sql += `);\n\n`;
+
+  // 16. sri_configs
+  sql += `-- 16. TABLA: sri_configs\n`;
+  sql += `CREATE TABLE IF NOT EXISTS sri_configs (\n`;
+  sql += `  id SERIAL PRIMARY KEY,\n`;
+  sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  ruc TEXT DEFAULT '1700000000001',\n`;
+  sql += `  estado_ruc TEXT DEFAULT 'ACTIVO',\n`;
+  sql += `  razon_social TEXT DEFAULT 'COMERXIA E-COMMERCE S.A.',\n`;
+  sql += `  nombre_comercial TEXT DEFAULT 'COMERXIA ECUADOR',\n`;
+  sql += `  estab TEXT DEFAULT '001',\n`;
+  sql += `  pto_emi TEXT DEFAULT '001',\n`;
+  sql += `  dir_matriz TEXT DEFAULT 'Quito, Ecuador',\n`;
+  sql += `  obligado_contabilidad TEXT DEFAULT 'NO',\n`;
+  sql += `  contribuyente_especial TEXT,\n`;
+  sql += `  regimen_rimpe TEXT DEFAULT 'NO',\n`;
+  sql += `  ambiente TEXT DEFAULT '1',\n`;
+  sql += `  p12_base64 TEXT,\n`;
+  sql += `  p12_password TEXT,\n`;
+  sql += `  p12_filename TEXT,\n`;
+  sql += `  last_factura_secuencial INTEGER DEFAULT 0,\n`;
+  sql += `  last_nota_credito_secuencial INTEGER DEFAULT 0,\n`;
+  sql += `  last_nota_debito_secuencial INTEGER DEFAULT 0,\n`;
+  sql += `  last_guia_remision_secuencial INTEGER DEFAULT 0,\n`;
+  sql += `  last_retencion_secuencial INTEGER DEFAULT 0,\n`;
+  sql += `  last_liquidacion_secuencial INTEGER DEFAULT 0,\n`;
+  sql += `  is_active BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
+  sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
+  sql += `);\n\n`;
+
+  // 17. sri_invoices
+  sql += `-- 17. TABLA: sri_invoices\n`;
+  sql += `CREATE TABLE IF NOT EXISTS sri_invoices (\n`;
+  sql += `  id SERIAL PRIMARY KEY,\n`;
+  sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  order_id INTEGER REFERENCES customer_orders(id) ON DELETE SET NULL,\n`;
+  sql += `  order_number TEXT,\n`;
+  sql += `  secuencial TEXT NOT NULL,\n`;
+  sql += `  clave_acceso TEXT NOT NULL,\n`;
+  sql += `  ambiente TEXT DEFAULT '1',\n`;
+  sql += `  customer_name TEXT NOT NULL,\n`;
+  sql += `  customer_ci_ruc TEXT NOT NULL,\n`;
+  sql += `  total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,\n`;
+  sql += `  estado_recepcion TEXT DEFAULT 'PENDIENTE',\n`;
+  sql += `  estado_autorizacion TEXT DEFAULT 'PENDIENTE',\n`;
+  sql += `  fecha_autorizacion TIMESTAMP,\n`;
+  sql += `  numero_autorizacion TEXT,\n`;
+  sql += `  xml_generado TEXT,\n`;
+  sql += `  xml_firmado TEXT,\n`;
+  sql += `  mensajes_sri TEXT,\n`;
+  sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
+  sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
+  sql += `);\n\n`;
+
+  // 18. store_analytics_events
+  sql += `-- 18. TABLA: store_analytics_events\n`;
   sql += `CREATE TABLE IF NOT EXISTS store_analytics_events (\n`;
   sql += `  id SERIAL PRIMARY KEY,\n`;
   sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,\n`;
@@ -606,7 +765,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.telegramConfigs.length > 0) {
     sql += `-- Datos: telegram_configs\n`;
     for (const tc of data.telegramConfigs) {
-      sql += `INSERT INTO telegram_configs (id, user_id, bot_token, webhook_secret, supplier_name, supplier_username, auto_approve, default_margin_percent, currency, default_stock_enabled, default_stock_quantity, tax_percent, use_ai) VALUES (${tc.id || 1}, ${tc.userId || 1}, ${escapeSqlString(tc.botToken)}, ${escapeSqlString(tc.webhookSecret)}, ${escapeSqlString(tc.supplierName)}, ${escapeSqlString(tc.supplierUsername)}, ${tc.autoApprove !== false ? 'TRUE' : 'FALSE'}, ${tc.defaultMarginPercent || 35}, ${escapeSqlString(tc.currency || 'USD')}, ${tc.defaultStockEnabled ? 'TRUE' : 'FALSE'}, ${tc.defaultStockQuantity || 10}, ${tc.taxPercent ?? 15}, ${tc.useAi !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, bot_token = EXCLUDED.bot_token, webhook_secret = EXCLUDED.webhook_secret, supplier_name = EXCLUDED.supplier_name, supplier_username = EXCLUDED.supplier_username, auto_approve = EXCLUDED.auto_approve, default_margin_percent = EXCLUDED.default_margin_percent, currency = EXCLUDED.currency, default_stock_enabled = EXCLUDED.default_stock_enabled, default_stock_quantity = EXCLUDED.default_stock_quantity, tax_percent = EXCLUDED.tax_percent, use_ai = EXCLUDED.use_ai;\n`;
+      sql += `INSERT INTO telegram_configs (id, user_id, bot_token, bot_username, bot_first_name, webhook_secret, supplier_name, supplier_username, auto_approve, default_margin_percent, currency, default_stock_enabled, default_stock_quantity, tax_percent, use_ai, is_active) VALUES (${tc.id || 1}, ${tc.userId || 1}, ${escapeSqlString(tc.botToken)}, ${escapeSqlString(tc.botUsername)}, ${escapeSqlString(tc.botFirstName)}, ${escapeSqlString(tc.webhookSecret)}, ${escapeSqlString(tc.supplierName)}, ${escapeSqlString(tc.supplierUsername)}, ${tc.autoApprove !== false ? 'TRUE' : 'FALSE'}, ${tc.defaultMarginPercent || 35}, ${escapeSqlString(tc.currency || 'USD')}, ${tc.defaultStockEnabled ? 'TRUE' : 'FALSE'}, ${tc.defaultStockQuantity || 10}, ${tc.taxPercent ?? 15}, ${tc.useAi !== false ? 'TRUE' : 'FALSE'}, ${tc.isActive !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, bot_token = EXCLUDED.bot_token, webhook_secret = EXCLUDED.webhook_secret, supplier_name = EXCLUDED.supplier_name, supplier_username = EXCLUDED.supplier_username, auto_approve = EXCLUDED.auto_approve, default_margin_percent = EXCLUDED.default_margin_percent, currency = EXCLUDED.currency, default_stock_enabled = EXCLUDED.default_stock_enabled, default_stock_quantity = EXCLUDED.default_stock_quantity, tax_percent = EXCLUDED.tax_percent, use_ai = EXCLUDED.use_ai, is_active = EXCLUDED.is_active;\n`;
     }
     sql += `\n`;
   }
@@ -651,7 +810,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.customerOrders.length > 0) {
     sql += `-- Datos: customer_orders (${data.customerOrders.length} registros)\n`;
     for (const o of data.customerOrders) {
-      sql += `INSERT INTO customer_orders (id, user_id, order_number, customer_name, customer_phone, customer_ci, customer_email, customer_address, items, total_amount, payment_method, status, payment_voucher, notes, tracking_number, tracking_carrier, tracking_notes, fulfillment_status, linked_purchase_id, linked_purchase_number, returns, created_at) VALUES (${o.id}, ${o.userId || 1}, ${escapeSqlString(o.orderNumber)}, ${escapeSqlString(o.customerName)}, ${escapeSqlString(o.customerPhone)}, ${escapeSqlString(o.customerCi)}, ${escapeSqlString(o.customerEmail)}, ${escapeSqlString(o.customerAddress)}, ${escapeSqlString(o.items)}, ${o.totalAmount || 0}, ${escapeSqlString(o.paymentMethod || 'whatsapp')}, ${escapeSqlString(o.status || 'pending')}, ${escapeSqlString(o.paymentVoucher)}, ${escapeSqlString(o.notes)}, ${escapeSqlString(o.trackingNumber)}, ${escapeSqlString(o.trackingCarrier)}, ${escapeSqlString(o.trackingNotes)}, ${escapeSqlString(o.fulfillmentStatus || 'in_stock')}, ${o.linkedPurchaseId ? o.linkedPurchaseId : 'NULL'}, ${escapeSqlString(o.linkedPurchaseNumber)}, ${escapeSqlString(o.returns)}, ${escapeSqlDate(o.createdAt)}) ON CONFLICT (id) DO UPDATE SET order_number = EXCLUDED.order_number, customer_name = EXCLUDED.customer_name, customer_phone = EXCLUDED.customer_phone, customer_ci = EXCLUDED.customer_ci, customer_email = EXCLUDED.customer_email, customer_address = EXCLUDED.customer_address, items = EXCLUDED.items, total_amount = EXCLUDED.total_amount, payment_method = EXCLUDED.payment_method, status = EXCLUDED.status, payment_voucher = EXCLUDED.payment_voucher, notes = EXCLUDED.notes, tracking_number = EXCLUDED.tracking_number, tracking_carrier = EXCLUDED.tracking_carrier, tracking_notes = EXCLUDED.tracking_notes, fulfillment_status = EXCLUDED.fulfillment_status, linked_purchase_id = EXCLUDED.linked_purchase_id, linked_purchase_number = EXCLUDED.linked_purchase_number, returns = EXCLUDED.returns;\n`;
+      sql += `INSERT INTO customer_orders (id, user_id, order_number, customer_name, customer_phone, customer_ci, customer_email, customer_address, items, total_amount, payment_method, status, payment_voucher, notes, tracking_number, tracking_carrier, tracking_notes, fulfillment_status, delivery_type, linked_purchase_id, linked_purchase_number, returns, created_at) VALUES (${o.id}, ${o.userId || 1}, ${escapeSqlString(o.orderNumber)}, ${escapeSqlString(o.customerName)}, ${escapeSqlString(o.customerPhone)}, ${escapeSqlString(o.customerCi)}, ${escapeSqlString(o.customerEmail)}, ${escapeSqlString(o.customerAddress)}, ${escapeSqlString(o.items)}, ${o.totalAmount || 0}, ${escapeSqlString(o.paymentMethod || 'whatsapp')}, ${escapeSqlString(o.status || 'pending')}, ${escapeSqlString(o.paymentVoucher)}, ${escapeSqlString(o.notes)}, ${escapeSqlString(o.trackingNumber)}, ${escapeSqlString(o.trackingCarrier)}, ${escapeSqlString(o.trackingNotes)}, ${escapeSqlString(o.fulfillmentStatus || 'in_stock')}, ${escapeSqlString(o.deliveryType || 'shipping')}, ${o.linkedPurchaseId ? o.linkedPurchaseId : 'NULL'}, ${escapeSqlString(o.linkedPurchaseNumber)}, ${escapeSqlString(o.returns)}, ${escapeSqlDate(o.createdAt)}) ON CONFLICT (id) DO UPDATE SET order_number = EXCLUDED.order_number, customer_name = EXCLUDED.customer_name, customer_phone = EXCLUDED.customer_phone, customer_ci = EXCLUDED.customer_ci, customer_email = EXCLUDED.customer_email, customer_address = EXCLUDED.customer_address, items = EXCLUDED.items, total_amount = EXCLUDED.total_amount, payment_method = EXCLUDED.payment_method, status = EXCLUDED.status, payment_voucher = EXCLUDED.payment_voucher, notes = EXCLUDED.notes, tracking_number = EXCLUDED.tracking_number, tracking_carrier = EXCLUDED.tracking_carrier, tracking_notes = EXCLUDED.tracking_notes, fulfillment_status = EXCLUDED.fulfillment_status, delivery_type = EXCLUDED.delivery_type, linked_purchase_id = EXCLUDED.linked_purchase_id, linked_purchase_number = EXCLUDED.linked_purchase_number, returns = EXCLUDED.returns;\n`;
     }
     sql += `\n`;
   }
@@ -690,7 +849,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.storeConfigs.length > 0) {
     sql += `-- Datos: store_configs\n`;
     for (const sc of data.storeConfigs) {
-      sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(sc.courierLogos)}, ${escapeSqlString(sc.paymentLogos)}, ${escapeSqlString(sc.theme || 'classic')}, ${escapeSqlString(sc.promoPopup)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, promo_popup = EXCLUDED.promo_popup;\n`;
+      sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, enable_pagination, items_per_page, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${sc.enablePagination ? 'TRUE' : 'FALSE'}, ${sc.itemsPerPage || 12}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(sc.courierLogos)}, ${escapeSqlString(sc.paymentLogos)}, ${escapeSqlString(sc.theme || 'classic')}, ${escapeSqlString(sc.promoPopup)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, enable_pagination = EXCLUDED.enable_pagination, items_per_page = EXCLUDED.items_per_page, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, promo_popup = EXCLUDED.promo_popup;\n`;
     }
     sql += `\n`;
   }
@@ -708,7 +867,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.aiConfigs.length > 0) {
     sql += `-- Datos: ai_configs\n`;
     for (const aic of data.aiConfigs) {
-      sql += `INSERT INTO ai_configs (id, user_id, api_key, model_name, temperature) VALUES (${aic.id || 1}, ${aic.userId || 1}, ${escapeSqlString(aic.apiKey)}, ${escapeSqlString(aic.modelName || 'gemini-3.6-flash')}, ${aic.temperature || 0.20}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, model_name = EXCLUDED.model_name, temperature = EXCLUDED.temperature;\n`;
+      sql += `INSERT INTO ai_configs (id, user_id, api_key, account_email, model_name, temperature, is_active) VALUES (${aic.id || 1}, ${aic.userId || 1}, ${escapeSqlString(aic.apiKey)}, ${escapeSqlString(aic.accountEmail)}, ${escapeSqlString(aic.modelName || 'gemini-3.6-flash')}, ${aic.temperature || 0.20}, ${aic.isActive !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, account_email = EXCLUDED.account_email, model_name = EXCLUDED.model_name, temperature = EXCLUDED.temperature, is_active = EXCLUDED.is_active;\n`;
     }
     sql += `\n`;
   }
@@ -722,7 +881,45 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
     sql += `\n`;
   }
 
-  // 14. store_analytics_events
+  // 14. ecuador_api_configs
+  if (data.ecuadorApiConfigs && data.ecuadorApiConfigs.length > 0) {
+    sql += `-- Datos: ecuador_api_configs\n`;
+    for (const eac of data.ecuadorApiConfigs) {
+      sql += `INSERT INTO ecuador_api_configs (id, user_id, api_key, is_active) VALUES (${eac.id || 1}, ${eac.userId || 1}, ${escapeSqlString(eac.apiKey)}, ${eac.isActive !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, is_active = EXCLUDED.is_active;\n`;
+    }
+    sql += `\n`;
+  }
+
+  // 15. payphone_configs
+  if (data.payphoneConfigs && data.payphoneConfigs.length > 0) {
+    sql += `-- Datos: payphone_configs\n`;
+    for (const ppc of data.payphoneConfigs) {
+      sql += `INSERT INTO payphone_configs (id, user_id, token, store_id, environment, is_active) VALUES (${ppc.id || 1}, ${ppc.userId || 1}, ${escapeSqlString(ppc.token)}, ${escapeSqlString(ppc.storeId)}, ${escapeSqlString(ppc.environment || 'production')}, ${ppc.isActive !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, token = EXCLUDED.token, store_id = EXCLUDED.store_id, environment = EXCLUDED.environment, is_active = EXCLUDED.is_active;\n`;
+    }
+    sql += `\n`;
+  }
+
+  // 16. sri_configs
+  if (data.sriConfigs && data.sriConfigs.length > 0) {
+    sql += `-- Datos: sri_configs\n`;
+    for (const sric of data.sriConfigs) {
+      sql += `INSERT INTO sri_configs (id, user_id, ruc, estado_ruc, razon_social, nombre_comercial, estab, pto_emi, dir_matriz, obligado_contabilidad, contribuyente_especial, regimen_rimpe, ambiente, p12_base64, p12_password, p12_filename, last_factura_secuencial, last_nota_credito_secuencial, last_nota_debito_secuencial, last_guia_remision_secuencial, last_retencion_secuencial, last_liquidacion_secuencial, is_active) VALUES (${sric.id || 1}, ${sric.userId || 1}, ${escapeSqlString(sric.ruc || '1700000000001')}, ${escapeSqlString(sric.estadoRuc || 'ACTIVO')}, ${escapeSqlString(sric.razonSocial)}, ${escapeSqlString(sric.nombreComercial)}, ${escapeSqlString(sric.estab || '001')}, ${escapeSqlString(sric.ptoEmi || '001')}, ${escapeSqlString(sric.dirMatriz)}, ${escapeSqlString(sric.obligadoContabilidad || 'NO')}, ${escapeSqlString(sric.contribuyenteEspecial)}, ${escapeSqlString(sric.regimenRimpe || 'NO')}, ${escapeSqlString(sric.ambiente || '1')}, ${escapeSqlString(sric.p12Base64)}, ${escapeSqlString(sric.p12Password)}, ${escapeSqlString(sric.p12Filename)}, ${sric.lastFacturaSecuencial || 0}, ${sric.lastNotaCreditoSecuencial || 0}, ${sric.lastNotaDebitoSecuencial || 0}, ${sric.lastGuiaRemisionSecuencial || 0}, ${sric.lastRetencionSecuencial || 0}, ${sric.lastLiquidacionSecuencial || 0}, ${sric.isActive !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, ruc = EXCLUDED.ruc, estado_ruc = EXCLUDED.estado_ruc, razon_social = EXCLUDED.razon_social, nombre_comercial = EXCLUDED.nombre_comercial, estab = EXCLUDED.estab, pto_emi = EXCLUDED.pto_emi, dir_matriz = EXCLUDED.dir_matriz, obligado_contabilidad = EXCLUDED.obligado_contabilidad, contribuyente_especial = EXCLUDED.contribuyente_especial, regimen_rimpe = EXCLUDED.regimen_rimpe, ambiente = EXCLUDED.ambiente, p12_base64 = EXCLUDED.p12_base64, p12_password = EXCLUDED.p12_password, p12_filename = EXCLUDED.p12_filename, last_factura_secuencial = EXCLUDED.last_factura_secuencial, last_nota_credito_secuencial = EXCLUDED.last_nota_credito_secuencial, last_nota_debito_secuencial = EXCLUDED.last_nota_debito_secuencial, last_guia_remision_secuencial = EXCLUDED.last_guia_remision_secuencial, last_retencion_secuencial = EXCLUDED.last_retencion_secuencial, last_liquidacion_secuencial = EXCLUDED.last_liquidacion_secuencial, is_active = EXCLUDED.is_active;\n`;
+    }
+    sql += `\n`;
+  }
+
+  // 17. sri_invoices
+  if (data.sriInvoices && data.sriInvoices.length > 0) {
+    const validOrderIds = new Set(data.customerOrders.map((o) => o.id));
+    sql += `-- Datos: sri_invoices (${data.sriInvoices.length} registros)\n`;
+    for (const inv of data.sriInvoices) {
+      const safeOrderId = inv.orderId && validOrderIds.has(inv.orderId) ? inv.orderId : 'NULL';
+      sql += `INSERT INTO sri_invoices (id, user_id, order_id, order_number, secuencial, clave_acceso, ambiente, customer_name, customer_ci_ruc, total_amount, estado_recepcion, estado_autorizacion, fecha_autorizacion, numero_autorizacion, xml_generado, xml_firmado, mensajes_sri, created_at) VALUES (${inv.id}, ${inv.userId || 1}, ${safeOrderId}, ${escapeSqlString(inv.orderNumber)}, ${escapeSqlString(inv.secuencial)}, ${escapeSqlString(inv.claveAcceso)}, ${escapeSqlString(inv.ambiente || '1')}, ${escapeSqlString(inv.customerName)}, ${escapeSqlString(inv.customerCiRuc)}, ${inv.totalAmount || 0}, ${escapeSqlString(inv.estadoRecepcion || 'PENDIENTE')}, ${escapeSqlString(inv.estadoAutorizacion || 'PENDIENTE')}, ${inv.fechaAutorizacion ? escapeSqlDate(inv.fechaAutorizacion) : 'NULL'}, ${escapeSqlString(inv.numeroAutorizacion)}, ${escapeSqlString(inv.xmlGenerado)}, ${escapeSqlString(inv.xmlFirmado)}, ${escapeSqlString(inv.mensajesSri)}, ${escapeSqlDate(inv.createdAt)}) ON CONFLICT (id) DO NOTHING;\n`;
+    }
+    sql += `\n`;
+  }
+
+  // 18. store_analytics_events
   if (data.storeAnalyticsEvents && data.storeAnalyticsEvents.length > 0) {
     sql += `-- Datos: store_analytics_events (${data.storeAnalyticsEvents.length} registros)\n`;
     for (const ev of data.storeAnalyticsEvents) {
@@ -731,7 +928,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
     sql += `\n`;
   }
 
-  // 15. RESET SEQUENCES
+  // RESET SEQUENCES FOR ALL 18 TABLES
   sql += `-- =========================================================================\n`;
   sql += `-- ACTUALIZACIÓN DE SECUENCIAS (EVITA ERRORES DE ID DUPLICADO EN NUEVAS INSERCIONES)\n`;
   sql += `-- =========================================================================\n`;
@@ -749,6 +946,10 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
     'server_domain_configs',
     'ai_configs',
     'email_configs',
+    'ecuador_api_configs',
+    'payphone_configs',
+    'sri_configs',
+    'sri_invoices',
     'store_analytics_events',
   ];
   for (const t of tables) {
@@ -767,7 +968,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
  * Creates the Master ZIP containing:
  * 1. comerxia_backup_completo.sql
  * 2. comerxia_backup_completo.json
- * 3. uploads/* (All photos and video files in full resolution)
+ * 3. uploads/* (All photos, logos, videos, P12 certificates and media files)
  * 4. manifest.json (Metadata & statistics)
  * 5. restaurar.sh (One-command restore script for bash/docker)
  * 6. LEEME_MIGRACION.txt
@@ -785,19 +986,23 @@ export async function createFullSystemMasterZip(userId?: number): Promise<Buffer
   const jsonContent = JSON.stringify(data, null, 2);
   zip.addFile('comerxia_backup_completo.json', Buffer.from(jsonContent, 'utf-8'));
 
-  // 3. Add all physical media from uploads/ directory
+  // 3. Add all physical media and files from uploads/ directory (recursively)
   let mediaCount = 0;
   let mediaTotalBytes = 0;
-  if (fs.existsSync(UPLOADS_DIR)) {
-    const files = fs.readdirSync(UPLOADS_DIR);
+
+  function addDirectoryToZip(dirPath: string, zipPrefix: string) {
+    if (!fs.existsSync(dirPath)) return;
+    const files = fs.readdirSync(dirPath);
     for (const f of files) {
       if (f.startsWith('.')) continue;
-      const fullPath = path.join(UPLOADS_DIR, f);
+      const fullPath = path.join(dirPath, f);
       try {
         const stat = fs.statSync(fullPath);
-        if (stat.isFile()) {
+        if (stat.isDirectory()) {
+          addDirectoryToZip(fullPath, `${zipPrefix}/${f}`);
+        } else if (stat.isFile()) {
           const fileBuf = fs.readFileSync(fullPath);
-          zip.addFile(`uploads/${f}`, fileBuf);
+          zip.addFile(`${zipPrefix}/${f}`, fileBuf);
           mediaCount++;
           mediaTotalBytes += stat.size;
         }
@@ -806,6 +1011,8 @@ export async function createFullSystemMasterZip(userId?: number): Promise<Buffer
       }
     }
   }
+
+  addDirectoryToZip(UPLOADS_DIR, 'uploads');
 
   // 4. Create Manifest
   const manifest: FullSystemBackupManifest = {
@@ -821,6 +1028,10 @@ export async function createFullSystemMasterZip(userId?: number): Promise<Buffer
       purchasesCount: data.purchases.length,
       paymentsCount: data.payments.length,
       telegramMessagesCount: data.telegramMessages.length,
+      ecuadorApiConfigsCount: data.ecuadorApiConfigs.length,
+      payphoneConfigsCount: data.payphoneConfigs.length,
+      sriConfigsCount: data.sriConfigs.length,
+      sriInvoicesCount: data.sriInvoices.length,
       mediaFilesCount: mediaCount,
       mediaTotalSizeBytes: mediaTotalBytes,
     },
@@ -841,14 +1052,14 @@ export PGUSER="\${PGUSER:-postgres}"
 export PGPASSWORD="\${PGPASSWORD:-postgres}"
 export PGDATABASE="\${PGDATABASE:-comerxia_db}"
 
-echo "📦 1. Extrayendo archivos multimedia a la carpeta ./uploads..."
+echo "📦 1. Extrayendo archivos multimedia y logos a la carpeta ./uploads..."
 mkdir -p uploads
 if command -v unzip &> /dev/null; then
   unzip -o -q "\$0" "uploads/*" 2>/dev/null || true
 fi
 if [ -d "uploads" ]; then
   chmod -R 755 uploads
-  echo "✅ Multimedia listo en ./uploads"
+  echo "✅ Multimedia y logos listos en ./uploads"
 fi
 
 if [ -f "comerxia_backup_completo.sql" ]; then
@@ -868,7 +1079,7 @@ if [ -f "comerxia_backup_completo.sql" ]; then
   fi
 fi
 
-echo "🎉 ¡Restauración de fotos, videos y datos completada con éxito!"
+echo "🎉 ¡Restauración de fotos, videos, logos y datos completada con éxito!"
 `;
   zip.addFile('restaurar.sh', Buffer.from(restoreScript, 'utf-8'));
 
@@ -923,7 +1134,7 @@ fi
 
 if [ \$DUMP_OK -eq 1 ]; then
   if [ -d "uploads" ] && [ "\$(ls -A uploads 2>/dev/null)" ]; then
-    echo "📸 Empaquetando fotos y videos de ./uploads..."
+    echo "📸 Empaquetando fotos, videos y logos de ./uploads..."
     tar -czf "\$TAR_FILE" "\$SQL_FILE" uploads/ 2>/dev/null || true
     echo "🎉 ¡Respaldo total completado en: \$TAR_FILE!"
   else
@@ -938,14 +1149,14 @@ fi
 
   // 6. Clear step-by-step instructions in Spanish
   const readme = `================================================================================
-COMERXIA - RESPALDO MAESTRO 100% DEL SISTEMA (DATOS + FOTOS Y VIDEOS)
+COMERXIA - RESPALDO MAESTRO 100% DEL SISTEMA (DATOS + FOTOS, VIDEOS Y LOGOS)
 ================================================================================
 Fecha de creación: ${new Date().toLocaleString('es-EC')}
 
 Este archivo contiene el 100% de la información de tu plataforma Comerxia:
 1. Base de datos completa en PostgreSQL: comerxia_backup_completo.sql
 2. Base de datos completa en JSON:       comerxia_backup_completo.json
-3. Fotografías y videos de productos:   carpeta uploads/ (con nombres exactos)
+3. Logos, fotografías y videos:         carpeta uploads/ (con nombres exactos)
 4. Manifiesto y estadísticas:           manifest.json
 5. Script de restauración:              restaurar.sh
 6. Script de respaldo futuro:           respaldar.sh
@@ -965,7 +1176,7 @@ MÉTODO A: RESTAURACIÓN AUTOMÁTICA DESDE EL PANEL DE COMERXIA (RECOMENDADO)
 1. Inicia sesión como administrador en el nuevo servidor.
 2. Ve a Configuración de Servidor -> Pestaña "Respaldos y Migración".
 3. En la sección "Restaurar Respaldo Maestro (.ZIP)", sube este archivo.
-4. El sistema descomprimirá automáticamente todas las fotos y videos en /uploads
+4. El sistema descomprimirá automáticamente todas las fotos, logos y configuraciones en /uploads
    y actualizará los registros de la base de datos. ¡Listo al instante!
 
 MÉTODO B: RESTAURACIÓN POR COMANDOS DE TERMINAL
@@ -981,7 +1192,7 @@ MÉTODO B: RESTAURACIÓN POR COMANDOS DE TERMINAL
 3. Reinicia el servicio Comerxia:
    pm2 restart comerxia || npm start
 
-¡Todas las fotos, videos y configuraciones cargarán de forma idéntica!
+¡Todas las fotos, videos, logos y configuraciones cargarán de forma idéntica!
 `;
   zip.addFile('LEEME_MIGRACION.txt', Buffer.from(readme, 'utf-8'));
 
@@ -1008,6 +1219,10 @@ export async function restoreCompleteJsonDump(
     aiConfigs: 0,
     emailConfigs: 0,
     serverDomainConfigs: 0,
+    ecuadorApiConfigs: 0,
+    payphoneConfigs: 0,
+    sriConfigs: 0,
+    sriInvoices: 0,
   };
   const errors: string[] = [];
 
@@ -1015,27 +1230,32 @@ export async function restoreCompleteJsonDump(
     throw new Error('El archivo de respaldo JSON no tiene un formato válido.');
   }
 
-  // PostgreSQL restore
+  // Ensure SQL tables exist before restoration
   await ensureTablesCreated().catch(() => {});
+
+  const localState = storage.getState();
+
   try {
-    // Users
+    // 1. Users
     if (Array.isArray(backupData.users)) {
       for (const u of backupData.users) {
         try {
-          await db
-            .insert(users)
-            .values({
-              id: u.id,
-              uid: u.uid || `user-${u.id}`,
-              username: u.username,
-              password: u.password || 'admin',
-              email: u.email || 'admin@comerxia.com',
-              name: u.name || 'Admin',
-              role: u.role || 'admin',
-              photoUrl: u.photoUrl || null,
-              isActive: u.isActive !== false,
-            })
-            .onConflictDoNothing();
+          if (isPostgresConfigured()) {
+            await db
+              .insert(users)
+              .values({
+                id: u.id,
+                uid: u.uid || `user-${u.id}`,
+                username: u.username,
+                password: u.password || 'admin',
+                email: u.email || 'admin@comerxia.com',
+                name: u.name || 'Admin',
+                role: u.role || 'admin',
+                photoUrl: u.photoUrl || null,
+                isActive: u.isActive !== false,
+              })
+              .onConflictDoNothing();
+          }
           counts.users++;
         } catch (err: any) {
           errors.push(`Error al restaurar usuario ${u.username}: ${err?.message}`);
@@ -1043,24 +1263,12 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Store Configs
+    // 2. Store Configs
     if (Array.isArray(backupData.storeConfigs) && backupData.storeConfigs.length > 0) {
+      if (!localState.storeConfigs) localState.storeConfigs = [];
       for (const sc of backupData.storeConfigs) {
         try {
           const validUserId = await resolveValidUserId(sc.userId || targetUserId);
-          let existingStore: any = null;
-          if (sc.id) {
-            const [foundById] = await db.select().from(storeConfigs).where(eq(storeConfigs.id, sc.id)).limit(1);
-            if (foundById) existingStore = foundById;
-          }
-          if (!existingStore) {
-            const [foundByUser] = await db.select().from(storeConfigs).where(eq(storeConfigs.userId, validUserId)).limit(1);
-            if (foundByUser) existingStore = foundByUser;
-          }
-          if (!existingStore) {
-            const [foundAny] = await db.select().from(storeConfigs).limit(1);
-            if (foundAny) existingStore = foundAny;
-          }
 
           const storeValues: any = {
             userId: validUserId,
@@ -1077,8 +1285,10 @@ export async function restoreCompleteJsonDump(
             allowCatalogBrowsing: Boolean(sc.allowCatalogBrowsing),
             showStock: sc.showStock !== false,
             showOutOfStock: sc.showOutOfStock !== false,
+            enablePagination: Boolean(sc.enablePagination),
+            itemsPerPage: sc.itemsPerPage || 12,
             instagramUrl: sc.instagramUrl || null,
-            websiteUrl: sc.websiteUrl || null,
+            websiteUrl: sc.websiteUrl || sc.website_url || null,
             address: sc.address || null,
             logoUrl: normalizeMediaUrl(sc.logoUrl),
             logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url),
@@ -1089,13 +1299,43 @@ export async function restoreCompleteJsonDump(
             updatedAt: new Date(),
           };
 
-          if (existingStore) {
-            await db.update(storeConfigs).set(storeValues).where(eq(storeConfigs.id, existingStore.id));
-          } else {
-            if (sc.id && typeof sc.id === 'number') {
-              storeValues.id = sc.id;
+          if (isPostgresConfigured()) {
+            let existingStore: any = null;
+            if (sc.id) {
+              const [foundById] = await db.select().from(storeConfigs).where(eq(storeConfigs.id, sc.id)).limit(1);
+              if (foundById) existingStore = foundById;
             }
-            await db.insert(storeConfigs).values(storeValues).onConflictDoNothing();
+            if (!existingStore) {
+              const [foundByUser] = await db.select().from(storeConfigs).where(eq(storeConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existingStore = foundByUser;
+            }
+            if (!existingStore) {
+              const [foundAny] = await db.select().from(storeConfigs).limit(1);
+              if (foundAny) existingStore = foundAny;
+            }
+
+            if (existingStore) {
+              await db.update(storeConfigs).set(storeValues).where(eq(storeConfigs.id, existingStore.id));
+            } else {
+              if (sc.id && typeof sc.id === 'number') {
+                storeValues.id = sc.id;
+              }
+              await db.insert(storeConfigs).values(storeValues).onConflictDoNothing();
+            }
+          }
+
+          // Update local JSON storage state for offline fallback
+          const localIdx = localState.storeConfigs.findIndex((s) => s.userId === validUserId || s.id === sc.id);
+          const localRecord = {
+            id: sc.id || 1,
+            ...storeValues,
+            createdAt: sc.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) {
+            localState.storeConfigs[localIdx] = localRecord;
+          } else {
+            localState.storeConfigs.push(localRecord);
           }
 
           counts.storeConfigs++;
@@ -1105,21 +1345,13 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Inventory Items
+    // 3. Inventory Items
     if (Array.isArray(backupData.inventoryItems)) {
+      if (!localState.inventoryItems) localState.inventoryItems = [];
       for (const item of backupData.inventoryItems) {
         try {
           const clean = sanitizeInventoryItemForExport(item);
           const validUserId = await resolveValidUserId(clean.userId || targetUserId);
-          let existingItem: any = null;
-          if (clean.id) {
-            const [foundById] = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(eq(inventoryItems.id, clean.id)).limit(1);
-            if (foundById) existingItem = foundById;
-          }
-          if (!existingItem && clean.sku) {
-            const [foundBySku] = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(eq(inventoryItems.sku, clean.sku)).limit(1);
-            if (foundBySku) existingItem = foundBySku;
-          }
 
           const itemValues: any = {
             userId: validUserId,
@@ -1142,14 +1374,27 @@ export async function restoreCompleteJsonDump(
             marketingCopy: clean.marketingCopy || null,
           };
 
-          if (existingItem) {
-            await db.update(inventoryItems).set(itemValues).where(eq(inventoryItems.id, existingItem.id));
-          } else {
-            if (clean.id && typeof clean.id === 'number') {
-              itemValues.id = clean.id;
+          if (isPostgresConfigured()) {
+            let existingItem: any = null;
+            if (clean.id) {
+              const [foundById] = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(eq(inventoryItems.id, clean.id)).limit(1);
+              if (foundById) existingItem = foundById;
             }
-            await db.insert(inventoryItems).values(itemValues).onConflictDoNothing();
+            if (!existingItem && clean.sku) {
+              const [foundBySku] = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(eq(inventoryItems.sku, clean.sku)).limit(1);
+              if (foundBySku) existingItem = foundBySku;
+            }
+
+            if (existingItem) {
+              await db.update(inventoryItems).set(itemValues).where(eq(inventoryItems.id, existingItem.id));
+            } else {
+              if (clean.id && typeof clean.id === 'number') {
+                itemValues.id = clean.id;
+              }
+              await db.insert(inventoryItems).values(itemValues).onConflictDoNothing();
+            }
           }
+
           counts.inventoryItems++;
         } catch (err: any) {
           errors.push(`Error al restaurar producto ${item.name}: ${err?.message}`);
@@ -1157,21 +1402,11 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Customers
+    // 4. Customers
     if (Array.isArray(backupData.customers)) {
       for (const c of backupData.customers) {
         try {
           const validUserId = await resolveValidUserId(c.userId || targetUserId);
-          let existingCust: any = null;
-          if (c.id) {
-            const [foundById] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, c.id)).limit(1);
-            if (foundById) existingCust = foundById;
-          }
-          if (!existingCust && c.phone) {
-            const [foundByPhone] = await db.select({ id: customers.id }).from(customers).where(eq(customers.phone, c.phone)).limit(1);
-            if (foundByPhone) existingCust = foundByPhone;
-          }
-
           const custValues: any = {
             userId: validUserId,
             name: c.name,
@@ -1189,13 +1424,25 @@ export async function restoreCompleteJsonDump(
             notes: c.notes || null,
           };
 
-          if (existingCust) {
-            await db.update(customers).set(custValues).where(eq(customers.id, existingCust.id));
-          } else {
-            if (c.id && typeof c.id === 'number') {
-              custValues.id = c.id;
+          if (isPostgresConfigured()) {
+            let existingCust: any = null;
+            if (c.id) {
+              const [foundById] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, c.id)).limit(1);
+              if (foundById) existingCust = foundById;
             }
-            await db.insert(customers).values(custValues).onConflictDoNothing();
+            if (!existingCust && c.phone) {
+              const [foundByPhone] = await db.select({ id: customers.id }).from(customers).where(eq(customers.phone, c.phone)).limit(1);
+              if (foundByPhone) existingCust = foundByPhone;
+            }
+
+            if (existingCust) {
+              await db.update(customers).set(custValues).where(eq(customers.id, existingCust.id));
+            } else {
+              if (c.id && typeof c.id === 'number') {
+                custValues.id = c.id;
+              }
+              await db.insert(customers).values(custValues).onConflictDoNothing();
+            }
           }
           counts.customers++;
         } catch (err: any) {
@@ -1204,27 +1451,17 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Customer Orders
+    // 5. Customer Orders
     if (Array.isArray(backupData.customerOrders)) {
       for (const o of backupData.customerOrders) {
         try {
           const validUserId = await resolveValidUserId(o.userId || targetUserId);
-          let existingOrder: any = null;
-          if (o.id) {
-            const [foundById] = await db.select({ id: customerOrders.id }).from(customerOrders).where(eq(customerOrders.id, o.id)).limit(1);
-            if (foundById) existingOrder = foundById;
-          }
-          if (!existingOrder && o.orderNumber) {
-            const [foundByNum] = await db.select({ id: customerOrders.id }).from(customerOrders).where(eq(customerOrders.orderNumber, o.orderNumber)).limit(1);
-            if (foundByNum) existingOrder = foundByNum;
-          }
-
           const orderValues: any = {
             userId: validUserId,
             orderNumber: o.orderNumber,
             customerName: o.customerName,
             customerPhone: o.customerPhone,
-            customerCi: o.customerCi || null,
+            customerCi: o.customerCi || o.ci || null,
             customerEmail: o.customerEmail || null,
             customerAddress: o.customerAddress || null,
             items: typeof o.items === 'object' ? JSON.stringify(o.items) : (o.items || '[]'),
@@ -1237,19 +1474,32 @@ export async function restoreCompleteJsonDump(
             trackingCarrier: o.trackingCarrier || null,
             trackingNotes: o.trackingNotes || null,
             fulfillmentStatus: o.fulfillmentStatus || 'in_stock',
+            deliveryType: o.deliveryType || 'shipping',
             linkedPurchaseId: o.linkedPurchaseId || null,
             linkedPurchaseNumber: o.linkedPurchaseNumber || null,
             returns: o.returns || null,
             createdAt: o.createdAt ? new Date(o.createdAt) : new Date(),
           };
 
-          if (existingOrder) {
-            await db.update(customerOrders).set(orderValues).where(eq(customerOrders.id, existingOrder.id));
-          } else {
-            if (o.id && typeof o.id === 'number') {
-              orderValues.id = o.id;
+          if (isPostgresConfigured()) {
+            let existingOrder: any = null;
+            if (o.id) {
+              const [foundById] = await db.select({ id: customerOrders.id }).from(customerOrders).where(eq(customerOrders.id, o.id)).limit(1);
+              if (foundById) existingOrder = foundById;
             }
-            await db.insert(customerOrders).values(orderValues).onConflictDoNothing();
+            if (!existingOrder && o.orderNumber) {
+              const [foundByNum] = await db.select({ id: customerOrders.id }).from(customerOrders).where(eq(customerOrders.orderNumber, o.orderNumber)).limit(1);
+              if (foundByNum) existingOrder = foundByNum;
+            }
+
+            if (existingOrder) {
+              await db.update(customerOrders).set(orderValues).where(eq(customerOrders.id, existingOrder.id));
+            } else {
+              if (o.id && typeof o.id === 'number') {
+                orderValues.id = o.id;
+              }
+              await db.insert(customerOrders).values(orderValues).onConflictDoNothing();
+            }
           }
           counts.customerOrders++;
         } catch (err: any) {
@@ -1258,21 +1508,11 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Suppliers
+    // 6. Suppliers
     if (Array.isArray(backupData.suppliers)) {
       for (const s of backupData.suppliers) {
         try {
           const validUserId = await resolveValidUserId(s.userId || targetUserId);
-          let existingSupplier: any = null;
-          if (s.id) {
-            const [foundById] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.id, s.id)).limit(1);
-            if (foundById) existingSupplier = foundById;
-          }
-          if (!existingSupplier && s.name) {
-            const [foundByName] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.name, s.name)).limit(1);
-            if (foundByName) existingSupplier = foundByName;
-          }
-
           const supplierValues: any = {
             userId: validUserId,
             name: s.name,
@@ -1297,13 +1537,25 @@ export async function restoreCompleteJsonDump(
             notes: s.notes || null,
           };
 
-          if (existingSupplier) {
-            await db.update(suppliers).set(supplierValues).where(eq(suppliers.id, existingSupplier.id));
-          } else {
-            if (s.id && typeof s.id === 'number') {
-              supplierValues.id = s.id;
+          if (isPostgresConfigured()) {
+            let existingSupplier: any = null;
+            if (s.id) {
+              const [foundById] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.id, s.id)).limit(1);
+              if (foundById) existingSupplier = foundById;
             }
-            await db.insert(suppliers).values(supplierValues).onConflictDoNothing();
+            if (!existingSupplier && s.name) {
+              const [foundByName] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.name, s.name)).limit(1);
+              if (foundByName) existingSupplier = foundByName;
+            }
+
+            if (existingSupplier) {
+              await db.update(suppliers).set(supplierValues).where(eq(suppliers.id, existingSupplier.id));
+            } else {
+              if (s.id && typeof s.id === 'number') {
+                supplierValues.id = s.id;
+              }
+              await db.insert(suppliers).values(supplierValues).onConflictDoNothing();
+            }
           }
           counts.suppliers = (counts.suppliers || 0) + 1;
         } catch (err: any) {
@@ -1312,60 +1564,11 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Purchases (Compras y Abastecimiento de Proveedores)
+    // 7. Purchases
     if (Array.isArray(backupData.purchases)) {
       for (const p of backupData.purchases) {
         try {
           const validUserId = await resolveValidUserId(p.userId || targetUserId);
-
-          // Foreign Key Safe Check: verify linkedCustomerOrderId exists in customerOrders table
-          let validLinkedOrderId: number | null = null;
-          if (p.linkedCustomerOrderId) {
-            try {
-              const [existOrd] = await db
-                .select({ id: customerOrders.id })
-                .from(customerOrders)
-                .where(eq(customerOrders.id, p.linkedCustomerOrderId))
-                .limit(1);
-              if (existOrd) {
-                validLinkedOrderId = existOrd.id;
-              }
-            } catch {}
-          }
-          // If not matched by ID, try matching by linkedCustomerOrderNumber
-          if (!validLinkedOrderId && p.linkedCustomerOrderNumber) {
-            try {
-              const [existOrdByNum] = await db
-                .select({ id: customerOrders.id })
-                .from(customerOrders)
-                .where(eq(customerOrders.orderNumber, p.linkedCustomerOrderNumber))
-                .limit(1);
-              if (existOrdByNum) {
-                validLinkedOrderId = existOrdByNum.id;
-              }
-            } catch {}
-          }
-
-          // Check if purchase already exists by ID or purchaseNumber
-          let existingPurchase: any = null;
-          try {
-            if (p.id) {
-              const [foundById] = await db
-                .select({ id: purchases.id })
-                .from(purchases)
-                .where(eq(purchases.id, p.id))
-                .limit(1);
-              if (foundById) existingPurchase = foundById;
-            }
-            if (!existingPurchase && p.purchaseNumber) {
-              const [foundByNum] = await db
-                .select({ id: purchases.id })
-                .from(purchases)
-                .where(eq(purchases.purchaseNumber, p.purchaseNumber))
-                .limit(1);
-              if (foundByNum) existingPurchase = foundByNum;
-            }
-          } catch {}
 
           const itemsStr = typeof p.items === 'object' ? JSON.stringify(p.items) : (p.items || '[]');
           const receptionsStr = typeof p.receptions === 'object' ? JSON.stringify(p.receptions) : (p.receptions || '[]');
@@ -1380,7 +1583,7 @@ export async function restoreCompleteJsonDump(
             totalCost: String(p.totalCost || '0.00'),
             status: p.status || 'pending',
             paymentStatus: p.paymentStatus || 'paid',
-            linkedCustomerOrderId: validLinkedOrderId,
+            linkedCustomerOrderId: p.linkedCustomerOrderId || null,
             linkedCustomerOrderNumber: p.linkedCustomerOrderNumber || null,
             receiptVoucher: p.receiptVoucher || null,
             receptions: receptionsStr,
@@ -1391,90 +1594,40 @@ export async function restoreCompleteJsonDump(
             updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
           };
 
-          if (existingPurchase) {
-            await db
-              .update(purchases)
-              .set(purchaseValues)
-              .where(eq(purchases.id, existingPurchase.id));
-          } else {
-            if (p.id && typeof p.id === 'number') {
-              purchaseValues.id = p.id;
+          if (isPostgresConfigured()) {
+            let existingPurchase: any = null;
+            if (p.id) {
+              const [foundById] = await db.select({ id: purchases.id }).from(purchases).where(eq(purchases.id, p.id)).limit(1);
+              if (foundById) existingPurchase = foundById;
             }
-            purchaseValues.createdAt = p.createdAt ? new Date(p.createdAt) : new Date();
-            await db.insert(purchases).values(purchaseValues).onConflictDoNothing();
+            if (!existingPurchase && p.purchaseNumber) {
+              const [foundByNum] = await db.select({ id: purchases.id }).from(purchases).where(eq(purchases.purchaseNumber, p.purchaseNumber)).limit(1);
+              if (foundByNum) existingPurchase = foundByNum;
+            }
+
+            if (existingPurchase) {
+              await db.update(purchases).set(purchaseValues).where(eq(purchases.id, existingPurchase.id));
+            } else {
+              if (p.id && typeof p.id === 'number') {
+                purchaseValues.id = p.id;
+              }
+              purchaseValues.createdAt = p.createdAt ? new Date(p.createdAt) : new Date();
+              await db.insert(purchases).values(purchaseValues).onConflictDoNothing();
+            }
           }
 
           counts.purchases = (counts.purchases || 0) + 1;
         } catch (err: any) {
-          console.error(`[SystemBackup] Error al restaurar compra ${p?.purchaseNumber}:`, err);
           errors.push(`Error al restaurar compra ${p?.purchaseNumber}: ${err?.message}`);
         }
       }
     }
 
-    // Payments (Cobros y Pagos)
+    // 8. Payments
     if (Array.isArray(backupData.payments)) {
       for (const pm of backupData.payments) {
         try {
           const validUserId = await resolveValidUserId(pm.userId || targetUserId);
-
-          // Foreign Key Safe Check for orderId
-          let validOrderId: number | null = null;
-          if (pm.orderId) {
-            try {
-              const [existOrd] = await db.select({ id: customerOrders.id }).from(customerOrders).where(eq(customerOrders.id, pm.orderId)).limit(1);
-              if (existOrd) validOrderId = existOrd.id;
-            } catch {}
-          }
-          if (!validOrderId && pm.orderNumber) {
-            try {
-              const [existOrdByNum] = await db.select({ id: customerOrders.id }).from(customerOrders).where(eq(customerOrders.orderNumber, pm.orderNumber)).limit(1);
-              if (existOrdByNum) validOrderId = existOrdByNum.id;
-            } catch {}
-          }
-
-          // Foreign Key Safe Check for purchaseId
-          let validPurchaseId: number | null = null;
-          if (pm.purchaseId) {
-            try {
-              const [existPurch] = await db.select({ id: purchases.id }).from(purchases).where(eq(purchases.id, pm.purchaseId)).limit(1);
-              if (existPurch) validPurchaseId = existPurch.id;
-            } catch {}
-          }
-          if (!validPurchaseId && pm.purchaseNumber) {
-            try {
-              const [existPurchByNum] = await db.select({ id: purchases.id }).from(purchases).where(eq(purchases.purchaseNumber, pm.purchaseNumber)).limit(1);
-              if (existPurchByNum) validPurchaseId = existPurchByNum.id;
-            } catch {}
-          }
-
-          // Foreign Key Safe Check for customerId
-          let validCustomerId: number | null = null;
-          if (pm.customerId) {
-            try {
-              const [existCust] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, pm.customerId)).limit(1);
-              if (existCust) validCustomerId = existCust.id;
-            } catch {}
-          }
-
-          // Foreign Key Safe Check for supplierId
-          let validSupplierId: number | null = null;
-          if (pm.supplierId) {
-            try {
-              const [existSupp] = await db.select({ id: suppliers.id }).from(suppliers).where(eq(suppliers.id, pm.supplierId)).limit(1);
-              if (existSupp) validSupplierId = existSupp.id;
-            } catch {}
-          }
-
-          let existingPayment: any = null;
-          if (pm.id) {
-            const [foundById] = await db.select({ id: payments.id }).from(payments).where(eq(payments.id, pm.id)).limit(1);
-            if (foundById) existingPayment = foundById;
-          }
-          if (!existingPayment && pm.paymentNumber) {
-            const [foundByNum] = await db.select({ id: payments.id }).from(payments).where(eq(payments.paymentNumber, pm.paymentNumber)).limit(1);
-            if (foundByNum) existingPayment = foundByNum;
-          }
 
           const paymentValues: any = {
             userId: validUserId,
@@ -1489,26 +1642,38 @@ export async function restoreCompleteJsonDump(
             status: pm.status || 'completed',
             notes: pm.notes || null,
             voucherUrl: pm.voucherUrl || null,
-            orderId: validOrderId,
+            orderId: pm.orderId || null,
             orderNumber: pm.orderNumber || null,
-            customerId: validCustomerId,
+            customerId: pm.customerId || null,
             customerName: pm.customerName || null,
-            purchaseId: validPurchaseId,
+            purchaseId: pm.purchaseId || null,
             purchaseNumber: pm.purchaseNumber || null,
             supplierName: pm.supplierName || null,
-            supplierId: validSupplierId,
+            supplierId: pm.supplierId || null,
             returnId: pm.returnId || null,
             updatedAt: pm.updatedAt ? new Date(pm.updatedAt) : new Date(),
           };
 
-          if (existingPayment) {
-            await db.update(payments).set(paymentValues).where(eq(payments.id, existingPayment.id));
-          } else {
-            if (pm.id && typeof pm.id === 'number') {
-              paymentValues.id = pm.id;
+          if (isPostgresConfigured()) {
+            let existingPayment: any = null;
+            if (pm.id) {
+              const [foundById] = await db.select({ id: payments.id }).from(payments).where(eq(payments.id, pm.id)).limit(1);
+              if (foundById) existingPayment = foundById;
             }
-            paymentValues.createdAt = pm.createdAt ? new Date(pm.createdAt) : new Date();
-            await db.insert(payments).values(paymentValues).onConflictDoNothing();
+            if (!existingPayment && pm.paymentNumber) {
+              const [foundByNum] = await db.select({ id: payments.id }).from(payments).where(eq(payments.paymentNumber, pm.paymentNumber)).limit(1);
+              if (foundByNum) existingPayment = foundByNum;
+            }
+
+            if (existingPayment) {
+              await db.update(payments).set(paymentValues).where(eq(payments.id, existingPayment.id));
+            } else {
+              if (pm.id && typeof pm.id === 'number') {
+                paymentValues.id = pm.id;
+              }
+              paymentValues.createdAt = pm.createdAt ? new Date(pm.createdAt) : new Date();
+              await db.insert(payments).values(paymentValues).onConflictDoNothing();
+            }
           }
 
           counts.payments = (counts.payments || 0) + 1;
@@ -1518,28 +1683,18 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Telegram Configs
+    // 9. Telegram Configs
     if (Array.isArray(backupData.telegramConfigs) && backupData.telegramConfigs.length > 0) {
+      if (!localState.telegramConfigs) localState.telegramConfigs = [];
       for (const tc of backupData.telegramConfigs) {
         try {
           const validUserId = await resolveValidUserId(tc.userId || targetUserId);
-          let existingTg: any = null;
-          if (tc.id) {
-            const [foundById] = await db.select().from(telegramConfigs).where(eq(telegramConfigs.id, tc.id)).limit(1);
-            if (foundById) existingTg = foundById;
-          }
-          if (!existingTg) {
-            const [foundByUser] = await db.select().from(telegramConfigs).where(eq(telegramConfigs.userId, validUserId)).limit(1);
-            if (foundByUser) existingTg = foundByUser;
-          }
-          if (!existingTg) {
-            const [foundAny] = await db.select().from(telegramConfigs).limit(1);
-            if (foundAny) existingTg = foundAny;
-          }
 
           const tgValues: any = {
             userId: validUserId,
             botToken: tc.botToken || null,
+            botUsername: tc.botUsername || null,
+            botFirstName: tc.botFirstName || null,
             webhookSecret: tc.webhookSecret || null,
             supplierName: tc.supplierName || 'Proveedor Telegram Principal',
             supplierUsername: tc.supplierUsername || null,
@@ -1550,17 +1705,45 @@ export async function restoreCompleteJsonDump(
             defaultStockQuantity: tc.defaultStockQuantity || 10,
             taxPercent: tc.taxPercent ?? 15,
             useAi: tc.useAi !== false,
+            isActive: tc.isActive !== false,
             updatedAt: new Date(),
           };
 
-          if (existingTg) {
-            await db.update(telegramConfigs).set(tgValues).where(eq(telegramConfigs.id, existingTg.id));
-          } else {
-            if (tc.id && typeof tc.id === 'number') {
-              tgValues.id = tc.id;
+          if (isPostgresConfigured()) {
+            let existingTg: any = null;
+            if (tc.id) {
+              const [foundById] = await db.select().from(telegramConfigs).where(eq(telegramConfigs.id, tc.id)).limit(1);
+              if (foundById) existingTg = foundById;
             }
-            await db.insert(telegramConfigs).values(tgValues).onConflictDoNothing();
+            if (!existingTg) {
+              const [foundByUser] = await db.select().from(telegramConfigs).where(eq(telegramConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existingTg = foundByUser;
+            }
+            if (!existingTg) {
+              const [foundAny] = await db.select().from(telegramConfigs).limit(1);
+              if (foundAny) existingTg = foundAny;
+            }
+
+            if (existingTg) {
+              await db.update(telegramConfigs).set(tgValues).where(eq(telegramConfigs.id, existingTg.id));
+            } else {
+              if (tc.id && typeof tc.id === 'number') {
+                tgValues.id = tc.id;
+              }
+              await db.insert(telegramConfigs).values(tgValues).onConflictDoNothing();
+            }
           }
+
+          // Local JSON storage update
+          const localIdx = localState.telegramConfigs.findIndex((t) => t.userId === validUserId || t.id === tc.id);
+          const localRecord = {
+            id: tc.id || 1,
+            ...tgValues,
+            createdAt: tc.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.telegramConfigs[localIdx] = localRecord;
+          else localState.telegramConfigs.push(localRecord);
 
           if (tc.botToken && typeof tc.botToken === 'string' && tc.botToken.trim()) {
             process.env.TELEGRAM_BOT_TOKEN = tc.botToken.trim();
@@ -1573,41 +1756,59 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // AI Configs
+    // 10. AI Configs
     if (Array.isArray(backupData.aiConfigs) && backupData.aiConfigs.length > 0) {
+      if (!localState.aiConfigs) localState.aiConfigs = [];
       for (const aic of backupData.aiConfigs) {
         try {
           const validUserId = await resolveValidUserId(aic.userId || targetUserId);
-          let existingAi: any = null;
-          if (aic.id) {
-            const [foundById] = await db.select().from(aiConfigs).where(eq(aiConfigs.id, aic.id)).limit(1);
-            if (foundById) existingAi = foundById;
-          }
-          if (!existingAi) {
-            const [foundByUser] = await db.select().from(aiConfigs).where(eq(aiConfigs.userId, validUserId)).limit(1);
-            if (foundByUser) existingAi = foundByUser;
-          }
-          if (!existingAi) {
-            const [foundAny] = await db.select().from(aiConfigs).limit(1);
-            if (foundAny) existingAi = foundAny;
-          }
 
           const aiValues: any = {
             userId: validUserId,
             apiKey: aic.apiKey || null,
+            accountEmail: aic.accountEmail || null,
             modelName: aic.modelName || 'gemini-3.6-flash',
             temperature: String(aic.temperature || '0.20'),
+            isActive: aic.isActive !== false,
             updatedAt: new Date(),
           };
 
-          if (existingAi) {
-            await db.update(aiConfigs).set(aiValues).where(eq(aiConfigs.id, existingAi.id));
-          } else {
-            if (aic.id && typeof aic.id === 'number') {
-              aiValues.id = aic.id;
+          if (isPostgresConfigured()) {
+            let existingAi: any = null;
+            if (aic.id) {
+              const [foundById] = await db.select().from(aiConfigs).where(eq(aiConfigs.id, aic.id)).limit(1);
+              if (foundById) existingAi = foundById;
             }
-            await db.insert(aiConfigs).values(aiValues).onConflictDoNothing();
+            if (!existingAi) {
+              const [foundByUser] = await db.select().from(aiConfigs).where(eq(aiConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existingAi = foundByUser;
+            }
+            if (!existingAi) {
+              const [foundAny] = await db.select().from(aiConfigs).limit(1);
+              if (foundAny) existingAi = foundAny;
+            }
+
+            if (existingAi) {
+              await db.update(aiConfigs).set(aiValues).where(eq(aiConfigs.id, existingAi.id));
+            } else {
+              if (aic.id && typeof aic.id === 'number') {
+                aiValues.id = aic.id;
+              }
+              await db.insert(aiConfigs).values(aiValues).onConflictDoNothing();
+            }
           }
+
+          // Local JSON storage update
+          const localIdx = localState.aiConfigs.findIndex((a) => a.userId === validUserId || a.id === aic.id);
+          const localRecord = {
+            id: aic.id || 1,
+            ...aiValues,
+            temperature: Number(aiValues.temperature),
+            createdAt: aic.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.aiConfigs[localIdx] = localRecord;
+          else localState.aiConfigs.push(localRecord);
 
           if (aic.apiKey && typeof aic.apiKey === 'string' && aic.apiKey.trim()) {
             process.env.GEMINI_API_KEY = aic.apiKey.trim();
@@ -1620,24 +1821,12 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Email Configs
+    // 11. Email Configs
     if (Array.isArray(backupData.emailConfigs) && backupData.emailConfigs.length > 0) {
+      if (!localState.emailConfigs) localState.emailConfigs = [];
       for (const ec of backupData.emailConfigs) {
         try {
           const validUserId = await resolveValidUserId(ec.userId || targetUserId);
-          let existingEmail: any = null;
-          if (ec.id) {
-            const [foundById] = await db.select().from(emailConfigs).where(eq(emailConfigs.id, ec.id)).limit(1);
-            if (foundById) existingEmail = foundById;
-          }
-          if (!existingEmail) {
-            const [foundByUser] = await db.select().from(emailConfigs).where(eq(emailConfigs.userId, validUserId)).limit(1);
-            if (foundByUser) existingEmail = foundByUser;
-          }
-          if (!existingEmail) {
-            const [foundAny] = await db.select().from(emailConfigs).limit(1);
-            if (foundAny) existingEmail = foundAny;
-          }
 
           const emailValues: any = {
             userId: validUserId,
@@ -1651,14 +1840,41 @@ export async function restoreCompleteJsonDump(
             updatedAt: new Date(),
           };
 
-          if (existingEmail) {
-            await db.update(emailConfigs).set(emailValues).where(eq(emailConfigs.id, existingEmail.id));
-          } else {
-            if (ec.id && typeof ec.id === 'number') {
-              emailValues.id = ec.id;
+          if (isPostgresConfigured()) {
+            let existingEmail: any = null;
+            if (ec.id) {
+              const [foundById] = await db.select().from(emailConfigs).where(eq(emailConfigs.id, ec.id)).limit(1);
+              if (foundById) existingEmail = foundById;
             }
-            await db.insert(emailConfigs).values(emailValues).onConflictDoNothing();
+            if (!existingEmail) {
+              const [foundByUser] = await db.select().from(emailConfigs).where(eq(emailConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existingEmail = foundByUser;
+            }
+            if (!existingEmail) {
+              const [foundAny] = await db.select().from(emailConfigs).limit(1);
+              if (foundAny) existingEmail = foundAny;
+            }
+
+            if (existingEmail) {
+              await db.update(emailConfigs).set(emailValues).where(eq(emailConfigs.id, existingEmail.id));
+            } else {
+              if (ec.id && typeof ec.id === 'number') {
+                emailValues.id = ec.id;
+              }
+              await db.insert(emailConfigs).values(emailValues).onConflictDoNothing();
+            }
           }
+
+          // Local JSON storage update
+          const localIdx = localState.emailConfigs.findIndex((e) => e.userId === validUserId || e.id === ec.id);
+          const localRecord = {
+            id: ec.id || 1,
+            ...emailValues,
+            createdAt: ec.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.emailConfigs[localIdx] = localRecord;
+          else localState.emailConfigs.push(localRecord);
 
           counts.emailConfigs = (counts.emailConfigs || 0) + 1;
         } catch (err: any) {
@@ -1667,24 +1883,12 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Server Domain Configs
+    // 12. Server Domain Configs
     if (Array.isArray(backupData.serverDomainConfigs) && backupData.serverDomainConfigs.length > 0) {
+      if (!localState.serverDomainConfigs) localState.serverDomainConfigs = [];
       for (const dc of backupData.serverDomainConfigs) {
         try {
           const validUserId = await resolveValidUserId(dc.userId || targetUserId);
-          let existingDomain: any = null;
-          if (dc.id) {
-            const [foundById] = await db.select().from(serverDomainConfigs).where(eq(serverDomainConfigs.id, dc.id)).limit(1);
-            if (foundById) existingDomain = foundById;
-          }
-          if (!existingDomain) {
-            const [foundByUser] = await db.select().from(serverDomainConfigs).where(eq(serverDomainConfigs.userId, validUserId)).limit(1);
-            if (foundByUser) existingDomain = foundByUser;
-          }
-          if (!existingDomain) {
-            const [foundAny] = await db.select().from(serverDomainConfigs).limit(1);
-            if (foundAny) existingDomain = foundAny;
-          }
 
           const domainValues: any = {
             userId: validUserId,
@@ -1695,14 +1899,41 @@ export async function restoreCompleteJsonDump(
             updatedAt: new Date(),
           };
 
-          if (existingDomain) {
-            await db.update(serverDomainConfigs).set(domainValues).where(eq(serverDomainConfigs.id, existingDomain.id));
-          } else {
-            if (dc.id && typeof dc.id === 'number') {
-              domainValues.id = dc.id;
+          if (isPostgresConfigured()) {
+            let existingDomain: any = null;
+            if (dc.id) {
+              const [foundById] = await db.select().from(serverDomainConfigs).where(eq(serverDomainConfigs.id, dc.id)).limit(1);
+              if (foundById) existingDomain = foundById;
             }
-            await db.insert(serverDomainConfigs).values(domainValues).onConflictDoNothing();
+            if (!existingDomain) {
+              const [foundByUser] = await db.select().from(serverDomainConfigs).where(eq(serverDomainConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existingDomain = foundByUser;
+            }
+            if (!existingDomain) {
+              const [foundAny] = await db.select().from(serverDomainConfigs).limit(1);
+              if (foundAny) existingDomain = foundAny;
+            }
+
+            if (existingDomain) {
+              await db.update(serverDomainConfigs).set(domainValues).where(eq(serverDomainConfigs.id, existingDomain.id));
+            } else {
+              if (dc.id && typeof dc.id === 'number') {
+                domainValues.id = dc.id;
+              }
+              await db.insert(serverDomainConfigs).values(domainValues).onConflictDoNothing();
+            }
           }
+
+          // Local JSON storage update
+          const localIdx = localState.serverDomainConfigs.findIndex((d) => d.userId === validUserId || d.id === dc.id);
+          const localRecord = {
+            id: dc.id || 1,
+            ...domainValues,
+            createdAt: dc.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.serverDomainConfigs[localIdx] = localRecord;
+          else localState.serverDomainConfigs.push(localRecord);
 
           counts.serverDomainConfigs = (counts.serverDomainConfigs || 0) + 1;
         } catch (err: any) {
@@ -1711,30 +1942,290 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // Reset PostgreSQL serial sequences to prevent duplicate key constraint violations on subsequent inserts
-    const tableNames = [
-      'users',
-      'telegram_configs',
-      'inventory_items',
-      'telegram_messages',
-      'suppliers',
-      'customers',
-      'customer_orders',
-      'purchases',
-      'payments',
-      'store_configs',
-      'server_domain_configs',
-      'ai_configs',
-      'email_configs',
-    ];
-    for (const tbl of tableNames) {
-      try {
-        await pool.query(
-          `SELECT setval(pg_get_serial_sequence($1, 'id'), COALESCE((SELECT MAX(id) FROM ${tbl}), 1), true)`,
-          [tbl]
-        );
-      } catch {
-        // Safe to ignore if table has no sequence or is empty
+    // 13. Ecuador API Configs
+    if (Array.isArray(backupData.ecuadorApiConfigs) && backupData.ecuadorApiConfigs.length > 0) {
+      if (!localState.ecuadorApiConfigs) localState.ecuadorApiConfigs = [];
+      for (const eac of backupData.ecuadorApiConfigs) {
+        try {
+          const validUserId = await resolveValidUserId(eac.userId || targetUserId);
+          const ecuadorValues: any = {
+            userId: validUserId,
+            apiKey: eac.apiKey || null,
+            isActive: eac.isActive !== false,
+            updatedAt: new Date(),
+          };
+
+          if (isPostgresConfigured()) {
+            let existing: any = null;
+            if (eac.id) {
+              const [foundById] = await db.select().from(ecuadorApiConfigs).where(eq(ecuadorApiConfigs.id, eac.id)).limit(1);
+              if (foundById) existing = foundById;
+            }
+            if (!existing) {
+              const [foundByUser] = await db.select().from(ecuadorApiConfigs).where(eq(ecuadorApiConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existing = foundByUser;
+            }
+
+            if (existing) {
+              await db.update(ecuadorApiConfigs).set(ecuadorValues).where(eq(ecuadorApiConfigs.id, existing.id));
+            } else {
+              if (eac.id && typeof eac.id === 'number') {
+                ecuadorValues.id = eac.id;
+              }
+              await db.insert(ecuadorApiConfigs).values(ecuadorValues).onConflictDoNothing();
+            }
+          }
+
+          const localIdx = localState.ecuadorApiConfigs.findIndex((e) => e.userId === validUserId || e.id === eac.id);
+          const localRecord = {
+            id: eac.id || 1,
+            ...ecuadorValues,
+            createdAt: eac.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.ecuadorApiConfigs[localIdx] = localRecord;
+          else localState.ecuadorApiConfigs.push(localRecord);
+
+          if (eac.apiKey && typeof eac.apiKey === 'string' && eac.apiKey.trim()) {
+            process.env.ECUADORAPI_KEY = eac.apiKey.trim();
+          }
+
+          counts.ecuadorApiConfigs = (counts.ecuadorApiConfigs || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar ecuador api config: ${err?.message}`);
+        }
+      }
+    }
+
+    // 14. Payphone Configs
+    if (Array.isArray(backupData.payphoneConfigs) && backupData.payphoneConfigs.length > 0) {
+      if (!localState.payphoneConfigs) localState.payphoneConfigs = [];
+      for (const ppc of backupData.payphoneConfigs) {
+        try {
+          const validUserId = await resolveValidUserId(ppc.userId || targetUserId);
+          const payphoneValues: any = {
+            userId: validUserId,
+            token: ppc.token || null,
+            storeId: ppc.storeId || null,
+            environment: ppc.environment || 'production',
+            isActive: ppc.isActive !== false,
+            updatedAt: new Date(),
+          };
+
+          if (isPostgresConfigured()) {
+            let existing: any = null;
+            if (ppc.id) {
+              const [foundById] = await db.select().from(payphoneConfigs).where(eq(payphoneConfigs.id, ppc.id)).limit(1);
+              if (foundById) existing = foundById;
+            }
+            if (!existing) {
+              const [foundByUser] = await db.select().from(payphoneConfigs).where(eq(payphoneConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existing = foundByUser;
+            }
+
+            if (existing) {
+              await db.update(payphoneConfigs).set(payphoneValues).where(eq(payphoneConfigs.id, existing.id));
+            } else {
+              if (ppc.id && typeof ppc.id === 'number') {
+                payphoneValues.id = ppc.id;
+              }
+              await db.insert(payphoneConfigs).values(payphoneValues).onConflictDoNothing();
+            }
+          }
+
+          const localIdx = localState.payphoneConfigs.findIndex((p) => p.userId === validUserId || p.id === ppc.id);
+          const localRecord = {
+            id: ppc.id || 1,
+            ...payphoneValues,
+            createdAt: ppc.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.payphoneConfigs[localIdx] = localRecord;
+          else localState.payphoneConfigs.push(localRecord);
+
+          if (ppc.token && typeof ppc.token === 'string' && ppc.token.trim()) {
+            process.env.PAYPHONE_API_TOKEN = ppc.token.trim();
+          }
+          if (ppc.storeId && typeof ppc.storeId === 'string' && ppc.storeId.trim()) {
+            process.env.PAYPHONE_STORE_ID = ppc.storeId.trim();
+          }
+
+          counts.payphoneConfigs = (counts.payphoneConfigs || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar payphone config: ${err?.message}`);
+        }
+      }
+    }
+
+    // 15. SRI Configs
+    if (Array.isArray(backupData.sriConfigs) && backupData.sriConfigs.length > 0) {
+      if (!localState.sriConfigs) localState.sriConfigs = [];
+      for (const sric of backupData.sriConfigs) {
+        try {
+          const validUserId = await resolveValidUserId(sric.userId || targetUserId);
+          const sriValues: any = {
+            userId: validUserId,
+            ruc: sric.ruc || '1700000000001',
+            estadoRuc: sric.estadoRuc || 'ACTIVO',
+            razonSocial: sric.razonSocial || 'COMERXIA E-COMMERCE S.A.',
+            nombreComercial: sric.nombreComercial || 'COMERXIA ECUADOR',
+            estab: sric.estab || '001',
+            ptoEmi: sric.ptoEmi || '001',
+            dirMatriz: sric.dirMatriz || 'Quito, Ecuador',
+            obligadoContabilidad: sric.obligadoContabilidad || 'NO',
+            contribuyenteEspecial: sric.contribuyenteEspecial || null,
+            regimenRimpe: sric.regimenRimpe || 'NO',
+            ambiente: sric.ambiente || '1',
+            p12Base64: sric.p12Base64 || null,
+            p12Password: sric.p12Password || null,
+            p12Filename: sric.p12Filename || null,
+            lastFacturaSecuencial: Number(sric.lastFacturaSecuencial || 0),
+            lastNotaCreditoSecuencial: Number(sric.lastNotaCreditoSecuencial || 0),
+            lastNotaDebitoSecuencial: Number(sric.lastNotaDebitoSecuencial || 0),
+            lastGuiaRemisionSecuencial: Number(sric.lastGuiaRemisionSecuencial || 0),
+            lastRetencionSecuencial: Number(sric.lastRetencionSecuencial || 0),
+            lastLiquidacionSecuencial: Number(sric.lastLiquidacionSecuencial || 0),
+            isActive: sric.isActive !== false,
+            updatedAt: new Date(),
+          };
+
+          if (isPostgresConfigured()) {
+            let existing: any = null;
+            if (sric.id) {
+              const [foundById] = await db.select().from(sriConfigs).where(eq(sriConfigs.id, sric.id)).limit(1);
+              if (foundById) existing = foundById;
+            }
+            if (!existing) {
+              const [foundByUser] = await db.select().from(sriConfigs).where(eq(sriConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existing = foundByUser;
+            }
+
+            if (existing) {
+              await db.update(sriConfigs).set(sriValues).where(eq(sriConfigs.id, existing.id));
+            } else {
+              if (sric.id && typeof sric.id === 'number') {
+                sriValues.id = sric.id;
+              }
+              await db.insert(sriConfigs).values(sriValues).onConflictDoNothing();
+            }
+          }
+
+          const localIdx = localState.sriConfigs.findIndex((s: any) => s.userId === validUserId || s.id === sric.id);
+          const localRecord = {
+            id: sric.id || 1,
+            ...sriValues,
+            createdAt: sric.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.sriConfigs[localIdx] = localRecord;
+          else localState.sriConfigs.push(localRecord);
+
+          counts.sriConfigs = (counts.sriConfigs || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar SRI config: ${err?.message}`);
+        }
+      }
+    }
+
+    // 16. SRI Invoices
+    if (Array.isArray(backupData.sriInvoices) && backupData.sriInvoices.length > 0) {
+      if (!localState.sriInvoices) localState.sriInvoices = [];
+      for (const inv of backupData.sriInvoices) {
+        try {
+          const validUserId = await resolveValidUserId(inv.userId || targetUserId);
+          const invoiceValues: any = {
+            userId: validUserId,
+            orderId: inv.orderId || null,
+            orderNumber: inv.orderNumber || null,
+            secuencial: inv.secuencial,
+            claveAcceso: inv.claveAcceso,
+            ambiente: inv.ambiente || '1',
+            customerName: inv.customerName,
+            customerCiRuc: inv.customerCiRuc,
+            totalAmount: String(inv.totalAmount || '0.00'),
+            estadoRecepcion: inv.estadoRecepcion || 'PENDIENTE',
+            estadoAutorizacion: inv.estadoAutorizacion || 'PENDIENTE',
+            fechaAutorizacion: inv.fechaAutorizacion ? new Date(inv.fechaAutorizacion) : null,
+            numeroAutorizacion: inv.numeroAutorizacion || null,
+            xmlGenerado: inv.xmlGenerado || null,
+            xmlFirmado: inv.xmlFirmado || null,
+            mensajesSri: inv.mensajesSri || null,
+            updatedAt: new Date(),
+          };
+
+          if (isPostgresConfigured()) {
+            let existing: any = null;
+            if (inv.id) {
+              const [foundById] = await db.select({ id: sriInvoices.id }).from(sriInvoices).where(eq(sriInvoices.id, inv.id)).limit(1);
+              if (foundById) existing = foundById;
+            }
+            if (!existing && inv.claveAcceso) {
+              const [foundByClave] = await db.select({ id: sriInvoices.id }).from(sriInvoices).where(eq(sriInvoices.claveAcceso, inv.claveAcceso)).limit(1);
+              if (foundByClave) existing = foundByClave;
+            }
+
+            if (existing) {
+              await db.update(sriInvoices).set(invoiceValues).where(eq(sriInvoices.id, existing.id));
+            } else {
+              if (inv.id && typeof inv.id === 'number') {
+                invoiceValues.id = inv.id;
+              }
+              invoiceValues.createdAt = inv.createdAt ? new Date(inv.createdAt) : new Date();
+              await db.insert(sriInvoices).values(invoiceValues).onConflictDoNothing();
+            }
+          }
+
+          const localIdx = localState.sriInvoices.findIndex((i: any) => i.claveAcceso === inv.claveAcceso || i.id === inv.id);
+          const localRecord = {
+            id: inv.id || localState.sriInvoices.length + 1,
+            ...invoiceValues,
+            createdAt: inv.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.sriInvoices[localIdx] = localRecord;
+          else localState.sriInvoices.push(localRecord);
+
+          counts.sriInvoices = (counts.sriInvoices || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar factura SRI ${inv.secuencial}: ${err?.message}`);
+        }
+      }
+    }
+
+    // Save local JSON storage state
+    storage.save();
+
+    // Reset PostgreSQL serial sequences for all 18 tables
+    if (isPostgresConfigured()) {
+      const tableNames = [
+        'users',
+        'telegram_configs',
+        'inventory_items',
+        'telegram_messages',
+        'suppliers',
+        'customers',
+        'customer_orders',
+        'purchases',
+        'payments',
+        'store_configs',
+        'server_domain_configs',
+        'ai_configs',
+        'email_configs',
+        'ecuador_api_configs',
+        'payphone_configs',
+        'sri_configs',
+        'sri_invoices',
+        'store_analytics_events',
+      ];
+      for (const tbl of tableNames) {
+        try {
+          await pool.query(
+            `SELECT setval(pg_get_serial_sequence($1, 'id'), COALESCE((SELECT MAX(id) FROM ${tbl}), 1), true)`,
+            [tbl]
+          );
+        } catch {
+          // Safe to ignore if sequence missing or empty table
+        }
       }
     }
 
@@ -1747,7 +2238,7 @@ export async function restoreCompleteJsonDump(
 
 /**
  * Restores full system from Master ZIP:
- * 1. Unpacks all media files directly into /uploads
+ * 1. Unpacks all media files and logos directly into /uploads
  * 2. Finds comerxia_backup_completo.json and restores all database rows
  */
 export async function restoreMasterFullSystemZip(
@@ -1782,12 +2273,30 @@ export async function restoreMasterFullSystemZip(
       continue;
     }
 
-    // Media file extraction
+    // Extract any file in uploads folder or media file
+    if (name.startsWith('uploads/') || name.startsWith('uploads\\')) {
+      const relativeSubpath = name.replace(/^uploads[/\\]/, '');
+      if (!relativeSubpath || entry.isDirectory) continue;
+      try {
+        const destPath = path.join(UPLOADS_DIR, relativeSubpath);
+        const destDir = path.dirname(destPath);
+        if (!fs.existsSync(destDir)) {
+          fs.mkdirSync(destDir, { recursive: true });
+        }
+        const data = entry.getData();
+        fs.writeFileSync(destPath, data);
+        restoredMediaCount++;
+      } catch (err: any) {
+        errors.push(`Error al escribir archivo multimedia ${relativeSubpath}: ${err?.message}`);
+      }
+      continue;
+    }
+
+    // Root media files fallback extraction
     const cleanFilename = path.basename(name);
     if (!cleanFilename || cleanFilename.startsWith('.')) continue;
 
-    // Verify allowed media extensions
-    if (/\.(jpg|jpeg|png|webp|gif|svg|avif|mp4|webm|mov|ogg|m4v)$/i.test(cleanFilename)) {
+    if (/\.(jpg|jpeg|png|webp|gif|svg|avif|mp4|webm|mov|ogg|m4v|p12|pdf|ico|json|txt)$/i.test(cleanFilename)) {
       try {
         const destPath = path.join(UPLOADS_DIR, cleanFilename);
         const data = entry.getData();
