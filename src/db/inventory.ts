@@ -2894,47 +2894,9 @@ export async function saveEcuadorApiConfig(
 // -------------------------------------------------------------
 
 export async function getPayphoneConfig(userId: number = 1) {
-  const envToken = process.env.PAYPHONE_TOKEN || '';
+  const envToken = process.env.PAYPHONE_API_TOKEN || process.env.PAYPHONE_TOKEN || '';
   const envStoreId = process.env.PAYPHONE_STORE_ID || '';
-  const envEnv = process.env.PAYPHONE_ENV || 'production';
-  const state = storage.getState();
-  if (!state.payphoneConfigs) {
-    state.payphoneConfigs = [];
-  }
-
-  let localConfig = state.payphoneConfigs.find((c) => c.userId === userId) || state.payphoneConfigs[0];
-  const effectiveToken = localConfig?.token || envToken || '';
-  const effectiveStoreId = localConfig?.storeId || envStoreId || '';
-  const effectiveEnv = localConfig?.environment || envEnv || 'production';
-
-  if (!isPostgresConfigured()) {
-    if (!localConfig) {
-      localConfig = {
-        id: state.nextId?.payphoneConfigs ? state.nextId.payphoneConfigs++ : 1,
-        userId,
-        token: envToken || null,
-        storeId: envStoreId || null,
-        environment: envEnv,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      state.payphoneConfigs.push(localConfig);
-      storage.save();
-    }
-    return {
-      id: localConfig.id,
-      userId: localConfig.userId,
-      token: effectiveToken,
-      storeId: effectiveStoreId,
-      environment: effectiveEnv,
-      hasToken: Boolean(effectiveToken && effectiveToken.trim().length > 0),
-      isConfigured: Boolean(effectiveToken && effectiveToken.trim().length > 0),
-      isActive: localConfig.isActive !== false,
-      createdAt: localConfig.createdAt,
-      updatedAt: localConfig.updatedAt,
-    };
-  }
+  const envEnv = process.env.PAYPHONE_ENVIRONMENT || 'production';
 
   try {
     const configs = await db
@@ -2952,15 +2914,7 @@ export async function getPayphoneConfig(userId: number = 1) {
     }
 
     if (!sqlRow) {
-      let targetUserId = userId || 1;
-      const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-      if (userCheck.length === 0) {
-        const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-        if (anyUser.length > 0) {
-          targetUserId = anyUser[0].id;
-        }
-      }
-
+      const targetUserId = await resolveValidUserId(userId);
       const created = await db
         .insert(payphoneConfigs)
         .values({
@@ -2977,9 +2931,9 @@ export async function getPayphoneConfig(userId: number = 1) {
       }
     }
 
-    const tokenToUse = sqlRow?.token || effectiveToken;
-    const storeIdToUse = sqlRow?.storeId || effectiveStoreId;
-    const envToUse = sqlRow?.environment || effectiveEnv;
+    const tokenToUse = sqlRow?.token || envToken;
+    const storeIdToUse = sqlRow?.storeId || envStoreId;
+    const envToUse = sqlRow?.environment || envEnv;
 
     return {
       id: sqlRow?.id || 1,
@@ -2994,16 +2948,16 @@ export async function getPayphoneConfig(userId: number = 1) {
       updatedAt: sqlRow?.updatedAt,
     };
   } catch (error) {
-    console.warn('Error fetching payphone api config from SQL, fallback to local state:', error);
+    console.warn('Error fetching payphone api config from SQL:', error);
     return {
-      id: localConfig?.id || 1,
+      id: 1,
       userId,
-      token: effectiveToken,
-      storeId: effectiveStoreId,
-      environment: effectiveEnv,
-      hasToken: Boolean(effectiveToken && effectiveToken.trim().length > 0),
-      isConfigured: Boolean(effectiveToken && effectiveToken.trim().length > 0),
-      isActive: localConfig?.isActive !== false,
+      token: envToken,
+      storeId: envStoreId,
+      environment: envEnv,
+      hasToken: Boolean(envToken && envToken.trim().length > 0),
+      isConfigured: Boolean(envToken && envToken.trim().length > 0),
+      isActive: true,
     };
   }
 }
@@ -3012,38 +2966,9 @@ export async function savePayphoneConfig(
   userId: number = 1,
   data: { token?: string; storeId?: string; environment?: string; isActive?: boolean }
 ) {
-  const state = storage.getState();
-  if (!state.payphoneConfigs) state.payphoneConfigs = [];
-
-  let localConfig = state.payphoneConfigs.find((c) => c.userId === userId);
   const cleanToken = (data.token !== undefined && data.token.trim().length > 0) ? data.token.trim() : undefined;
   const cleanStoreId = data.storeId !== undefined ? data.storeId.trim() : undefined;
   const cleanEnv = data.environment !== undefined ? data.environment.trim() : undefined;
-
-  if (!localConfig) {
-    localConfig = {
-      id: state.nextId?.payphoneConfigs ? state.nextId.payphoneConfigs++ : 1,
-      userId,
-      token: cleanToken ?? null,
-      storeId: cleanStoreId ?? null,
-      environment: cleanEnv ?? 'production',
-      isActive: data.isActive !== undefined ? data.isActive : true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    state.payphoneConfigs.push(localConfig);
-  } else {
-    if (cleanToken !== undefined) localConfig.token = cleanToken;
-    if (cleanStoreId !== undefined) localConfig.storeId = cleanStoreId;
-    if (cleanEnv !== undefined) localConfig.environment = cleanEnv;
-    if (data.isActive !== undefined) localConfig.isActive = data.isActive;
-    localConfig.updatedAt = new Date().toISOString();
-  }
-  storage.save();
-
-  if (!isPostgresConfigured()) {
-    return localConfig;
-  }
 
   try {
     const existing = await getPayphoneConfig(userId);
@@ -3091,8 +3016,8 @@ export async function savePayphoneConfig(
 
     return inserted[0];
   } catch (error) {
-    console.warn('Error updating payphone api config in SQL, fallback to local store:', error);
-    return localConfig;
+    console.warn('Error updating payphone api config in SQL:', error);
+    return await getPayphoneConfig(userId);
   }
 }
 

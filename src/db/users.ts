@@ -1,8 +1,7 @@
 import crypto from 'crypto';
 import { and, eq, or } from 'drizzle-orm';
-import { db, ensureTablesCreated, isPostgresConfigured } from './index.ts';
+import { db, ensureTablesCreated } from './index.ts';
 import { users, telegramConfigs, storeConfigs, aiConfigs, serverDomainConfigs, emailConfigs } from './schema.ts';
-import { storage } from './storage.ts';
 import { sendActivationEmail, sendPasswordResetEmail, getEmailConfig } from '../services/email.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.APP_SECRET || 'comerxia-sql-auth-secret-key-2026';
@@ -67,14 +66,6 @@ export function verifyAuthToken(token: string): { id: number; username: string; 
 
 // Check if an administrator user exists in the database
 export async function checkAdminExists(): Promise<boolean> {
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const configuredUser = state.users.find(
-      (u) => u.role === 'admin' && !(u.username === 'admin' && u.email === 'admin@comerxia.com' && u.password === 'admin')
-    );
-    return Boolean(configuredUser);
-  }
-
   try {
     const allUsers = await db
       .select({ id: users.id, username: users.username, email: users.email, password: users.password, role: users.role })
@@ -90,12 +81,8 @@ export async function checkAdminExists(): Promise<boolean> {
 
     return configuredAdmins.length > 0;
   } catch (error) {
-    console.warn('PostgreSQL checkAdminExists error (database empty or unreachable):', error);
-    const state = storage.getState();
-    const configuredUser = state.users.find(
-      (u) => u.role === 'admin' && !(u.username === 'admin' && u.email === 'admin@comerxia.com' && u.password === 'admin')
-    );
-    return Boolean(configuredUser);
+    console.warn('PostgreSQL checkAdminExists error:', error);
+    return false;
   }
 }
 
@@ -125,281 +112,59 @@ export async function createInitialAdmin(data: {
   const uid = 'admin-' + Date.now();
   const adminName = data.name?.trim() || 'Administrador Principal';
 
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const now = new Date().toISOString();
-    const adminRecord = {
-      id: 1,
-      uid,
-      username,
-      password: hashedPassword,
-      name: adminName,
-      email: adminEmail,
-      role: 'admin',
-      photoUrl: null,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    };
-    state.users = [adminRecord];
-    state.nextId.users = 2;
+  // Ensure all tables exist before inserting in case database was freshly recreated
+  await ensureTablesCreated().catch(() => {});
 
-    // Initialize or reset default configs with empty sensitive credentials
-    if (!state.telegramConfigs || state.telegramConfigs.length === 0) {
-      state.telegramConfigs = [{
-        id: 1,
-        userId: 1,
-        botToken: null,
-        webhookSecret: null,
-        supplierName: 'Proveedor Telegram Principal',
-        supplierUsername: null,
-        autoApprove: true,
-        defaultMarginPercent: 35,
-        currency: 'USD',
-        defaultStockEnabled: false,
-        defaultStockQuantity: 10,
-        taxPercent: 15,
-        useAi: true,
-        createdAt: now,
-        updatedAt: now,
-      }];
-    } else {
-      state.telegramConfigs[0].botToken = null;
-      state.telegramConfigs[0].updatedAt = now;
-    }
+  // Check if a placeholder user exists in SQL
+  const existingUsers = await db.select().from(users).limit(10);
+  const placeholderUser = existingUsers.find(
+    (u) => u.username === 'admin' && u.email === 'admin@comerxia.com' && (u.password === 'admin' || !u.password.includes(':'))
+  );
 
-    if (!state.aiConfigs || state.aiConfigs.length === 0) {
-      state.aiConfigs = [{
-        id: 1,
-        userId: 1,
-        apiKey: null,
-        modelName: 'gemini-3.6-flash',
-        temperature: 0.2,
-        createdAt: now,
-        updatedAt: now,
-      }];
-    } else {
-      state.aiConfigs[0].apiKey = null;
-      state.aiConfigs[0].updatedAt = now;
-    }
-
-    if (!state.emailConfigs || state.emailConfigs.length === 0) {
-      state.emailConfigs = [{
-        id: 1,
-        userId: 1,
-        googleEmail: null,
-        googleAppPassword: null,
-        senderName: 'Comerxia App',
-        smtpHost: 'smtp.gmail.com',
-        smtpPort: 465,
-        smtpSecure: true,
-        requireActivation: true,
-        createdAt: now,
-        updatedAt: now,
-      }];
-    } else {
-      state.emailConfigs[0].googleEmail = null;
-      state.emailConfigs[0].googleAppPassword = null;
-      state.emailConfigs[0].updatedAt = now;
-    }
-
-    if (!state.storeConfigs || state.storeConfigs.length === 0) {
-      state.storeConfigs = [{
-        id: 1,
-        userId: 1,
-        storeName: 'Comerxia Store',
-        whatsappNumber: '',
-        description: 'Catálogo digital con envíos y pedidos directos por WhatsApp',
-        bannerText: '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
-        deliveryFee: '0.00',
-        minOrderAmount: '0.00',
-        currency: 'USD',
-        showStock: true,
-        showOutOfStock: true,
-        instagramUrl: null,
-        address: null,
-        logoUrl: null,
-        logoDesktopUrl: null,
-        courierLogos: null,
-        paymentLogos: null,
-        createdAt: now,
-        updatedAt: now,
-      }];
-    } else {
-      state.storeConfigs[0].whatsappNumber = '';
-      state.storeConfigs[0].updatedAt = now;
-    }
-
-    storage.save();
-    return {
-      id: adminRecord.id,
-      username: adminRecord.username,
-      email: adminEmail,
-      name: adminRecord.name,
-      role: adminRecord.role,
-      photoUrl: adminRecord.photoUrl,
-    };
+  let createdUser;
+  if (placeholderUser) {
+    // Update existing placeholder with the actual admin credentials
+    const updated = await db
+      .update(users)
+      .set({
+        uid,
+        username,
+        password: hashedPassword,
+        name: adminName,
+        email: adminEmail,
+        role: 'admin',
+        isActive: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, placeholderUser.id))
+      .returning();
+    createdUser = updated[0];
+  } else {
+    const inserted = await db
+      .insert(users)
+      .values({
+        uid,
+        username,
+        password: hashedPassword,
+        name: adminName,
+        email: adminEmail,
+        role: 'admin',
+      })
+      .returning();
+    createdUser = inserted[0];
   }
 
+  // Initialize default configs in SQL if needed with empty credentials by default
   try {
-    // Ensure all tables exist before inserting in case database was freshly recreated
-    await ensureTablesCreated().catch(() => {});
-
-    // Check if a placeholder user exists in SQL
-    const existingUsers = await db.select().from(users).limit(10);
-    const placeholderUser = existingUsers.find(
-      (u) => u.username === 'admin' && u.email === 'admin@comerxia.com' && (u.password === 'admin' || !u.password.includes(':'))
-    );
-
-    let createdUser;
-    if (placeholderUser) {
-      // Update existing placeholder with the actual admin credentials
-      const updated = await db
-        .update(users)
-        .set({
-          uid,
-          username,
-          password: hashedPassword,
-          name: adminName,
-          email: adminEmail,
-          role: 'admin',
-          isActive: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, placeholderUser.id))
-        .returning();
-      createdUser = updated[0];
+    // 1. Telegram Config
+    const existingTg = await db.select().from(telegramConfigs).where(eq(telegramConfigs.userId, createdUser.id)).limit(1);
+    if (existingTg.length > 0) {
+      await db.update(telegramConfigs).set({ botToken: null, updatedAt: new Date() }).where(eq(telegramConfigs.id, existingTg[0].id));
     } else {
-      const inserted = await db
-        .insert(users)
-        .values({
-          uid,
-          username,
-          password: hashedPassword,
-          name: adminName,
-          email: adminEmail,
-          role: 'admin',
-        })
-        .returning();
-      createdUser = inserted[0];
-    }
-
-    // Initialize default configs in SQL if needed with empty credentials by default
-    try {
-      // 1. Telegram Config (botToken empty by default)
-      const existingTg = await db.select().from(telegramConfigs).where(eq(telegramConfigs.userId, createdUser.id)).limit(1);
-      if (existingTg.length > 0) {
-        await db.update(telegramConfigs).set({ botToken: null, updatedAt: new Date() }).where(eq(telegramConfigs.id, existingTg[0].id));
-      } else {
-        await db.insert(telegramConfigs).values({
-          userId: createdUser.id,
-          botToken: null,
-          supplierName: 'Proveedor Telegram Principal',
-          autoApprove: true,
-          defaultMarginPercent: 35,
-          currency: 'USD',
-          defaultStockEnabled: false,
-          defaultStockQuantity: 10,
-          taxPercent: 15,
-          useAi: true,
-        }).catch(() => {});
-      }
-
-      // 2. Store Config (whatsappNumber empty by default)
-      const existingStore = await db.select().from(storeConfigs).where(eq(storeConfigs.userId, createdUser.id)).limit(1);
-      if (existingStore.length > 0) {
-        await db.update(storeConfigs).set({ whatsappNumber: '', updatedAt: new Date() }).where(eq(storeConfigs.id, existingStore[0].id));
-      } else {
-        await db.insert(storeConfigs).values({
-          userId: createdUser.id,
-          storeName: 'Comerxia Store',
-          whatsappNumber: '',
-          description: 'Catálogo digital con envíos y pedidos directos',
-          bannerText: '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
-          currency: 'USD',
-          showStock: true,
-          showOutOfStock: true,
-        }).catch(() => {});
-      }
-
-      // 3. AI Config (Gemini API Key empty by default)
-      const existingAi = await db.select().from(aiConfigs).where(eq(aiConfigs.userId, createdUser.id)).limit(1);
-      if (existingAi.length > 0) {
-        await db.update(aiConfigs).set({ apiKey: null, updatedAt: new Date() }).where(eq(aiConfigs.id, existingAi[0].id));
-      } else {
-        await db.insert(aiConfigs).values({
-          userId: createdUser.id,
-          apiKey: null,
-          modelName: 'gemini-3.6-flash',
-          temperature: '0.20',
-        }).catch(() => {});
-      }
-
-      // 4. Email Config (Google Email & App Password empty by default)
-      const existingEmail = await db.select().from(emailConfigs).where(eq(emailConfigs.userId, createdUser.id)).limit(1);
-      if (existingEmail.length > 0) {
-        await db.update(emailConfigs).set({ googleEmail: null, googleAppPassword: null, updatedAt: new Date() }).where(eq(emailConfigs.id, existingEmail[0].id));
-      } else {
-        await db.insert(emailConfigs).values({
-          userId: createdUser.id,
-          googleEmail: null,
-          googleAppPassword: null,
-          senderName: 'Comerxia App',
-          smtpHost: 'smtp.gmail.com',
-          smtpPort: 465,
-          smtpSecure: true,
-          requireActivation: true,
-        }).catch(() => {});
-      }
-
-      // 5. Server Domain Config
-      await db.insert(serverDomainConfigs).values({
+      await db.insert(telegramConfigs).values({
         userId: createdUser.id,
-        adminDomain: 'admin.dominio1.com',
-        storeDomain: 'www.dominio1.com, dominio1.com',
-        autoRouting: true,
-        defaultFallbackView: 'admin',
-      }).catch(() => {});
-    } catch (e) {
-      console.warn('Initial configs notice:', e);
-    }
-
-    return {
-      id: createdUser.id,
-      username: createdUser.username || 'admin',
-      email: createdUser.email,
-      name: createdUser.name || 'Administrador',
-      role: createdUser.role || 'admin',
-      photoUrl: createdUser.photoUrl,
-    };
-  } catch (error: any) {
-    console.error('Error creating initial admin in SQL, trying storage fallback:', error);
-    const state = storage.getState();
-    const now = new Date().toISOString();
-    const adminRecord = {
-      id: 1,
-      uid,
-      username,
-      password: hashedPassword,
-      name: adminName,
-      email: adminEmail,
-      role: 'admin',
-      photoUrl: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    state.users = [adminRecord];
-    state.nextId.users = 2;
-
-    // Initialize or reset default configs with empty sensitive credentials
-    if (!state.telegramConfigs || state.telegramConfigs.length === 0) {
-      state.telegramConfigs = [{
-        id: 1,
-        userId: 1,
         botToken: null,
-        webhookSecret: null,
         supplierName: 'Proveedor Telegram Principal',
-        supplierUsername: null,
         autoApprove: true,
         defaultMarginPercent: 35,
         currency: 'USD',
@@ -407,33 +172,46 @@ export async function createInitialAdmin(data: {
         defaultStockQuantity: 10,
         taxPercent: 15,
         useAi: true,
-        createdAt: now,
-        updatedAt: now,
-      }];
-    } else {
-      state.telegramConfigs[0].botToken = null;
-      state.telegramConfigs[0].updatedAt = now;
+      }).catch(() => {});
     }
 
-    if (!state.aiConfigs || state.aiConfigs.length === 0) {
-      state.aiConfigs = [{
-        id: 1,
-        userId: 1,
+    // 2. Store Config
+    const existingStore = await db.select().from(storeConfigs).where(eq(storeConfigs.userId, createdUser.id)).limit(1);
+    if (existingStore.length > 0) {
+      await db.update(storeConfigs).set({ whatsappNumber: '', updatedAt: new Date() }).where(eq(storeConfigs.id, existingStore[0].id));
+    } else {
+      await db.insert(storeConfigs).values({
+        userId: createdUser.id,
+        storeName: 'Comerxia Store',
+        whatsappNumber: '',
+        description: 'Catálogo digital con envíos y pedidos directos',
+        bannerText: '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
+        currency: 'USD',
+        showStock: true,
+        showOutOfStock: true,
+      }).catch(() => {});
+    }
+
+    // 3. AI Config
+    const existingAi = await db.select().from(aiConfigs).where(eq(aiConfigs.userId, createdUser.id)).limit(1);
+    if (existingAi.length > 0) {
+      await db.update(aiConfigs).set({ apiKey: null, updatedAt: new Date() }).where(eq(aiConfigs.id, existingAi[0].id));
+    } else {
+      await db.insert(aiConfigs).values({
+        userId: createdUser.id,
         apiKey: null,
         modelName: 'gemini-3.6-flash',
-        temperature: 0.2,
-        createdAt: now,
-        updatedAt: now,
-      }];
-    } else {
-      state.aiConfigs[0].apiKey = null;
-      state.aiConfigs[0].updatedAt = now;
+        temperature: '0.20',
+      }).catch(() => {});
     }
 
-    if (!state.emailConfigs || state.emailConfigs.length === 0) {
-      state.emailConfigs = [{
-        id: 1,
-        userId: 1,
+    // 4. Email Config
+    const existingEmail = await db.select().from(emailConfigs).where(eq(emailConfigs.userId, createdUser.id)).limit(1);
+    if (existingEmail.length > 0) {
+      await db.update(emailConfigs).set({ googleEmail: null, googleAppPassword: null, updatedAt: new Date() }).where(eq(emailConfigs.id, existingEmail[0].id));
+    } else {
+      await db.insert(emailConfigs).values({
+        userId: createdUser.id,
         googleEmail: null,
         googleAppPassword: null,
         senderName: 'Comerxia App',
@@ -441,91 +219,34 @@ export async function createInitialAdmin(data: {
         smtpPort: 465,
         smtpSecure: true,
         requireActivation: true,
-        createdAt: now,
-        updatedAt: now,
-      }];
-    } else {
-      state.emailConfigs[0].googleEmail = null;
-      state.emailConfigs[0].googleAppPassword = null;
-      state.emailConfigs[0].updatedAt = now;
+      }).catch(() => {});
     }
 
-    if (!state.storeConfigs || state.storeConfigs.length === 0) {
-      state.storeConfigs = [{
-        id: 1,
-        userId: 1,
-        storeName: 'Comerxia Store',
-        whatsappNumber: '',
-        description: 'Catálogo digital con envíos y pedidos directos por WhatsApp',
-        bannerText: '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
-        deliveryFee: '0.00',
-        minOrderAmount: '0.00',
-        currency: 'USD',
-        showStock: true,
-        showOutOfStock: true,
-        instagramUrl: null,
-        address: null,
-        logoUrl: null,
-        logoDesktopUrl: null,
-        courierLogos: null,
-        paymentLogos: null,
-        createdAt: now,
-        updatedAt: now,
-      }];
-    } else {
-      state.storeConfigs[0].whatsappNumber = '';
-      state.storeConfigs[0].updatedAt = now;
-    }
-
-    storage.save();
-
-    return {
-      id: adminRecord.id,
-      username: adminRecord.username,
-      email: adminRecord.email,
-      name: adminRecord.name,
-      role: adminRecord.role,
-      photoUrl: adminRecord.photoUrl,
-    };
+    // 5. Server Domain Config
+    await db.insert(serverDomainConfigs).values({
+      userId: createdUser.id,
+      adminDomain: 'admin.dominio1.com',
+      storeDomain: 'www.dominio1.com, dominio1.com',
+      autoRouting: true,
+      defaultFallbackView: 'admin',
+    }).catch(() => {});
+  } catch (e) {
+    console.warn('Initial configs notice:', e);
   }
+
+  return {
+    id: createdUser.id,
+    username: createdUser.username || 'admin',
+    email: createdUser.email,
+    name: createdUser.name || 'Administrador',
+    role: createdUser.role || 'admin',
+    photoUrl: createdUser.photoUrl,
+  };
 }
 
 // Authenticate user against database
 export async function validateUserCredentials(usernameOrEmail: string, passwordAttempt: string) {
   const cleanQuery = usernameOrEmail.trim().toLowerCase();
-
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const user = state.users.find(
-      (u) => u.username?.toLowerCase() === cleanQuery || u.email?.toLowerCase() === cleanQuery
-    );
-
-    if (!user) {
-      return null;
-    }
-
-    const isMatch = verifyPassword(passwordAttempt, user.password);
-    if (!isMatch) {
-      return null;
-    }
-
-    // Upgrade plain text password if needed
-    if (!user.password.includes(':')) {
-      user.password = hashPassword(passwordAttempt);
-      user.updatedAt = new Date().toISOString();
-      storage.save();
-    }
-
-    return {
-      id: user.id,
-      username: user.username || 'admin',
-      email: user.email,
-      name: user.name || 'Administrador',
-      role: user.role || 'admin',
-      photoUrl: user.photoUrl,
-      isActive: user.isActive !== false,
-    };
-  }
 
   try {
     const rows = await db
@@ -535,22 +256,6 @@ export async function validateUserCredentials(usernameOrEmail: string, passwordA
       .limit(1);
 
     if (rows.length === 0) {
-      // Check fallback store if SQL was empty/offline
-      const state = storage.getState();
-      const user = state.users.find(
-        (u) => u.username?.toLowerCase() === cleanQuery || u.email?.toLowerCase() === cleanQuery
-      );
-      if (user && verifyPassword(passwordAttempt, user.password)) {
-        return {
-          id: user.id,
-          username: user.username || 'admin',
-          email: user.email,
-          name: user.name || 'Administrador',
-          role: user.role || 'admin',
-          photoUrl: user.photoUrl,
-          isActive: user.isActive !== false,
-        };
-      }
       return null;
     }
 
@@ -575,22 +280,7 @@ export async function validateUserCredentials(usernameOrEmail: string, passwordA
       isActive: user.isActive !== false,
     };
   } catch (error) {
-    console.error('Error validating user credentials in SQL, trying storage fallback:', error);
-    const state = storage.getState();
-    const user = state.users.find(
-      (u) => u.username?.toLowerCase() === cleanQuery || u.email?.toLowerCase() === cleanQuery
-    );
-    if (user && verifyPassword(passwordAttempt, user.password)) {
-      return {
-        id: user.id,
-        username: user.username || 'admin',
-        email: user.email,
-        name: user.name || 'Administrador',
-        role: user.role || 'admin',
-        photoUrl: user.photoUrl,
-        isActive: user.isActive !== false,
-      };
-    }
+    console.error('Error validating user credentials in SQL:', error);
     return null;
   }
 }
@@ -606,16 +296,6 @@ export async function verifyUserPasswordById(userId: number, passwordAttempt: st
     return true;
   }
 
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const user = state.users.find((u) => u.id === userId) || state.users.find((u) => u.role === 'admin') || state.users[0];
-    if (!user) return false;
-    if (verifyPassword(cleanPassword, user.password)) return true;
-    const adminUser = state.users.find((u) => u.role === 'admin');
-    if (adminUser && verifyPassword(cleanPassword, adminUser.password)) return true;
-    return false;
-  }
-
   try {
     const rows = await db
       .select({ id: users.id, password: users.password })
@@ -624,7 +304,6 @@ export async function verifyUserPasswordById(userId: number, passwordAttempt: st
       .limit(1);
 
     if (rows.length === 0) {
-      // Fallback to first admin
       const adminRows = await db
         .select({ id: users.id, password: users.password })
         .from(users)
@@ -633,12 +312,11 @@ export async function verifyUserPasswordById(userId: number, passwordAttempt: st
       if (adminRows.length > 0) {
         return verifyPassword(cleanPassword, adminRows[0].password);
       }
-      const state = storage.getState();
-      const user = state.users.find((u) => u.id === userId) || state.users[0];
-      return user ? verifyPassword(cleanPassword, user.password) : false;
+      return false;
     }
 
     if (verifyPassword(cleanPassword, rows[0].password)) return true;
+
     const adminRows = await db
       .select({ id: users.id, password: users.password })
       .from(users)
@@ -650,45 +328,15 @@ export async function verifyUserPasswordById(userId: number, passwordAttempt: st
     return false;
   } catch (error) {
     console.error('Error verifying user password by ID in SQL:', error);
-    const state = storage.getState();
-    const user = state.users.find((u) => u.id === userId) || state.users[0];
-    return user ? verifyPassword(cleanPassword, user.password) : false;
+    return false;
   }
 }
 
 // Get user profile by ID
 export async function getUserById(id: number) {
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const user = state.users.find((u) => u.id === id);
-    if (!user) return null;
-    return {
-      id: user.id,
-      username: user.username || 'admin',
-      email: user.email,
-      name: user.name || 'Administrador',
-      role: user.role || 'admin',
-      photoUrl: user.photoUrl,
-      createdAt: user.createdAt,
-    };
-  }
-
   try {
     const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    if (rows.length === 0) {
-      const state = storage.getState();
-      const user = state.users.find((u) => u.id === id);
-      if (!user) return null;
-      return {
-        id: user.id,
-        username: user.username || 'admin',
-        email: user.email,
-        name: user.name || 'Administrador',
-        role: user.role || 'admin',
-        photoUrl: user.photoUrl,
-        createdAt: user.createdAt,
-      };
-    }
+    if (rows.length === 0) return null;
     const user = rows[0];
     return {
       id: user.id,
@@ -700,19 +348,8 @@ export async function getUserById(id: number) {
       createdAt: user.createdAt,
     };
   } catch (error) {
-    console.error('Error getting user by ID from SQL, trying fallback:', error);
-    const state = storage.getState();
-    const user = state.users.find((u) => u.id === id);
-    if (!user) return null;
-    return {
-      id: user.id,
-      username: user.username || 'admin',
-      email: user.email,
-      name: user.name || 'Administrador',
-      role: user.role || 'admin',
-      photoUrl: user.photoUrl,
-      createdAt: user.createdAt,
-    };
+    console.error('Error getting user by ID from SQL:', error);
+    return null;
   }
 }
 
@@ -728,62 +365,6 @@ export async function updateUserProfile(
     photoUrl?: string;
   }
 ) {
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const userIndex = state.users.findIndex((u) => u.id === id);
-    if (userIndex === -1) {
-      throw new Error('Usuario administrador no encontrado');
-    }
-
-    const user = state.users[userIndex];
-
-    if (data.newPassword && data.newPassword.trim()) {
-      if (!data.currentPassword) {
-        throw new Error('Debes ingresar tu contraseña actual para establecer una nueva');
-      }
-      if (!verifyPassword(data.currentPassword, user.password)) {
-        throw new Error('La contraseña actual ingresada es incorrecta');
-      }
-      if (data.newPassword.trim().length < 4) {
-        throw new Error('La nueva contraseña debe tener al menos 4 caracteres');
-      }
-      user.password = hashPassword(data.newPassword.trim());
-    }
-
-    if (data.username && data.username.trim()) {
-      const cleanUsername = data.username.trim().toLowerCase();
-      const duplicate = state.users.find((u) => u.username === cleanUsername && u.id !== id);
-      if (duplicate) {
-        throw new Error(`El nombre de usuario "${cleanUsername}" ya está en uso`);
-      }
-      user.username = cleanUsername;
-    }
-
-    if (data.name !== undefined) {
-      user.name = data.name.trim();
-    }
-
-    if (data.email && data.email.trim()) {
-      user.email = data.email.trim();
-    }
-
-    if (data.photoUrl !== undefined) {
-      user.photoUrl = data.photoUrl;
-    }
-
-    user.updatedAt = new Date().toISOString();
-    storage.save();
-
-    return {
-      id: user.id,
-      username: user.username || 'admin',
-      email: user.email,
-      name: user.name || 'Administrador',
-      role: user.role || 'admin',
-      photoUrl: user.photoUrl,
-    };
-  }
-
   try {
     const existing = await db.select().from(users).where(eq(users.id, id)).limit(1);
     if (existing.length === 0) {
@@ -860,36 +441,6 @@ export async function getOrCreateUser(
   name?: string,
   photoUrl?: string
 ) {
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    let existing = state.users.find((u) => u.uid === uid || u.email === email);
-    const now = new Date().toISOString();
-    if (existing) {
-      if (name) existing.name = name;
-      if (photoUrl) existing.photoUrl = photoUrl;
-      existing.updatedAt = now;
-      storage.save();
-      return existing;
-    }
-
-    const nextId = state.nextId.users++;
-    const newUser = {
-      id: nextId,
-      uid,
-      username: email.split('@')[0] || `user_${nextId}`,
-      password: hashPassword('admin'),
-      email,
-      name: name || 'Usuario',
-      role: 'admin',
-      photoUrl: photoUrl || null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    state.users.push(newUser);
-    storage.save();
-    return newUser;
-  }
-
   try {
     const result = await db
       .insert(users)
@@ -925,22 +476,6 @@ export async function getOrCreateUser(
 
 // List all operator accounts
 export async function listOperators() {
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const ops = state.users.filter((u) => u.role === 'operador' || u.role === 'operator');
-    return ops.map((u) => ({
-      id: u.id,
-      username: u.username,
-      name: u.name,
-      email: u.email,
-      role: 'operador' as const,
-      photoUrl: u.photoUrl || null,
-      isActive: u.isActive !== false,
-      activationCode: u.activationCode || null,
-      createdAt: u.createdAt,
-    }));
-  }
-
   try {
     const rows = await db
       .select({
@@ -1015,72 +550,6 @@ export async function createOperator(data: {
   const hashedPassword = hashPassword(cleanPassword);
   const now = new Date().toISOString();
 
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const exists = state.users.find(
-      (u) => u.username?.toLowerCase() === cleanUsername || (cleanEmail && u.email?.toLowerCase() === cleanEmail.toLowerCase())
-    );
-    if (exists) {
-      throw new Error(`El usuario o correo "${cleanUsername}" ya existe`);
-    }
-
-    const maxId = state.users.reduce((max, u) => Math.max(max, u.id || 0), 0);
-    const nextId = Math.max(state.nextId.users || 2, maxId + 1);
-    state.nextId.users = nextId + 1;
-    const newOp = {
-      id: nextId,
-      uid: `op_${nextId}_${Date.now()}`,
-      username: cleanUsername,
-      password: hashedPassword,
-      name: cleanName,
-      email: cleanEmail,
-      role: 'operador',
-      photoUrl: null,
-      isActive,
-      activationCode,
-      activationExpiresAt: activationExpiresAt ? activationExpiresAt.toISOString() : null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    state.users.push(newOp);
-    storage.save();
-
-    // Send activation email if enabled and configured
-    let emailSent = false;
-    let emailError: string | null = null;
-    if (shouldRequireActivation && activationCode && cleanEmail.includes('@')) {
-      try {
-        if (emailCfg.isConfigured) {
-          await sendActivationEmail({
-            to: cleanEmail,
-            name: cleanName,
-            username: cleanUsername,
-            code: activationCode,
-            appUrl: data.appUrl,
-          });
-          emailSent = true;
-        }
-      } catch (err: any) {
-        console.warn('Could not send operator activation email:', err);
-        emailError = err.message || 'No se pudo enviar el correo de activación';
-      }
-    }
-
-    return {
-      id: newOp.id,
-      username: newOp.username,
-      name: newOp.name,
-      email: newOp.email,
-      role: 'operador' as const,
-      photoUrl: null,
-      isActive: newOp.isActive,
-      activationCode: newOp.activationCode,
-      emailSent,
-      emailError,
-      createdAt: newOp.createdAt,
-    };
-  }
-
   try {
     const existing = await db
       .select({ id: users.id, username: users.username })
@@ -1152,17 +621,6 @@ export async function createOperator(data: {
 
 // Toggle operator account active state (Admin only)
 export async function setOperatorActivation(operatorId: number, isActive: boolean) {
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const user = state.users.find((u) => u.id === operatorId);
-    if (!user) throw new Error('Usuario no encontrado');
-    user.isActive = isActive;
-    if (isActive) user.activationCode = null;
-    user.updatedAt = new Date().toISOString();
-    storage.save();
-    return { success: true, isActive };
-  }
-
   try {
     await db
       .update(users)
@@ -1187,40 +645,6 @@ export async function activateUserAccount(usernameOrEmail: string, code: string)
 
   if (!cleanCode || cleanCode.length < 4) {
     throw new Error('Ingresa un código de activación válido');
-  }
-
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const user = state.users.find(
-      (u) => u.username?.toLowerCase() === cleanQuery || u.email?.toLowerCase() === cleanQuery
-    );
-
-    if (!user) throw new Error('No se encontró ninguna cuenta con ese usuario o correo');
-    if (user.isActive) return { success: true, message: 'La cuenta ya se encuentra activa', user };
-
-    if (!user.activationCode || user.activationCode !== cleanCode) {
-      throw new Error('El código de activación ingresado es incorrecto');
-    }
-
-    user.isActive = true;
-    user.activationCode = null;
-    user.activationExpiresAt = null;
-    user.updatedAt = new Date().toISOString();
-    storage.save();
-
-    return {
-      success: true,
-      message: '¡Cuenta activada exitosamente! Ya puedes iniciar sesión.',
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        photoUrl: user.photoUrl,
-        isActive: true,
-      },
-    };
   }
 
   try {
@@ -1278,51 +702,28 @@ export async function resendActivationCode(usernameOrEmail: string, appUrl?: str
   const newCode = generateSixDigitCode();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-  let targetEmail = '';
-  let targetName = '';
-  let targetUsername = '';
+  const rows = await db
+    .select()
+    .from(users)
+    .where(or(eq(users.username, cleanQuery), eq(users.email, cleanQuery)))
+    .limit(1);
 
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const user = state.users.find(
-      (u) => u.username?.toLowerCase() === cleanQuery || u.email?.toLowerCase() === cleanQuery
-    );
+  if (rows.length === 0) throw new Error('No se encontró la cuenta especificada');
+  const user = rows[0];
+  if (user.isActive) throw new Error('Esta cuenta ya se encuentra activa');
 
-    if (!user) throw new Error('No se encontró la cuenta especificada');
-    if (user.isActive) throw new Error('Esta cuenta ya se encuentra activa');
+  await db
+    .update(users)
+    .set({
+      activationCode: newCode,
+      activationExpiresAt: expiresAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, user.id));
 
-    user.activationCode = newCode;
-    user.activationExpiresAt = expiresAt.toISOString();
-    user.updatedAt = new Date().toISOString();
-    storage.save();
-
-    targetEmail = user.email;
-    targetName = user.name;
-    targetUsername = user.username;
-  } else {
-    const rows = await db
-      .select()
-      .from(users)
-      .where(or(eq(users.username, cleanQuery), eq(users.email, cleanQuery)))
-      .limit(1);
-
-    if (rows.length === 0) throw new Error('No se encontró la cuenta especificada');
-    const user = rows[0];
-    if (user.isActive) throw new Error('Esta cuenta ya se encuentra activa');
-
-    await db
-      .update(users)
-      .set({
-        activationCode: newCode,
-        activationExpiresAt: expiresAt,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, user.id));
-
-    targetEmail = user.email || '';
-    targetName = user.name || '';
-    targetUsername = user.username || '';
-  }
+  const targetEmail = user.email || '';
+  const targetName = user.name || '';
+  const targetUsername = user.username || '';
 
   // Dispatch email
   await sendActivationEmail({
@@ -1346,61 +747,33 @@ export async function requestPasswordReset(usernameOrEmail: string, appUrl?: str
   const resetCode = generateSixDigitCode();
   const resetExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
 
-  let targetEmail = '';
-  let targetName = '';
-  let targetUsername = '';
+  const rows = await db
+    .select()
+    .from(users)
+    .where(or(eq(users.username, cleanQuery), eq(users.email, cleanQuery)))
+    .limit(1);
 
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const user = state.users.find(
-      (u) => u.username?.toLowerCase() === cleanQuery || u.email?.toLowerCase() === cleanQuery
-    );
-
-    if (!user) {
-      throw new Error('No se encontró ningún usuario o correo asociado a esa cuenta');
-    }
-
-    if (!user.email || !user.email.includes('@')) {
-      throw new Error('El usuario no tiene una dirección de correo válida configurada para recibir el código');
-    }
-
-    user.resetCode = resetCode;
-    user.resetExpiresAt = resetExpiresAt.toISOString();
-    user.updatedAt = new Date().toISOString();
-    storage.save();
-
-    targetEmail = user.email;
-    targetName = user.name;
-    targetUsername = user.username;
-  } else {
-    const rows = await db
-      .select()
-      .from(users)
-      .where(or(eq(users.username, cleanQuery), eq(users.email, cleanQuery)))
-      .limit(1);
-
-    if (rows.length === 0) {
-      throw new Error('No se encontró ningún usuario o correo asociado a esa cuenta');
-    }
-
-    const user = rows[0];
-    if (!user.email || !user.email.includes('@')) {
-      throw new Error('El usuario no tiene una dirección de correo válida configurada');
-    }
-
-    await db
-      .update(users)
-      .set({
-        resetCode,
-        resetExpiresAt,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, user.id));
-
-    targetEmail = user.email;
-    targetName = user.name || '';
-    targetUsername = user.username || '';
+  if (rows.length === 0) {
+    throw new Error('No se encontró ningún usuario o correo asociado a esa cuenta');
   }
+
+  const user = rows[0];
+  if (!user.email || !user.email.includes('@')) {
+    throw new Error('El usuario no tiene una dirección de correo válida configurada');
+  }
+
+  await db
+    .update(users)
+    .set({
+      resetCode,
+      resetExpiresAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, user.id));
+
+  const targetEmail = user.email;
+  const targetName = user.name || '';
+  const targetUsername = user.username || '';
 
   // Send Google Email
   try {
@@ -1442,31 +815,6 @@ export async function confirmPasswordReset(usernameOrEmail: string, code: string
   }
 
   const hashedPassword = hashPassword(cleanPassword);
-
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const user = state.users.find(
-      (u) => u.username?.toLowerCase() === cleanQuery || u.email?.toLowerCase() === cleanQuery
-    );
-
-    if (!user) throw new Error('Usuario no encontrado');
-    if (!user.resetCode || user.resetCode !== cleanCode) {
-      throw new Error('El código de recuperación ingresado es incorrecto o ha expirado');
-    }
-
-    if (user.resetExpiresAt && new Date(user.resetExpiresAt).getTime() < Date.now()) {
-      throw new Error('El código de recuperación ha expirado. Solicita uno nuevo.');
-    }
-
-    user.password = hashedPassword;
-    user.resetCode = null;
-    user.resetExpiresAt = null;
-    user.isActive = true; // Auto-activate on successful password reset
-    user.updatedAt = new Date().toISOString();
-    storage.save();
-
-    return { success: true, message: '¡Contraseña restablecida exitosamente! Ya puedes iniciar sesión.' };
-  }
 
   try {
     const rows = await db
@@ -1515,31 +863,6 @@ export async function deleteOperator(operatorId: number, currentUserId?: number,
     throw new Error('No puedes eliminar la cuenta con la que has iniciado sesión actualmente');
   }
 
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const targetIndex = state.users.findIndex((u) => u.id === operatorId);
-    if (targetIndex === -1) {
-      throw new Error('Usuario operador no encontrado');
-    }
-
-    const targetUser = state.users[targetIndex];
-
-    // Check if target username matches current session
-    if (currentUsername && targetUser.username?.toLowerCase() === currentUsername.toLowerCase()) {
-      throw new Error('No puedes eliminar la cuenta con la que has iniciado sesión actualmente');
-    }
-
-    // Strictly ensure only accounts with operator role can be deleted
-    const role = (targetUser.role || '').toLowerCase();
-    if (role !== 'operador' && role !== 'operator') {
-      throw new Error('Solo se pueden eliminar cuentas con rol de Operador. Las cuentas de Administrador están permanentemente protegidas.');
-    }
-
-    state.users.splice(targetIndex, 1);
-    storage.save();
-    return { success: true };
-  }
-
   try {
     const existing = await db.select().from(users).where(eq(users.id, operatorId)).limit(1);
     if (existing.length === 0) {
@@ -1569,10 +892,6 @@ export async function deleteOperator(operatorId: number, currentUserId?: number,
 
 // Retrieve all user accounts (Admin / Operators) for full system backup
 export async function getAllUsers() {
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    return state.users || [];
-  }
   try {
     const rows = await db.select().from(users).orderBy(users.id);
     return rows;

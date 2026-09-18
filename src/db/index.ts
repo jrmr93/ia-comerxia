@@ -749,7 +749,129 @@ export async function ensureTablesCreated() {
         ALTER TABLE payments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
       `);
 
-      // 12. Synchronize tables
+      // 12. Create payphone_configs table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS payphone_configs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          token TEXT,
+          store_id TEXT,
+          environment TEXT DEFAULT 'production',
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+
+      await client.query(`
+        ALTER TABLE payphone_configs ADD COLUMN IF NOT EXISTS token TEXT;
+        ALTER TABLE payphone_configs ADD COLUMN IF NOT EXISTS store_id TEXT;
+        ALTER TABLE payphone_configs ADD COLUMN IF NOT EXISTS environment TEXT DEFAULT 'production';
+        ALTER TABLE payphone_configs ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+        ALTER TABLE payphone_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+      `);
+
+      // 13. Create sri_configs table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS sri_configs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          ruc TEXT DEFAULT '1700000000001',
+          estado_ruc TEXT DEFAULT 'ACTIVO',
+          razon_social TEXT DEFAULT 'COMERXIA E-COMMERCE S.A.',
+          nombre_comercial TEXT DEFAULT 'COMERXIA ECUADOR',
+          estab TEXT DEFAULT '001',
+          pto_emi TEXT DEFAULT '001',
+          dir_matriz TEXT DEFAULT 'Quito, Ecuador',
+          obligado_contabilidad TEXT DEFAULT 'NO',
+          contribuyente_especial TEXT,
+          regimen_rimpe TEXT DEFAULT 'NO',
+          ambiente TEXT DEFAULT '1',
+          p12_base64 TEXT,
+          p12_password TEXT,
+          p12_filename TEXT,
+          last_factura_secuencial INTEGER DEFAULT 0,
+          last_nota_credito_secuencial INTEGER DEFAULT 0,
+          last_nota_debito_secuencial INTEGER DEFAULT 0,
+          last_guia_remision_secuencial INTEGER DEFAULT 0,
+          last_retencion_secuencial INTEGER DEFAULT 0,
+          last_liquidacion_secuencial INTEGER DEFAULT 0,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+
+      await client.query(`
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS ruc TEXT DEFAULT '1700000000001';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS estado_ruc TEXT DEFAULT 'ACTIVO';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS razon_social TEXT DEFAULT 'COMERXIA E-COMMERCE S.A.';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS nombre_comercial TEXT DEFAULT 'COMERXIA ECUADOR';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS estab TEXT DEFAULT '001';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS pto_emi TEXT DEFAULT '001';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS dir_matriz TEXT DEFAULT 'Quito, Ecuador';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS obligado_contabilidad TEXT DEFAULT 'NO';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS contribuyente_especial TEXT;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS regimen_rimpe TEXT DEFAULT 'NO';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS ambiente TEXT DEFAULT '1';
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS p12_base64 TEXT;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS p12_password TEXT;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS p12_filename TEXT;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS last_factura_secuencial INTEGER DEFAULT 0;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS last_nota_credito_secuencial INTEGER DEFAULT 0;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS last_nota_debito_secuencial INTEGER DEFAULT 0;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS last_guia_remision_secuencial INTEGER DEFAULT 0;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS last_retencion_secuencial INTEGER DEFAULT 0;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS last_liquidacion_secuencial INTEGER DEFAULT 0;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+        ALTER TABLE sri_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+      `);
+
+      // 14. Create sri_invoices table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS sri_invoices (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          order_id INTEGER REFERENCES customer_orders(id) ON DELETE SET NULL,
+          order_number TEXT,
+          secuencial TEXT NOT NULL,
+          clave_acceso TEXT NOT NULL,
+          ambiente TEXT DEFAULT '1',
+          customer_name TEXT NOT NULL,
+          customer_ci_ruc TEXT NOT NULL,
+          total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+          estado_recepcion TEXT DEFAULT 'PENDIENTE',
+          estado_autorizacion TEXT DEFAULT 'PENDIENTE',
+          fecha_autorizacion TIMESTAMP,
+          numero_autorizacion TEXT,
+          xml_generado TEXT,
+          xml_firmado TEXT,
+          mensajes_sri TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+
+      await client.query(`
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS order_id INTEGER;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS order_number TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS secuencial TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS clave_acceso TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS ambiente TEXT DEFAULT '1';
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS customer_name TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS customer_ci_ruc TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS total_amount NUMERIC(12, 2) DEFAULT 0.00;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS estado_recepcion TEXT DEFAULT 'PENDIENTE';
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS estado_autorizacion TEXT DEFAULT 'PENDIENTE';
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS fecha_autorizacion TIMESTAMP;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS numero_autorizacion TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS xml_generado TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS xml_firmado TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS mensajes_sri TEXT;
+        ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+      `);
+
+      // 15. Synchronize tables
       console.log('✅ PostgreSQL connection verified and database schemas synchronized');
     } finally {
       client.release();

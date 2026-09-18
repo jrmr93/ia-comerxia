@@ -2,13 +2,12 @@ import nodemailer from 'nodemailer';
 import { eq } from 'drizzle-orm';
 import { db, isPostgresConfigured } from '../db/index.ts';
 import { emailConfigs, users } from '../db/schema.ts';
-import { storage } from '../db/storage.ts';
 import { getStoreConfig } from '../db/inventory.ts';
 import { GoogleEmailConfig } from '../types.ts';
 
 /**
  * Retrieve Google Email (Gmail SMTP) configuration
- * Prioritizes SQL database, falls back to storage and then environment variables.
+ * Query exclusively from PostgreSQL database.
  */
 export async function getEmailConfig(userId?: number): Promise<GoogleEmailConfig> {
   const envGoogleEmail = process.env.GOOGLE_EMAIL || process.env.SMTP_USER || '';
@@ -17,30 +16,6 @@ export async function getEmailConfig(userId?: number): Promise<GoogleEmailConfig
   const envPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465;
   const envSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : envPort === 465;
   const envFromName = process.env.SMTP_FROM_NAME || 'Comerxia App';
-
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const found = state.emailConfigs?.find((c) => (userId ? c.userId === userId : true)) || state.emailConfigs?.[0];
-
-    const email = found?.googleEmail || '';
-    const password = found?.googleAppPassword || '';
-
-    return {
-      id: found?.id || 1,
-      userId: found?.userId || userId || 1,
-      googleEmail: email,
-      googleAppPassword: password ? '••••••••••••••••' : '',
-      hasAppPassword: Boolean(password && password.trim().length > 0),
-      senderName: found?.senderName || envFromName,
-      smtpHost: found?.smtpHost || envHost,
-      smtpPort: found?.smtpPort || envPort,
-      smtpSecure: found?.smtpSecure ?? envSecure,
-      requireActivation: found?.requireActivation ?? true,
-      isConfigured: Boolean(email && email.includes('@') && password && password.trim().length > 0),
-      createdAt: found?.createdAt,
-      updatedAt: found?.updatedAt,
-    };
-  }
 
   try {
     const rows = await db
@@ -74,7 +49,7 @@ export async function getEmailConfig(userId?: number): Promise<GoogleEmailConfig
     console.warn('Could not fetch email config from PostgreSQL:', error);
   }
 
-  // Fallback to empty default
+  // Default config if not inserted yet
   return {
     id: 1,
     userId: userId || 1,
@@ -100,20 +75,6 @@ async function getRawEmailCredentials(userId?: number) {
   const envPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465;
   const envSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : envPort === 465;
   const envFromName = process.env.SMTP_FROM_NAME || 'Comerxia App';
-
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    const found = state.emailConfigs?.find((c) => (userId ? c.userId === userId : true)) || state.emailConfigs?.[0];
-
-    return {
-      googleEmail: (found?.googleEmail || '').trim(),
-      googleAppPassword: (found?.googleAppPassword || '').replace(/\s+/g, ''),
-      senderName: found?.senderName || envFromName,
-      smtpHost: found?.smtpHost || envHost,
-      smtpPort: found?.smtpPort || envPort,
-      smtpSecure: found?.smtpSecure ?? envSecure,
-    };
-  }
 
   try {
     const rows = await db
@@ -169,46 +130,6 @@ export async function saveEmailConfig(
   const cleanPort = data.smtpPort || (cleanHost === 'smtp.gmail.com' ? 465 : 587);
   const cleanSecure = data.smtpSecure !== undefined ? data.smtpSecure : cleanPort === 465;
   const cleanActivation = data.requireActivation !== undefined ? data.requireActivation : true;
-
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    if (!state.emailConfigs) state.emailConfigs = [];
-
-    let existing = state.emailConfigs.find((c) => c.userId === userId) || state.emailConfigs[0];
-    const now = new Date().toISOString();
-
-    if (existing) {
-      if (data.googleEmail !== undefined) existing.googleEmail = cleanEmail;
-      // Only overwrite password if it's not a masked string placeholder
-      if (cleanPassword !== undefined && !cleanPassword.startsWith('•••')) {
-        existing.googleAppPassword = cleanPassword;
-      }
-      if (data.senderName !== undefined) existing.senderName = cleanSenderName;
-      if (data.smtpHost !== undefined) existing.smtpHost = cleanHost;
-      if (data.smtpPort !== undefined) existing.smtpPort = cleanPort;
-      if (data.smtpSecure !== undefined) existing.smtpSecure = cleanSecure;
-      if (data.requireActivation !== undefined) existing.requireActivation = cleanActivation;
-      existing.updatedAt = now;
-    } else {
-      const nextId = (state.nextId.emailConfigs = (state.nextId.emailConfigs || 1) + 1);
-      existing = {
-        id: nextId,
-        userId,
-        googleEmail: cleanEmail,
-        googleAppPassword: cleanPassword && !cleanPassword.startsWith('•••') ? cleanPassword : null,
-        senderName: cleanSenderName,
-        smtpHost: cleanHost,
-        smtpPort: cleanPort,
-        smtpSecure: cleanSecure,
-        requireActivation: cleanActivation,
-        createdAt: now,
-        updatedAt: now,
-      };
-      state.emailConfigs.push(existing);
-    }
-    storage.save();
-    return getEmailConfig(userId);
-  }
 
   try {
     const rows = await db.select().from(emailConfigs).where(eq(emailConfigs.userId, userId)).limit(1);

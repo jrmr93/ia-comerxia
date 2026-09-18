@@ -1046,7 +1046,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       if (!p) return;
       const cost = Number(p.totalCost || 0);
       totalFilteredVolume += cost;
-      if (p.hasInvoice || (p as any).preFacturaNumber || (p as any).facturaNumber) {
+      if ((p as any).hasInvoice || (p as any).preFacturaNumber || (p as any).facturaNumber) {
         invoicedVolume += cost;
         invoicedCount++;
       } else {

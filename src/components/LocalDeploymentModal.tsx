@@ -53,7 +53,7 @@ import { DevTestingTab } from './DevTestingTab.tsx';
 interface LocalDeploymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'sri' | 'sri_invoices' | 'store' | 'email' | 'sandbox';
+  initialTab?: 'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'payphone_api' | 'sri' | 'sri_invoices' | 'store' | 'email' | 'sandbox';
   config?: TelegramConfig | null;
   onConfigSaved?: () => void;
   storeConfig?: StoreConfig | null;
@@ -76,7 +76,7 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
   const [downloadingType, setDownloadingType] = useState<string | null>(null);
 
   // Modal Main Navigation
-  const [activeTab, setActiveTab] = useState<'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'sri' | 'sri_invoices' | 'email' | 'store' | 'sandbox'>(initialTab || 'store');
+  const [activeTab, setActiveTab] = useState<'deploy' | 'status' | 'domains' | 'security' | 'backup' | 'telegram' | 'ai' | 'ecuador_api' | 'payphone_api' | 'sri' | 'sri_invoices' | 'email' | 'store' | 'sandbox'>(initialTab || 'store');
 
   // Sub-tabs inside "Despliegue"
   const [deploySubTab, setDeploySubTab] = useState<'guide' | 'scripts'>('guide');

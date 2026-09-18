@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
-import { db, isPostgresConfigured, pool } from '../db/index.ts';
+import { db, isPostgresConfigured, pool, ensureTablesCreated } from '../db/index.ts';
 import {
   users,
   inventoryItems,
@@ -19,7 +19,6 @@ import {
   storeAnalyticsEvents,
 } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
-import { storage } from '../db/storage.ts';
 import { getAllUsers } from '../db/users.ts';
 import {
   getInventoryItems,
@@ -246,14 +245,10 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
   }
 
   let analyticsEvents: any[] = [];
-  if (isPostgresConfigured()) {
-    try {
-      analyticsEvents = await db.select().from(storeAnalyticsEvents).limit(1000);
-    } catch {
-      analyticsEvents = [];
-    }
-  } else {
-    analyticsEvents = storage.getState().storeAnalyticsEvents || [];
+  try {
+    analyticsEvents = await db.select().from(storeAnalyticsEvents).limit(1000);
+  } catch {
+    analyticsEvents = [];
   }
 
   return {
@@ -1020,139 +1015,8 @@ export async function restoreCompleteJsonDump(
     throw new Error('El archivo de respaldo JSON no tiene un formato válido.');
   }
 
-  // 1. Local storage restore
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-
-    if (Array.isArray(backupData.users) && backupData.users.length > 0) {
-      for (const u of backupData.users) {
-        const idx = state.users.findIndex((ex) => ex.id === u.id || ex.username === u.username);
-        if (idx >= 0) {
-          state.users[idx] = { ...state.users[idx], ...u };
-        } else {
-          state.users.push(u);
-        }
-        counts.users++;
-      }
-    }
-
-    if (Array.isArray(backupData.inventoryItems) && backupData.inventoryItems.length > 0) {
-      for (const item of backupData.inventoryItems) {
-        const clean = sanitizeInventoryItemForExport(item);
-        const idx = state.inventoryItems.findIndex((ex) => ex.id === clean.id || ex.sku === clean.sku);
-        if (idx >= 0) {
-          state.inventoryItems[idx] = { ...state.inventoryItems[idx], ...clean };
-        } else {
-          state.inventoryItems.push(clean);
-        }
-        counts.inventoryItems++;
-      }
-    }
-
-    if (Array.isArray(backupData.customerOrders) && backupData.customerOrders.length > 0) {
-      for (const o of backupData.customerOrders) {
-        const idx = state.customerOrders.findIndex((ex) => ex.id === o.id || ex.orderNumber === o.orderNumber);
-        if (idx >= 0) {
-          state.customerOrders[idx] = { ...state.customerOrders[idx], ...o };
-        } else {
-          state.customerOrders.push(o);
-        }
-        counts.customerOrders++;
-      }
-    }
-
-    if (Array.isArray(backupData.customers) && backupData.customers.length > 0) {
-      for (const c of backupData.customers) {
-        const idx = state.customers.findIndex((ex) => ex.id === c.id || ex.phone === c.phone);
-        if (idx >= 0) {
-          state.customers[idx] = { ...state.customers[idx], ...c };
-        } else {
-          state.customers.push(c);
-        }
-        counts.customers++;
-      }
-    }
-
-    if (Array.isArray(backupData.suppliers) && backupData.suppliers.length > 0) {
-      for (const s of backupData.suppliers) {
-        const idx = state.suppliers.findIndex((ex) => ex.id === s.id || ex.phone === s.phone);
-        if (idx >= 0) {
-          state.suppliers[idx] = { ...state.suppliers[idx], ...s };
-        } else {
-          state.suppliers.push(s);
-        }
-        counts.suppliers++;
-      }
-    }
-
-    if (Array.isArray(backupData.purchases) && backupData.purchases.length > 0) {
-      for (const p of backupData.purchases) {
-        const idx = state.purchases.findIndex((ex) => ex.id === p.id || ex.purchaseNumber === p.purchaseNumber);
-        if (idx >= 0) {
-          state.purchases[idx] = { ...state.purchases[idx], ...p };
-        } else {
-          state.purchases.push(p);
-        }
-        counts.purchases++;
-      }
-    }
-
-    if (Array.isArray(backupData.payments) && backupData.payments.length > 0) {
-      for (const pm of backupData.payments) {
-        const idx = state.payments.findIndex((ex) => ex.id === pm.id || ex.paymentNumber === pm.paymentNumber);
-        if (idx >= 0) {
-          state.payments[idx] = { ...state.payments[idx], ...pm };
-        } else {
-          state.payments.push(pm);
-        }
-        counts.payments++;
-      }
-    }
-
-    if (Array.isArray(backupData.storeConfigs) && backupData.storeConfigs.length > 0) {
-      state.storeConfigs = backupData.storeConfigs.map((sc: any) => ({
-        ...sc,
-        logoUrl: normalizeMediaUrl(sc.logoUrl),
-        logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url),
-      }));
-      counts.storeConfigs = state.storeConfigs.length;
-    }
-
-    if (Array.isArray(backupData.telegramConfigs) && backupData.telegramConfigs.length > 0) {
-      state.telegramConfigs = backupData.telegramConfigs;
-      counts.telegramConfigs = state.telegramConfigs.length;
-      for (const tc of backupData.telegramConfigs) {
-        if (tc.botToken && typeof tc.botToken === 'string' && tc.botToken.trim()) {
-          process.env.TELEGRAM_BOT_TOKEN = tc.botToken.trim();
-        }
-      }
-    }
-
-    if (Array.isArray(backupData.aiConfigs) && backupData.aiConfigs.length > 0) {
-      state.aiConfigs = backupData.aiConfigs;
-      counts.aiConfigs = state.aiConfigs.length;
-      for (const aic of backupData.aiConfigs) {
-        if (aic.apiKey && typeof aic.apiKey === 'string' && aic.apiKey.trim()) {
-          process.env.GEMINI_API_KEY = aic.apiKey.trim();
-        }
-      }
-    }
-
-    if (Array.isArray(backupData.emailConfigs) && backupData.emailConfigs.length > 0) {
-      state.emailConfigs = backupData.emailConfigs;
-      counts.emailConfigs = state.emailConfigs.length;
-    }
-
-    if (Array.isArray(backupData.serverDomainConfigs) && backupData.serverDomainConfigs.length > 0) {
-      state.serverDomainConfigs = backupData.serverDomainConfigs;
-      counts.serverDomainConfigs = state.serverDomainConfigs.length;
-    }
-
-    storage.save();
-    return { success: true, counts, errors };
-  }
-
-  // 2. PostgreSQL restore
+  // PostgreSQL restore
+  await ensureTablesCreated().catch(() => {});
   try {
     // Users
     if (Array.isArray(backupData.users)) {
@@ -1232,25 +1096,6 @@ export async function restoreCompleteJsonDump(
               storeValues.id = sc.id;
             }
             await db.insert(storeConfigs).values(storeValues).onConflictDoNothing();
-          }
-
-          // Sync storage fallback
-          const state = storage.getState();
-          if (!state.storeConfigs) state.storeConfigs = [];
-          const idx = state.storeConfigs.findIndex((ex) => ex.id === (sc.id || existingStore?.id) || ex.userId === validUserId);
-          if (idx >= 0) {
-            state.storeConfigs[idx] = { 
-              ...state.storeConfigs[idx], 
-              ...sc, 
-              logoUrl: normalizeMediaUrl(sc.logoUrl),
-              logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) 
-            };
-          } else {
-            state.storeConfigs.push({ 
-              ...sc, 
-              logoUrl: normalizeMediaUrl(sc.logoUrl),
-              logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url)
-            });
           }
 
           counts.storeConfigs++;
@@ -1559,16 +1404,6 @@ export async function restoreCompleteJsonDump(
             await db.insert(purchases).values(purchaseValues).onConflictDoNothing();
           }
 
-          // Also sync to memory/file storage fallback so local Node.js environment has the purchases
-          const state = storage.getState();
-          if (!state.purchases) state.purchases = [];
-          const idx = state.purchases.findIndex((ex) => ex.id === p.id || ex.purchaseNumber === p.purchaseNumber);
-          if (idx >= 0) {
-            state.purchases[idx] = { ...state.purchases[idx], ...p };
-          } else {
-            state.purchases.push(p);
-          }
-
           counts.purchases = (counts.purchases || 0) + 1;
         } catch (err: any) {
           console.error(`[SystemBackup] Error al restaurar compra ${p?.purchaseNumber}:`, err);
@@ -1676,15 +1511,6 @@ export async function restoreCompleteJsonDump(
             await db.insert(payments).values(paymentValues).onConflictDoNothing();
           }
 
-          const state = storage.getState();
-          if (!state.payments) state.payments = [];
-          const idx = state.payments.findIndex((ex) => ex.id === pm.id || ex.paymentNumber === pm.paymentNumber);
-          if (idx >= 0) {
-            state.payments[idx] = { ...state.payments[idx], ...pm };
-          } else {
-            state.payments.push(pm);
-          }
-
           counts.payments = (counts.payments || 0) + 1;
         } catch (err: any) {
           errors.push(`Error al restaurar pago ${pm.paymentNumber}: ${err?.message}`);
@@ -1740,17 +1566,6 @@ export async function restoreCompleteJsonDump(
             process.env.TELEGRAM_BOT_TOKEN = tc.botToken.trim();
           }
 
-          // Sync storage fallback
-          const state = storage.getState();
-          if (!state.telegramConfigs) state.telegramConfigs = [];
-          const idx = state.telegramConfigs.findIndex((ex) => ex.id === (tc.id || existingTg?.id) || ex.userId === validUserId);
-          if (idx >= 0) {
-            state.telegramConfigs[idx] = { ...state.telegramConfigs[idx], ...tc };
-          } else {
-            state.telegramConfigs.push(tc);
-          }
-          storage.save();
-
           counts.telegramConfigs = (counts.telegramConfigs || 0) + 1;
         } catch (err: any) {
           errors.push(`Error al restaurar telegram config: ${err?.message}`);
@@ -1796,16 +1611,6 @@ export async function restoreCompleteJsonDump(
 
           if (aic.apiKey && typeof aic.apiKey === 'string' && aic.apiKey.trim()) {
             process.env.GEMINI_API_KEY = aic.apiKey.trim();
-          }
-
-          // Sync storage fallback
-          const state = storage.getState();
-          if (!state.aiConfigs) state.aiConfigs = [];
-          const idx = state.aiConfigs.findIndex((ex) => ex.id === (aic.id || existingAi?.id) || ex.userId === validUserId);
-          if (idx >= 0) {
-            state.aiConfigs[idx] = { ...state.aiConfigs[idx], ...aic };
-          } else {
-            state.aiConfigs.push(aic);
           }
 
           counts.aiConfigs = (counts.aiConfigs || 0) + 1;
@@ -1855,16 +1660,6 @@ export async function restoreCompleteJsonDump(
             await db.insert(emailConfigs).values(emailValues).onConflictDoNothing();
           }
 
-          // Sync storage fallback
-          const state = storage.getState();
-          if (!state.emailConfigs) state.emailConfigs = [];
-          const idx = state.emailConfigs.findIndex((ex) => ex.id === (ec.id || existingEmail?.id) || ex.userId === validUserId);
-          if (idx >= 0) {
-            state.emailConfigs[idx] = { ...state.emailConfigs[idx], ...ec };
-          } else {
-            state.emailConfigs.push(ec);
-          }
-
           counts.emailConfigs = (counts.emailConfigs || 0) + 1;
         } catch (err: any) {
           errors.push(`Error al restaurar email config: ${err?.message}`);
@@ -1909,25 +1704,12 @@ export async function restoreCompleteJsonDump(
             await db.insert(serverDomainConfigs).values(domainValues).onConflictDoNothing();
           }
 
-          // Sync storage fallback
-          const state = storage.getState();
-          if (!state.serverDomainConfigs) state.serverDomainConfigs = [];
-          const idx = state.serverDomainConfigs.findIndex((ex) => ex.id === (dc.id || existingDomain?.id) || ex.userId === validUserId);
-          if (idx >= 0) {
-            state.serverDomainConfigs[idx] = { ...state.serverDomainConfigs[idx], ...dc };
-          } else {
-            state.serverDomainConfigs.push(dc);
-          }
-
           counts.serverDomainConfigs = (counts.serverDomainConfigs || 0) + 1;
         } catch (err: any) {
           errors.push(`Error al restaurar domain config: ${err?.message}`);
         }
       }
     }
-
-    // Persist local state sync
-    storage.save();
 
     // Reset PostgreSQL serial sequences to prevent duplicate key constraint violations on subsequent inserts
     const tableNames = [

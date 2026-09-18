@@ -1,7 +1,6 @@
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { db, isPostgresConfigured } from './index.ts';
 import { customerOrders, inventoryItems, storeAnalyticsEvents, users } from './schema.ts';
-import { storage } from './storage.ts';
 
 export interface AnalyticsEventInput {
   userId?: number;
@@ -60,34 +59,6 @@ export async function recordAnalyticsEvent(event: AnalyticsEventInput) {
   const metadataStr = event.metadata ? JSON.stringify(event.metadata) : null;
   const device = event.deviceType || 'desktop';
 
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    if (!state.storeAnalyticsEvents) {
-      state.storeAnalyticsEvents = [];
-    }
-    const newId = (state.nextId.storeAnalyticsEvents = (state.nextId.storeAnalyticsEvents || 1) + 1);
-
-    state.storeAnalyticsEvents.push({
-      id: newId,
-      userId,
-      eventType: event.eventType,
-      productId: event.productId || null,
-      productName: event.productName || null,
-      sessionId: event.sessionId || null,
-      deviceType: device,
-      metadata: metadataStr,
-      createdAt: now.toISOString(),
-    });
-
-    // Keep array bounded to prevent memory growth (keep last 50,000 events)
-    if (state.storeAnalyticsEvents.length > 50000) {
-      state.storeAnalyticsEvents.splice(0, state.storeAnalyticsEvents.length - 50000);
-    }
-
-    storage.save();
-    return { success: true, id: newId };
-  }
-
   try {
     // Resolve user ID
     let targetUserId = userId;
@@ -115,23 +86,8 @@ export async function recordAnalyticsEvent(event: AnalyticsEventInput) {
 
     return { success: true, id: inserted[0]?.id };
   } catch (error) {
-    console.warn('Error inserting analytics event into PostgreSQL, fallback to memory:', error);
-    const state = storage.getState();
-    if (!state.storeAnalyticsEvents) state.storeAnalyticsEvents = [];
-    const newId = (state.nextId.storeAnalyticsEvents = (state.nextId.storeAnalyticsEvents || 1) + 1);
-    state.storeAnalyticsEvents.push({
-      id: newId,
-      userId,
-      eventType: event.eventType,
-      productId: event.productId || null,
-      productName: event.productName || null,
-      sessionId: event.sessionId || null,
-      deviceType: device,
-      metadata: metadataStr,
-      createdAt: now.toISOString(),
-    });
-    storage.save();
-    return { success: true, id: newId };
+    console.error('Error inserting analytics event into PostgreSQL:', error);
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -147,46 +103,23 @@ export async function getStoreAnalyticsDashboard(filter: AnalyticsDashboardFilte
   let rawOrders: any[] = [];
   let rawItems: any[] = [];
 
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    rawEvents = (state.storeAnalyticsEvents || []).filter((ev) => {
-      if (!startDate) return true;
-      return new Date(ev.createdAt) >= startDate;
-    });
-    rawOrders = (state.customerOrders || []).filter((ord) => {
-      if (!startDate) return true;
-      return new Date(ord.createdAt) >= startDate;
-    });
-    rawItems = state.inventoryItems || [];
-  } else {
-    try {
-      if (startDate) {
-        rawEvents = await db
-          .select()
-          .from(storeAnalyticsEvents)
-          .where(gte(storeAnalyticsEvents.createdAt, startDate));
-        rawOrders = await db
-          .select()
-          .from(customerOrders)
-          .where(gte(customerOrders.createdAt, startDate));
-      } else {
-        rawEvents = await db.select().from(storeAnalyticsEvents);
-        rawOrders = await db.select().from(customerOrders);
-      }
-      rawItems = await db.select().from(inventoryItems);
-    } catch (err) {
-      console.warn('Postgres error loading analytics, using fallback state:', err);
-      const state = storage.getState();
-      rawEvents = (state.storeAnalyticsEvents || []).filter((ev) => {
-        if (!startDate) return true;
-        return new Date(ev.createdAt) >= startDate;
-      });
-      rawOrders = (state.customerOrders || []).filter((ord) => {
-        if (!startDate) return true;
-        return new Date(ord.createdAt) >= startDate;
-      });
-      rawItems = state.inventoryItems || [];
+  try {
+    if (startDate) {
+      rawEvents = await db
+        .select()
+        .from(storeAnalyticsEvents)
+        .where(gte(storeAnalyticsEvents.createdAt, startDate));
+      rawOrders = await db
+        .select()
+        .from(customerOrders)
+        .where(gte(customerOrders.createdAt, startDate));
+    } else {
+      rawEvents = await db.select().from(storeAnalyticsEvents);
+      rawOrders = await db.select().from(customerOrders);
     }
+    rawItems = await db.select().from(inventoryItems);
+  } catch (err) {
+    console.error('Postgres error loading analytics:', err);
   }
 
   // Filter by single product if requested
@@ -521,30 +454,15 @@ export async function getStoreAnalyticsDashboard(filter: AnalyticsDashboardFilte
  */
 export async function resetStoreAnalytics(userId?: number) {
   const targetUserId = userId || 1;
-  if (!isPostgresConfigured()) {
-    const state = storage.getState();
-    state.storeAnalyticsEvents = [];
-    storage.save();
-    return { success: true, message: 'Estadísticas de tráfico y visualizaciones reiniciadas correctamente' };
-  }
-
   try {
     if (userId && userId > 1) {
       await db.delete(storeAnalyticsEvents).where(eq(storeAnalyticsEvents.userId, targetUserId));
     } else {
       await db.delete(storeAnalyticsEvents);
     }
-    const state = storage.getState();
-    if (state.storeAnalyticsEvents) {
-      state.storeAnalyticsEvents = [];
-      storage.save();
-    }
     return { success: true, message: 'Estadísticas de tráfico y visualizaciones reiniciadas correctamente en PostgreSQL' };
-  } catch (err) {
-    console.warn('Error resetting analytics in PostgreSQL, fallback to memory:', err);
-    const state = storage.getState();
-    state.storeAnalyticsEvents = [];
-    storage.save();
-    return { success: true, message: 'Estadísticas reiniciadas correctamente' };
+  } catch (err: any) {
+    console.error('Error resetting analytics in PostgreSQL:', err);
+    throw new Error('Error al reiniciar estadísticas en PostgreSQL: ' + (err.message || 'Error de BD'));
   }
 }

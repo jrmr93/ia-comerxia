@@ -1257,8 +1257,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     if (docType === '05' && res.type !== 'cedula') {
       return { isValid: false, type: 'cedula', error: 'Se requiere una Cédula de 10 dígitos' };
     }
-    if (docType === '04' && res.type !== 'ruc') {
-      return { isValid: false, type: 'ruc', error: 'Se requiere un RUC de 13 dígitos' };
+    if (docType === '04' && !String(res.type).startsWith('ruc')) {
+      return { isValid: false, type: 'ruc_natural', error: 'Se requiere un RUC de 13 dígitos' };
     }
     return res;
   }, [customerCi, docType]);
@@ -2239,7 +2239,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     idValidation?.isValid ? (
                       <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 truncate">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                        <span className="truncate">✓ {idValidation.type === 'cedula' ? 'Cédula Válida' : 'RUC Válido'} ({idValidation.provinceName})</span>
+                        <span className="truncate">✓ {idValidation.type === 'cedula' ? 'Cédula Válida' : 'RUC Válido'} ({(idValidation as any).provinceName || 'Ecuador'})</span>
                       </p>
                     ) : (
                       <p className="text-[10px] text-rose-600 font-medium flex items-center gap-1 truncate" title={idValidation?.error}>

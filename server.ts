@@ -4662,7 +4662,7 @@ async function startServer() {
       const messages: string[] = [];
 
       for (const act of requestedActions) {
-        const result = await cleanTestData(act, req.dbUserId, { targetStockQuantity });
+        const result = await cleanTestData(act as any, req.dbUserId, { targetStockQuantity });
         results.push({ action: act, message: result.message });
         if (result.message) {
           messages.push(result.message);
