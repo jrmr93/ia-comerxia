@@ -38,6 +38,8 @@ import {
   Flame,
   ChevronDown,
   RotateCcw,
+  Tag,
+  Filter,
 } from 'lucide-react';
 import { CartItem, CustomerOrder, InventoryItem, StoreConfig, StoreTheme, CourierPartner, PaymentMethodPartner } from '../../types.ts';
 import { buildWhatsAppLink, toEcuadorInternationalPhone } from '../../utils/phone.ts';
@@ -982,7 +984,7 @@ export const CategorySelector: React.FC<{
   if (variant === 'vertical-atelier') {
     return (
       <>
-        {/* Mobile Horizontal Selector */}
+        {/* Mobile Horizontal Selector (Touch Pills) */}
         <div className="lg:hidden flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none w-full -mx-1 px-1">
           <button
             onClick={() => setSelectedCategory('all')}
@@ -1008,40 +1010,33 @@ export const CategorySelector: React.FC<{
           ))}
         </div>
 
-        {/* Desktop Vertical Panel */}
+        {/* Desktop PC Modern Dropdown List */}
         <div className="hidden lg:block bg-zinc-900 border border-amber-500/30 rounded-2xl p-4 space-y-3 shadow-sm">
-          <div className="flex items-center space-x-2 border-b border-zinc-800 pb-2.5">
-            <Layers className="w-4 h-4 text-amber-400" />
-            <h3 className="text-xs font-black text-zinc-100 tracking-wider uppercase">Colecciones</h3>
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+            <div className="flex items-center space-x-2">
+              <Layers className="w-4 h-4 text-amber-400" />
+              <h3 className="text-xs font-black text-zinc-100 tracking-wider uppercase">Colecciones</h3>
+            </div>
+            <span className="text-[10px] text-amber-400 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+              {categories.length} categorías
+            </span>
           </div>
-          <div className="space-y-1">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${selectedCategory === 'all'
-                ? 'bg-amber-500 text-zinc-950 font-black shadow-sm'
-                : 'text-zinc-300 hover:bg-zinc-800 hover:text-amber-300'
-                }`}
+          <div className="relative">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full appearance-none bg-zinc-950 border border-zinc-800 hover:border-amber-500/50 text-zinc-100 text-xs font-bold rounded-xl pl-9 pr-8 py-2.5 focus:outline-none focus:border-amber-500 transition cursor-pointer shadow-xs"
+              title="Seleccionar categoría"
             >
-              <span>Todas las Piezas</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-800/80 text-zinc-300">
-                {products.length}
-              </span>
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${selectedCategory === cat
-                  ? 'bg-amber-500 text-zinc-950 font-black shadow-sm'
-                  : 'text-zinc-300 hover:bg-zinc-800 hover:text-amber-300'
-                  }`}
-              >
-                <span className="truncate">{cat}</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-800/80 text-zinc-300">
-                  {categoryCounts[cat] || 0}
-                </span>
-              </button>
-            ))}
+              <option value="all">Todas las Piezas ({products.length})</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat} ({categoryCounts[cat] || 0})
+                </option>
+              ))}
+            </select>
+            <Filter className="w-4 h-4 text-amber-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       </>
@@ -1079,38 +1074,33 @@ export const CategorySelector: React.FC<{
           ))}
         </div>
 
-        {/* Desktop Vertical Box */}
+        {/* Desktop PC Modern Dropdown List */}
         <div className="hidden lg:block p-4 border-3 border-black bg-yellow-300 shadow-[4px_4px_0px_#000] space-y-3">
-          <div className="flex items-center space-x-2 border-b-2 border-black pb-2">
-            <Layers className="w-4 h-4 text-black" />
-            <h3 className="text-xs font-black text-black uppercase">🏷️ CATEGORÍAS POP</h3>
+          <div className="flex items-center justify-between border-b-2 border-black pb-2">
+            <div className="flex items-center space-x-2">
+              <Layers className="w-4 h-4 text-black" />
+              <h3 className="text-xs font-black text-black uppercase">🏷️ CATEGORÍAS POP</h3>
+            </div>
+            <span className="text-[10px] font-black bg-white text-black px-1.5 py-0.5 border border-black">
+              {categories.length} CATS
+            </span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-3 py-2 border-2 border-black text-xs font-black uppercase text-left transition flex items-center justify-between cursor-pointer ${selectedCategory === 'all'
-                ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#fff]'
-                : 'bg-white text-black hover:bg-emerald-200'
-                }`}
+          <div className="relative">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full appearance-none bg-white text-black font-black uppercase text-xs border-2 border-black rounded-none pl-9 pr-8 py-2.5 shadow-[2px_2px_0px_#000] focus:bg-yellow-100 focus:outline-none cursor-pointer transition"
+              title="Seleccionar categoría"
             >
-              <span>TODO ({products.length})</span>
-              {selectedCategory === 'all' && <span>✓</span>}
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-2 border-2 border-black text-xs font-black uppercase text-left transition flex items-center justify-between cursor-pointer ${selectedCategory === cat
-                  ? 'bg-black text-yellow-300 shadow-[2px_2px_0px_#fff]'
-                  : 'bg-white text-black hover:bg-emerald-200'
-                  }`}
-              >
-                <span className="truncate">{cat}</span>
-                <span className="text-[10px] px-1.5 py-0.2 border border-black bg-amber-100">
-                  {categoryCounts[cat] || 0}
-                </span>
-              </button>
-            ))}
+              <option value="all">TODAS LAS CATEGORÍAS ({products.length})</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat.toUpperCase()} ({categoryCounts[cat] || 0})
+                </option>
+              ))}
+            </select>
+            <Tag className="w-4 h-4 text-black absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 text-black absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       </>
@@ -1146,36 +1136,33 @@ export const CategorySelector: React.FC<{
           ))}
         </div>
 
-        {/* Desktop Vertical Matrix */}
+        {/* Desktop PC Modern Dropdown List */}
         <div className="hidden lg:block p-4 border border-cyan-500/60 bg-[#0b1528] shadow-[0_0_12px_rgba(6,182,212,0.2)] space-y-3 font-mono">
-          <div className="flex items-center space-x-2 border-b border-cyan-900 pb-2">
-            <Terminal className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-xs font-bold text-cyan-300 uppercase">[PROTOCOLS_MATRIX]</h3>
+          <div className="flex items-center justify-between border-b border-cyan-900 pb-2">
+            <div className="flex items-center space-x-2">
+              <Terminal className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-xs font-bold text-cyan-300 uppercase">[PROTOCOLS_MATRIX]</h3>
+            </div>
+            <span className="text-[10px] text-cyan-400 bg-cyan-950 px-1.5 py-0.5 border border-cyan-800">
+              {categories.length} CATS
+            </span>
           </div>
-          <div className="space-y-1">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`w-full px-3 py-2 text-xs text-left border transition cursor-pointer flex items-center justify-between ${selectedCategory === 'all'
-                ? 'bg-cyan-500 text-black font-black border-cyan-300'
-                : 'border-cyan-900/60 text-cyan-400 hover:bg-cyan-950/60'
-                }`}
+          <div className="relative">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full appearance-none bg-[#070d18] text-cyan-300 font-mono text-xs border border-cyan-500 rounded-none pl-9 pr-8 py-2.5 focus:outline-none focus:border-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)] cursor-pointer"
+              title="Seleccionar protocolo / categoría"
             >
-              <span>&gt; ALL_ITEMS</span>
-              <span className="text-[10px]">[{products.length}]</span>
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`w-full px-3 py-2 text-xs text-left border transition cursor-pointer flex items-center justify-between ${selectedCategory === cat
-                  ? 'bg-cyan-500 text-black font-black border-cyan-300'
-                  : 'border-cyan-900/60 text-cyan-400 hover:bg-cyan-950/60'
-                  }`}
-              >
-                <span className="truncate">&gt; {cat}</span>
-                <span className="text-[10px]">[{categoryCounts[cat] || 0}]</span>
-              </button>
-            ))}
+              <option value="all">&gt; ALL_ITEMS ({products.length})</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  &gt; {cat.toUpperCase()} [{categoryCounts[cat] || 0}]
+                </option>
+              ))}
+            </select>
+            <Tag className="w-4 h-4 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 text-cyan-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       </>
@@ -1184,44 +1171,122 @@ export const CategorySelector: React.FC<{
 
   if (variant === 'story-chips') {
     return (
-      <div className="flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-none w-full -mx-1 px-1">
-        <button
-          onClick={() => setSelectedCategory('all')}
-          className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === 'all'
-            ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
-            : 'bg-white border border-teal-200 text-slate-700 hover:bg-teal-50'
-            }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Todos ({products.length})</span>
-        </button>
-        {categories.map((cat) => (
+      <>
+        {/* Mobile Horizontal Story Chips */}
+        <div className="md:hidden flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-none w-full -mx-1 px-1">
           <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === cat
+            onClick={() => setSelectedCategory('all')}
+            className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === 'all'
               ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
               : 'bg-white border border-teal-200 text-slate-700 hover:bg-teal-50'
               }`}
           >
-            <span>{cat}</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10">
-              {categoryCounts[cat] || 0}
-            </span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Todos ({products.length})</span>
           </button>
-        ))}
-      </div>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === cat
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
+                : 'bg-white border border-teal-200 text-slate-700 hover:bg-teal-50'
+                }`}
+            >
+              <span>{cat}</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-black/10">
+                {categoryCounts[cat] || 0}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Desktop PC Modern Dropdown List */}
+        <div className="hidden md:flex bg-white border border-teal-200/90 rounded-2xl p-3 sm:p-4 shadow-xs flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-2 text-teal-800 flex-shrink-0">
+            <Sparkles className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-black uppercase tracking-wide">Categoría Destacada:</span>
+          </div>
+          <div className="relative flex-1 max-w-md">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full appearance-none bg-teal-50/60 hover:bg-teal-50 border border-teal-300 text-slate-900 text-xs font-bold rounded-xl pl-9 pr-8 py-2 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs transition"
+              title="Filtrar por categoría"
+            >
+              <option value="all">Todas las Categorías ({products.length})</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat} ({categoryCounts[cat] || 0})
+                </option>
+              ))}
+            </select>
+            <Filter className="w-4 h-4 text-teal-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+      </>
     );
   }
 
   if (variant === 'minimal-centered') {
     return (
-      <div className="flex items-center justify-start sm:justify-center space-x-1.5 sm:space-x-2 overflow-x-auto pb-1 sm:pb-2 scrollbar-none flex-nowrap sm:flex-wrap gap-y-2 w-full -mx-1 px-1">
+      <>
+        {/* Mobile Centered Pills */}
+        <div className="sm:hidden flex items-center justify-start space-x-1.5 overflow-x-auto pb-1 scrollbar-none flex-nowrap w-full -mx-1 px-1">
+          <button
+            onClick={() => setSelectedCategory('all')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition cursor-pointer whitespace-nowrap flex-shrink-0 ${selectedCategory === 'all'
+              ? 'bg-stone-900 text-stone-50 shadow-xs'
+              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+              }`}
+          >
+            Todos ({products.length})
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition cursor-pointer whitespace-nowrap flex-shrink-0 ${selectedCategory === cat
+                ? 'bg-stone-900 text-stone-50 shadow-xs'
+                : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                }`}
+            >
+              {cat} ({categoryCounts[cat] || 0})
+            </button>
+          ))}
+        </div>
+
+        {/* Desktop PC Modern Dropdown List */}
+        <div className="hidden sm:block max-w-md mx-auto w-full relative">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full appearance-none bg-white border border-stone-300 hover:border-stone-400 text-stone-900 text-xs font-medium rounded-full pl-9 pr-8 py-2 shadow-2xs focus:outline-none focus:ring-1 focus:ring-stone-400 cursor-pointer transition text-center"
+            title="Filtrar por categoría"
+          >
+            <option value="all">Todas las Categorías ({products.length})</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat} ({categoryCounts[cat] || 0})
+              </option>
+            ))}
+          </select>
+          <Filter className="w-3.5 h-3.5 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
+      </>
+    );
+  }
+
+  // Standard Pills (Mobile pills + Desktop PC Modern Dropdown List)
+  return (
+    <>
+      {/* Mobile Touch Pills */}
+      <div className="md:hidden flex items-center space-x-1.5 overflow-x-auto w-full pb-1 scrollbar-none -mx-1 px-1">
         <button
           onClick={() => setSelectedCategory('all')}
-          className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-medium transition cursor-pointer whitespace-nowrap flex-shrink-0 ${selectedCategory === 'all'
-            ? 'bg-stone-900 text-stone-50 shadow-xs'
-            : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${selectedCategory === 'all' ? themeStyles.pillActive : themeStyles.pillInactive
             }`}
         >
           Todos ({products.length})
@@ -1230,39 +1295,33 @@ export const CategorySelector: React.FC<{
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-medium transition cursor-pointer whitespace-nowrap flex-shrink-0 ${selectedCategory === cat
-              ? 'bg-stone-900 text-stone-50 shadow-xs'
-              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+            className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${selectedCategory === cat ? themeStyles.pillActive : themeStyles.pillInactive
               }`}
           >
-            {cat} ({categoryCounts[cat] || 0})
+            {cat}
           </button>
         ))}
       </div>
-    );
-  }
 
-  // Standard Pills
-  return (
-    <div className="flex items-center space-x-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none -mx-1 px-1 md:mx-0 md:px-0">
-      <button
-        onClick={() => setSelectedCategory('all')}
-        className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${selectedCategory === 'all' ? themeStyles.pillActive : themeStyles.pillInactive
-          }`}
-      >
-        Todos ({products.length})
-      </button>
-      {categories.map((cat) => (
-        <button
-          key={cat}
-          onClick={() => setSelectedCategory(cat)}
-          className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition cursor-pointer flex-shrink-0 ${selectedCategory === cat ? themeStyles.pillActive : themeStyles.pillInactive
-            }`}
+      {/* Desktop PC Modern Dropdown List */}
+      <div className="hidden md:block relative w-full max-w-xs sm:max-w-sm">
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="w-full appearance-none bg-white border border-slate-300 hover:border-amber-500 text-slate-900 text-xs font-bold rounded-xl pl-9 pr-8 py-2 transition cursor-pointer shadow-2xs focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20"
+          title="Filtrar por categoría"
         >
-          {cat}
-        </button>
-      ))}
-    </div>
+          <option value="all">Todas las Categorías ({products.length})</option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat} ({categoryCounts[cat] || 0})
+            </option>
+          ))}
+        </select>
+        <Tag className="w-3.5 h-3.5 text-amber-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </div>
+    </>
   );
 };
 
@@ -2424,40 +2483,23 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
 
         {/* Desktop Lower Row: Amazon Department Ribbon & Fast Filter Toggles (Spacious MD+ screens) */}
         <div className="hidden md:flex py-2 items-center justify-between gap-2 text-xs overflow-x-auto scrollbar-none border-t border-amber-300/30">
-          {/* Department / Category Quick Pills */}
-          <div className="flex items-center space-x-1.5 flex-shrink-0">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black transition whitespace-nowrap cursor-pointer flex items-center space-x-1 ${selectedCategory === 'all'
-                ? 'bg-amber-400 text-slate-950 shadow-xs border border-amber-400'
-                : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
-                }`}
+          {/* Department / Category Modern Dropdown List (Desktop PC Mode Only) */}
+          <div className="relative flex-shrink-0">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="appearance-none bg-white/90 hover:bg-white text-slate-900 border border-amber-300/80 rounded-lg pl-8 pr-7 py-1 text-xs font-bold focus:outline-none cursor-pointer shadow-2xs max-w-[220px] truncate transition"
+              title="Seleccionar Categoría"
             >
-              <span>☰ Todos</span>
-              <span className={`text-[10px] px-1 rounded-full ${selectedCategory === 'all' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-200 text-slate-600'}`}>
-                {products.length}
-              </span>
-            </button>
-
-            {categories.map((cat) => {
-              const count = categoryCounts[cat] || 0;
-              const isSel = selectedCategory === cat;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1 ${isSel
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
-                    : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
-                    }`}
-                >
-                  <span>{cat}</span>
-                  <span className={`text-[10px] px-1 rounded-full ${isSel ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-200 text-slate-600'}`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+              <option value="all">Todas las Categorías ({products.length})</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat} ({categoryCounts[cat] || 0})
+                </option>
+              ))}
+            </select>
+            <Tag className="w-3.5 h-3.5 text-amber-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
           {/* Quick Toggles: Offers, Stock, Sort */}
