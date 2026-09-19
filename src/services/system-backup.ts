@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
+import XLSX from 'xlsx';
 import { db, isPostgresConfigured, pool, ensureTablesCreated } from '../db/index.ts';
 import { storage } from '../db/storage.ts';
 import {
@@ -2328,4 +2329,140 @@ export async function restoreMasterFullSystemZip(
     restoredDbCounts,
     errors,
   };
+}
+
+/**
+ * Generates an Excel workbook (.xlsx) containing only products with comprehensive financial metrics
+ * (cost with/without tax, tax rate, tax amount, sale price, card price, discount, profit margins,
+ * stock unit valuation, projected total profit, and volume cost options).
+ */
+export async function generateFinancialProductsExcelBuffer(userId?: number): Promise<Buffer> {
+  const items = await getInventoryItems(userId);
+
+  const rows = items.map((item) => {
+    const costPriceNum = parseFloat(String(item.costPrice || '0')) || 0;
+    const taxRateNum = parseFloat(String(item.taxRate || '15')) || 0;
+    const costWithTaxNum =
+      item.costWithTax !== null && item.costWithTax !== undefined
+        ? parseFloat(String(item.costWithTax))
+        : costPriceNum;
+
+    const costWithoutTaxNum =
+      item.costWithoutTax !== null && item.costWithoutTax !== undefined
+        ? parseFloat(String(item.costWithoutTax))
+        : taxRateNum > 0
+        ? costWithTaxNum / (1 + taxRateNum / 100)
+        : costWithTaxNum;
+
+    const taxAmountPerUnit = costWithTaxNum - costWithoutTaxNum;
+    const salePriceNum = parseFloat(String(item.salePrice || '0')) || 0;
+    const cardSalePriceNum = item.cardSalePrice ? parseFloat(String(item.cardSalePrice)) : null;
+    const discountPercent = item.discountPercent || 0;
+    const finalPriceWithDiscount = discountPercent > 0
+      ? salePriceNum * (1 - discountPercent / 100)
+      : salePriceNum;
+
+    const unitProfit = salePriceNum - costWithTaxNum;
+    const profitMarginPercent = costWithTaxNum > 0
+      ? (unitProfit / costWithTaxNum) * 100
+      : 0;
+
+    const stock = item.stock || 0;
+    const stockTotalCostValue = stock * costWithTaxNum;
+    const stockTotalSaleValue = stock * salePriceNum;
+    const stockTotalProjectedProfit = stock * unitProfit;
+
+    // Parse cost options / volume pricing from extractedAttributes if present
+    let costOptionsSummary = '';
+    let affiliatePrice: number | null = null;
+    let wholesalePrice: number | null = null;
+
+    if (item.extractedAttributes) {
+      try {
+        const parsed = typeof item.extractedAttributes === 'string'
+          ? JSON.parse(item.extractedAttributes)
+          : item.extractedAttributes;
+
+        if (parsed && Array.isArray(parsed.costOptions) && parsed.costOptions.length > 0) {
+          costOptionsSummary = parsed.costOptions
+            .map((opt: any) => `${opt.label}: $${Number(opt.price).toFixed(2)}`)
+            .join(' | ');
+
+          const affOpt = parsed.costOptions.find((opt: any) => /afiliad/i.test(opt.label || ''));
+          if (affOpt) affiliatePrice = parseFloat(String(affOpt.price));
+
+          const wholeOpt = parsed.costOptions.find((opt: any) => /mayor/i.test(opt.label || '') || /bulto/i.test(opt.label || '') || /caja/i.test(opt.label || ''));
+          if (wholeOpt) wholesalePrice = parseFloat(String(wholeOpt.price));
+        }
+      } catch {}
+    }
+
+    const createdDateStr = item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 10) : '';
+
+    return {
+      'ID Producto': item.id,
+      'SKU': item.sku,
+      'Código de Barras': item.barcode || '',
+      'Nombre del Producto': item.name,
+      'Categoría': item.category || 'General',
+      'Proveedor': item.supplierName || 'General',
+      'Estado': item.status === 'available' ? 'Disponible' : item.status === 'low_stock' ? 'Stock Bajo' : item.status === 'sold_out' ? 'Agotado' : item.status || 'Disponible',
+
+      // Costos e Impuestos
+      'Costo Sin IVA ($)': Number(costWithoutTaxNum.toFixed(2)),
+      'Tasa IVA (%)': Number(taxRateNum.toFixed(2)),
+      'Monto IVA ($)': Number(taxAmountPerUnit.toFixed(2)),
+      'Costo Con IVA ($)': Number(costWithTaxNum.toFixed(2)),
+
+      // Precios de Venta
+      'PVP Efectivo / Base ($)': Number(salePriceNum.toFixed(2)),
+      'PVP Con Tarjeta ($)': cardSalePriceNum !== null ? Number(cardSalePriceNum.toFixed(2)) : 'N/A',
+      '% Descuento Promocional': `${discountPercent}%`,
+      'PVP Final ($)': Number(finalPriceWithDiscount.toFixed(2)),
+
+      // Rentabilidad y Márgenes
+      'Margen Ganancia Unitario ($)': Number(unitProfit.toFixed(2)),
+      '% Margen Ganancia (ROI)': `${profitMarginPercent.toFixed(2)}%`,
+
+      // Inventario y Valorización de Stock
+      'Stock (Unidades)': stock,
+      'Inversión Total Stock ($)': Number(stockTotalCostValue.toFixed(2)),
+      'Venta Total Proyectada ($)': Number(stockTotalSaleValue.toFixed(2)),
+      'Ganancia Total Proyectada ($)': Number(stockTotalProjectedProfit.toFixed(2)),
+
+      // Opciones de Costo / Escalas de Proveedor
+      'Costo Afiliado / Muestra ($)': affiliatePrice !== null ? Number(affiliatePrice.toFixed(2)) : 'N/A',
+      'Costo Mayorista / Bulto ($)': wholesalePrice !== null ? Number(wholesalePrice.toFixed(2)) : 'N/A',
+      'Escala de Precios Proveedor': costOptionsSummary || 'Precio Único',
+
+      // Metadatos
+      'Etiquetas': item.tags || '',
+      'Imagen Principal': item.imageUrl || '',
+      'Video URL': item.videoUrl || '',
+      'Fecha Registro': createdDateStr,
+    };
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+
+  // Auto-fit column widths
+  if (rows.length > 0) {
+    const keys = Object.keys(rows[0]);
+    worksheet['!cols'] = keys.map((key) => {
+      let maxLen = key.length;
+      for (const r of rows) {
+        const valStr = String((r as any)[key] ?? '');
+        if (valStr.length > maxLen) {
+          maxLen = Math.min(valStr.length, 60);
+        }
+      }
+      return { wch: maxLen + 3 };
+    });
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte Financiero');
+
+  const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  return excelBuffer;
 }

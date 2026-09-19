@@ -171,6 +171,7 @@ import {
   createFullSystemMasterZip,
   restoreCompleteJsonDump,
   restoreMasterFullSystemZip,
+  generateFinancialProductsExcelBuffer,
 } from './src/services/system-backup.ts';
 import { searchProductVideos } from './src/services/video-search.ts';
 import { quoteProductInEcuadorMarket } from './src/services/market-quote.ts';
@@ -5458,6 +5459,24 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error exporting uploads zip:', error);
       res.status(500).json({ success: false, error: error.message || 'Error al generar ZIP de imágenes' });
+    }
+  });
+
+  app.get('/api/export-products-financial-excel', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const excelBuffer = await generateFinancialProductsExcelBuffer(req.dbUserId || 1);
+      const filename = `comerxia_reporte_financiero_productos_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', excelBuffer.length);
+      res.send(excelBuffer);
+    } catch (error: any) {
+      console.error('Error exporting financial products excel:', error);
+      res.status(500).json({ success: false, error: error.message || 'Error al generar Excel de productos' });
     }
   });
 

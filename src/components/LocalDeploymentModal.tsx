@@ -36,6 +36,9 @@ import {
   Upload,
   FolderArchive,
   RotateCcw,
+  FileSpreadsheet,
+  DollarSign,
+  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
@@ -331,6 +334,10 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
 
   const handleDownloadImagesZip = () => {
     triggerDownload('/api/export-uploads-zip', 'comerxia_uploads_media.zip', 'images');
+  };
+
+  const handleDownloadProductsFinancialExcel = () => {
+    triggerDownload('/api/export-products-financial-excel', 'comerxia_reporte_financiero_productos.xlsx', 'excel_financial');
   };
 
   const handleRunDiagnostics = async () => {
@@ -2540,7 +2547,7 @@ server {
               </div>
 
               {/* Individual Download Action Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
                 {/* 1. Backup SQL Dump */}
                 <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
@@ -2638,6 +2645,36 @@ server {
                       )}
                     </button>
                   </div>
+                </div>
+
+                {/* 4. Financial Products Excel (.xlsx) */}
+                <div className="p-5 rounded-2xl bg-slate-50 border border-emerald-300 bg-emerald-50/40 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shadow-xs">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900">Excel Financiero (.xlsx)</h4>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Informe exclusivo de productos con todas sus columnas financieras: Costos sin/con IVA, PVP, Margen, ROI y Valorización de Stock.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleDownloadProductsFinancialExcel}
+                    disabled={downloadingType !== null}
+                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-75 text-white font-bold text-xs flex items-center justify-center space-x-2 transition shadow-xs cursor-pointer"
+                  >
+                    {downloadingType === 'excel_financial' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Generando Excel...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span>Descargar Excel Financiero</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
