@@ -333,13 +333,28 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     analyticsEvents = storage.getState()?.storeAnalyticsEvents || [];
   }
 
-  const sanitizedStoreConfigs = (allStoreConfigs || []).map((sc) => ({
-    ...sc,
-    logoUrl: normalizeMediaUrl(sc.logoUrl || sc.logo_url) || null,
-    logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
-    courierLogos: normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos),
-    paymentLogos: normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos),
-  }));
+  const sanitizedStoreConfigs = (allStoreConfigs || []).map((sc) => {
+    let effectiveTheme = sc.theme || 'classic';
+    if (typeof sc.theme === 'object' && sc.theme !== null) {
+      effectiveTheme = JSON.stringify(sc.theme);
+    } else if (sc.themeColors && typeof sc.themeColors === 'object') {
+      effectiveTheme = JSON.stringify({
+        theme: typeof sc.theme === 'string' ? sc.theme : 'classic',
+        colors: sc.themeColors,
+      });
+    }
+    return {
+      ...sc,
+      theme: effectiveTheme,
+      logoUrl: normalizeMediaUrl(sc.logoUrl || sc.logo_url) || null,
+      logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
+      courierLogos: normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos),
+      paymentLogos: normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos),
+      promoPopup: typeof (sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup) === 'object'
+        ? JSON.stringify(sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup)
+        : ((sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup) || null),
+    };
+  });
 
   return {
     users: allUsers || [],
@@ -877,8 +892,16 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
     for (const sc of data.storeConfigs) {
       const normCourierLogos = normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos);
       const normPaymentLogos = normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos);
-      sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, enable_pagination, items_per_page, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${sc.enablePagination ? 'TRUE' : 'FALSE'}, ${sc.itemsPerPage || 12}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(normCourierLogos)}, ${escapeSqlString(normPaymentLogos)}, ${escapeSqlString(sc.theme || 'classic')}, ${escapeSqlString(sc.promoPopup)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, enable_pagination = EXCLUDED.enable_pagination, items_per_page = EXCLUDED.items_per_page, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, promo_popup = EXCLUDED.promo_popup;\n`;
+      let effectiveThemeSql = sc.theme || 'classic';
+      if (typeof sc.theme === 'object' && sc.theme !== null) {
+        effectiveThemeSql = JSON.stringify(sc.theme);
+      } else if (sc.themeColors && typeof sc.themeColors === 'object') {
+        effectiveThemeSql = JSON.stringify({ theme: sc.theme || 'classic', colors: sc.themeColors });
+      }
+      const rawPromo = sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup;
+      const promoStr = typeof rawPromo === 'object' && rawPromo !== null ? JSON.stringify(rawPromo) : (rawPromo || null);
 
+      sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, enable_pagination, items_per_page, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${sc.enablePagination ? 'TRUE' : 'FALSE'}, ${sc.itemsPerPage || 12}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl || sc.logo_url))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(normCourierLogos)}, ${escapeSqlString(normPaymentLogos)}, ${escapeSqlString(effectiveThemeSql)}, ${escapeSqlString(promoStr)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, enable_pagination = EXCLUDED.enable_pagination, items_per_page = EXCLUDED.items_per_page, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, promo_popup = EXCLUDED.promo_popup, updated_at = NOW();\n`;
     }
     sql += `\n`;
   }
@@ -1309,6 +1332,20 @@ export async function restoreCompleteJsonDump(
         try {
           const validUserId = await resolveValidUserId(sc.userId || sc.user_id || targetUserId);
 
+          let effectiveTheme = sc.theme;
+          if (typeof effectiveTheme === 'object' && effectiveTheme !== null) {
+            effectiveTheme = JSON.stringify(effectiveTheme);
+          } else if (sc.themeColors || sc.theme_colors) {
+            const rawColors = sc.themeColors || sc.theme_colors;
+            const colorsObj = typeof rawColors === 'string' ? JSON.parse(rawColors) : rawColors;
+            effectiveTheme = JSON.stringify({ theme: sc.theme || 'classic', colors: colorsObj });
+          } else if (!effectiveTheme) {
+            effectiveTheme = 'classic';
+          }
+
+          const rawPromo = sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup;
+          const promoStr = typeof rawPromo === 'object' && rawPromo !== null ? JSON.stringify(rawPromo) : (rawPromo || null);
+
           const storeValues: any = {
             userId: validUserId,
             storeName: sc.storeName || sc.store_name || 'Comerxia Store',
@@ -1333,10 +1370,8 @@ export async function restoreCompleteJsonDump(
             logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
             courierLogos: normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos),
             paymentLogos: normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos),
-            theme: typeof sc.theme === 'object' ? JSON.stringify(sc.theme) : (sc.theme || 'classic'),
-            promoPopup: typeof (sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup) === 'object'
-              ? JSON.stringify(sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup)
-              : ((sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup) || null),
+            theme: effectiveTheme,
+            promoPopup: promoStr,
             updatedAt: new Date(),
           };
 
