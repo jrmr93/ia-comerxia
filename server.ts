@@ -4878,8 +4878,8 @@ async function startServer() {
         returnId,
       } = req.body;
 
-      if (!amount || Number(amount) <= 0) {
-        return res.status(400).json({ error: 'El monto debe ser mayor a 0.00' });
+      if (amount === undefined || amount === null || amount === '' || isNaN(Number(amount)) || Number(amount) < 0) {
+        return res.status(400).json({ error: 'El monto debe ser mayor o igual a 0.00' });
       }
 
       if (!paymentMethod) {

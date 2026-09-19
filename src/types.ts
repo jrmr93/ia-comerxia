@@ -71,6 +71,7 @@ export interface InventoryItem {
   status: 'available' | 'low_stock' | 'sold_out' | 'archived';
   rawTelegramMessage: string | null;
   marketingCopy?: string | ProductMarketingCopy | null;
+  isSupplierGift?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -247,6 +248,7 @@ export interface CustomerOrderItem {
   imageUrl?: string | null;
   supplierName?: string | null;
   isCustomOrder?: boolean;
+  isSupplierGift?: boolean;
 }
 
 export interface CustomerReturnRecord {
@@ -366,6 +368,7 @@ export interface PurchaseItem {
   customerOrderId?: number | null;
   orderNumber?: string | null;
   customerName?: string | null;
+  isSupplierGift?: boolean;
 }
 
 export interface PurchaseOrder {

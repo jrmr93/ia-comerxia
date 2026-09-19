@@ -71,6 +71,7 @@ export const inventoryItems = pgTable('inventory_items', {
   status: text('status').notNull().default('available'), // 'available', 'low_stock', 'sold_out', 'archived'
   rawTelegramMessage: text('raw_telegram_message'),
   marketingCopy: text('marketing_copy'), // JSON string with AI generated marketing copy
+  isSupplierGift: boolean('is_supplier_gift').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

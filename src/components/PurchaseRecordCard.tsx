@@ -293,6 +293,11 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
                             </div>
                           )}
                           <span className="font-extrabold text-slate-900 text-xs line-clamp-1">{item.name}</span>
+                          {(unitCost === 0 || item.isSupplierGift) && (
+                            <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 shrink-0">
+                              🎁 Regalo ($0.00)
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="p-3 font-mono text-[11px]">

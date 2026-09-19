@@ -93,6 +93,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
   const [category, setCategory] = useState('General');
+  const [isSupplierGift, setIsSupplierGift] = useState<boolean>(false);
   const [costPrice, setCostPrice] = useState('0.00');
   const [costWithoutTax, setCostWithoutTax] = useState('0.00');
   const [costWithTax, setCostWithTax] = useState('0.00');
@@ -314,6 +315,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               : editingItem.extractedAttributes;
         } catch {}
       }
+
+      setIsSupplierGift(Boolean(editingItem.isSupplierGift || parsedAttr.isSupplierGift));
 
       // Unified product tax rate determination (single IVA for both purchases and sales)
       const explicitSaleTax =
@@ -591,6 +594,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setProfitAmount(newProfitNum.toFixed(2));
       const newPvp = computePublishedPvp(costWithout, newProfitNum, discountPercent, applySaleTax, saleTaxPercent);
       setSalePrice(newPvp.toFixed(2));
+    } else {
+      const currentProfit = parseFloat(profitAmount) || 0;
+      const newPvp = computePublishedPvp(0, currentProfit, discountPercent, applySaleTax, saleTaxPercent);
+      setSalePrice(newPvp.toFixed(2));
     }
   };
 
@@ -599,9 +606,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setProfitAmount(newProfitStr);
     const newProfitNum = parseFloat(newProfitStr);
     const costWithout = parseFloat(costWithoutTax) || 0;
-    if (!isNaN(newProfitNum) && costWithout > 0) {
-      const newMargin = Math.round((newProfitNum / costWithout) * 100);
-      setMarginPercent(newMargin);
+    if (!isNaN(newProfitNum)) {
+      if (costWithout > 0) {
+        const newMargin = Math.round((newProfitNum / costWithout) * 100);
+        setMarginPercent(newMargin);
+      } else {
+        setMarginPercent(newProfitNum > 0 ? 100 : 0);
+      }
       const newPvp = computePublishedPvp(costWithout, newProfitNum, discountPercent, applySaleTax, saleTaxPercent);
       setSalePrice(newPvp.toFixed(2));
     }
@@ -611,10 +622,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleDiscountChange = (newDiscount: number) => {
     setDiscountPercent(newDiscount);
     const costWithout = parseFloat(costWithoutTax) || 0;
-    if (costWithout > 0) {
-      const newPvp = computePublishedPvp(costWithout, profitAmount, newDiscount, applySaleTax, saleTaxPercent);
-      setSalePrice(newPvp.toFixed(2));
-    }
+    const profitNum = parseFloat(profitAmount) || 0;
+    const newPvp = computePublishedPvp(costWithout, profitNum, newDiscount, applySaleTax, saleTaxPercent);
+    setSalePrice(newPvp.toFixed(2));
   };
 
   // Recalculate margin & profit amount when user manually types a custom sale price (PVP)
@@ -622,16 +632,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setSalePrice(newVal);
     const num = parseFloat(newVal);
     const costWithout = parseFloat(costWithoutTax) || 0;
-    if (!isNaN(num) && costWithout > 0) {
+    if (!isNaN(num)) {
       const priceSinIVA = applySaleTax && saleTaxPercent > 0 ? num / (1 + saleTaxPercent / 100) : num;
       const discountNum = Math.max(0, Math.min(99, Number(discountPercent) || 0));
       const discountRate = discountNum / 100;
       const baseImponibleNeta = priceSinIVA * (1 - discountRate);
       const profit = baseImponibleNeta - costWithout;
       setProfitAmount(profit.toFixed(2));
-      const calculatedMargin = Math.round((profit / costWithout) * 100);
-      if (calculatedMargin >= -100 && calculatedMargin <= 1000) {
-        setMarginPercent(calculatedMargin);
+      if (costWithout > 0) {
+        const calculatedMargin = Math.round((profit / costWithout) * 100);
+        if (calculatedMargin >= -100 && calculatedMargin <= 1000) {
+          setMarginPercent(calculatedMargin);
+        }
+      } else {
+        setMarginPercent(profit > 0 ? 100 : 0);
       }
     }
   };
@@ -827,13 +841,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         ...existingAttr,
         costOptions,
         profitMarginPercent: marginPercent,
-        selectedCostPrice: parseFloat(costPrice) || 0,
+        profitAmount: parseFloat(profitAmount) || 0,
+        discountPercent: Number(discountPercent) || 0,
+        selectedCostPrice: isSupplierGift ? 0 : (parseFloat(costPrice) || 0),
         hasPurchaseTax: effectiveHasTax,
         purchaseTaxPercent: effectiveTaxRate,
         applySaleTax: effectiveHasTax,
         saleTaxPercent: effectiveTaxRate,
         images: allPhotos,
         totalPhotos: allPhotos.length,
+        isSupplierGift,
       };
 
       const url = editingItem ? `/api/inventory/${editingItem.id}` : '/api/inventory';
@@ -847,9 +864,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           sku: sku.trim(),
           barcode: barcode.trim() || null,
           category,
-          costPrice: String(parseFloat(costWithTax || costPrice) || 0),
-          costWithoutTax: String(parseFloat(costWithoutTax) || 0),
-          costWithTax: String(parseFloat(costWithTax || costPrice) || 0),
+          costPrice: isSupplierGift ? '0.00' : String(parseFloat(costWithTax || costPrice) || 0),
+          costWithoutTax: isSupplierGift ? '0.00' : String(parseFloat(costWithoutTax) || 0),
+          costWithTax: isSupplierGift ? '0.00' : String(parseFloat(costWithTax || costPrice) || 0),
           taxRate: String(effectiveTaxRate),
           hasPurchaseTax: effectiveHasTax,
           purchaseTaxPercent: effectiveTaxRate,
@@ -866,6 +883,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           description: description.trim(),
           tags: tags.trim(),
           extractedAttributes: JSON.stringify(mergedAttributes),
+          isSupplierGift,
           status,
         }),
       });
@@ -906,7 +924,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const totalClientePaid = Math.round((baseImponibleAfterDiscount + saleTaxAmount) * 100) / 100;
   const unitProfit = Math.round((baseImponibleAfterDiscount - costWithoutNum) * 100) / 100;
-  const calculatedMarginPercent = costWithoutNum > 0 ? (unitProfit / costWithoutNum) * 100 : 0;
+  const calculatedMarginPercent = costWithoutNum > 0 ? (unitProfit / costWithoutNum) * 100 : (unitProfit > 0 ? 100 : 0);
 
   // Aliases for full JSX backward compatibility
   const activeTaxRate = activeSaleTax;
@@ -1130,6 +1148,49 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             {/* ========================================================================= */}
             {/* SECCIÓN FINANCIERA Y PRECIOS - COLUMNA UNIFICADA DE INGRESO (SRI ECUADOR) */}
             {/* ========================================================================= */}
+            {/* Tarjeta de Activación: Producto Regalado por Proveedor */}
+            <div className={`sm:col-span-2 p-3.5 rounded-2xl border transition flex items-center justify-between gap-3 ${
+              isSupplierGift ? 'bg-purple-50/90 border-purple-300 ring-2 ring-purple-400/30 shadow-xs' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg shrink-0 ${
+                  isSupplierGift ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/30' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  🎁
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-900 block flex items-center gap-1.5">
+                    <span>Producto Regalado por Proveedor (Bonificación / Regalía)</span>
+                    {isSupplierGift && (
+                      <span className="bg-purple-100 text-purple-900 text-[10px] font-black px-2 py-0.5 rounded-md border border-purple-300">
+                        Costo $0.00 / Utilidad 100%
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[11px] text-slate-500 block leading-tight mt-0.5">
+                    Al activar esta opción, el costo de compra se fija en $0.00. No genera deudas en Tesorería ni egresos a proveedores.
+                  </span>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isSupplierGift}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsSupplierGift(checked);
+                    if (checked) {
+                      setCostPrice('0.00');
+                      setCostWithoutTax('0.00');
+                      setCostWithTax('0.00');
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+            </div>
+
             <div className="sm:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-200/90 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
                   <div className="flex items-center space-x-2">

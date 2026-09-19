@@ -2138,8 +2138,8 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
     setError(null);
 
     const numAmt = Number(amount);
-    if (isNaN(numAmt) || numAmt <= 0) {
-      setError('Por favor ingresa un monto válido mayor a 0.00');
+    if (isNaN(numAmt) || numAmt < 0) {
+      setError('Por favor ingresa un monto válido mayor o igual a 0.00');
       return;
     }
 
@@ -2327,7 +2327,7 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                   placeholder="0.00"
                   value={amount}

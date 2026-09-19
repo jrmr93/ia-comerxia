@@ -1287,6 +1287,7 @@ export async function createInventoryItem(data: {
       status: data.status || 'available',
       rawTelegramMessage: data.rawTelegramMessage || null,
       marketingCopy: data.marketingCopy || null,
+      isSupplierGift: Boolean((data as any).isSupplierGift),
       createdAt: now,
       updatedAt: now,
     };
@@ -1322,6 +1323,7 @@ export async function createInventoryItem(data: {
         status: data.status || 'available',
         rawTelegramMessage: data.rawTelegramMessage || null,
         marketingCopy: data.marketingCopy || null,
+        isSupplierGift: Boolean((data as any).isSupplierGift),
       })
       .returning();
 
@@ -1365,6 +1367,7 @@ export async function createInventoryItem(data: {
       status: data.status || 'available',
       rawTelegramMessage: data.rawTelegramMessage || null,
       marketingCopy: data.marketingCopy || null,
+      isSupplierGift: Boolean((data as any).isSupplierGift),
       createdAt: now,
       updatedAt: now,
     };

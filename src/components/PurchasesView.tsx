@@ -2362,22 +2362,26 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     }
 
     // Agregar producto nuevo como PRIMER REGISTRO (index 0)
+    const isGiftItem = Boolean(it.isSupplierGift || Number(it.costPrice) === 0 || (it as any).isGift);
+    const finalCostPrice = isGiftItem ? '0.00' : (costWithoutTax % 1 === 0 ? costWithoutTax.toFixed(2) : Number(costWithoutTax.toFixed(3)).toString());
+
     setItems((prev) => [
       {
         inventoryItemId: it.id,
         name: it.name,
         sku: it.sku,
         barcode: it.barcode || undefined,
-        costPrice: costWithoutTax % 1 === 0 ? costWithoutTax.toFixed(2) : Number(costWithoutTax.toFixed(3)).toString(),
+        costPrice: finalCostPrice,
         salePrice: it.salePrice,
         quantity: 1,
         imageUrl: it.imageUrl || null,
         supplierName: itemSupplier,
         taxPercent: defaultTaxPercent,
+        isSupplierGift: isGiftItem,
       },
       ...prev,
     ]);
-    showToast(`✓ Agregado: "${it.name}"`);
+    showToast(`✓ Agregado: "${it.name}" ${isGiftItem ? '(Regalo $0.00)' : ''}`);
     setProductSearch('');
   };
 
@@ -3124,6 +3128,11 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                                     isImmutable ? 'cursor-not-allowed text-slate-600' : ''
                                   }`}
                                 />
+                                {(Number(it.costPrice) === 0 || it.isSupplierGift) && (
+                                  <span className="bg-purple-100 text-purple-900 border border-purple-300 font-bold px-1.5 py-0.5 rounded text-[10px] shrink-0 whitespace-nowrap">
+                                    🎁 Regalo ($0.00)
+                                  </span>
+                                )}
                               </div>
                             </td>
                             <td className="p-2.5 font-mono text-[11px]">
@@ -3802,8 +3811,8 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
     }
 
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      showToast('⚠️ Ingresa un monto de pago válido mayor a 0');
+    if (isNaN(numAmount) || numAmount < 0) {
+      showToast('⚠️ Ingresa un monto de pago válido mayor o igual a 0');
       return;
     }
 
@@ -3934,7 +3943,7 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   required
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
