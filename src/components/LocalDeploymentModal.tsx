@@ -397,9 +397,12 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
       } else {
         const rawText = await res.text();
         console.error('Non-JSON response from restore-master-zip:', res.status, rawText);
+        const is413 = res.status === 413;
         setRestoreFeedback({
           type: 'error',
-          message: `El servidor devolvió una respuesta de formato no válido (Status ${res.status}). El archivo ZIP puede exceder el límite permitido (250MB) o haber fallado la conexión.`,
+          message: is413
+            ? `El servidor o proxy (Error HTTP 413: Payload Too Large) rechazó el archivo. Si usas Nginx o un servidor web inverso, agrega la línea "client_max_body_size 500M;" en tu archivo de configuración de Nginx y reinícialo (sudo systemctl reload nginx).`
+            : `El servidor devolvió una respuesta no válida (Status ${res.status}). Verifica el estado de la red y el peso del archivo.`,
         });
         return;
       }
@@ -466,9 +469,12 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
       } else {
         const rawText = await res.text();
         console.error('Non-JSON response from restore-uploads-zip:', res.status, rawText);
+        const is413 = res.status === 413;
         setRestoreFeedback({
           type: 'error',
-          message: `El servidor devolvió una respuesta no válida (Status ${res.status}). Verifica el tamaño del archivo ZIP o la conexión.`,
+          message: is413
+            ? `El servidor o proxy (Error HTTP 413: Payload Too Large) rechazó la imagen/ZIP. Si usas Nginx, agrega "client_max_body_size 500M;" en Nginx y recárgalo.`
+            : `El servidor devolvió una respuesta no válida (Status ${res.status}). Verifica el tamaño del archivo ZIP o la conexión.`,
         });
         return;
       }
@@ -1801,6 +1807,8 @@ server {
     listen 80;
     server_name ${adminDomain.split(/[,;\n]/).join(' ')} ${storeDomain.split(/[,;\n]/).join(' ')};
 
+    client_max_body_size 500M;
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -1825,6 +1833,8 @@ server {
 {`server {
     listen 80;
     server_name ${adminDomain.split(/[,;\n]/).join(' ')} ${storeDomain.split(/[,;\n]/).join(' ')};
+
+    client_max_body_size 500M;
 
     location / {
         proxy_pass http://127.0.0.1:3000;

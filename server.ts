@@ -243,9 +243,9 @@ async function startServer() {
     res.status(200).send(svg);
   });
 
-  // Increase payload size for base64 product images
-  app.use(express.json({ limit: '25mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+  // Increase payload size for base64 product images and large ZIP backups
+  app.use(express.json({ limit: '500mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
   // 1. Health & Database Connection Status endpoints
   app.get('/api/db-status', async (req: Request, res: Response) => {
@@ -5384,7 +5384,10 @@ async function startServer() {
   // 14b. Uploads / Media Backup & Restore Endpoints
   const uploadZipMiddleware = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 250 * 1024 * 1024 }, // Max 250MB ZIP
+    limits: {
+      fileSize: 500 * 1024 * 1024, // Max 500MB ZIP
+      fieldSize: 500 * 1024 * 1024,
+    },
   });
 
   const handleZipUploadMiddleware = (req: Request, res: Response, next: NextFunction) => {
@@ -5394,7 +5397,7 @@ async function startServer() {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(413).json({
             success: false,
-            error: 'El archivo ZIP excede el tamaño máximo permitido de 250MB.',
+            error: 'El archivo ZIP excede el tamaño máximo permitido del servidor Node.js (500MB).',
           });
         }
         return res.status(400).json({
