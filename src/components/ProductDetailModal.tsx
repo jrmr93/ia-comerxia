@@ -1033,19 +1033,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         )}
                       </div>
                       {(() => {
-                        const itemTaxRate = Number(currentItem.taxRate) || 15;
-                        const costWithout = Math.round((
-                          currentItem.costWithoutTax !== undefined && currentItem.costWithoutTax !== null
-                            ? Number(currentItem.costWithoutTax)
-                            : cost / (1 + itemTaxRate / 100)
-                        ) * 100) / 100;
-                        const costWith = Math.round((
-                          currentItem.costWithTax !== undefined && currentItem.costWithTax !== null
-                            ? Number(currentItem.costWithTax)
-                            : cost
-                        ) * 100) / 100;
-                        const purchaseTaxVal = Math.max(0, Math.round((costWith - costWithout) * 100) / 100);
-
                         let parsedAttr: Record<string, any> = {};
                         if (currentItem.extractedAttributes) {
                           try {
@@ -1055,6 +1042,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                                 : currentItem.extractedAttributes;
                           } catch {}
                         }
+
+                        const itemTaxRate =
+                          currentItem.taxRate !== undefined && currentItem.taxRate !== null && !isNaN(Number(currentItem.taxRate))
+                            ? Number(currentItem.taxRate)
+                            : currentItem.purchaseTaxPercent !== undefined && !isNaN(Number(currentItem.purchaseTaxPercent))
+                            ? Number(currentItem.purchaseTaxPercent)
+                            : parsedAttr.purchaseTaxPercent !== undefined && !isNaN(Number(parsedAttr.purchaseTaxPercent))
+                            ? Number(parsedAttr.purchaseTaxPercent)
+                            : parsedAttr.taxPercent !== undefined && !isNaN(Number(parsedAttr.taxPercent))
+                            ? Number(parsedAttr.taxPercent)
+                            : 15;
+
+                        const costWithout = Math.round((
+                          currentItem.costWithoutTax !== undefined && currentItem.costWithoutTax !== null
+                            ? Number(currentItem.costWithoutTax)
+                            : itemTaxRate > 0 ? cost / (1 + itemTaxRate / 100) : cost
+                        ) * 100) / 100;
+                        const costWith = Math.round((
+                          currentItem.costWithTax !== undefined && currentItem.costWithTax !== null
+                            ? Number(currentItem.costWithTax)
+                            : cost
+                        ) * 100) / 100;
+                        const purchaseTaxVal = Math.max(0, Math.round((costWith - costWithout) * 100) / 100);
                         const margin =
                           parsedAttr.profitMarginPercent !== undefined
                             ? Number(parsedAttr.profitMarginPercent)

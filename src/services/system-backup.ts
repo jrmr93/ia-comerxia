@@ -2340,106 +2340,92 @@ export async function generateFinancialProductsExcelBuffer(userId?: number): Pro
   const items = await getInventoryItems(userId);
 
   const rows = items.map((item) => {
-    const costPriceNum = parseFloat(String(item.costPrice || '0')) || 0;
-    const taxRateNum = parseFloat(String(item.taxRate || '15')) || 0;
-    const costWithTaxNum =
-      item.costWithTax !== null && item.costWithTax !== undefined
-        ? parseFloat(String(item.costWithTax))
-        : costPriceNum;
+    const cost = parseFloat(String(item.costPrice || '0')) || 0;
+    const sale = parseFloat(String(item.salePrice || '0')) || 0;
 
-    const costWithoutTaxNum =
-      item.costWithoutTax !== null && item.costWithoutTax !== undefined
-        ? parseFloat(String(item.costWithoutTax))
-        : taxRateNum > 0
-        ? costWithTaxNum / (1 + taxRateNum / 100)
-        : costWithTaxNum;
-
-    const taxAmountPerUnit = costWithTaxNum - costWithoutTaxNum;
-    const salePriceNum = parseFloat(String(item.salePrice || '0')) || 0;
-    const cardSalePriceNum = item.cardSalePrice ? parseFloat(String(item.cardSalePrice)) : null;
-    const discountPercent = item.discountPercent || 0;
-    const finalPriceWithDiscount = discountPercent > 0
-      ? salePriceNum * (1 - discountPercent / 100)
-      : salePriceNum;
-
-    const unitProfit = salePriceNum - costWithTaxNum;
-    const profitMarginPercent = costWithTaxNum > 0
-      ? (unitProfit / costWithTaxNum) * 100
-      : 0;
-
-    const stock = item.stock || 0;
-    const stockTotalCostValue = stock * costWithTaxNum;
-    const stockTotalSaleValue = stock * salePriceNum;
-    const stockTotalProjectedProfit = stock * unitProfit;
-
-    // Parse cost options / volume pricing from extractedAttributes if present
-    let costOptionsSummary = '';
-    let affiliatePrice: number | null = null;
-    let wholesalePrice: number | null = null;
-
+    let parsedAttr: Record<string, any> = {};
     if (item.extractedAttributes) {
       try {
-        const parsed = typeof item.extractedAttributes === 'string'
+        parsedAttr = typeof item.extractedAttributes === 'string'
           ? JSON.parse(item.extractedAttributes)
           : item.extractedAttributes;
-
-        if (parsed && Array.isArray(parsed.costOptions) && parsed.costOptions.length > 0) {
-          costOptionsSummary = parsed.costOptions
-            .map((opt: any) => `${opt.label}: $${Number(opt.price).toFixed(2)}`)
-            .join(' | ');
-
-          const affOpt = parsed.costOptions.find((opt: any) => /afiliad/i.test(opt.label || ''));
-          if (affOpt) affiliatePrice = parseFloat(String(affOpt.price));
-
-          const wholeOpt = parsed.costOptions.find((opt: any) => /mayor/i.test(opt.label || '') || /bulto/i.test(opt.label || '') || /caja/i.test(opt.label || ''));
-          if (wholeOpt) wholesalePrice = parseFloat(String(wholeOpt.price));
-        }
       } catch {}
     }
 
-    const createdDateStr = item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 10) : '';
+    const itemTaxRate =
+      item.taxRate !== undefined && item.taxRate !== null && !isNaN(Number(item.taxRate))
+        ? Number(item.taxRate)
+        : item.purchaseTaxPercent !== undefined && !isNaN(Number(item.purchaseTaxPercent))
+        ? Number(item.purchaseTaxPercent)
+        : parsedAttr.purchaseTaxPercent !== undefined && !isNaN(Number(parsedAttr.purchaseTaxPercent))
+        ? Number(parsedAttr.purchaseTaxPercent)
+        : parsedAttr.taxPercent !== undefined && !isNaN(Number(parsedAttr.taxPercent))
+        ? Number(parsedAttr.taxPercent)
+        : 15;
+
+    const costWith = Math.round((
+      item.costWithTax !== undefined && item.costWithTax !== null
+        ? Number(item.costWithTax)
+        : cost
+    ) * 100) / 100;
+
+    const costWithout = Math.round((
+      item.costWithoutTax !== undefined && item.costWithoutTax !== null
+        ? Number(item.costWithoutTax)
+        : itemTaxRate > 0 ? costWith / (1 + itemTaxRate / 100) : costWith
+    ) * 100) / 100;
+
+    const purchaseTaxVal = Math.max(0, Math.round((costWith - costWithout) * 100) / 100);
+
+    const margin = parsedAttr.profitMarginPercent !== undefined
+      ? Number(parsedAttr.profitMarginPercent)
+      : costWithout > 0
+      ? Math.round(((sale - costWithout) / costWithout) * 100)
+      : 30;
+
+    const applySaleTax = item.applySaleTax !== undefined
+      ? Boolean(item.applySaleTax)
+      : parsedAttr.applySaleTax !== undefined
+      ? Boolean(parsedAttr.applySaleTax)
+      : false;
+
+    const saleTaxPercent = item.saleTaxPercent !== undefined && !isNaN(Number(item.saleTaxPercent))
+      ? Number(item.saleTaxPercent)
+      : parsedAttr.saleTaxPercent !== undefined && !isNaN(Number(parsedAttr.saleTaxPercent))
+      ? Number(parsedAttr.saleTaxPercent)
+      : itemTaxRate;
+
+    const discountPercent = Math.max(0, Math.min(100, Number(item.discountPercent) || 0));
+    const discountVal = Math.round((sale * (discountPercent / 100)) * 100) / 100;
+    const effectivePvp = Math.max(0, sale - discountVal);
+
+    const subtotalVenta = Math.round(
+      (applySaleTax && saleTaxPercent > 0
+        ? effectivePvp / (1 + saleTaxPercent / 100)
+        : effectivePvp) * 100
+    ) / 100;
+
+    const saleTaxVal = Math.round((effectivePvp - subtotalVenta) * 100) / 100;
+    const ivaNetoDeclarar = Math.max(0, Math.round((saleTaxVal - purchaseTaxVal) * 100) / 100);
+    const totalVentaFinal = effectivePvp;
+    const unitProfit = Math.round((subtotalVenta - costWithout) * 100) / 100;
 
     return {
-      'ID Producto': item.id,
-      'SKU': item.sku,
-      'Código de Barras': item.barcode || '',
+      'Código (SKU)': item.sku,
       'Nombre del Producto': item.name,
-      'Categoría': item.category || 'General',
-      'Proveedor': item.supplierName || 'General',
-      'Estado': item.status === 'available' ? 'Disponible' : item.status === 'low_stock' ? 'Stock Bajo' : item.status === 'sold_out' ? 'Agotado' : item.status || 'Disponible',
-
-      // Costos e Impuestos
-      'Costo Sin IVA ($)': Number(costWithoutTaxNum.toFixed(2)),
-      'Tasa IVA (%)': Number(taxRateNum.toFixed(2)),
-      'Monto IVA ($)': Number(taxAmountPerUnit.toFixed(2)),
-      'Costo Con IVA ($)': Number(costWithTaxNum.toFixed(2)),
-
-      // Precios de Venta
-      'PVP Efectivo / Base ($)': Number(salePriceNum.toFixed(2)),
-      'PVP Con Tarjeta ($)': cardSalePriceNum !== null ? Number(cardSalePriceNum.toFixed(2)) : 'N/A',
-      '% Descuento Promocional': `${discountPercent}%`,
-      'PVP Final ($)': Number(finalPriceWithDiscount.toFixed(2)),
-
-      // Rentabilidad y Márgenes
-      'Margen Ganancia Unitario ($)': Number(unitProfit.toFixed(2)),
-      '% Margen Ganancia (ROI)': `${profitMarginPercent.toFixed(2)}%`,
-
-      // Inventario y Valorización de Stock
-      'Stock (Unidades)': stock,
-      'Inversión Total Stock ($)': Number(stockTotalCostValue.toFixed(2)),
-      'Venta Total Proyectada ($)': Number(stockTotalSaleValue.toFixed(2)),
-      'Ganancia Total Proyectada ($)': Number(stockTotalProjectedProfit.toFixed(2)),
-
-      // Opciones de Costo / Escalas de Proveedor
-      'Costo Afiliado / Muestra ($)': affiliatePrice !== null ? Number(affiliatePrice.toFixed(2)) : 'N/A',
-      'Costo Mayorista / Bulto ($)': wholesalePrice !== null ? Number(wholesalePrice.toFixed(2)) : 'N/A',
-      'Escala de Precios Proveedor': costOptionsSummary || 'Precio Único',
-
-      // Metadatos
-      'Etiquetas': item.tags || '',
-      'Imagen Principal': item.imageUrl || '',
-      'Video URL': item.videoUrl || '',
-      'Fecha Registro': createdDateStr,
+      '1. IVA Producto (%)': Number(itemTaxRate.toFixed(2)),
+      '2. Costo Neto (Sin IVA) ($)': Number(costWithout.toFixed(2)),
+      '3. IVA Compra ($)': Number(purchaseTaxVal.toFixed(2)),
+      '4. Costo + IVA ($)': Number(costWith.toFixed(2)),
+      '5. Descuento (%)': Number(discountPercent.toFixed(2)),
+      '6. Descuento ($)': Number(discountVal.toFixed(2)),
+      '7. PVP Marcado ($)': Number(sale.toFixed(2)),
+      '8. Subtotal Venta ($)': Number(subtotalVenta.toFixed(2)),
+      '9. IVA Venta ($)': Number(saleTaxVal.toFixed(2)),
+      '10. IVA Neto SRI ($)': Number(ivaNetoDeclarar.toFixed(2)),
+      '11. Margen Utilidad (%)': Number(margin.toFixed(2)),
+      '12. Utilidad Neta ($)': Number(unitProfit.toFixed(2)),
+      '13. Total PVP Final ($)': Number(totalVentaFinal.toFixed(2)),
     };
   });
 
@@ -2461,7 +2447,7 @@ export async function generateFinancialProductsExcelBuffer(userId?: number): Pro
   }
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte Financiero');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Desglose SRI Productos');
 
   const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   return excelBuffer;

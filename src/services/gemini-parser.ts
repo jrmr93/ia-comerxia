@@ -2030,3 +2030,57 @@ function buildFallbackCommercialDescription(
   return parts.join('\n');
 }
 
+/**
+ * Transcribes audio / voice notes to Spanish text using Gemini AI multimodal capabilities
+ */
+export async function transcribeAudioWithGemini(
+  audioBuffer: Buffer,
+  mimeType: string,
+  apiKey?: string
+): Promise<string | null> {
+  try {
+    const ai = getAiClient(apiKey);
+    const base64Audio = audioBuffer.toString('base64');
+    const activeMime = mimeType || 'audio/ogg';
+
+    const modelsToTry = [
+      'gemini-2.5-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+    ];
+
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: [
+            {
+              inlineData: {
+                mimeType: activeMime,
+                data: base64Audio,
+              },
+            },
+            'Escucha atentamente el siguiente audio en español. Transcribe de manera exacta y completa todo el contenido hablado, conservando números, precios, nombres de productos y detalles dictados. Retorna ÚNICAMENTE la transcripción del texto en español sin comentarios ni explicaciones adicionales.',
+          ],
+        });
+
+        const text = response.text?.trim();
+        if (text && text.length > 0) {
+          console.log(`[Gemini AI] Audio transcribed successfully using model ${modelName}: "${text.slice(0, 80)}..."`);
+          return text;
+        }
+      } catch (err: any) {
+        console.warn(`[Gemini AI] Audio transcription attempt with ${modelName} failed:`, err?.message || err);
+        continue;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[Gemini AI] Failed to transcribe audio:', error);
+    return null;
+  }
+}
+
+

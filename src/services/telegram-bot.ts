@@ -10,7 +10,7 @@ import {
   generateNextSku,
   getSupplierSkuPrefix,
 } from '../db/inventory.ts';
-import { parseSupplierTelegramMessage } from './gemini-parser.ts';
+import { parseSupplierTelegramMessage, transcribeAudioWithGemini } from './gemini-parser.ts';
 import { saveVideoBufferLocally, saveImageBufferLocally, persistImageListLocally } from './media-storage.ts';
 import {
   extractProductUrlFromText,
@@ -468,6 +468,85 @@ export async function extractVideoFromMessage(
 }
 
 /**
+ * Downloads a voice note / audio file sent to the bot from Telegram's servers
+ */
+export async function downloadTelegramAudio(
+  botToken: string,
+  fileId: string,
+  providedMime?: string
+): Promise<{ audioBuffer: Buffer; mimeType: string } | null> {
+  try {
+    const fileInfoRes = await fetch(
+      `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`
+    );
+    const fileInfo = await fileInfoRes.json();
+
+    if (!fileInfo.ok || !fileInfo.result?.file_path) {
+      console.warn('[Telegram Bot] Could not get audio file path from Telegram API:', fileInfo);
+      return null;
+    }
+
+    const filePath = fileInfo.result.file_path;
+    const downloadUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
+    const audioRes = await fetch(downloadUrl);
+
+    if (!audioRes.ok) return null;
+
+    const arrayBuf = await audioRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
+
+    let mimeType = providedMime;
+    if (!mimeType) {
+      if (filePath.endsWith('.ogg') || filePath.endsWith('.oga')) mimeType = 'audio/ogg';
+      else if (filePath.endsWith('.mp3')) mimeType = 'audio/mp3';
+      else if (filePath.endsWith('.m4a') || filePath.endsWith('.mp4')) mimeType = 'audio/m4a';
+      else if (filePath.endsWith('.wav')) mimeType = 'audio/wav';
+      else mimeType = 'audio/ogg';
+    }
+
+    return { audioBuffer: buffer, mimeType };
+  } catch (err) {
+    console.error('Failed to download audio from Telegram:', err);
+    return null;
+  }
+}
+
+/**
+ * Extracts voice note or audio file from message, transcribes it via Gemini AI into text string
+ */
+export async function extractVoiceFromMessage(
+  token: string,
+  message: any,
+  userId: number = 1
+): Promise<string | null> {
+  const audioTarget = message.voice || message.audio;
+  if (!audioTarget || !audioTarget.file_id) return null;
+
+  const chatId = message.chat?.id;
+  if (chatId) {
+    sendTelegramChatAction(token, chatId, 'typing').catch(() => {});
+  }
+
+  const downloaded = await downloadTelegramAudio(token, audioTarget.file_id, audioTarget.mime_type);
+  if (!downloaded) return null;
+
+  const aiConfig = await getAiConfig(userId).catch(() => null);
+  const transcribedText = await transcribeAudioWithGemini(
+    downloaded.audioBuffer,
+    downloaded.mimeType,
+    aiConfig?.apiKey || undefined
+  );
+
+  if (transcribedText && transcribedText.length > 0) {
+    console.log(`[Telegram Bot] Voice message transcribed successfully: "${transcribedText}"`);
+    return transcribedText;
+  }
+
+  return null;
+}
+
+
+/**
  * Creates or updates a product with multiple photos and optional video
  */
 async function processCompleteProduct(
@@ -669,21 +748,26 @@ async function processCompleteProduct(
     parsed.sku = finalSku;
   }
 
-  // 6b. Auto Image Search: If no photos were attached in Telegram, search internet for 3 matching product photos
+  // 6b. Auto Image Search: If fewer than 4 photos were attached in Telegram, search internet for missing photos to complete 4
   let autoFetchedWebPhotos = false;
-  if (photosLocalUrls.length === 0 && parsed.name && parsed.name.trim().length >= 2) {
+  const neededCount = 4 - photosLocalUrls.length;
+  if (neededCount > 0 && parsed.name && parsed.name.trim().length >= 2) {
     if (chatId) {
       sendTelegramChatAction(token, chatId, 'typing').catch(() => {});
-      await sendTelegramChatMessage(
-        token,
-        chatId,
-        `🔍 *Producto sin fotografía detectado*\n\n` +
-        `_Buscando 3 imágenes de alta calidad en internet que coincidan con "*${escapeTelegramMarkdown(parsed.name)}*"..._`
-      );
+      const searchNoticeMsg =
+        photosLocalUrls.length === 0
+          ? `🔍 *Producto sin fotografía detectado*\n\n` +
+            `_Buscando 4 imágenes de alta calidad en internet que coincidan con "*${escapeTelegramMarkdown(parsed.name)}*"..._`
+          : `🔍 *Galería incompleta detectada (${photosLocalUrls.length}/4 fotos)*\n\n` +
+            `_Buscando ${neededCount} imagen(es) faltante(s) en internet para completar 4 fotografías de "*${escapeTelegramMarkdown(parsed.name)}*"..._`;
+
+      await sendTelegramChatMessage(token, chatId, searchNoticeMsg);
     }
 
     try {
-      console.log(`[Telegram Bot] Product "${parsed.name}" has no photo. Searching web for 3 matching images...`);
+      console.log(
+        `[Telegram Bot] Product "${parsed.name}" has ${photosLocalUrls.length} photo(s). Searching web for ${neededCount} missing image(s) to reach 4...`
+      );
       const searchResult = await searchProductImagesWithAI({
         name: parsed.name,
         category: parsed.category,
@@ -693,8 +777,8 @@ async function processCompleteProduct(
       });
 
       if (searchResult && Array.isArray(searchResult.images) && searchResult.images.length > 0) {
-        const top3Candidates = searchResult.images.slice(0, 3);
-        const webPhotoInputs = top3Candidates.map((img) => ({
+        const topCandidates = searchResult.images.slice(0, neededCount);
+        const webPhotoInputs = topCandidates.map((img) => ({
           url: img.url,
           thumbnailUrl: img.thumbnailUrl,
         }));
@@ -702,14 +786,14 @@ async function processCompleteProduct(
         const persistedLocalUrls = await persistImageListLocally(webPhotoInputs);
 
         if (persistedLocalUrls.length > 0) {
-          photosLocalUrls = persistedLocalUrls;
+          photosLocalUrls = [...photosLocalUrls, ...persistedLocalUrls];
           primaryPhoto = photosLocalUrls[0] || null;
           autoFetchedWebPhotos = true;
           attributesWithGallery.images = photosLocalUrls;
           attributesWithGallery.totalPhotos = photosLocalUrls.length;
           attributesWithGallery.autoImageSource = 'web_search_ai';
           console.log(
-            `[Telegram Bot] Successfully fetched and persisted ${persistedLocalUrls.length} web photos for "${parsed.name}".`
+            `[Telegram Bot] Successfully fetched and persisted ${persistedLocalUrls.length} web photos (Total: ${photosLocalUrls.length}/4) for "${parsed.name}".`
           );
         }
       }
@@ -1155,7 +1239,7 @@ export async function processTelegramMessage(
 
   const chatId = message.chat?.id;
   const messageId = String(message.message_id);
-  const text = message.text || message.caption || '';
+  let text = message.text || message.caption || '';
   const mediaGroupId = message.media_group_id ? String(message.media_group_id) : null;
 
   const { senderName, senderUsername } = extractSupplierFromMessage(message);
@@ -1166,8 +1250,8 @@ export async function processTelegramMessage(
       const welcomeMsg =
         `👋 *¡Hola ${senderName}! Tu Bot de Inventario IA está activo.*\n\n` +
         `📦 *¿Cómo funciona?*\n` +
-        `• Reenvíame fotos de productos (o *álbumes de varias fotos* del mismo producto) con su precio y detalles en el texto.\n` +
-        `• La Inteligencia Artificial analizará la imagen y descripción para crear automáticamente el producto en tu catálogo e inventario.\n\n` +
+        `• Reenvíame fotos o *notas de voz* de productos (o *álbumes de varias fotos* del mismo producto) con su precio y detalles.\n` +
+        `• La Inteligencia Artificial analizará la imagen, audio y descripción para crear automáticamente el producto en tu catálogo e inventario.\n\n` +
         `🤖 *Gemini IA* organizará todo en tiempo real.`;
 
       await sendTelegramChatMessage(token, chatId, welcomeMsg);
@@ -1175,11 +1259,16 @@ export async function processTelegramMessage(
     return { status: 'command_handled' };
   }
 
-  // 2. Extract media from message (photos and videos)
+  // 2. Extract media from message (photos, videos, and voice/audio notes)
   const photoData = await extractPhotoFromMessage(token, message);
   const videoData = await extractVideoFromMessage(token, message);
+  const voiceText = await extractVoiceFromMessage(token, message, userId);
 
-  // If no photo, no video, and text is too short / empty
+  if (voiceText) {
+    text = text && text.trim().length > 0 ? `${text}\n${voiceText}` : voiceText;
+  }
+
+  // If no photo, no video, no voice text, and text is too short / empty
   if (!photoData && !videoData && (!text || text.trim().length < 2)) {
     return null;
   }
