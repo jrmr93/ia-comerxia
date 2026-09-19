@@ -34,6 +34,7 @@ export interface WebProductScrapeResult {
   images: string[];
   primaryImage: string | null;
   supplierNotes?: string;
+  discountPercent?: number;
   confidenceScore: number;
 }
 

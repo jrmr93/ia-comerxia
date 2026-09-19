@@ -148,12 +148,7 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
       if (rawCostWithoutTax > 0) {
         baseUnitCost = rawCostWithoutTax;
       } else if (rawCostPrice > 0) {
-        const totalPoCost = Number(purchase?.totalCost || 0);
-        if (taxPercent > 0 && totalPoCost > 0 && Math.abs(rawCostPrice * qty - totalPoCost) < 0.05) {
-          baseUnitCost = rawCostPrice / (1 + taxPercent / 100);
-        } else {
-          baseUnitCost = rawCostPrice;
-        }
+        baseUnitCost = rawCostPrice;
       } else if (rawBaseCost > 0) {
         baseUnitCost = rawBaseCost;
       }

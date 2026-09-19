@@ -229,24 +229,28 @@ export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item:
     ? Number(saleTaxPercent)
     : purchaseTaxPercent !== undefined && !isNaN(Number(purchaseTaxPercent))
     ? Number(purchaseTaxPercent)
+    : item.taxPercent !== undefined && !isNaN(Number(item.taxPercent))
+    ? Number(item.taxPercent)
     : taxRate;
 
   const unifiedHasTax = applySaleTax !== undefined
     ? Boolean(applySaleTax)
     : hasPurchaseTax !== undefined
     ? Boolean(hasPurchaseTax)
+    : item.hasPurchaseTax !== undefined
+    ? Boolean(item.hasPurchaseTax)
     : unifiedRate > 0;
 
   const finalTaxRate = unifiedHasTax ? unifiedRate : 0;
 
   if (costWithoutTax === undefined || costWithoutTax === null || costWithTax === undefined || costWithTax === null) {
     const costNum = parseFloat(String(item.costPrice || '0')) || 0;
-    if (!costWithTax) {
-      costWithTax = costNum > 0 ? costNum.toFixed(2) : '0.00';
-    }
     if (!costWithoutTax) {
-      const numWith = parseFloat(String(costWithTax)) || costNum;
-      costWithoutTax = (numWith / (1 + finalTaxRate / 100)).toFixed(2);
+      costWithoutTax = costNum > 0 ? costNum.toFixed(2) : '0.00';
+    }
+    if (!costWithTax) {
+      const numWithout = parseFloat(String(costWithoutTax)) || costNum;
+      costWithTax = (numWithout * (1 + finalTaxRate / 100)).toFixed(2);
     }
   }
 
@@ -11772,19 +11776,11 @@ export function calculatePurchaseSriBreakdown(po: any) {
       let costWithoutTax = 0;
       const rawCostPrice = item.costPrice !== undefined && item.costPrice !== null ? Number(item.costPrice) : 0;
       const rawCostWithoutTax = item.costWithoutTax !== undefined && item.costWithoutTax !== null ? Number(item.costWithoutTax) : 0;
-      const normCostWithoutTax = normalized.costWithoutTax !== undefined && normalized.costWithoutTax !== null ? Number(normalized.costWithoutTax) : 0;
 
       if (rawCostWithoutTax > 0) {
         costWithoutTax = rawCostWithoutTax;
       } else if (rawCostPrice > 0) {
-        const totalPoCost = Number(po?.totalCost || 0);
-        if (taxPercent > 0 && totalPoCost > 0 && Math.abs(rawCostPrice * qty - totalPoCost) < 0.05) {
-          costWithoutTax = rawCostPrice / (1 + taxPercent / 100);
-        } else {
-          costWithoutTax = rawCostPrice;
-        }
-      } else if (normCostWithoutTax > 0) {
-        costWithoutTax = normCostWithoutTax;
+        costWithoutTax = rawCostPrice;
       }
 
       const lineBase = Math.max(0, costWithoutTax * qty - discount);

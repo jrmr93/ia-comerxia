@@ -2125,8 +2125,9 @@ const PaymentFormModal: React.FC<PaymentFormModalProps> = ({
       const purch = purchases.find((p) => Number(p.id) === Number(selectedPurchaseId));
       if (purch) {
         setSupplierName(purch.supplierName);
-        if (!amount || amount === '0') {
-          setAmount(String(purch.totalCost));
+        if (!amount || amount === '0' || amount === '0.00') {
+          const val = Number(purch.totalCost || 0);
+          setAmount(isNaN(val) ? String(purch.totalCost) : val.toFixed(2));
         }
       }
     }

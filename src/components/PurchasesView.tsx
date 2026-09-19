@@ -171,11 +171,6 @@ export function getInventoryCostWithoutTax(inv: InventoryItem | any): number {
       : 15;
 
   const costWithTax = Number(inv.costPrice || inv.salePrice || 0);
-
-  if (taxRate > 0 && costWithTax > 0) {
-    return costWithTax / (1 + taxRate / 100);
-  }
-
   return costWithTax;
 }
 
@@ -2550,10 +2545,30 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     setIsSubmitting(true);
     try {
       const finalPaymentStatus = status === 'pending' ? 'unpaid' : paymentStatus;
+      const formattedItems = items.map((it) => {
+        const unitCost = Number(it.costPrice || 0);
+        const taxPct =
+          it.taxPercent !== undefined
+            ? Number(it.taxPercent)
+            : (it as any).purchaseTaxPercent !== undefined
+            ? Number((it as any).purchaseTaxPercent)
+            : (it as any).hasPurchaseTax === false
+            ? 0
+            : 15;
+        return {
+          ...it,
+          costPrice: unitCost,
+          costWithoutTax: unitCost,
+          purchaseTaxPercent: taxPct,
+          taxPercent: taxPct,
+          hasPurchaseTax: taxPct > 0,
+        };
+      });
+
       const payload = {
         supplierName: supplierName.trim(),
         supplierContact: supplierContact.trim(),
-        items,
+        items: formattedItems,
         totalCost: totalCost.toFixed(2),
         status,
         paymentStatus: finalPaymentStatus,

@@ -659,7 +659,7 @@ async function processCompleteProduct(
   );
 
   // Include photos array, video, cost options and profit margin inside extractedAttributes (all using disk /uploads/ URLs)
-  const attributesWithGallery = {
+  const attributesWithGallery: Record<string, any> = {
     ...parsed.attributes,
     images: photosLocalUrls,
     totalPhotos: photosLocalUrls.length,
