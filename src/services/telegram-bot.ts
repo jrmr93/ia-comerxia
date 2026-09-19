@@ -11,12 +11,13 @@ import {
   getSupplierSkuPrefix,
 } from '../db/inventory.ts';
 import { parseSupplierTelegramMessage } from './gemini-parser.ts';
-import { saveVideoBufferLocally, saveImageBufferLocally } from './media-storage.ts';
+import { saveVideoBufferLocally, saveImageBufferLocally, persistImageListLocally } from './media-storage.ts';
 import {
   extractProductUrlFromText,
   scrapeAndProcessWebProduct,
   WebProductScrapeResult,
 } from './web-product-scraper.ts';
+import { searchProductImagesWithAI } from './image-search.ts';
 
 let pollingActive = false;
 let pollingAbortController: AbortController | null = null;
@@ -492,8 +493,8 @@ async function processCompleteProduct(
   }
 
   // 2. Extract photos clean local URLs (never store raw base64 into database)
-  const photosLocalUrls = photos.map((p) => p.localUrl || p.photoBase64);
-  const primaryPhoto = photosLocalUrls[0] || null;
+  let photosLocalUrls = photos.map((p) => p.localUrl || p.photoBase64);
+  let primaryPhoto = photosLocalUrls[0] || null;
   const currencySym = config.currency === 'EUR' ? '€' : '$';
 
   // 3. Fast Duplicate Check (before AI): If the same product text was already saved, prevent duplicate creation
@@ -668,6 +669,55 @@ async function processCompleteProduct(
     parsed.sku = finalSku;
   }
 
+  // 6b. Auto Image Search: If no photos were attached in Telegram, search internet for 3 matching product photos
+  let autoFetchedWebPhotos = false;
+  if (photosLocalUrls.length === 0 && parsed.name && parsed.name.trim().length >= 2) {
+    if (chatId) {
+      sendTelegramChatAction(token, chatId, 'typing').catch(() => {});
+      await sendTelegramChatMessage(
+        token,
+        chatId,
+        `🔍 *Producto sin fotografía detectado*\n\n` +
+        `_Buscando 3 imágenes de alta calidad en internet que coincidan con "*${escapeTelegramMarkdown(parsed.name)}*"..._`
+      );
+    }
+
+    try {
+      console.log(`[Telegram Bot] Product "${parsed.name}" has no photo. Searching web for 3 matching images...`);
+      const searchResult = await searchProductImagesWithAI({
+        name: parsed.name,
+        category: parsed.category,
+        sku: finalSku,
+        description: parsed.description,
+        limit: 10,
+      });
+
+      if (searchResult && Array.isArray(searchResult.images) && searchResult.images.length > 0) {
+        const top3Candidates = searchResult.images.slice(0, 3);
+        const webPhotoInputs = top3Candidates.map((img) => ({
+          url: img.url,
+          thumbnailUrl: img.thumbnailUrl,
+        }));
+
+        const persistedLocalUrls = await persistImageListLocally(webPhotoInputs);
+
+        if (persistedLocalUrls.length > 0) {
+          photosLocalUrls = persistedLocalUrls;
+          primaryPhoto = photosLocalUrls[0] || null;
+          autoFetchedWebPhotos = true;
+          attributesWithGallery.images = photosLocalUrls;
+          attributesWithGallery.totalPhotos = photosLocalUrls.length;
+          attributesWithGallery.autoImageSource = 'web_search_ai';
+          console.log(
+            `[Telegram Bot] Successfully fetched and persisted ${persistedLocalUrls.length} web photos for "${parsed.name}".`
+          );
+        }
+      }
+    } catch (searchErr) {
+      console.warn(`[Telegram Bot] Notice: Auto web image search for "${parsed.name}" encountered non-blocking issue:`, searchErr);
+    }
+  }
+
   // Stock is always 0 and always auto-approves into inventory as requested
   const effectiveStock = 0;
   parsed.stock = 0;
@@ -730,7 +780,13 @@ async function processCompleteProduct(
   if (chatId) {
     const profit = (parsed.salePrice - parsed.costPrice).toFixed(2);
     const photoCountNote =
-      photos.length > 1 ? `📸 *Galería:* ${photos.length} fotografías vinculadas al producto\n` : '';
+      photos.length > 1
+        ? `📸 *Galería:* ${photos.length} fotografías vinculadas al producto\n`
+        : autoFetchedWebPhotos
+        ? `📸 *Fotos:* ${photosLocalUrls.length} fotografías de catálogo obtenidas automáticamente desde internet\n`
+        : photosLocalUrls.length === 1
+        ? `📸 *Fotografía:* 1 fotografía vinculada al producto\n`
+        : `⚠️ *Fotografía:* Sin foto adjunta\n`;
     const videoNote = videoUrl ? `🎬 *Video del producto:* Guardado y listo para la tienda / catálogo\n` : '';
 
     const effectiveTaxRate = typeof parsed.taxPercent === 'number' ? parsed.taxPercent : (config.taxPercent ?? 15);
