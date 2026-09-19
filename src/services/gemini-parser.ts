@@ -442,6 +442,8 @@ export interface ParsedProductResult {
   taxPercent?: number;
   costOptions: CostOption[];
   profitMarginPercent: number;
+  profitAmount?: number;
+  discountPercent?: number;
   salePrice: number;
   stock: number;
   description: string;
@@ -751,19 +753,71 @@ function extractFallbackFromText(
 
   // 7. IVA / Tax detection & calculation
   const detectedTaxStatus = detectTaxStatus(text);
-  const taxRate = detectedTaxStatus === 'NOT_SPECIFIED' ? 0 : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
-  const profitMarginPercent = defaultMarginPercent || 30;
+  let explicitTaxRate: number | undefined = undefined;
+  const taxRateMatch = text.match(/(?:iva|impuesto[s]?|igv|vat)\s*(?:de\s*|del\s*)?(\d{1,2})\s*%/i) ||
+                       text.match(/(\d{1,2})\s*%\s*(?:de\s*)?iva/i);
+  if (taxRateMatch && taxRateMatch[1]) {
+    const parsedRate = parseInt(taxRateMatch[1], 10);
+    if (!isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 50) {
+      explicitTaxRate = parsedRate;
+    }
+  }
+
+  const taxRate = detectedTaxStatus === 'NOT_SPECIFIED' ? 0 : (explicitTaxRate ?? (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15));
+  const fallbackMargin = defaultMarginPercent || 30;
 
   const taxAdjustment = calculateTaxAdjustment({
     costPrice,
     taxStatus: detectedTaxStatus,
     taxPercent: taxRate,
-    profitMarginPercent,
+    profitMarginPercent: fallbackMargin,
   });
 
   const costWithoutTax = taxAdjustment.baseCostPrice;
   const costWithTax = taxAdjustment.costPrice;
 
+  // 8. Utilidad (Profit Margin % / Profit Amount $) detection
+  let finalProfitMarginPercent = fallbackMargin;
+  let finalProfitAmount = Math.round(costWithoutTax * (fallbackMargin / 100) * 100) / 100;
+
+  const profitPctMatch = textWithoutPhones.match(/(?:utilidad|ganancia|margen)\s*(?:de\s*|del\s*)?(\d+(?:[.,]\d{1,2})?)\s*%/i) ||
+                         textWithoutPhones.match(/(\d+(?:[.,]\d{1,2})?)\s*%\s*(?:de\s*)?(?:utilidad|ganancia|margen)/i);
+  const profitDollarMatch = textWithoutPhones.match(/(?:utilidad|ganancia)\s*(?:de\s*)?\$?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:\$|usd|d[oó]lares)?\b/i);
+
+  if (profitPctMatch && profitPctMatch[1]) {
+    const parsedPct = parseFloat(profitPctMatch[1].replace(',', '.'));
+    if (!isNaN(parsedPct) && parsedPct > 0 && parsedPct < 1000) {
+      finalProfitMarginPercent = parsedPct;
+      finalProfitAmount = Math.round(costWithoutTax * (finalProfitMarginPercent / 100) * 100) / 100;
+    }
+  } else if (profitDollarMatch && profitDollarMatch[1]) {
+    const parsedDollar = parseFloat(profitDollarMatch[1].replace(',', '.'));
+    if (!isNaN(parsedDollar) && parsedDollar > 0 && parsedDollar < 50000) {
+      finalProfitAmount = Math.round(parsedDollar * 100) / 100;
+      finalProfitMarginPercent = costWithoutTax > 0 ? Math.round((finalProfitAmount / costWithoutTax) * 100) : fallbackMargin;
+    }
+  }
+
+  // 9. Descuento (Discount % / Discount Amount $) detection
+  let finalDiscountPercent = 0;
+  const discPctMatch = textWithoutPhones.match(/(?:descuento|desc|rebaja|oferta)\s*(?:de\s*|del\s*)?(\d+(?:[.,]\d{1,2})?)\s*%/i) ||
+                       textWithoutPhones.match(/(\d+(?:[.,]\d{1,2})?)\s*%\s*(?:de\s*)?(?:descuento|desc)/i);
+  const discDollarMatch = textWithoutPhones.match(/(?:descuento|desc)\s*(?:de\s*)?\$?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:\$|usd|d[oó]lares)?\b/i);
+
+  if (discPctMatch && discPctMatch[1]) {
+    const parsedDiscPct = parseFloat(discPctMatch[1].replace(',', '.'));
+    if (!isNaN(parsedDiscPct) && parsedDiscPct >= 0 && parsedDiscPct < 100) {
+      finalDiscountPercent = parsedDiscPct;
+    }
+  } else if (discDollarMatch && discDollarMatch[1]) {
+    const parsedDiscDollar = parseFloat(discDollarMatch[1].replace(',', '.'));
+    if (!isNaN(parsedDiscDollar) && parsedDiscDollar > 0) {
+      const targetBase = costWithoutTax + finalProfitAmount;
+      finalDiscountPercent = targetBase > 0 ? Math.round((parsedDiscDollar / targetBase) * 100) : 0;
+    }
+  }
+
+  // 10. Cost options adjustment
   const adjustedCostOptions = costOptions.map((opt) => {
     let optWithout = opt.price;
     let optWith = opt.price;
@@ -786,15 +840,22 @@ function extractFallbackFromText(
     };
   });
 
-  // 8. Tags
+  // 11. Tags
   const tags = [category.toLowerCase(), 'telegram', 'proveedor'];
   if (lower.includes('nike')) tags.push('nike');
   if (lower.includes('adidas')) tags.push('adidas');
   if (lower.includes('original')) tags.push('original');
 
-  const finalSale = detectedSalePrice && detectedSalePrice > costWithTax
-    ? detectedSalePrice
-    : taxAdjustment.salePrice;
+  // 12. Calculate Published Sale Price (PVP) with discount protection formula
+  let finalSale = 0;
+  if (detectedSalePrice && detectedSalePrice > costWithTax) {
+    finalSale = detectedSalePrice;
+  } else {
+    const targetNetBaseSinIVA = costWithoutTax + finalProfitAmount;
+    const discRate = Math.max(0, Math.min(0.99, finalDiscountPercent / 100));
+    const publishedSinIVA = discRate < 1 ? targetNetBaseSinIVA / (1 - discRate) : targetNetBaseSinIVA;
+    finalSale = Math.round((taxRate > 0 ? publishedSinIVA * (1 + taxRate / 100) : publishedSinIVA) * 100) / 100;
+  }
 
   return {
     name: name || 'Producto Nuevo Telegram',
@@ -808,7 +869,9 @@ function extractFallbackFromText(
     taxStatus: detectedTaxStatus,
     taxPercent: taxRate,
     costOptions: adjustedCostOptions,
-    profitMarginPercent,
+    profitMarginPercent: finalProfitMarginPercent,
+    profitAmount: finalProfitAmount,
+    discountPercent: finalDiscountPercent,
     salePrice: finalSale,
     stock,
     description: text || 'Producto importado automáticamente desde mensaje de proveedor en Telegram.',
@@ -824,6 +887,9 @@ function extractFallbackFromText(
       costWithoutTax,
       costWithTax,
       taxAmount: taxAdjustment.taxAmount,
+      profitMarginPercent: finalProfitMarginPercent,
+      profitAmount: finalProfitAmount,
+      discountPercent: finalDiscountPercent,
       iva:
         detectedTaxStatus === 'PLUS_TAX'
           ? `+${taxRate}% aplicado (Base: $${costWithoutTax.toFixed(2)} ➔ Con IVA: $${costWithTax.toFixed(2)})`
@@ -900,17 +966,20 @@ REGLAS CRÍTICAS DE RECONOCIMIENTO Y PREVENCIÓN DE ERRORES DE PRECIOS:
 6. "sku": Código SKU alfanumérico secuencial sencillo o el código del fabricante si se menciona explícitamente. Si no hay código explícito, coloca "AUTO".
 7. "barcode": Código de barras físico del producto (EAN-13, UPC, EAN-8 o numérico detectado en fotos/etiquetas o texto). Cadena vacía si no existe.
 8. "category": Clasifica en: "Calzado", "Ropa y Moda", "Electrónica y Celulares", "Computación y Accesorios", "Hogar y Cocina", "Belleza y Cuidado Personal", "Deportes y Fitness", "Juguetes y Niños", "Ferretería y Herramientas", o "General".
-9. "profitMarginPercent": Porcentaje de margen de ganancia comercial. Usa ${defaultMarginPercent} por defecto.
-10. "salePrice": Precio de venta al público (PVP):
-    - Si el mensaje menciona precio de venta sugerido (PVP / MSRP / "vender a"), úsalo como salePrice.
-    - Si no se menciona PVP, calcúlalo aplicando profitMarginPercent sobre el costo neto sin IVA (salePrice = costWithoutTax * (1 + profitMarginPercent/100)).
+9. "profitMarginPercent" y "profitAmount":
+   - "profitMarginPercent": Porcentaje de margen de ganancia comercial (usa ${defaultMarginPercent} por defecto si no se menciona).
+   - "profitAmount": Si el mensaje especifica utilidad o ganancia en monto fijo de dólares (ej. "utilidad de $50", "utilidad de 50.00", "ganancia de 30"), extrae ese número explícito en dólares.
+10. "discountPercent": Si el mensaje especifica un porcentaje de descuento promocional (ej. "descuento de 10%", "10% desc", "-10% desc"), extrae el número del porcentaje (ej. 10). Si no se menciona descuento, coloca 0.
+11. "salePrice": Precio de venta al público (PVP):
+    - Si el mensaje menciona precio de venta sugerido explícito (PVP / MSRP / "vender a"), úsalo como salePrice.
+    - Si no se menciona PVP, calcúlalo aplicando profitMarginPercent o profitAmount sobre el costo neto sin IVA, ajustado por el descuento promocional.
     - NUNCA pongas un salePrice menor que el costWithoutTax.
-11. "stock": Cantidad de unidades disponibles mencionadas (ej. "llegaron 30 unidades", "lote de 15"). Si no especifica, pon 1.
-12. "description": Redacta una descripción atractiva, estructurada con viñetas sobre características, materiales, usos y ventajas.
-13. "tags": Lista de 3 a 7 etiquetas de búsqueda (ej. ["zapatillas", "running", "deportes", "nike", "calzado"]).
-14. "attributes": Objeto JSON con detalles específicos (colores disponibles, tallas, modelo, marca, conectividad, etc.).
-15. "supplierNotes": Notas adicionales del proveedor.
-16. "confidenceScore": Puntuación de 0 a 100 de qué tan confiable fue la extracción.
+12. "stock": Cantidad de unidades disponibles mencionadas (ej. "llegaron 30 unidades", "lote de 15"). Si no especifica, pon 1.
+13. "description": Redacta una descripción atractiva, estructurada con viñetas sobre características, materiales, usos y ventajas.
+14. "tags": Lista de 3 a 7 etiquetas de búsqueda (ej. ["zapatillas", "running", "deportes", "nike", "calzado"]).
+15. "attributes": Objeto JSON con detalles específicos (colores disponibles, tallas, modelo, marca, conectividad, etc.).
+16. "supplierNotes": Notas adicionales del proveedor.
+17. "confidenceScore": Puntuación de 0 a 100 de qué tan confiable fue la extracción.
 
 Texto del mensaje recibido del proveedor:
 """
@@ -945,7 +1014,7 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
             }
 
             const taxRate = finalTaxStatus === 'NOT_SPECIFIED' ? 0 : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
-            const margin = Math.max(1, Number(parsed.profitMarginPercent) || defaultMarginPercent || 30);
+            let margin = Math.max(1, Number(parsed.profitMarginPercent) || defaultMarginPercent || 30);
             const rawCostVal = Math.max(0.01, Number(parsed.costPrice || parsed.costWithTax || parsed.costWithoutTax) || 15.0);
 
             const costAdj = calculateTaxAdjustment({
@@ -954,6 +1023,19 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
               taxPercent: taxRate,
               profitMarginPercent: margin,
             });
+
+            const parsedProfitAmt = typeof parsed.profitAmount === 'number' && parsed.profitAmount > 0 ? parsed.profitAmount : undefined;
+            if (parsedProfitAmt && costAdj.baseCostPrice > 0) {
+              margin = Math.round((parsedProfitAmt / costAdj.baseCostPrice) * 100);
+            }
+            const profitAmt = parsedProfitAmt ?? Math.round(costAdj.baseCostPrice * (margin / 100) * 100) / 100;
+            const discountPct = Math.max(0, Number(parsed.discountPercent) || 0);
+
+            // Compute Published PVP
+            const targetBaseSinIVA = costAdj.baseCostPrice + profitAmt;
+            const discRate = Math.max(0, Math.min(0.99, discountPct / 100));
+            const publishedSinIVA = discRate < 1 ? targetBaseSinIVA / (1 - discRate) : targetBaseSinIVA;
+            const calculatedSale = Math.round((taxRate > 0 ? publishedSinIVA * (1 + taxRate / 100) : publishedSinIVA) * 100) / 100;
 
             return {
               name: parsed.name || 'Producto Nuevo (LM Studio Local)',
@@ -968,11 +1050,13 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
               taxPercent: taxRate,
               costOptions: Array.isArray(parsed.costOptions) && parsed.costOptions.length > 0 ? parsed.costOptions : [{ label: `Costo Principal ($${costAdj.costPrice.toFixed(2)})`, price: costAdj.costPrice }],
               profitMarginPercent: margin,
-              salePrice: Number(parsed.salePrice) || costAdj.salePrice,
+              profitAmount: profitAmt,
+              discountPercent: discountPct,
+              salePrice: Number(parsed.salePrice) && Number(parsed.salePrice) > costAdj.costPrice ? Number(parsed.salePrice) : calculatedSale,
               stock: Math.max(1, Number(parsed.stock) || 1),
               description: parsed.description || caption || 'Sin descripción',
               tags: Array.isArray(parsed.tags) ? parsed.tags : ['local-ia'],
-              attributes: { ...(parsed.attributes || {}), proveedorIA: 'LM Studio Local' },
+              attributes: { ...(parsed.attributes || {}), proveedorIA: 'LM Studio Local', profitAmount: profitAmt, discountPercent: discountPct },
               supplierNotes: parsed.supplierNotes || 'Procesado con IA Local (LM Studio)',
               confidenceScore: Number(parsed.confidenceScore) || 95,
             };
@@ -1054,6 +1138,8 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
                 },
               },
               profitMarginPercent: { type: Type.NUMBER, description: 'Porcentaje de margen de ganancia' },
+              profitAmount: { type: Type.NUMBER, description: 'Monto de ganancia o utilidad fija en dolares si se especifica' },
+              discountPercent: { type: Type.NUMBER, description: 'Porcentaje de descuento promocional si se menciona' },
               salePrice: { type: Type.NUMBER, description: 'Precio de venta al publico' },
               stock: { type: Type.INTEGER },
               description: { type: Type.STRING },
@@ -1133,7 +1219,7 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
       const taxRate = finalTaxStatus === 'NOT_SPECIFIED'
         ? 0
         : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
-      const margin = Math.max(1, Number(parsed.profitMarginPercent) || defaultMarginPercent || 30);
+      let margin = Math.max(1, Number(parsed.profitMarginPercent) || defaultMarginPercent || 30);
 
       const taxAdjustment = calculateTaxAdjustment({
         costPrice: finalHighestCost,
@@ -1165,6 +1251,14 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         finalCostWithoutTax = finalCostWithTax;
       }
 
+      // Profit amount & Discount calculations
+      const parsedProfitAmt = typeof parsed.profitAmount === 'number' && parsed.profitAmount > 0 ? parsed.profitAmount : undefined;
+      if (parsedProfitAmt && finalCostWithoutTax > 0) {
+        margin = Math.round((parsedProfitAmt / finalCostWithoutTax) * 100);
+      }
+      const profitAmt = parsedProfitAmt ?? Math.round(finalCostWithoutTax * (margin / 100) * 100) / 100;
+      const discountPct = Math.max(0, Number(parsed.discountPercent) || 0);
+
       // Populate costWithoutTax and costWithTax on each option
       const adjustedCostOptions: CostOption[] = costOptions.map((opt) => {
         let optWithout = opt.costWithoutTax;
@@ -1193,7 +1287,13 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         };
       });
 
-      let finalSalePrice = Math.round(finalCostWithTax * (1 + margin / 100) * 100) / 100;
+      // Compute Published PVP
+      const targetBaseSinIVA = finalCostWithoutTax + profitAmt;
+      const discRate = Math.max(0, Math.min(0.99, discountPct / 100));
+      const publishedSinIVA = discRate < 1 ? targetBaseSinIVA / (1 - discRate) : targetBaseSinIVA;
+      const calculatedSalePrice = Math.round((taxRate > 0 ? publishedSinIVA * (1 + taxRate / 100) : publishedSinIVA) * 100) / 100;
+
+      let finalSalePrice = calculatedSalePrice;
       if (parsed.salePrice) {
         const parsedSale = Number(parsed.salePrice);
         if (!isNaN(parsedSale) && parsedSale > finalCostWithTax) {
@@ -1214,6 +1314,8 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         taxPercent: taxRate,
         costOptions: adjustedCostOptions,
         profitMarginPercent: margin,
+        profitAmount: profitAmt,
+        discountPercent: discountPct,
         salePrice: finalSalePrice,
         stock: Math.max(1, Number(parsed.stock) || 1),
         description: parsed.description || caption || 'Sin descripción',
@@ -1229,6 +1331,9 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
           costWithoutTax: finalCostWithoutTax,
           costWithTax: finalCostWithTax,
           taxAmount: Math.round((finalCostWithTax - finalCostWithoutTax) * 100) / 100,
+          profitMarginPercent: margin,
+          profitAmount: profitAmt,
+          discountPercent: discountPct,
           iva:
             finalTaxStatus === 'PLUS_TAX'
               ? `+${taxRate}% aplicado (Base: $${finalCostWithoutTax.toFixed(2)} ➔ Con IVA: $${finalCostWithTax.toFixed(2)})`

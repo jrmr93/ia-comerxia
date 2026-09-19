@@ -415,7 +415,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const costWithoutNum = parseFloat(initialCostWithout) || 0;
       let initMargin = 30;
       let initProfit = 0;
-      if (parsedAttr.profitMarginPercent !== undefined) {
+      if (parsedAttr.profitAmount !== undefined && !isNaN(Number(parsedAttr.profitAmount))) {
+        initProfit = Number(parsedAttr.profitAmount);
+        initMargin = costWithoutNum > 0 ? Math.round((initProfit / costWithoutNum) * 100) : (parsedAttr.profitMarginPercent ? Number(parsedAttr.profitMarginPercent) : 30);
+      } else if (parsedAttr.profitMarginPercent !== undefined && !isNaN(Number(parsedAttr.profitMarginPercent))) {
         initMargin = Number(parsedAttr.profitMarginPercent);
         initProfit = costWithoutNum * (initMargin / 100);
       } else if (costWithoutNum > 0 && saleNum > 0) {
@@ -431,7 +434,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setMarginPercent(initMargin);
       setProfitAmount(initProfit.toFixed(2));
 
-      setDiscountPercent(editingItem.discountPercent || 0);
+      setDiscountPercent(
+        editingItem.discountPercent !== undefined && editingItem.discountPercent !== null
+          ? Number(editingItem.discountPercent)
+          : parsedAttr.discountPercent !== undefined && !isNaN(Number(parsedAttr.discountPercent))
+          ? Number(parsedAttr.discountPercent)
+          : 0
+      );
       setStock(editingItem.stock ?? 0);
 
       // Collect all available photos for the item

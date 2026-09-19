@@ -732,6 +732,15 @@ async function processCompleteProduct(
       : effectiveCostWith;
 
   // 7. Create product in PostgreSQL
+  const attributesToStore = {
+    ...attributesWithGallery,
+    hasPurchaseTax: effectiveTaxRate > 0,
+    purchaseTaxPercent: effectiveTaxRate,
+    discountPercent: parsed.discountPercent || 0,
+    profitMarginPercent: parsed.profitMarginPercent,
+    profitAmount: parsed.profitAmount,
+  };
+
   const inventoryItem = await createInventoryItem({
     userId,
     name: parsed.name,
@@ -743,16 +752,13 @@ async function processCompleteProduct(
     costWithTax: String(effectiveCostWith.toFixed(2)),
     taxRate: String(effectiveTaxRate),
     salePrice: String(parsed.salePrice.toFixed(2)),
+    discountPercent: parsed.discountPercent || 0,
     stock: effectiveStock,
     imageUrl: primaryPhoto,
     videoUrl: videoUrl || null,
     supplierName: senderName,
     tags: parsed.tags.join(', '),
-    extractedAttributes: JSON.stringify({
-      ...attributesWithGallery,
-      hasPurchaseTax: effectiveTaxRate > 0,
-      purchaseTaxPercent: effectiveTaxRate,
-    }),
+    extractedAttributes: JSON.stringify(attributesToStore),
     status: 'available',
     rawTelegramMessage: caption,
   });
@@ -820,6 +826,13 @@ async function processCompleteProduct(
           .join('\n');
     }
 
+    const discountNote = parsed.discountPercent && parsed.discountPercent > 0
+      ? `🏷️ *Descuento Promocional:* ${parsed.discountPercent}%\n`
+      : '';
+    const profitDetail = parsed.profitAmount
+      ? ` _(Utilidad: ${currencySym}${parsed.profitAmount.toFixed(2)})_`
+      : '';
+
     const stockMsg = `📊 *Stock Ingresado:* 0 unidades\n\n`;
 
     const safeName = escapeTelegramMarkdown(parsed.name);
@@ -836,8 +849,9 @@ async function processCompleteProduct(
       `🏷️ *SKU:* \`${finalSku}\`\n` +
       `📂 *Categoría:* ${safeCategory}\n` +
       `${costSection}\n` +
-      `🏷️ *PVP Sugerido (${parsed.profitMarginPercent || config.defaultMarginPercent || 30}%):* ${currencySym}${parsed.salePrice.toFixed(2)}\n` +
-      `📈 *Margen Estimado:* +${currencySym}${profit}\n` +
+      `🏷️ *PVP Sugerido (${parsed.profitMarginPercent || config.defaultMarginPercent || 30}% margen):* ${currencySym}${parsed.salePrice.toFixed(2)}\n` +
+      discountNote +
+      `📈 *Margen Estimado:* +${currencySym}${profit}${profitDetail}\n` +
       stockMsg +
       `⚡ _Ya puedes verlo con todas sus opciones de costo, video y fotos en tu panel de inventario._`;
 
@@ -1035,6 +1049,7 @@ async function processWebProductUrlMessage(
     costWithTax: effectiveCostWith,
     taxRate: String(effectiveTaxRate),
     salePrice: String(scraped.salePrice.toFixed(2)),
+    discountPercent: scraped.discountPercent || 0,
     stock: effectiveStock,
     imageUrl: scraped.primaryImage,
     supplierName: effectiveSupplier,
