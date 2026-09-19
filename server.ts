@@ -4,6 +4,7 @@ dotenv.config();
 import express, { Request, Response, NextFunction } from 'express';
 import http from 'http';
 import path from 'path';
+import os from 'os';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { optionalAuth, requireAuth, requireAdmin, AuthRequest } from './src/middleware/auth.ts';
@@ -5383,10 +5384,10 @@ async function startServer() {
 
   // 14b. Uploads / Media Backup & Restore Endpoints
   const uploadZipMiddleware = multer({
-    storage: multer.memoryStorage(),
+    dest: os.tmpdir(),
     limits: {
-      fileSize: 500 * 1024 * 1024, // Max 500MB ZIP
-      fieldSize: 500 * 1024 * 1024,
+      fileSize: 1024 * 1024 * 1024, // Max 1024MB (1GB) ZIP
+      fieldSize: 1024 * 1024 * 1024,
     },
   });
 
@@ -5397,7 +5398,7 @@ async function startServer() {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(413).json({
             success: false,
-            error: 'El archivo ZIP excede el tamaño máximo permitido del servidor Node.js (500MB).',
+            error: 'El archivo ZIP excede el tamaño máximo permitido del servidor Node.js (1 GB).',
           });
         }
         return res.status(400).json({
@@ -5521,12 +5522,20 @@ async function startServer() {
   });
 
   app.post('/api/restore-uploads-zip', requireAuth, handleZipUploadMiddleware, async (req: AuthRequest, res: Response) => {
+    let tempPath: string | null = null;
     try {
-      if (!req.file || !req.file.buffer) {
+      if (!req.file) {
         return res.status(400).json({ success: false, error: 'Debe adjuntar un archivo ZIP válido con las imágenes' });
       }
 
-      const result = await restoreUploadsFromZipBuffer(req.file.buffer);
+      tempPath = req.file.path || null;
+      const fileBuffer = req.file.buffer || (tempPath && fs.existsSync(tempPath) ? fs.readFileSync(tempPath) : null);
+
+      if (!fileBuffer) {
+        return res.status(400).json({ success: false, error: 'No se pudieron leer los datos del archivo ZIP de imágenes subido' });
+      }
+
+      const result = await restoreUploadsFromZipBuffer(fileBuffer);
       res.json({
         success: true,
         restoredCount: result.restoredCount,
@@ -5536,17 +5545,29 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error restoring uploads zip:', error);
       res.status(500).json({ success: false, error: error.message || 'Error al procesar y restaurar el archivo ZIP' });
+    } finally {
+      if (tempPath && fs.existsSync(tempPath)) {
+        try { fs.unlinkSync(tempPath); } catch (_) {}
+      }
     }
   });
 
   // 14c. Restore Master Full System ZIP (One-click migration: extracts media + restores database)
   app.post('/api/restore-master-zip', requireAuth, handleZipUploadMiddleware, async (req: AuthRequest, res: Response) => {
+    let tempPath: string | null = null;
     try {
-      if (!req.file || !req.file.buffer) {
+      if (!req.file) {
         return res.status(400).json({ success: false, error: 'Debe adjuntar un archivo ZIP válido de respaldo maestro' });
       }
 
-      const result = await restoreMasterFullSystemZip(req.file.buffer, req.dbUserId || 1);
+      tempPath = req.file.path || null;
+      const fileBuffer = req.file.buffer || (tempPath && fs.existsSync(tempPath) ? fs.readFileSync(tempPath) : null);
+
+      if (!fileBuffer) {
+        return res.status(400).json({ success: false, error: 'No se pudieron leer los datos del archivo ZIP de respaldo maestro' });
+      }
+
+      const result = await restoreMasterFullSystemZip(fileBuffer, req.dbUserId || 1);
 
       // Auto-resume Telegram polling if token was restored
       try {
@@ -5573,6 +5594,10 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error restoring master zip:', error);
       res.status(500).json({ success: false, error: error.message || 'Error al procesar respaldo maestro' });
+    } finally {
+      if (tempPath && fs.existsSync(tempPath)) {
+        try { fs.unlinkSync(tempPath); } catch (_) {}
+      }
     }
   });
 
