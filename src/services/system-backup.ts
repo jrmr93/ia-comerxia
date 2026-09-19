@@ -1943,6 +1943,85 @@ export async function restoreCompleteJsonDump(
       }
     }
 
+    // 12.5. Store Configs (Ajustes de Tienda)
+    if (Array.isArray(backupData.storeConfigs) && backupData.storeConfigs.length > 0) {
+      if (!localState.storeConfigs) localState.storeConfigs = [];
+      for (const sc of backupData.storeConfigs) {
+        try {
+          const validUserId = await resolveValidUserId(sc.userId || targetUserId);
+
+          const storeValues: any = {
+            userId: validUserId,
+            storeName: sc.storeName || 'Comerxia Store',
+            whatsappNumber: sc.whatsappNumber || '',
+            description: sc.description || 'Catálogo digital con envíos y pedidos directos',
+            bannerText: sc.bannerText || '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
+            deliveryFee: String(sc.deliveryFee || '0.00'),
+            minOrderAmount: String(sc.minOrderAmount || '0.00'),
+            currency: sc.currency || 'USD',
+            isActive: sc.isActive !== false,
+            maintenanceTitle: sc.maintenanceTitle || 'Tienda Temporalmente Pausada',
+            maintenanceMessage: sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!',
+            allowCatalogBrowsing: sc.allowCatalogBrowsing !== false,
+            showStock: sc.showStock !== false,
+            showOutOfStock: sc.showOutOfStock !== false,
+            enablePagination: sc.enablePagination !== false,
+            itemsPerPage: sc.itemsPerPage || 12,
+            instagramUrl: sc.instagramUrl || null,
+            websiteUrl: sc.websiteUrl || null,
+            address: sc.address || null,
+            logoUrl: normalizeMediaUrl(sc.logoUrl || sc.logo_url) || null,
+            logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
+            courierLogos: sc.courierLogos || null,
+            paymentLogos: sc.paymentLogos || null,
+            theme: sc.theme || 'classic',
+            promoPopup: sc.promoPopup || null,
+            updatedAt: new Date(),
+          };
+
+          if (isPostgresConfigured()) {
+            let existingStore: any = null;
+            if (sc.id) {
+              const [foundById] = await db.select().from(storeConfigs).where(eq(storeConfigs.id, sc.id)).limit(1);
+              if (foundById) existingStore = foundById;
+            }
+            if (!existingStore) {
+              const [foundByUser] = await db.select().from(storeConfigs).where(eq(storeConfigs.userId, validUserId)).limit(1);
+              if (foundByUser) existingStore = foundByUser;
+            }
+            if (!existingStore) {
+              const [foundAny] = await db.select().from(storeConfigs).limit(1);
+              if (foundAny) existingStore = foundAny;
+            }
+
+            if (existingStore) {
+              await db.update(storeConfigs).set(storeValues).where(eq(storeConfigs.id, existingStore.id));
+            } else {
+              if (sc.id && typeof sc.id === 'number') {
+                storeValues.id = sc.id;
+              }
+              await db.insert(storeConfigs).values(storeValues).onConflictDoNothing();
+            }
+          }
+
+          // Local JSON storage update
+          const localIdx = localState.storeConfigs.findIndex((s) => s.userId === validUserId || s.id === sc.id);
+          const localRecord = {
+            id: sc.id || 1,
+            ...storeValues,
+            createdAt: sc.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.storeConfigs[localIdx] = localRecord;
+          else localState.storeConfigs.push(localRecord);
+
+          counts.storeConfigs = (counts.storeConfigs || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar store config (ajustes de tienda): ${err?.message}`);
+        }
+      }
+    }
+
     // 13. Ecuador API Configs
     if (Array.isArray(backupData.ecuadorApiConfigs) && backupData.ecuadorApiConfigs.length > 0) {
       if (!localState.ecuadorApiConfigs) localState.ecuadorApiConfigs = [];
