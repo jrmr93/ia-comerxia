@@ -1293,41 +1293,52 @@ export async function restoreCompleteJsonDump(
     }
 
     // 2. Store Configs
-    if (Array.isArray(backupData.storeConfigs) && backupData.storeConfigs.length > 0) {
+    const rawStoresList = Array.isArray(backupData.storeConfigs)
+      ? backupData.storeConfigs
+      : Array.isArray(backupData.store_configs)
+      ? backupData.store_configs
+      : backupData.storeConfig
+      ? [backupData.storeConfig]
+      : backupData.store_config
+      ? [backupData.store_config]
+      : [];
+
+    if (rawStoresList.length > 0) {
       if (!localState.storeConfigs) localState.storeConfigs = [];
-      for (const sc of backupData.storeConfigs) {
+      for (const sc of rawStoresList) {
         try {
-          const validUserId = await resolveValidUserId(sc.userId || targetUserId);
+          const validUserId = await resolveValidUserId(sc.userId || sc.user_id || targetUserId);
 
           const storeValues: any = {
             userId: validUserId,
-            storeName: sc.storeName || 'Comerxia Store',
-            whatsappNumber: sc.whatsappNumber || '',
-            description: sc.description || 'Catálogo digital con envíos y pedidos directos',
-            bannerText: sc.bannerText || '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
-            deliveryFee: String(sc.deliveryFee || '0.00'),
-            minOrderAmount: String(sc.minOrderAmount || '0.00'),
+            storeName: sc.storeName || sc.store_name || 'Comerxia Store',
+            whatsappNumber: sc.whatsappNumber !== undefined ? String(sc.whatsappNumber) : sc.whatsapp_number !== undefined ? String(sc.whatsapp_number) : '',
+            description: sc.description !== undefined ? String(sc.description) : 'Catálogo digital con envíos y pedidos directos',
+            bannerText: sc.bannerText !== undefined ? String(sc.bannerText) : sc.banner_text !== undefined ? String(sc.banner_text) : '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
+            deliveryFee: String(sc.deliveryFee !== undefined ? sc.deliveryFee : sc.delivery_fee !== undefined ? sc.delivery_fee : '0.00'),
+            minOrderAmount: String(sc.minOrderAmount !== undefined ? sc.minOrderAmount : sc.min_order_amount !== undefined ? sc.min_order_amount : '0.00'),
             currency: sc.currency || 'USD',
-            isActive: sc.isActive !== false,
-            maintenanceTitle: sc.maintenanceTitle || 'Tienda Temporalmente Pausada',
-            maintenanceMessage: sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!',
-            allowCatalogBrowsing: sc.allowCatalogBrowsing !== false,
-            showStock: sc.showStock !== false,
-            showOutOfStock: sc.showOutOfStock !== false,
-            enablePagination: sc.enablePagination !== false,
-            itemsPerPage: sc.itemsPerPage || 12,
-            instagramUrl: sc.instagramUrl || null,
+            isActive: sc.isActive !== undefined ? Boolean(sc.isActive) : sc.is_active !== undefined ? Boolean(sc.is_active) : true,
+            maintenanceTitle: sc.maintenanceTitle || sc.maintenance_title || 'Tienda Temporalmente Pausada',
+            maintenanceMessage: sc.maintenanceMessage || sc.maintenance_message || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!',
+            allowCatalogBrowsing: sc.allowCatalogBrowsing !== undefined ? Boolean(sc.allowCatalogBrowsing) : sc.allow_catalog_browsing !== undefined ? Boolean(sc.allow_catalog_browsing) : false,
+            showStock: sc.showStock !== undefined ? Boolean(sc.showStock) : sc.show_stock !== undefined ? Boolean(sc.show_stock) : true,
+            showOutOfStock: sc.showOutOfStock !== undefined ? Boolean(sc.showOutOfStock) : sc.show_out_of_stock !== undefined ? Boolean(sc.show_out_of_stock) : true,
+            enablePagination: sc.enablePagination !== undefined ? Boolean(sc.enablePagination) : sc.enable_pagination !== undefined ? Boolean(sc.enable_pagination) : false,
+            itemsPerPage: sc.itemsPerPage !== undefined ? Number(sc.itemsPerPage) : sc.items_per_page !== undefined ? Number(sc.items_per_page) : 12,
+            instagramUrl: sc.instagramUrl || sc.instagram_url || null,
             websiteUrl: sc.websiteUrl || sc.website_url || null,
             address: sc.address || null,
             logoUrl: normalizeMediaUrl(sc.logoUrl || sc.logo_url) || null,
             logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
             courierLogos: normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos),
             paymentLogos: normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos),
-            theme: sc.theme || 'classic',
-            promoPopup: sc.promoPopup || null,
+            theme: typeof sc.theme === 'object' ? JSON.stringify(sc.theme) : (sc.theme || 'classic'),
+            promoPopup: typeof (sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup) === 'object'
+              ? JSON.stringify(sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup)
+              : ((sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup) || null),
             updatedAt: new Date(),
           };
-
 
           if (isPostgresConfigured()) {
             let existingStore: any = null;
@@ -1355,21 +1366,17 @@ export async function restoreCompleteJsonDump(
           }
 
           // Update local JSON storage state for offline fallback (always ensure index 0 holds active config)
-          const localIdx = localState.storeConfigs.findIndex((s) => s.userId === validUserId || s.id === sc.id);
           const localRecord = {
             id: sc.id || 1,
             ...storeValues,
-            createdAt: sc.createdAt || new Date().toISOString(),
+            createdAt: sc.createdAt || sc.created_at || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          if (localIdx !== -1) {
-            localState.storeConfigs[localIdx] = localRecord;
-          } else if (localState.storeConfigs.length > 0) {
+          if (localState.storeConfigs.length > 0) {
             localState.storeConfigs[0] = localRecord;
           } else {
             localState.storeConfigs.push(localRecord);
           }
-
 
           counts.storeConfigs++;
         } catch (err: any) {
@@ -1377,6 +1384,7 @@ export async function restoreCompleteJsonDump(
         }
       }
     }
+
 
     // 3. Inventory Items
     if (Array.isArray(backupData.inventoryItems)) {
