@@ -46,7 +46,8 @@ import {
 } from '../db/inventory.ts';
 import { getEmailConfig } from './email.ts';
 import { ensureUploadsDirExists } from './media-storage.ts';
-import { normalizeMediaUrl } from '../utils/media-helper.ts';
+import { normalizeMediaUrl, normalizeJsonMediaArray } from '../utils/media-helper.ts';
+
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
@@ -296,6 +297,21 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
   } else {
     // Fallback to local storage state if available
     const localState = storage.getState();
+    if (localState.storeConfigs && localState.storeConfigs.length > 0) {
+      allStoreConfigs = localState.storeConfigs;
+    }
+    if (localState.serverDomainConfigs && localState.serverDomainConfigs.length > 0) {
+      allDomainConfigs = localState.serverDomainConfigs;
+    }
+    if (localState.aiConfigs && localState.aiConfigs.length > 0) {
+      allAiConfigs = localState.aiConfigs;
+    }
+    if (localState.emailConfigs && localState.emailConfigs.length > 0) {
+      allEmailConfigs = localState.emailConfigs;
+    }
+    if (localState.telegramConfigs && localState.telegramConfigs.length > 0) {
+      allTgConfigs = localState.telegramConfigs;
+    }
     if (localState.ecuadorApiConfigs && localState.ecuadorApiConfigs.length > 0) {
       allEcuadorApiConfigs = localState.ecuadorApiConfigs;
     }
@@ -317,6 +333,14 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     analyticsEvents = storage.getState()?.storeAnalyticsEvents || [];
   }
 
+  const sanitizedStoreConfigs = (allStoreConfigs || []).map((sc) => ({
+    ...sc,
+    logoUrl: normalizeMediaUrl(sc.logoUrl || sc.logo_url) || null,
+    logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
+    courierLogos: normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos),
+    paymentLogos: normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos),
+  }));
+
   return {
     users: allUsers || [],
     telegramConfigs: allTgConfigs,
@@ -327,7 +351,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     customerOrders: orders || [],
     purchases: purchs || [],
     payments: pmts || [],
-    storeConfigs: allStoreConfigs,
+    storeConfigs: sanitizedStoreConfigs,
     serverDomainConfigs: allDomainConfigs,
     aiConfigs: allAiConfigs,
     emailConfigs: allEmailConfigs,
@@ -338,6 +362,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     storeAnalyticsEvents: analyticsEvents,
   };
 }
+
 
 /**
  * Generates a 100% complete, fully compatible SQL dump for PostgreSQL.
@@ -850,7 +875,10 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.storeConfigs.length > 0) {
     sql += `-- Datos: store_configs\n`;
     for (const sc of data.storeConfigs) {
-      sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, enable_pagination, items_per_page, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${sc.enablePagination ? 'TRUE' : 'FALSE'}, ${sc.itemsPerPage || 12}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(sc.courierLogos)}, ${escapeSqlString(sc.paymentLogos)}, ${escapeSqlString(sc.theme || 'classic')}, ${escapeSqlString(sc.promoPopup)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, enable_pagination = EXCLUDED.enable_pagination, items_per_page = EXCLUDED.items_per_page, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, promo_popup = EXCLUDED.promo_popup;\n`;
+      const normCourierLogos = normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos);
+      const normPaymentLogos = normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos);
+      sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, enable_pagination, items_per_page, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${sc.enablePagination ? 'TRUE' : 'FALSE'}, ${sc.itemsPerPage || 12}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(normCourierLogos)}, ${escapeSqlString(normPaymentLogos)}, ${escapeSqlString(sc.theme || 'classic')}, ${escapeSqlString(sc.promoPopup)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, enable_pagination = EXCLUDED.enable_pagination, items_per_page = EXCLUDED.items_per_page, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, promo_popup = EXCLUDED.promo_popup;\n`;
+
     }
     sql += `\n`;
   }
@@ -1275,30 +1303,31 @@ export async function restoreCompleteJsonDump(
             userId: validUserId,
             storeName: sc.storeName || 'Comerxia Store',
             whatsappNumber: sc.whatsappNumber || '',
-            description: sc.description || '',
-            bannerText: sc.bannerText || '',
+            description: sc.description || 'Catálogo digital con envíos y pedidos directos',
+            bannerText: sc.bannerText || '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
             deliveryFee: String(sc.deliveryFee || '0.00'),
             minOrderAmount: String(sc.minOrderAmount || '0.00'),
             currency: sc.currency || 'USD',
             isActive: sc.isActive !== false,
             maintenanceTitle: sc.maintenanceTitle || 'Tienda Temporalmente Pausada',
             maintenanceMessage: sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!',
-            allowCatalogBrowsing: Boolean(sc.allowCatalogBrowsing),
+            allowCatalogBrowsing: sc.allowCatalogBrowsing !== false,
             showStock: sc.showStock !== false,
             showOutOfStock: sc.showOutOfStock !== false,
-            enablePagination: Boolean(sc.enablePagination),
+            enablePagination: sc.enablePagination !== false,
             itemsPerPage: sc.itemsPerPage || 12,
             instagramUrl: sc.instagramUrl || null,
             websiteUrl: sc.websiteUrl || sc.website_url || null,
             address: sc.address || null,
-            logoUrl: normalizeMediaUrl(sc.logoUrl),
-            logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url),
-            courierLogos: sc.courierLogos || null,
-            paymentLogos: sc.paymentLogos || null,
+            logoUrl: normalizeMediaUrl(sc.logoUrl || sc.logo_url) || null,
+            logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
+            courierLogos: normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos),
+            paymentLogos: normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos),
             theme: sc.theme || 'classic',
             promoPopup: sc.promoPopup || null,
             updatedAt: new Date(),
           };
+
 
           if (isPostgresConfigured()) {
             let existingStore: any = null;
@@ -1943,84 +1972,7 @@ export async function restoreCompleteJsonDump(
       }
     }
 
-    // 12.5. Store Configs (Ajustes de Tienda)
-    if (Array.isArray(backupData.storeConfigs) && backupData.storeConfigs.length > 0) {
-      if (!localState.storeConfigs) localState.storeConfigs = [];
-      for (const sc of backupData.storeConfigs) {
-        try {
-          const validUserId = await resolveValidUserId(sc.userId || targetUserId);
 
-          const storeValues: any = {
-            userId: validUserId,
-            storeName: sc.storeName || 'Comerxia Store',
-            whatsappNumber: sc.whatsappNumber || '',
-            description: sc.description || 'Catálogo digital con envíos y pedidos directos',
-            bannerText: sc.bannerText || '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
-            deliveryFee: String(sc.deliveryFee || '0.00'),
-            minOrderAmount: String(sc.minOrderAmount || '0.00'),
-            currency: sc.currency || 'USD',
-            isActive: sc.isActive !== false,
-            maintenanceTitle: sc.maintenanceTitle || 'Tienda Temporalmente Pausada',
-            maintenanceMessage: sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!',
-            allowCatalogBrowsing: sc.allowCatalogBrowsing !== false,
-            showStock: sc.showStock !== false,
-            showOutOfStock: sc.showOutOfStock !== false,
-            enablePagination: sc.enablePagination !== false,
-            itemsPerPage: sc.itemsPerPage || 12,
-            instagramUrl: sc.instagramUrl || null,
-            websiteUrl: sc.websiteUrl || null,
-            address: sc.address || null,
-            logoUrl: normalizeMediaUrl(sc.logoUrl || sc.logo_url) || null,
-            logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
-            courierLogos: sc.courierLogos || null,
-            paymentLogos: sc.paymentLogos || null,
-            theme: sc.theme || 'classic',
-            promoPopup: sc.promoPopup || null,
-            updatedAt: new Date(),
-          };
-
-          if (isPostgresConfigured()) {
-            let existingStore: any = null;
-            if (sc.id) {
-              const [foundById] = await db.select().from(storeConfigs).where(eq(storeConfigs.id, sc.id)).limit(1);
-              if (foundById) existingStore = foundById;
-            }
-            if (!existingStore) {
-              const [foundByUser] = await db.select().from(storeConfigs).where(eq(storeConfigs.userId, validUserId)).limit(1);
-              if (foundByUser) existingStore = foundByUser;
-            }
-            if (!existingStore) {
-              const [foundAny] = await db.select().from(storeConfigs).limit(1);
-              if (foundAny) existingStore = foundAny;
-            }
-
-            if (existingStore) {
-              await db.update(storeConfigs).set(storeValues).where(eq(storeConfigs.id, existingStore.id));
-            } else {
-              if (sc.id && typeof sc.id === 'number') {
-                storeValues.id = sc.id;
-              }
-              await db.insert(storeConfigs).values(storeValues).onConflictDoNothing();
-            }
-          }
-
-          // Local JSON storage update
-          const localIdx = localState.storeConfigs.findIndex((s) => s.userId === validUserId || s.id === sc.id);
-          const localRecord = {
-            id: sc.id || 1,
-            ...storeValues,
-            createdAt: sc.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          if (localIdx !== -1) localState.storeConfigs[localIdx] = localRecord;
-          else localState.storeConfigs.push(localRecord);
-
-          counts.storeConfigs = (counts.storeConfigs || 0) + 1;
-        } catch (err: any) {
-          errors.push(`Error al restaurar store config (ajustes de tienda): ${err?.message}`);
-        }
-      }
-    }
 
     // 13. Ecuador API Configs
     if (Array.isArray(backupData.ecuadorApiConfigs) && backupData.ecuadorApiConfigs.length > 0) {

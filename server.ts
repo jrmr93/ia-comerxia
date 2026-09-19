@@ -5474,7 +5474,8 @@ async function startServer() {
 
   app.get('/api/backup/master-zip', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const zipBuffer = await createMasterFullSystemZip(req.dbUserId || 1);
+      const zipBuffer = await createFullSystemMasterZip(req.dbUserId || 1);
+
       const dateStr = getEcuadorLocalDate();
       const filename = `comerxia_respaldo_maestro_${dateStr}.zip`;
 

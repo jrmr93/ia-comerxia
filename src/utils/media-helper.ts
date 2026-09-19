@@ -118,3 +118,44 @@ export function getProductPhotosWithFallback(item: {
 
   return list;
 }
+
+/**
+ * Normalizes all media URLs inside a JSON array string (such as courierLogos or paymentLogos).
+ * Ensures logos stored within partner objects stay portable as relative /uploads/... paths.
+ */
+export function normalizeJsonMediaArray(jsonVal: any): string | null {
+  if (!jsonVal) return null;
+  let parsed: any = jsonVal;
+  if (typeof jsonVal === 'string') {
+    try {
+      parsed = JSON.parse(jsonVal);
+    } catch {
+      return jsonVal;
+    }
+  }
+
+  if (Array.isArray(parsed)) {
+    const cleanedArray = parsed.map((item: any) => {
+      if (!item || typeof item !== 'object') return item;
+      const copy = { ...item };
+      if (copy.logoUrl) copy.logoUrl = normalizeMediaUrl(copy.logoUrl);
+      if (copy.logo_url) copy.logo_url = normalizeMediaUrl(copy.logo_url);
+      if (copy.logo) copy.logo = normalizeMediaUrl(copy.logo);
+      if (copy.image) copy.image = normalizeMediaUrl(copy.image);
+      return copy;
+    });
+    return JSON.stringify(cleanedArray);
+  }
+
+  if (typeof parsed === 'object') {
+    const copy = { ...parsed };
+    if (copy.logoUrl) copy.logoUrl = normalizeMediaUrl(copy.logoUrl);
+    if (copy.logo_url) copy.logo_url = normalizeMediaUrl(copy.logo_url);
+    if (copy.logo) copy.logo = normalizeMediaUrl(copy.logo);
+    if (copy.image) copy.image = normalizeMediaUrl(copy.image);
+    return JSON.stringify(copy);
+  }
+
+  return typeof jsonVal === 'string' ? jsonVal : JSON.stringify(jsonVal);
+}
+
