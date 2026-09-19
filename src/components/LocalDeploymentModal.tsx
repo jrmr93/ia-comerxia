@@ -390,8 +390,21 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
         body: formData,
       });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = null;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        console.error('Non-JSON response from restore-master-zip:', res.status, rawText);
+        setRestoreFeedback({
+          type: 'error',
+          message: `El servidor devolvió una respuesta de formato no válido (Status ${res.status}). El archivo ZIP puede exceder el límite permitido (250MB) o haber fallado la conexión.`,
+        });
+        return;
+      }
+
+      if (res.ok && data?.success) {
         setRestoreFeedback({
           type: 'success',
           message: data.message || `¡Respaldo maestro restaurado exitosamente!`,
@@ -401,7 +414,7 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
       } else {
         setRestoreFeedback({
           type: 'error',
-          message: data.error || 'Error al procesar el respaldo maestro.',
+          message: data?.error || 'Error al procesar el respaldo maestro.',
         });
       }
     } catch (err: any) {
@@ -446,8 +459,21 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
         body: formData,
       });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = null;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        console.error('Non-JSON response from restore-uploads-zip:', res.status, rawText);
+        setRestoreFeedback({
+          type: 'error',
+          message: `El servidor devolvió una respuesta no válida (Status ${res.status}). Verifica el tamaño del archivo ZIP o la conexión.`,
+        });
+        return;
+      }
+
+      if (res.ok && data?.success) {
         setRestoreFeedback({
           type: 'success',
           message: data.message || `Se restauraron exitosamente las imágenes.`,
@@ -456,7 +482,7 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
       } else {
         setRestoreFeedback({
           type: 'error',
-          message: data.error || 'Error al restaurar el archivo de imágenes.',
+          message: data?.error || 'Error al restaurar el archivo de imágenes.',
         });
       }
     } catch (err: any) {

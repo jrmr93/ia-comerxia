@@ -5387,6 +5387,25 @@ async function startServer() {
     limits: { fileSize: 250 * 1024 * 1024 }, // Max 250MB ZIP
   });
 
+  const handleZipUploadMiddleware = (req: Request, res: Response, next: NextFunction) => {
+    uploadZipMiddleware.single('file')(req, res, (err: any) => {
+      if (err) {
+        console.error('[Multer ZIP Upload Error]:', err);
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({
+            success: false,
+            error: 'El archivo ZIP excede el tamaño máximo permitido de 250MB.',
+          });
+        }
+        return res.status(400).json({
+          success: false,
+          error: err.message || 'Error al procesar la subida del archivo ZIP',
+        });
+      }
+      next();
+    });
+  };
+
   app.get('/api/media/stats', optionalAuth, async (req: AuthRequest, res: Response) => {
     try {
       const stats = getUploadsStats();
@@ -5434,16 +5453,34 @@ async function startServer() {
         }
       }
 
+      const totalPhysicalFiles = existingFiles.size;
+
       res.json({
         success: true,
         totalChecked,
         existingCount,
         missingCount: missingFiles.length,
         missingFiles: missingFiles.slice(0, 50),
-        uploadsTotalFiles: existingFiles.size,
+        totalPhysicalFiles,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message || 'Error en diagnóstico de multimedia' });
+      res.status(500).json({ success: false, error: error.message || 'Error al diagnosticar imágenes' });
+    }
+  });
+
+  app.get('/api/backup/master-zip', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const zipBuffer = await createMasterFullSystemZip(req.dbUserId || 1);
+      const dateStr = getEcuadorLocalDate();
+      const filename = `comerxia_respaldo_maestro_${dateStr}.zip`;
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', zipBuffer.length);
+      res.send(zipBuffer);
+    } catch (error: any) {
+      console.error('Error generating master zip backup:', error);
+      res.status(500).json({ success: false, error: error.message || 'Error al generar respaldo maestro ZIP' });
     }
   });
 
@@ -5480,7 +5517,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/restore-uploads-zip', requireAuth, uploadZipMiddleware.single('file'), async (req: AuthRequest, res: Response) => {
+  app.post('/api/restore-uploads-zip', requireAuth, handleZipUploadMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.file || !req.file.buffer) {
         return res.status(400).json({ success: false, error: 'Debe adjuntar un archivo ZIP válido con las imágenes' });
@@ -5500,7 +5537,7 @@ async function startServer() {
   });
 
   // 14c. Restore Master Full System ZIP (One-click migration: extracts media + restores database)
-  app.post('/api/restore-master-zip', requireAuth, uploadZipMiddleware.single('file'), async (req: AuthRequest, res: Response) => {
+  app.post('/api/restore-master-zip', requireAuth, handleZipUploadMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.file || !req.file.buffer) {
         return res.status(400).json({ success: false, error: 'Debe adjuntar un archivo ZIP válido de respaldo maestro' });
