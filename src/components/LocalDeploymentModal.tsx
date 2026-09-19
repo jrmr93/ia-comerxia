@@ -401,7 +401,7 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
         setRestoreFeedback({
           type: 'error',
           message: is413
-            ? `El servidor o proxy (Error HTTP 413: Payload Too Large) rechazó el archivo. Si usas Nginx o un servidor web inverso, agrega la línea "client_max_body_size 500M;" en tu archivo de configuración de Nginx y reinícialo (sudo systemctl reload nginx).`
+            ? `Error HTTP 413 (Payload Too Large): El servidor web inverso de tu VPS (Nginx) o Cloudflare rechazó el archivo. Solución en 1 segundo: ejecuta en tu terminal SSH del VPS: "echo 'client_max_body_size 1000M;' | sudo tee /etc/nginx/conf.d/limits.conf && sudo nginx -t && sudo systemctl reload nginx". (Si usas Cloudflare, cambia temporalmente el proxy a "Solo DNS" - nube gris).`
             : `El servidor devolvió una respuesta no válida (Status ${res.status}). Verifica el estado de la red y el peso del archivo.`,
         });
         return;
@@ -473,7 +473,7 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
         setRestoreFeedback({
           type: 'error',
           message: is413
-            ? `El servidor o proxy (Error HTTP 413: Payload Too Large) rechazó la imagen/ZIP. Si usas Nginx, agrega "client_max_body_size 500M;" en Nginx y recárgalo.`
+            ? `Error HTTP 413 (Payload Too Large): Tu Nginx/Cloudflare rechazó la imagen/ZIP. Solución VPS: ejecuta "echo 'client_max_body_size 1000M;' | sudo tee /etc/nginx/conf.d/limits.conf && sudo systemctl reload nginx".`
             : `El servidor devolvió una respuesta no válida (Status ${res.status}). Verifica el tamaño del archivo ZIP o la conexión.`,
         });
         return;

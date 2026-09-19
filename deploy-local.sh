@@ -47,7 +47,16 @@ npm install --production=false
 echo "⚙️ Compilando aplicación para producción..."
 npm run build
 
-# 4. Iniciar servidor con PM2 o Node.js directo
+# 4. Configurar límite de carga en Nginx si está instalado
+if command -v nginx &> /dev/null; then
+  echo "⚙️ Configurando límite de carga de archivos (client_max_body_size 1000M) en Nginx..."
+  mkdir -p /etc/nginx/conf.d
+  echo "client_max_body_size 1000M;" > /etc/nginx/conf.d/comerxia_limits.conf
+  nginx -t &> /dev/null && systemctl reload nginx || true
+  echo "✅ Nginx actualizado para aceptar subidas de hasta 1GB."
+fi
+
+# 5. Iniciar servidor con PM2 o Node.js directo
 if command -v pm2 &> /dev/null; then
   echo "✅ Iniciando / Recargando aplicación con PM2..."
   pm2 restart comerxia || pm2 start dist/server.cjs --name "comerxia"
