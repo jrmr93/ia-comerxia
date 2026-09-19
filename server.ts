@@ -3888,7 +3888,30 @@ async function startServer() {
         return res.send(logoUrl);
       }
 
+      const cleanBasename = path.basename(logoUrl.split('?')[0]);
+      if (cleanBasename) {
+        const fileInUploads = path.join(process.cwd(), 'uploads', cleanBasename);
+        if (fs.existsSync(fileInUploads)) {
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          return res.sendFile(fileInUploads);
+        }
+      }
+
+      const cleanRelPath = logoUrl.split('?')[0].replace(/^\//, '');
+      if (cleanRelPath) {
+        const relPathOnDisk = path.join(process.cwd(), cleanRelPath);
+        if (fs.existsSync(relPathOnDisk)) {
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          return res.sendFile(relPathOnDisk);
+        }
+      }
+
+      if (logoUrl.startsWith('/')) {
+        return res.redirect(logoUrl);
+      }
+
       return res.status(404).send('Logo not found');
+
     } catch (error: any) {
       console.error('Error serving store logo:', error);
       res.status(500).send('Error serving logo');

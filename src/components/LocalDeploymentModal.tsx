@@ -414,7 +414,13 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
         });
         fetchMediaStats();
         handleRunDiagnostics();
+        if (onStoreConfigSaved) onStoreConfigSaved();
+        if (onConfigSaved) onConfigSaved();
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else {
+
         setRestoreFeedback({
           type: 'error',
           message: data?.error || 'Error al procesar el respaldo maestro.',

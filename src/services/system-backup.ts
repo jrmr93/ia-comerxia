@@ -1354,7 +1354,7 @@ export async function restoreCompleteJsonDump(
             }
           }
 
-          // Update local JSON storage state for offline fallback
+          // Update local JSON storage state for offline fallback (always ensure index 0 holds active config)
           const localIdx = localState.storeConfigs.findIndex((s) => s.userId === validUserId || s.id === sc.id);
           const localRecord = {
             id: sc.id || 1,
@@ -1364,9 +1364,12 @@ export async function restoreCompleteJsonDump(
           };
           if (localIdx !== -1) {
             localState.storeConfigs[localIdx] = localRecord;
+          } else if (localState.storeConfigs.length > 0) {
+            localState.storeConfigs[0] = localRecord;
           } else {
             localState.storeConfigs.push(localRecord);
           }
+
 
           counts.storeConfigs++;
         } catch (err: any) {
