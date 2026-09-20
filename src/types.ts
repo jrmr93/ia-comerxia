@@ -586,6 +586,8 @@ export interface StoreConfig {
   themeColors?: Record<string, string[]> | string;
   enablePagination?: boolean;
   itemsPerPage?: number;
+  defaultProductSort?: 'price_desc' | 'price_asc' | 'category' | 'date_desc' | 'random' | 'featured' | string;
+  defaultInitialCategory?: string | null;
   promoPopup?: StorePromoPopupConfig | string | null;
   domain?: string;
 }

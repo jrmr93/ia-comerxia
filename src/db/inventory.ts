@@ -3210,6 +3210,8 @@ export async function getStoreConfig(userId: number = 1) {
       const allowCatalogBrowsing = cfg.allowCatalogBrowsing !== undefined ? cfg.allowCatalogBrowsing : false;
       const enablePagination = cfg.enablePagination !== undefined ? Boolean(cfg.enablePagination) : false;
       const itemsPerPage = cfg.itemsPerPage !== undefined ? Number(cfg.itemsPerPage) : 12;
+      const defaultProductSort = cfg.defaultProductSort || 'date_desc';
+      const defaultInitialCategory = cfg.defaultInitialCategory || null;
       return {
         ...cfg,
         theme,
@@ -3221,6 +3223,8 @@ export async function getStoreConfig(userId: number = 1) {
         allowCatalogBrowsing: Boolean(allowCatalogBrowsing),
         enablePagination,
         itemsPerPage,
+        defaultProductSort,
+        defaultInitialCategory,
       };
     }
 
@@ -3247,6 +3251,8 @@ export async function getStoreConfig(userId: number = 1) {
         courierLogos: null,
         paymentLogos: null,
         theme: 'classic',
+        defaultProductSort: 'date_desc',
+        defaultInitialCategory: null,
       })
       .returning();
 
@@ -3259,6 +3265,8 @@ export async function getStoreConfig(userId: number = 1) {
     const allowCatalogBrowsing = cfg.allowCatalogBrowsing !== undefined ? cfg.allowCatalogBrowsing : false;
     const enablePagination = cfg.enablePagination !== undefined ? Boolean(cfg.enablePagination) : false;
     const itemsPerPage = cfg.itemsPerPage !== undefined ? Number(cfg.itemsPerPage) : 12;
+    const defaultProductSort = cfg.defaultProductSort || 'date_desc';
+    const defaultInitialCategory = cfg.defaultInitialCategory || null;
     return {
       ...cfg,
       theme,
@@ -3270,6 +3278,8 @@ export async function getStoreConfig(userId: number = 1) {
       allowCatalogBrowsing: Boolean(allowCatalogBrowsing),
       enablePagination,
       itemsPerPage,
+      defaultProductSort,
+      defaultInitialCategory,
     };
   } catch (error) {
     console.warn('Error fetching store config from SQL, fallback to local store:', error);
@@ -3284,6 +3294,8 @@ export async function getStoreConfig(userId: number = 1) {
       const allowCatalogBrowsing = cfg.allowCatalogBrowsing !== undefined ? cfg.allowCatalogBrowsing : false;
       const enablePagination = cfg.enablePagination !== undefined ? Boolean(cfg.enablePagination) : false;
       const itemsPerPage = cfg.itemsPerPage !== undefined ? Number(cfg.itemsPerPage) : 12;
+      const defaultProductSort = cfg.defaultProductSort || 'date_desc';
+      const defaultInitialCategory = cfg.defaultInitialCategory || null;
       return {
         ...cfg,
         theme,
@@ -3295,6 +3307,8 @@ export async function getStoreConfig(userId: number = 1) {
         allowCatalogBrowsing: Boolean(allowCatalogBrowsing),
         enablePagination,
         itemsPerPage,
+        defaultProductSort,
+        defaultInitialCategory,
       };
     }
     return cfg;
@@ -3354,6 +3368,14 @@ export async function updateStoreConfig(
   if (data.itemsPerPage !== undefined || data.items_per_page !== undefined) {
     const rawVal = data.itemsPerPage !== undefined ? data.itemsPerPage : data.items_per_page;
     updatePayload.itemsPerPage = Number(rawVal) || 12;
+  }
+  if (data.defaultProductSort !== undefined || data.default_product_sort !== undefined) {
+    const rawVal = data.defaultProductSort !== undefined ? data.defaultProductSort : data.default_product_sort;
+    updatePayload.defaultProductSort = rawVal ? String(rawVal).trim() : 'date_desc';
+  }
+  if (data.defaultInitialCategory !== undefined || data.default_initial_category !== undefined) {
+    const rawVal = data.defaultInitialCategory !== undefined ? data.defaultInitialCategory : data.default_initial_category;
+    updatePayload.defaultInitialCategory = rawVal ? String(rawVal).trim() : null;
   }
   if (data.instagramUrl !== undefined) updatePayload.instagramUrl = data.instagramUrl ? String(data.instagramUrl).trim() : null;
   if (data.instagram_url !== undefined) updatePayload.instagramUrl = data.instagram_url ? String(data.instagram_url).trim() : null;

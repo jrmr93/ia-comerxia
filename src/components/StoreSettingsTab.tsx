@@ -214,6 +214,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   const [showOutOfStock, setShowOutOfStock] = useState(true);
   const [enablePagination, setEnablePagination] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState<number>(12);
+  const [defaultProductSort, setDefaultProductSort] = useState<string>('date_desc');
+  const [defaultInitialCategory, setDefaultInitialCategory] = useState<string>('all');
   const [instagramUrl, setInstagramUrl] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [address, setAddress] = useState('');
@@ -370,6 +372,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           if (data.showOutOfStock !== undefined) setShowOutOfStock(Boolean(data.showOutOfStock));
           if (data.enablePagination !== undefined) setEnablePagination(Boolean(data.enablePagination));
           if (data.itemsPerPage !== undefined) setItemsPerPage(Number(data.itemsPerPage) || 12);
+          if (data.defaultProductSort) setDefaultProductSort(data.defaultProductSort);
+          if (data.defaultInitialCategory !== undefined) setDefaultInitialCategory(data.defaultInitialCategory || 'all');
           if (data.instagramUrl) setInstagramUrl(data.instagramUrl);
           if (data.websiteUrl) setWebsiteUrl(data.websiteUrl);
           if (data.address) setAddress(data.address);
@@ -662,6 +666,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
         showOutOfStock,
         enablePagination,
         itemsPerPage: Number(itemsPerPage) || 12,
+        defaultProductSort,
+        defaultInitialCategory,
         instagramUrl: instagramUrl.trim(),
         websiteUrl: websiteUrl.trim(),
         address: address.trim(),
@@ -1263,6 +1269,55 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                     <option value={36}>36 productos por página</option>
                     <option value={48}>48 productos por página</option>
                   </select>
+                </div>
+              )}
+            </div>
+
+            {/* Orden Inicial Predeterminado de Productos */}
+            <div className="p-3 bg-amber-50/60 border border-amber-100/80 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="default-product-sort-select" className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Orden inicial de productos en vista cliente</span>
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-500 font-normal">
+                Selecciona cómo se mostrarán ordenados tus productos la primera vez que un cliente abra la tienda. No afecta la libertad de usar los filtros interactivos.
+              </p>
+              <select
+                id="default-product-sort-select"
+                value={defaultProductSort}
+                onChange={(e) => setDefaultProductSort(e.target.value)}
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer shadow-xs"
+              >
+                <option value="price_desc">📈 Precio: Mayor a Menor</option>
+                <option value="price_asc">📉 Precio: Menor a Mayor</option>
+                <option value="category">🏷️ Por Categoría (Alfabético)</option>
+                <option value="date_desc">📅 Por Fecha de Agregación (Más Recientes)</option>
+                <option value="random">🎲 Aleatorio / Mezclado (Novedad cada apertura)</option>
+              </select>
+
+              {defaultProductSort === 'category' && (
+                <div className="pt-2 border-t border-amber-100/80 space-y-1.5">
+                  <label htmlFor="default-initial-category-select" className="block text-[11px] font-bold text-amber-900">
+                    📌 Categoría destacada a mostrar primero:
+                  </label>
+                  <select
+                    id="default-initial-category-select"
+                    value={defaultInitialCategory}
+                    onChange={(e) => setDefaultInitialCategory(e.target.value)}
+                    className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-1.5 font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="all">Todas las categorías (Orden alfabético)</option>
+                    {Array.from(new Set(storeProducts.map((p) => p.category).filter(Boolean))).map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-amber-800/80">
+                    Los productos pertenecientes a esta categoría encabezarán el catálogo la primera vez que el cliente abra la tienda.
+                  </p>
                 </div>
               )}
             </div>

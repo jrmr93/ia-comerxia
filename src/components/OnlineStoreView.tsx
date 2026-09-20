@@ -904,7 +904,25 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
   const [showOffersOnly, setShowOffersOnly] = useState<boolean>(false);
-  const [sortBy, setSortBy] = useState<'featured' | 'price_asc' | 'price_desc' | 'name'>('featured');
+  const [sortBy, setSortBy] = useState<'featured' | 'price_asc' | 'price_desc' | 'name' | 'category' | 'date_desc' | 'random' | string>(() => {
+    return storeConfig?.defaultProductSort || 'date_desc';
+  });
+
+  // Synchronize initial sort option if storeConfig loads asynchronously
+  useEffect(() => {
+    if (storeConfig?.defaultProductSort) {
+      setSortBy(storeConfig.defaultProductSort);
+    }
+  }, [storeConfig?.defaultProductSort]);
+
+  // Stable random seed map for 'random' initial product order
+  const randomOrderSeedMap = useMemo(() => {
+    const map = new Map<number | string, number>();
+    (products || []).forEach((p) => {
+      map.set(p.id, Math.random());
+    });
+    return map;
+  }, [products]);
 
   // Search & Filter state for orders
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
@@ -2078,9 +2096,32 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         if (sortBy === 'price_asc') return priceA - priceB;
         if (sortBy === 'price_desc') return priceB - priceA;
         if (sortBy === 'name') return a.name.localeCompare(b.name);
+        if (sortBy === 'category') {
+          const firstCat = storeConfig?.defaultInitialCategory;
+          if (firstCat && firstCat !== 'all') {
+            const isAFirst = (a.category || '').trim().toLowerCase() === firstCat.trim().toLowerCase();
+            const isBFirst = (b.category || '').trim().toLowerCase() === firstCat.trim().toLowerCase();
+            if (isAFirst && !isBFirst) return -1;
+            if (!isAFirst && isBFirst) return 1;
+          }
+          const catComp = (a.category || '').localeCompare(b.category || '');
+          if (catComp !== 0) return catComp;
+          return a.name.localeCompare(b.name);
+        }
+        if (sortBy === 'date_desc' || sortBy === 'newest') {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          if (timeB !== timeA) return timeB - timeA;
+          return Number(b.id) - Number(a.id);
+        }
+        if (sortBy === 'random') {
+          const seedA = randomOrderSeedMap.get(a.id) ?? 0;
+          const seedB = randomOrderSeedMap.get(b.id) ?? 0;
+          return seedA - seedB;
+        }
         return 0; // featured default
       });
-  }, [products, searchQuery, selectedCategory, inStockOnly, showOffersOnly, sortBy, storeConfig?.showOutOfStock]);
+  }, [products, searchQuery, selectedCategory, inStockOnly, showOffersOnly, sortBy, storeConfig?.showOutOfStock, storeConfig?.defaultInitialCategory, randomOrderSeedMap]);
 
   // Active payment methods configured in store settings
   const activeConfiguredPayments = useMemo(() => {

@@ -60,7 +60,7 @@ export interface StoreLayoutProps {
   setInStockOnly: (v: boolean) => void;
   showOffersOnly: boolean;
   setShowOffersOnly: (v: boolean) => void;
-  sortBy: 'featured' | 'price_asc' | 'price_desc' | 'name';
+  sortBy: 'featured' | 'price_asc' | 'price_desc' | 'name' | 'category' | 'date_desc' | 'random' | string;
   setSortBy: (s: any) => void;
   cart: CartItem[];
   cartTotalItems: number;
@@ -2696,6 +2696,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                     { id: 'featured', label: 'Destacados' },
                     { id: 'price_asc', label: 'Menor Precio' },
                     { id: 'price_desc', label: 'Mayor Precio' },
+                    { id: 'category', label: 'Por Categoría' },
+                    { id: 'date_desc', label: 'Más Recientes' },
+                    { id: 'random', label: 'Aleatorio' },
                     { id: 'name', label: 'Nombre: A - Z' },
                   ].map((option) => {
                     const isSelected = sortBy === option.id;

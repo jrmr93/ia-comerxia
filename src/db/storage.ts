@@ -124,6 +124,8 @@ export interface LocalStoreConfig {
   promoPopup?: string | null;
   enablePagination?: boolean | null;
   itemsPerPage?: number | null;
+  defaultProductSort?: string | null;
+  defaultInitialCategory?: string | null;
   createdAt: string;
   updatedAt: string;
 }

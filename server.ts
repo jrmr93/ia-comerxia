@@ -3027,7 +3027,7 @@ async function startServer() {
           tags: item.tags,
           extractedAttributes: item.extractedAttributes,
           imageUrl: item.imageUrl,
-          images: item.images,
+          images: (item as any).images,
         },
         {
           tone: tone || 'persuasive',
@@ -3267,7 +3267,7 @@ async function startServer() {
         tags: tags !== undefined ? tags : item.tags,
         attributes: extractedAttributes || attributes || item.extractedAttributes,
         imageUrl: imageUrl !== undefined ? imageUrl : item.imageUrl,
-        images: images !== undefined ? images : item.images,
+        images: images !== undefined ? images : (item as any).images,
         costPrice: item.costPrice,
         salePrice: item.salePrice,
       });
