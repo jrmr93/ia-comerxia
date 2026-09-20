@@ -51,6 +51,7 @@ import { ProductAiVideoPickerModal } from './ProductAiVideoPickerModal.tsx';
 import { ProductMarketingCopyModal } from './ProductMarketingCopyModal.tsx';
 import { ProductWebImagePicker } from './ProductWebImagePicker.tsx';
 import { parseVideoUrl } from '../utils/video-helper.ts';
+import { getProductPhotosWithFallback, normalizeMediaUrl } from '../utils/media-helper.ts';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -446,22 +447,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       );
       setStock(editingItem.stock ?? 0);
 
-      // Collect all available photos for the item
-      const initialPhotos: string[] = [];
-      if (editingItem.imageUrl) initialPhotos.push(editingItem.imageUrl);
-      if (Array.isArray(editingItem.images)) {
-        editingItem.images.forEach((img) => {
-          if (img && !initialPhotos.includes(img)) initialPhotos.push(img);
-        });
-      }
-      if (Array.isArray(parsedAttr.images)) {
-        parsedAttr.images.forEach((img: string) => {
-          if (img && !initialPhotos.includes(img)) initialPhotos.push(img);
-        });
-      }
-      const initialCover = editingItem.imageUrl || initialPhotos[0] || '';
+      // Collect all available photos for the item safely without dropping cover or secondary photos
+      const initialPhotos = getProductPhotosWithFallback(editingItem);
+      const initialCover = normalizeMediaUrl(editingItem.imageUrl) || initialPhotos[0] || '';
       setImageUrl(initialCover);
-      setExtraImages(initialPhotos);
+      setExtraImages(initialPhotos.filter((img) => img !== initialCover));
 
       setVideoUrl(editingItem.videoUrl || '');
       setIsPlayingVideoPreview(false);

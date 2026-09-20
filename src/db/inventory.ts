@@ -28,6 +28,7 @@ import {
   deleteMediaFileIfUnreferenced,
 } from '../services/media-storage.ts';
 import { parseSupplierTelegramMessage } from '../services/gemini-parser.ts';
+import { getProductPhotosWithFallback, normalizeMediaUrl } from '../utils/media-helper.ts';
 
 /**
  * Sanitizes numeric strings to guarantee valid SQL NUMERIC/DECIMAL values (e.g., '12.50')
@@ -266,6 +267,25 @@ export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item:
   };
 }
 
+export function formatItemWithAllImages<T extends Record<string, any>>(item: T): T {
+  if (!item) return item;
+  const images = getProductPhotosWithFallback(item);
+  let videoUrl = item.videoUrl || null;
+  if (!videoUrl && item.extractedAttributes) {
+    try {
+      const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
+      videoUrl = parsed?.videoUrl || parsed?.video || null;
+    } catch {}
+  }
+  const effectiveImageUrl = normalizeMediaUrl(item.imageUrl) || images[0] || null;
+  return normalizeItemTaxesAndPrices({
+    ...item,
+    imageUrl: effectiveImageUrl,
+    images,
+    videoUrl,
+  });
+}
+
 export async function getInventoryItems(
   userId?: number,
   filters?: { search?: string; category?: string; status?: string; supplier?: string }
@@ -298,24 +318,7 @@ export async function getInventoryItems(
 
     list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    const processed = list.map((item) => {
-      let images: string[] = [];
-      if (item.extractedAttributes) {
-        try {
-          const parsed = JSON.parse(item.extractedAttributes);
-          if (Array.isArray(parsed.images)) {
-            images = parsed.images.filter(Boolean);
-          }
-        } catch {}
-      }
-      if (images.length === 0 && item.imageUrl) {
-        images = [item.imageUrl];
-      }
-      return normalizeItemTaxesAndPrices({
-        ...item,
-        images,
-      });
-    });
+    const processed = list.map((item) => formatItemWithAllImages(item));
 
     return attachErpStockMetricsToItems(processed, state.customerOrders, state.purchases);
   }
@@ -356,49 +359,14 @@ export async function getInventoryItems(
       .orderBy(desc(inventoryItems.createdAt));
 
     const rows = await query;
-    const processed = rows.map((item) => {
-      let images: string[] = [];
-      let videoUrl = item.videoUrl || null;
-      if (item.extractedAttributes) {
-        try {
-          const parsed = JSON.parse(item.extractedAttributes);
-          if (Array.isArray(parsed.images)) {
-            images = parsed.images.filter(Boolean);
-          }
-          if (!videoUrl && (parsed.videoUrl || parsed.video)) {
-            videoUrl = parsed.videoUrl || parsed.video;
-          }
-        } catch {}
-      }
-      if (images.length === 0 && item.imageUrl) {
-        images = [item.imageUrl];
-      }
-      return normalizeItemTaxesAndPrices({
-        ...item,
-        images,
-        videoUrl,
-      });
-    });
+    const processed = rows.map((item) => formatItemWithAllImages(item));
 
     const state = storage.getState();
     return attachErpStockMetricsToItems(processed, state.customerOrders, state.purchases);
   } catch (error) {
     console.warn('Error fetching inventory items from SQL, using local store:', error);
     const state = storage.getState();
-    const processed = state.inventoryItems.map((item) => {
-      let videoUrl = item.videoUrl || null;
-      if (!videoUrl && item.extractedAttributes) {
-        try {
-          const parsed = JSON.parse(item.extractedAttributes);
-          videoUrl = parsed.videoUrl || parsed.video || null;
-        } catch {}
-      }
-      return normalizeItemTaxesAndPrices({
-        ...item,
-        images: item.imageUrl ? [item.imageUrl] : [],
-        videoUrl,
-      });
-    });
+    const processed = state.inventoryItems.map((item) => formatItemWithAllImages(item));
     return attachErpStockMetricsToItems(processed, state.customerOrders, state.purchases);
   }
 }
@@ -408,28 +376,7 @@ export async function getInventoryItemById(id: number) {
     const state = storage.getState();
     const item = state.inventoryItems.find((it) => it.id === id);
     if (!item) return null;
-
-    let images: string[] = [];
-    let videoUrl = item.videoUrl || null;
-    if (item.extractedAttributes) {
-      try {
-        const parsed = JSON.parse(item.extractedAttributes);
-        if (Array.isArray(parsed.images)) {
-          images = parsed.images.filter(Boolean);
-        }
-        if (!videoUrl && (parsed.videoUrl || parsed.video)) {
-          videoUrl = parsed.videoUrl || parsed.video;
-        }
-      } catch {}
-    }
-    if (images.length === 0 && item.imageUrl) {
-      images = [item.imageUrl];
-    }
-    return normalizeItemTaxesAndPrices({
-      ...item,
-      images,
-      videoUrl,
-    });
+    return formatItemWithAllImages(item);
   }
 
   try {
@@ -440,47 +387,13 @@ export async function getInventoryItemById(id: number) {
       .limit(1);
 
     if (!items[0]) return null;
-    const item = items[0];
-
-    let images: string[] = [];
-    let videoUrl = item.videoUrl || null;
-    if (item.extractedAttributes) {
-      try {
-        const parsed = JSON.parse(item.extractedAttributes);
-        if (Array.isArray(parsed.images)) {
-          images = parsed.images.filter(Boolean);
-        }
-        if (!videoUrl && (parsed.videoUrl || parsed.video)) {
-          videoUrl = parsed.videoUrl || parsed.video;
-        }
-      } catch {}
-    }
-    if (images.length === 0 && item.imageUrl) {
-      images = [item.imageUrl];
-    }
-
-    return normalizeItemTaxesAndPrices({
-      ...item,
-      images,
-      videoUrl,
-    });
+    return formatItemWithAllImages(items[0]);
   } catch (error) {
     console.warn('Error fetching inventory item by id from SQL, fallback:', error);
     const state = storage.getState();
     const item = state.inventoryItems.find((it) => it.id === id);
     if (!item) return null;
-    let videoUrl = item.videoUrl || null;
-    if (!videoUrl && item.extractedAttributes) {
-      try {
-        const parsed = JSON.parse(item.extractedAttributes);
-        videoUrl = parsed.videoUrl || parsed.video || null;
-      } catch {}
-    }
-    return normalizeItemTaxesAndPrices({
-      ...item,
-      images: item.imageUrl ? [item.imageUrl] : [],
-      videoUrl,
-    });
+    return formatItemWithAllImages(item);
   }
 }
 
@@ -1455,22 +1368,6 @@ export async function updateInventoryItem(
     });
   }
 
-  const formatItemWithImages = (row: any) => {
-    if (!row) return row;
-    let imgs: string[] = [];
-    try {
-      const p = typeof row.extractedAttributes === 'string' ? JSON.parse(row.extractedAttributes) : row.extractedAttributes;
-      if (Array.isArray(p?.images)) imgs = p.images.filter(Boolean);
-    } catch {}
-    if (imgs.length === 0 && row.imageUrl) {
-      imgs = [row.imageUrl];
-    }
-    return normalizeItemTaxesAndPrices({
-      ...row,
-      images: imgs,
-    });
-  };
-
   if (!isPostgresConfigured()) {
     const state = storage.getState();
     const idx = state.inventoryItems.findIndex((it) => it.id === id);
@@ -1498,7 +1395,7 @@ export async function updateInventoryItem(
       });
     }
 
-    return formatItemWithImages(updated);
+    return formatItemWithAllImages(updated);
   }
 
   try {
@@ -1515,7 +1412,7 @@ export async function updateInventoryItem(
       .where(eq(inventoryItems.id, id))
       .returning();
 
-    const formatted = formatItemWithImages(result[0]);
+    const formatted = formatItemWithAllImages(result[0]);
 
     if (previousMediaUrls.length > 0) {
       const newMediaUrls = extractMediaUrlsFromProduct(result[0]);
@@ -1551,7 +1448,7 @@ export async function updateInventoryItem(
         });
       }
 
-      return formatItemWithImages(state.inventoryItems[idx]);
+      return formatItemWithAllImages(state.inventoryItems[idx]);
     }
     throw error;
   }

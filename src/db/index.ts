@@ -283,6 +283,7 @@ export async function ensureTablesCreated() {
           status TEXT NOT NULL DEFAULT 'available',
           raw_telegram_message TEXT,
           marketing_copy TEXT,
+          is_supplier_gift BOOLEAN DEFAULT FALSE,
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         );
@@ -308,6 +309,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'available';
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS raw_telegram_message TEXT;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS marketing_copy TEXT;
+        ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS is_supplier_gift BOOLEAN DEFAULT FALSE;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
       `);
 
