@@ -6034,8 +6034,10 @@ async function startServer() {
         });
       }
 
-      // Update heartbeat on query
-      await updateDisplayLastSeen(token);
+      // Update heartbeat & current playback index on query
+      const rawIdx = req.query.currentIndex;
+      const parsedIdx = rawIdx !== undefined ? parseInt(String(rawIdx), 10) : undefined;
+      await updateDisplayLastSeen(token, isNaN(parsedIdx!) ? undefined : parsedIdx);
 
       res.json({ success: true, ...config });
     } catch (err: any) {
@@ -6049,7 +6051,9 @@ async function startServer() {
       if (!token) {
         return res.status(400).json({ success: false, error: 'Token no especificado' });
       }
-      const ok = await updateDisplayLastSeen(token);
+      const rawIdx = req.body?.currentIndex ?? req.query?.currentIndex;
+      const parsedIdx = rawIdx !== undefined ? parseInt(String(rawIdx), 10) : undefined;
+      const ok = await updateDisplayLastSeen(token, isNaN(parsedIdx!) ? undefined : parsedIdx);
       res.json({ success: ok });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

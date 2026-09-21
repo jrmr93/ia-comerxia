@@ -48,6 +48,7 @@ export interface AdvertisingDisplay {
   loopMode: boolean;
   orientation: number; // 0, 90, 180, 270
   commandAction?: string | null;
+  currentIndex?: number;
   lastSeen?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -436,6 +437,7 @@ export async function getAdvertisingDisplays(userId: number): Promise<Advertisin
               p.name as "playlistName", d.active, d.is_paused as "isPaused",
               d.volume, d.is_muted as "isMuted", d.loop_mode as "loopMode",
               d.orientation as "orientation", d.command_action as "commandAction",
+              d.current_index as "currentIndex",
               d.last_seen as "lastSeen", d.created_at as "createdAt", d.updated_at as "updatedAt"
        FROM advertising_displays d
        LEFT JOIN advertising_playlists p ON d.playlist_id = p.id
@@ -453,6 +455,7 @@ export async function getAdvertisingDisplays(userId: number): Promise<Advertisin
       loopMode: row.loopMode !== undefined && row.loopMode !== null ? Boolean(row.loopMode) : true,
       orientation: typeof row.orientation === 'number' ? row.orientation : (parseInt(row.orientation, 10) || 0),
       commandAction: row.commandAction || null,
+      currentIndex: typeof row.currentIndex === 'number' ? row.currentIndex : (parseInt(row.currentIndex, 10) || 0),
       lastSeen: row.lastSeen ? new Date(row.lastSeen).toISOString() : null,
       createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
       updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : new Date().toISOString(),
@@ -683,8 +686,16 @@ export async function getPublicDisplayConfigByToken(token: string): Promise<Publ
   }
 }
 
-export async function updateDisplayLastSeen(token: string): Promise<boolean> {
+export async function updateDisplayLastSeen(token: string, currentIndex?: number): Promise<boolean> {
   try {
+    if (typeof currentIndex === 'number' && !isNaN(currentIndex)) {
+      const res = await pool.query(
+        `UPDATE advertising_displays SET last_seen = NOW(), current_index = $2 WHERE token = $1 RETURNING id`,
+        [token.trim(), Math.max(0, Math.floor(currentIndex))]
+      );
+      return (res.rowCount ?? 0) > 0;
+    }
+
     const res = await pool.query(
       `UPDATE advertising_displays SET last_seen = NOW() WHERE token = $1 RETURNING id`,
       [token.trim()]

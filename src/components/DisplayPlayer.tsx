@@ -75,7 +75,7 @@ export const DisplayPlayer: React.FC<DisplayPlayerProps> = ({ token }) => {
     isSyncingRef.current = true;
 
     try {
-      const res = await fetch(`/api/public/display/${encodeURIComponent(token)}`);
+      const res = await fetch(`/api/public/display/${encodeURIComponent(token)}?currentIndex=${currentIndexRef.current}`);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Pantalla no encontrada o inactiva.');
@@ -137,11 +137,22 @@ export const DisplayPlayer: React.FC<DisplayPlayerProps> = ({ token }) => {
 
   const videosRef = useRef(videos);
   const configRef = useRef(config);
+  const currentIndexRef = useRef(currentIndex);
 
   useEffect(() => {
     videosRef.current = videos;
     configRef.current = config;
-  }, [videos, config]);
+    currentIndexRef.current = currentIndex;
+  }, [videos, config, currentIndex]);
+
+  // Ping backend immediately on currentIndex change so admin panel receives instant live position
+  useEffect(() => {
+    fetch(`/api/public/display/${encodeURIComponent(token)}/ping`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentIndex }),
+    }).catch(() => {});
+  }, [token, currentIndex]);
 
   // Current item selection
   const currentItem = videos[currentIndex] || null;

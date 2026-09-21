@@ -933,6 +933,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS loop_mode BOOLEAN DEFAULT TRUE;
         ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS orientation INTEGER DEFAULT 0;
         ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS command_action TEXT;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS current_index INTEGER DEFAULT 0;
       `);
 
       // 17. Synchronize tables

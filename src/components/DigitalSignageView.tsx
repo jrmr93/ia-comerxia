@@ -116,8 +116,9 @@ export const DigitalSignageView: React.FC = () => {
 
   // Modals & form states
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
   const [videoName, setVideoName] = useState('');
-  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoFiles, setVideoFiles] = useState<File[]>([]);
   const [uploadMediaType, setUploadMediaType] = useState<'video' | 'image'>('video');
   const [slideDuration, setSlideDuration] = useState<number>(10);
   const [editingDurationId, setEditingDurationId] = useState<number | null>(null);
@@ -174,94 +175,134 @@ export const DigitalSignageView: React.FC = () => {
     loadData();
   }, []);
 
+  // Periodic silent refresh of displays status when on 'displays' tab to reflect real-time live transmission
+  useEffect(() => {
+    if (activeTab !== 'displays') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const dRes = await authFetch('/api/digital-signage/displays');
+        const dData = await dRes.json();
+        if (dData.success && dData.displays) {
+          setDisplays(dData.displays);
+        }
+      } catch (err) {
+        // silent catch
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, authFetch]);
+
   // ----------------------------------------------------
   // ----------------------------------------------------
-  // VIDEO & IMAGE MULTIMEDIA HANDLERS
+  // VIDEO & IMAGE MULTIMEDIA HANDLERS (MULTI-FILE UPLOAD)
   // ----------------------------------------------------
   const handleSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const isImage = file.type.startsWith('image/');
-      const isVideo = file.type.startsWith('video/');
+    if (e.target.files && e.target.files.length > 0) {
+      const selected = Array.from(e.target.files).filter(
+        (f) => f.type.startsWith('image/') || f.type.startsWith('video/')
+      );
 
-      if (!isImage && !isVideo) {
-        alert('Por favor selecciona un archivo de video (MP4, WebM, MOV) o imagen (JPG, PNG, WEBP, GIF).');
+      if (selected.length === 0) {
+        alert('Por favor selecciona archivos de video (MP4, WebM, MOV) o imagen (JPG, PNG, WEBP, GIF).');
         return;
       }
 
-      setVideoFile(file);
-      setUploadMediaType(isImage ? 'image' : 'video');
+      setVideoFiles(selected);
 
-      if (!videoName) {
-        setVideoName(file.name.replace(/\.[^/.]+$/, ''));
+      const hasImages = selected.some((f) => f.type.startsWith('image/'));
+      const hasVideos = selected.some((f) => f.type.startsWith('video/'));
+
+      if (hasImages && !hasVideos) setUploadMediaType('image');
+      else if (hasVideos && !hasImages) setUploadMediaType('video');
+
+      if (selected.length === 1 && !videoName) {
+        setVideoName(selected[0].name.replace(/\.[^/.]+$/, ''));
       }
     }
   };
 
   const handleUploadVideo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!videoFile) {
-      alert('Selecciona un archivo para continuar.');
+    if (videoFiles.length === 0) {
+      alert('Selecciona al menos un archivo para continuar.');
       return;
     }
 
     setUploading(true);
+    setUploadProgress(`Iniciando subida de ${videoFiles.length} archivo(s)...`);
+
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64Data = reader.result as string;
-          const isImage = uploadMediaType === 'image' || videoFile.type.startsWith('image/');
+      let successCount = 0;
 
-          let duration = 0;
-          if (isImage) {
-            duration = Math.max(1, Math.round(slideDuration || 10));
-          } else {
-            const tempVid = document.createElement('video');
-            tempVid.src = base64Data;
-            await new Promise((resolve) => {
-              tempVid.onloadedmetadata = () => {
-                duration = Math.round(tempVid.duration || 0);
-                resolve(null);
-              };
-              tempVid.onerror = () => resolve(null);
-            });
-          }
+      for (let i = 0; i < videoFiles.length; i++) {
+        const file = videoFiles[i];
+        setUploadProgress(`Procesando (${i + 1} de ${videoFiles.length}): ${file.name}`);
 
-          const fileSizeMB = Math.round((videoFile.size / (1024 * 1024)) * 100) / 100;
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
 
-          const res = await authFetch('/api/digital-signage/videos/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: videoName || videoFile.name,
-              videoData: base64Data,
-              mimeType: videoFile.type,
-              mediaType: isImage ? 'image' : 'video',
-              duration,
-              fileSize: fileSizeMB,
-            }),
+        const isImage = uploadMediaType === 'image' || file.type.startsWith('image/');
+
+        let duration = 0;
+        if (isImage) {
+          duration = Math.max(1, Math.round(slideDuration || 10));
+        } else {
+          const tempVid = document.createElement('video');
+          tempVid.src = base64Data;
+          await new Promise((resolve) => {
+            tempVid.onloadedmetadata = () => {
+              duration = Math.round(tempVid.duration || 0);
+              resolve(null);
+            };
+            tempVid.onerror = () => resolve(null);
           });
-
-          const data = await res.json();
-          if (data.success) {
-            setShowUploadModal(false);
-            setVideoFile(null);
-            setVideoName('');
-            loadData();
-          } else {
-            alert(data.error || 'Error al subir el archivo.');
-          }
-        } catch (err: any) {
-          alert('Error procesando el archivo: ' + err.message);
-        } finally {
-          setUploading(false);
         }
-      };
-      reader.readAsDataURL(videoFile);
+
+        const fileSizeMB = Math.round((file.size / (1024 * 1024)) * 100) / 100;
+        const itemName =
+          videoFiles.length === 1 && videoName.trim()
+            ? videoName.trim()
+            : file.name.replace(/\.[^/.]+$/, '');
+
+        const res = await authFetch('/api/digital-signage/videos/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: itemName,
+            videoData: base64Data,
+            mimeType: file.type,
+            mediaType: isImage ? 'image' : 'video',
+            duration,
+            fileSize: fileSizeMB,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          successCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        setShowUploadModal(false);
+        setVideoFiles([]);
+        setVideoName('');
+        setUploadProgress('');
+        loadData();
+      } else {
+        alert('Error al subir los archivos multimedia.');
+      }
     } catch (err: any) {
-      alert('Error al leer el archivo: ' + err.message);
+      alert('Error procesando la subida: ' + err.message);
+    } finally {
       setUploading(false);
+      setUploadProgress('');
     }
   };
 
@@ -1002,6 +1043,59 @@ export const DigitalSignageView: React.FC = () => {
                           </span>
                         </div>
 
+                        {/* Reproductor Miniatura en Vivo de la Pantalla */}
+                        {(() => {
+                          const currentPlaylist = playlists.find((p) => Number(p.id) === Number(display.playlistId));
+                          const items = currentPlaylist?.items || [];
+                          const activeIdx = (display.currentIndex !== undefined && display.currentIndex >= 0 && display.currentIndex < items.length)
+                            ? display.currentIndex
+                            : 0;
+                          const activeItem = items[activeIdx] || items[0];
+
+                          if (!activeItem || !activeItem.video) return null;
+
+                          const isImg =
+                            activeItem.video.mediaType === 'image' ||
+                            /^data:image\//i.test(activeItem.video.fileUrl) ||
+                            /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(activeItem.video.fileUrl);
+
+                          return (
+                            <div className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden mt-3 border border-slate-800 shadow-md group">
+                              {isImg ? (
+                                <img
+                                  src={activeItem.video.fileUrl}
+                                  alt={activeItem.video.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <video
+                                  src={activeItem.video.fileUrl}
+                                  autoPlay
+                                  loop
+                                  muted
+                                  playsInline
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+
+                              {/* Badge Transmitiendo en Vivo */}
+                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-slate-900/85 text-emerald-400 text-[10px] font-mono font-extrabold flex items-center gap-1.5 backdrop-blur-md border border-emerald-500/30">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                                EN TRANSMISIÓN
+                              </div>
+
+                              <div className="absolute bottom-2 left-2 right-2 px-2.5 py-1 rounded-md bg-slate-900/85 text-white text-[11px] font-medium flex items-center justify-between backdrop-blur-md border border-slate-800">
+                                <span className="truncate max-w-[180px] font-bold text-slate-100">
+                                  #{activeIdx + 1}: {activeItem.video.name}
+                                </span>
+                                <span className="text-[10px] font-mono text-sky-400 font-bold shrink-0">
+                                  {isImg ? `Imagen (${activeItem.video.duration || 10}s)` : `Video (${activeItem.video.duration || 0}s)`}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         <div className="text-[11px] font-mono text-slate-500 bg-slate-900 text-slate-200 p-2.5 rounded-xl flex items-center justify-between gap-2 overflow-hidden">
                           <span className="truncate">{fullUrl}</span>
                         </div>
@@ -1119,27 +1213,38 @@ export const DigitalSignageView: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* Playlist Item Direct Play Selector */}
+                          {/* Playlist Item Direct Play Selector & Thumbnail Card */}
                           {display.playlistId && (() => {
-                            const currentPlaylist = playlists.find(p => p.id === display.playlistId);
+                            const currentPlaylist = playlists.find((p) => Number(p.id) === Number(display.playlistId));
                             const items = currentPlaylist?.items || [];
-                            const selectedIdx = selectedItemIndexes[display.id] ?? 0;
+                            const selectedIdx = selectedItemIndexes[display.id] ?? display.currentIndex ?? 0;
 
                             if (items.length === 0) return null;
 
+                            const selectedItem = items[selectedIdx] || items[0];
+                            const isImg = selectedItem?.video ? (
+                              selectedItem.video.mediaType === 'image' ||
+                              /^data:image\//i.test(selectedItem.video.fileUrl) ||
+                              /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(selectedItem.video.fileUrl)
+                            ) : false;
+
                             return (
-                              <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                              <div className="pt-2 border-t border-slate-800/80 space-y-2">
                                 <div className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
                                   <span className="text-sky-300 flex items-center gap-1">
                                     <ListVideo className="w-3.5 h-3.5" />
                                     Elementos de la Playlist:
                                   </span>
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    {items.length} elemento(s)
+                                  </span>
                                 </div>
+
                                 <div className="flex items-center gap-1.5">
                                   <select
                                     value={selectedIdx}
                                     onChange={(e) => setSelectedItemIndexes(prev => ({ ...prev, [display.id]: Number(e.target.value) }))}
-                                    className="flex-1 min-w-0 px-2 py-1 bg-slate-800 text-slate-100 text-[11px] font-medium rounded-lg border border-slate-700 focus:outline-none focus:border-sky-500 truncate"
+                                    className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-800 text-slate-100 text-[11px] font-medium rounded-lg border border-slate-700 focus:outline-none focus:border-sky-500 truncate"
                                   >
                                     {items.map((it, idx) => (
                                       <option key={it.id} value={idx}>
@@ -1151,13 +1256,46 @@ export const DigitalSignageView: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleControlDisplay(display.id, { commandAction: `jump:${selectedIdx}` })}
-                                    className="py-1 px-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-md shrink-0 transition-all active:scale-95"
+                                    className="py-1.5 px-3 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-md shrink-0 transition-all active:scale-95"
                                     title="Reproducir este elemento inmediatamente"
                                   >
                                     <Play className="w-3 h-3 fill-current" />
                                     Reproducir
                                   </button>
                                 </div>
+
+                                {/* Tarjeta de Miniatura del Elemento Seleccionado en la Playlist */}
+                                {selectedItem?.video && (
+                                  <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5 shadow-xs">
+                                    <div className="w-16 h-10 rounded-lg bg-black overflow-hidden shrink-0 border border-slate-700 relative">
+                                      {isImg ? (
+                                        <img
+                                          src={selectedItem.video.fileUrl}
+                                          alt={selectedItem.video.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <video
+                                          src={selectedItem.video.fileUrl}
+                                          muted
+                                          loop
+                                          autoPlay
+                                          playsInline
+                                          className="w-full h-full object-cover pointer-events-none"
+                                        />
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[11px] font-bold text-slate-200 truncate">{selectedItem.video.name}</p>
+                                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5">
+                                        <span className="text-sky-400 font-bold">Posición #{selectedIdx + 1}</span>
+                                        <span>•</span>
+                                        <span>{isImg ? `Imagen (${selectedItem.video.duration || 10}s)` : `Video (${selectedItem.video.duration || 0}s)`}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             );
                           })()}
@@ -1304,7 +1442,7 @@ export const DigitalSignageView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Archivo {uploadMediaType === 'image' ? 'de Imagen' : 'de Video'}
+                  Archivos {uploadMediaType === 'image' ? 'de Imagen' : 'de Video'} (Puedes seleccionar varios)
                 </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
@@ -1313,6 +1451,7 @@ export const DigitalSignageView: React.FC = () => {
                   <input
                     ref={fileInputRef}
                     type="file"
+                    multiple
                     accept={uploadMediaType === 'image' ? 'image/jpeg,image/png,image/webp,image/gif' : 'video/mp4,video/webm,video/quicktime,video/mov'}
                     onChange={handleSelectFile}
                     className="hidden"
@@ -1323,48 +1462,62 @@ export const DigitalSignageView: React.FC = () => {
                     <Film className="w-10 h-10 text-sky-500 mx-auto mb-2" />
                   )}
 
-                  {videoFile ? (
+                  {videoFiles.length > 0 ? (
                     <div>
-                      <p className="font-bold text-slate-800 text-sm">{videoFile.name}</p>
+                      <p className="font-bold text-slate-800 text-sm">
+                        {videoFiles.length === 1 ? videoFiles[0].name : `¡${videoFiles.length} archivos seleccionados!`}
+                      </p>
                       <p className="text-xs text-slate-500 font-mono mt-0.5">
-                        {(videoFile.size / (1024 * 1024)).toFixed(2)} MB
+                        Peso total: {(videoFiles.reduce((acc, f) => acc + f.size, 0) / (1024 * 1024)).toFixed(2)} MB
                       </p>
                     </div>
                   ) : (
                     <div>
                       <p className="font-semibold text-slate-700 text-sm">
-                        Haz clic para buscar {uploadMediaType === 'image' ? 'imagen' : 'video'}
+                        Haz clic para seleccionar uno o varios {uploadMediaType === 'image' ? 'imágenes' : 'videos'}
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
                         {uploadMediaType === 'image'
-                          ? 'Formatos soportados: JPG, PNG, WEBP, GIF'
-                          : 'Formatos soportados: MP4, WebM, MOV (Máx. 500MB)'}
+                          ? 'Formatos soportados: JPG, PNG, WEBP, GIF (Selección múltiple)'
+                          : 'Formatos soportados: MP4, WebM, MOV (Selección múltiple)'}
                       </p>
                     </div>
                   )}
                 </div>
               </div>
 
+              {uploadProgress && (
+                <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-800 font-medium flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-sky-600 shrink-0" />
+                  <span className="truncate">{uploadProgress}</span>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowUploadModal(false)}
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setVideoFiles([]);
+                  }}
                   className="flex-1 py-2.5 px-4 bg-slate-100 text-slate-700 font-semibold rounded-xl text-sm hover:bg-slate-200 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={uploading || !videoFile}
+                  disabled={uploading || videoFiles.length === 0}
                   className="flex-1 py-2.5 px-4 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 shadow-md transition-colors"
                 >
                   {uploading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      Guardando...
+                      Subiendo...
                     </>
                   ) : (
-                    uploadMediaType === 'image' ? 'Subir Imagen' : 'Subir Video'
+                    videoFiles.length > 1
+                      ? `Subir ${videoFiles.length} Archivos`
+                      : (uploadMediaType === 'image' ? 'Subir Imagen' : 'Subir Video')
                   )}
                 </button>
               </div>

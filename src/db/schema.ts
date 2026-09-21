@@ -553,6 +553,7 @@ export const advertisingDisplays = pgTable('advertising_displays', {
   loopMode: boolean('loop_mode').default(true),
   orientation: integer('orientation').default(0), // 0, 90, 180, 270 degrees
   commandAction: text('command_action'),
+  currentIndex: integer('current_index').default(0),
   lastSeen: timestamp('last_seen'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

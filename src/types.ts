@@ -940,6 +940,7 @@ export interface AdvertisingDisplay {
   loopMode?: boolean;
   orientation?: number; // 0, 90, 180, 270 degrees
   commandAction?: string | null;
+  currentIndex?: number;
   lastSeen?: string | null;
   createdAt?: string;
   updatedAt?: string;

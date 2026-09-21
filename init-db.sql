@@ -334,6 +334,7 @@ CREATE TABLE IF NOT EXISTS advertising_displays (
   loop_mode BOOLEAN DEFAULT TRUE,
   orientation INTEGER DEFAULT 0,
   command_action TEXT,
+  current_index INTEGER DEFAULT 0,
   last_seen TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
