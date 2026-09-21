@@ -28,6 +28,10 @@ export const DisplayPlayer: React.FC<DisplayPlayerProps> = ({ token }) => {
   const isSyncingRef = useRef(false);
   const prevSrcRef = useRef<string | null>(null);
   const lastProcessedActionRef = useRef<string | null>(null);
+  const cachedUrlsRef = useRef(cachedUrls);
+  useEffect(() => {
+    cachedUrlsRef.current = cachedUrls;
+  }, [cachedUrls]);
 
   // ----------------------------------------------------
   // OFFLINE CACHING WORKER
@@ -41,6 +45,8 @@ export const DisplayPlayer: React.FC<DisplayPlayerProps> = ({ token }) => {
 
       for (const vid of videoList) {
         if (!vid.fileUrl) continue;
+        if (cachedUrlsRef.current[vid.id]) continue; // Skip if already cached in memory
+
         try {
           const match = await cache.match(vid.fileUrl);
           if (!match) {
@@ -83,9 +89,33 @@ export const DisplayPlayer: React.FC<DisplayPlayerProps> = ({ token }) => {
 
       const data: PublicDisplayConfig = await res.json();
       if (data) {
-        setConfig(data);
+        setConfig((prev) => {
+          if (!prev) return data;
+          if (
+            prev.display?.id === data.display?.id &&
+            prev.controls?.isPaused === data.controls?.isPaused &&
+            prev.controls?.volume === data.controls?.volume &&
+            prev.controls?.isMuted === data.controls?.isMuted &&
+            prev.controls?.loopMode === data.controls?.loopMode &&
+            prev.controls?.orientation === data.controls?.orientation &&
+            prev.controls?.commandAction === data.controls?.commandAction
+          ) {
+            return prev;
+          }
+          return data;
+        });
+
         const newVideos = data.videos || [];
-        setVideos(newVideos);
+        setVideos((prev) => {
+          if (
+            prev.length === newVideos.length &&
+            prev.every((v, i) => v.id === newVideos[i]?.id && v.fileUrl === newVideos[i]?.fileUrl && v.duration === newVideos[i]?.duration)
+          ) {
+            return prev;
+          }
+          return newVideos;
+        });
+
         setErrorMsg(null);
         setIsOffline(false);
 
@@ -266,7 +296,9 @@ export const DisplayPlayer: React.FC<DisplayPlayerProps> = ({ token }) => {
       ? Math.max(0, Math.min(100, controls.volume)) / 100
       : 1.0;
 
-    vid.volume = desiredVolume;
+    if (vid.volume !== desiredVolume) {
+      vid.volume = desiredVolume;
+    }
 
     if (desiredMuted !== vid.muted) {
       vid.muted = desiredMuted;
@@ -320,37 +352,41 @@ export const DisplayPlayer: React.FC<DisplayPlayerProps> = ({ token }) => {
     }
   }, [config, handleNextVideo, handlePrevVideo]);
 
-  // Trigger video play ONLY when currentSrc or currentIndex actually changes!
+  // Trigger video play ONLY when currentItem.id actually changes!
+  const prevItemIdRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (isImageItem || !videoRef.current || !currentSrc) return;
+    if (isImageItem || !videoRef.current || !currentSrc || !currentItem) return;
 
     const vidEl = videoRef.current;
 
-    // Only reset time if source has changed
-    if (prevSrcRef.current !== currentSrc) {
-      prevSrcRef.current = currentSrc;
+    // Reset currentTime ONLY when switching to a DIFFERENT item ID!
+    if (prevItemIdRef.current !== currentItem.id) {
+      prevItemIdRef.current = currentItem.id;
       vidEl.currentTime = 0;
     }
 
-    const isPausedRemotely = config?.controls?.isPaused ?? config?.display?.isPaused ?? false;
-    const isMutedRemotely = config?.controls?.isMuted ?? config?.display?.isMuted ?? false;
-    const vol = config?.controls?.volume ?? config?.display?.volume ?? 100;
+    const isPausedRemotely = configRef.current?.controls?.isPaused ?? configRef.current?.display?.isPaused ?? false;
+    const isMutedRemotely = configRef.current?.controls?.isMuted ?? configRef.current?.display?.isMuted ?? false;
+    const vol = configRef.current?.controls?.volume ?? configRef.current?.display?.volume ?? 100;
 
     vidEl.volume = Math.max(0, Math.min(100, vol)) / 100;
     vidEl.muted = isMutedRemotely;
 
     if (isPausedRemotely) return;
 
-    const playPromise = vidEl.play();
-    if (playPromise !== undefined) {
-      playPromise.catch((err) => {
-        console.warn('[Signage Player] Autoplay restricted by browser, applying muted fallback:', err);
-        vidEl.muted = true;
-        setAudioNeedsUserGesture(!isMutedRemotely);
-        vidEl.play().catch((e) => console.error('[Signage Player] Muted play failed:', e));
-      });
+    if (vidEl.paused) {
+      const playPromise = vidEl.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('[Signage Player] Autoplay restricted by browser, applying muted fallback:', err);
+          vidEl.muted = true;
+          setAudioNeedsUserGesture(!isMutedRemotely);
+          vidEl.play().catch((e) => console.error('[Signage Player] Muted play failed:', e));
+        });
+      }
     }
-  }, [currentSrc, currentIndex, isImageItem]); // NOT depending on config object to avoid 3s restart!
+  }, [currentItem?.id, currentSrc, isImageItem]); // NOT depending on config object to avoid 3s restart!
 
   // Handle Image Diapositiva / Slide Countdown Timer (Dependent strictly on primitive values!)
   const currentItemId = currentItem?.id;
