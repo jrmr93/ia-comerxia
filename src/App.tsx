@@ -21,6 +21,8 @@ import { SuppliersView } from './components/SuppliersView.tsx';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard.tsx';
 import { PurchasesView } from './components/PurchasesView.tsx';
 import { PaymentsView } from './components/PaymentsView.tsx';
+import { DigitalSignageView } from './components/DigitalSignageView.tsx';
+import { DisplayPlayer } from './components/DisplayPlayer.tsx';
 import { CustomerOrder, GoogleAiConfig, InventoryItem, InventoryStats, ServerDomainConfig, StoreConfig, StoreTheme, TelegramConfig, TelegramMessage, Supplier } from './types.ts';
 import { parseThemePalettes, getThemeColors } from './utils/themeColors.ts';
 import { safeLocalStorage, safeSessionStorage } from './utils/safeStorage.ts';
@@ -128,11 +130,11 @@ function InventoryApp() {
   }, [items]);
 
   // Active Main View Tab ('inventory' is default administration panel, remembered across sessions)
-  const [activeTab, setActiveTab] = useState<'customers' | 'suppliers' | 'store' | 'inventory' | 'analytics' | 'purchases' | 'orders' | 'payments'>(() => {
+  const [activeTab, setActiveTab] = useState<'customers' | 'suppliers' | 'store' | 'inventory' | 'analytics' | 'purchases' | 'orders' | 'payments' | 'signage'>(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = safeLocalStorage.getItem('comerxia_active_main_tab');
-        if (saved === 'customers' || saved === 'suppliers' || saved === 'store' || saved === 'inventory' || saved === 'analytics' || saved === 'purchases' || saved === 'orders' || saved === 'payments') {
+        if (saved === 'customers' || saved === 'suppliers' || saved === 'store' || saved === 'inventory' || saved === 'analytics' || saved === 'purchases' || saved === 'orders' || saved === 'payments' || saved === 'signage') {
           return saved as any;
         }
       } catch {}
@@ -1672,6 +1674,9 @@ function InventoryApp() {
             initialConfig={paymentsInitialConfig}
             onClearInitialConfig={() => setPaymentsInitialConfig(null)}
           />
+        ) : activeTab === 'signage' ? (
+          /* Digital Signage (Publicidad Digital) Module */
+          <DigitalSignageView key={`signage_${activeTab}`} />
         ) : (
           /* Inventory Items & Telegram Messages View */
           <InventoryView
@@ -1914,6 +1919,20 @@ function InventoryApp() {
 }
 
 export default function App() {
+  const displayToken = React.useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const pathname = window.location.pathname.toLowerCase();
+    if (pathname.startsWith('/display/') || pathname.startsWith('/pantalla/')) {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      return parts[1] || null;
+    }
+    return null;
+  }, []);
+
+  if (displayToken) {
+    return <DisplayPlayer token={displayToken} />;
+  }
+
   return (
     <AuthProvider>
       <InventoryApp />

@@ -26,14 +26,15 @@ import {
   Bell,
   BarChart3,
   HelpCircle,
+  Tv,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 import { StoreConfig } from '../types.ts';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
 
 export interface SidebarProps {
-  activeTab: 'customers' | 'suppliers' | 'store' | 'inventory' | 'purchases' | 'orders' | 'analytics' | 'payments' | 'messages' | 'categories';
-  setActiveTab: (tab: 'customers' | 'suppliers' | 'store' | 'inventory' | 'purchases' | 'orders' | 'analytics' | 'payments') => void;
+  activeTab: 'customers' | 'suppliers' | 'store' | 'inventory' | 'purchases' | 'orders' | 'analytics' | 'payments' | 'messages' | 'categories' | 'signage';
+  setActiveTab: (tab: 'customers' | 'suppliers' | 'store' | 'inventory' | 'purchases' | 'orders' | 'analytics' | 'payments' | 'signage') => void;
   storeSubTab?: 'catalog' | 'orders' | 'settings';
   onSelectStoreSubTab?: (subTab: 'catalog' | 'orders') => void;
   storeConfig?: StoreConfig;
@@ -236,6 +237,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           activeColor: 'bg-violet-600 text-white shadow-sm shadow-violet-600/20',
           activeIconColor: 'text-white',
           hoverColor: 'hover:bg-violet-50 text-slate-700 hover:text-violet-800',
+        },
+        {
+          id: 'tab-signage',
+          label: 'Publicidad Digital',
+          shortLabel: 'Publicidad',
+          icon: Tv,
+          isActive: activeTab === 'signage',
+          onClick: () => setActiveTab('signage'),
+          badge: null,
+          isHighlight: false,
+          badgeColor: '',
+          activeColor: 'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
+          activeIconColor: 'text-white',
+          hoverColor: 'hover:bg-sky-50 text-slate-700 hover:text-sky-800',
         },
       ],
     },

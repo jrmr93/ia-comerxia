@@ -167,6 +167,22 @@ import {
   restoreUploadsFromZipBuffer,
 } from './src/services/media-storage.ts';
 import {
+  getAdvertisingVideos,
+  createAdvertisingVideo,
+  updateAdvertisingVideo,
+  deleteAdvertisingVideo,
+  getAdvertisingPlaylists,
+  createAdvertisingPlaylist,
+  updateAdvertisingPlaylist,
+  deleteAdvertisingPlaylist,
+  getAdvertisingDisplays,
+  createAdvertisingDisplay,
+  updateAdvertisingDisplay,
+  deleteAdvertisingDisplay,
+  getPublicDisplayConfigByToken,
+  updateDisplayLastSeen,
+} from './src/db/digitalSignage.ts';
+import {
   getFullSystemData,
   generateCompleteSqlDump,
   createFullSystemMasterZip,
@@ -5767,6 +5783,276 @@ async function startServer() {
     } catch (err: any) {
       console.error('Error in download-image-proxy:', err);
       res.status(500).json({ error: err.message || 'Failed to proxy image download' });
+    }
+  });
+
+  // =======================================================
+  // DIGITAL SIGNAGE (PUBLICIDAD DIGITAL) ENDPOINTS
+  // =======================================================
+
+  // 1. Upload Advertising Video or Image
+  app.post('/api/digital-signage/videos/upload', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const { name, videoData, mimeType, duration, fileSize, mediaType: reqMediaType } = req.body;
+
+      if (!videoData || typeof videoData !== 'string') {
+        return res.status(400).json({ success: false, error: 'El archivo o datos multimedia son requeridos.' });
+      }
+
+      const fileUrl = await persistVideoLocally(videoData);
+      if (!fileUrl) {
+        return res.status(400).json({ success: false, error: 'No se pudo guardar el archivo multimedia.' });
+      }
+
+      // Detect media type (image vs video)
+      let mediaType: 'video' | 'image' = 'video';
+      if (
+        reqMediaType === 'image' ||
+        (mimeType && mimeType.startsWith('image/')) ||
+        (typeof videoData === 'string' && videoData.startsWith('data:image/')) ||
+        /\.(png|jpe?g|webp|gif|svg)$/i.test(fileUrl)
+      ) {
+        mediaType = 'image';
+      }
+
+      // Default duration for slides is 10s if not specified
+      const finalDuration = Number(duration) > 0 ? Number(duration) : (mediaType === 'image' ? 10 : 0);
+
+      const video = await createAdvertisingVideo(userId, {
+        name: name || (mediaType === 'image' ? 'Imagen Publicitaria' : 'Video Publicitario'),
+        mediaType,
+        fileUrl,
+        thumbnailUrl: mediaType === 'image' ? fileUrl : null,
+        duration: finalDuration,
+        fileSize: Number(fileSize || 0),
+        active: true,
+      });
+
+      res.json({ success: true, video });
+    } catch (err: any) {
+      console.error('Error uploading advertising media:', err);
+      res.status(500).json({ success: false, error: err.message || 'Error al subir el archivo multimedia.' });
+    }
+  });
+
+  // 2. Videos / Media CRUD
+  app.get('/api/digital-signage/videos', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const videos = await getAdvertisingVideos(userId);
+      res.json({ success: true, videos });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/digital-signage/videos', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const { name, fileUrl, thumbnailUrl, duration, fileSize, active, mediaType } = req.body;
+      if (!fileUrl) {
+        return res.status(400).json({ success: false, error: 'La URL del archivo es obligatoria.' });
+      }
+      const savedUrl = await persistVideoLocally(fileUrl);
+      const isImg = mediaType === 'image' || /\.(png|jpe?g|webp|gif|svg)$/i.test(fileUrl);
+      const video = await createAdvertisingVideo(userId, {
+        name: name || (isImg ? 'Imagen Publicitaria' : 'Video Publicitario'),
+        mediaType: isImg ? 'image' : 'video',
+        fileUrl: savedUrl || fileUrl,
+        thumbnailUrl: isImg ? (savedUrl || fileUrl) : thumbnailUrl,
+        duration: Number(duration) > 0 ? Number(duration) : (isImg ? 10 : 0),
+        fileSize,
+        active,
+      });
+      res.json({ success: true, video });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/digital-signage/videos/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const id = parseInt(req.params.id, 10);
+      const updated = await updateAdvertisingVideo(id, userId, req.body);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Video no encontrado.' });
+      }
+      res.json({ success: true, video: updated });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/digital-signage/videos/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const id = parseInt(req.params.id, 10);
+      const ok = await deleteAdvertisingVideo(id, userId);
+      res.json({ success: ok });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 3. Playlists CRUD
+  app.get('/api/digital-signage/playlists', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const playlists = await getAdvertisingPlaylists(userId);
+      res.json({ success: true, playlists });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/digital-signage/playlists', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const { name, active, videoIds } = req.body;
+      if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, error: 'El nombre de la playlist es requerido.' });
+      }
+      const playlist = await createAdvertisingPlaylist(userId, { name, active, videoIds });
+      res.json({ success: true, playlist });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/digital-signage/playlists/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const id = parseInt(req.params.id, 10);
+      const playlist = await updateAdvertisingPlaylist(id, userId, req.body);
+      if (!playlist) {
+        return res.status(404).json({ success: false, error: 'Playlist no encontrada.' });
+      }
+      res.json({ success: true, playlist });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/digital-signage/playlists/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const id = parseInt(req.params.id, 10);
+      const ok = await deleteAdvertisingPlaylist(id, userId);
+      res.json({ success: ok });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 4. Displays CRUD
+  app.get('/api/digital-signage/displays', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const displays = await getAdvertisingDisplays(userId);
+      res.json({ success: true, displays });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/digital-signage/displays', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const { name, playlistId, active } = req.body;
+      if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, error: 'El nombre de la pantalla es requerido.' });
+      }
+      const display = await createAdvertisingDisplay(userId, { name, playlistId, active });
+      res.json({ success: true, display });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/digital-signage/displays/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const id = parseInt(req.params.id, 10);
+      const display = await updateAdvertisingDisplay(id, userId, req.body);
+      if (!display) {
+        return res.status(404).json({ success: false, error: 'Pantalla no encontrada.' });
+      }
+      res.json({ success: true, display });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/digital-signage/displays/:id/control', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const id = parseInt(req.params.id, 10);
+      const { isPaused, volume, isMuted, loopMode, orientation, commandAction } = req.body;
+      const display = await updateAdvertisingDisplay(id, userId, {
+        isPaused,
+        volume,
+        isMuted,
+        loopMode,
+        orientation,
+        commandAction,
+      });
+      if (!display) {
+        return res.status(404).json({ success: false, error: 'Pantalla no encontrada.' });
+      }
+      res.json({ success: true, display });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/digital-signage/displays/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id || 1;
+      const id = parseInt(req.params.id, 10);
+      const ok = await deleteAdvertisingDisplay(id, userId);
+      res.json({ success: ok });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 5. Public Playback & Ping (No auth required)
+  app.get('/api/public/display/:token', async (req: Request, res: Response) => {
+    try {
+      const token = req.params.token;
+      if (!token) {
+        return res.status(400).json({ success: false, error: 'Token no especificado' });
+      }
+
+      const config = await getPublicDisplayConfigByToken(token);
+      if (!config) {
+        return res.status(404).json({
+          success: false,
+          error: 'Pantalla de publicidad no encontrada, inactiva o con token inválido.',
+        });
+      }
+
+      // Update heartbeat on query
+      await updateDisplayLastSeen(token);
+
+      res.json({ success: true, ...config });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/public/display/:token/ping', async (req: Request, res: Response) => {
+    try {
+      const token = req.params.token;
+      if (!token) {
+        return res.status(400).json({ success: false, error: 'Token no especificado' });
+      }
+      const ok = await updateDisplayLastSeen(token);
+      res.json({ success: ok });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

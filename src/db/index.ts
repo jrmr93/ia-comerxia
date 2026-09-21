@@ -876,7 +876,66 @@ export async function ensureTablesCreated() {
         ALTER TABLE sri_invoices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
       `);
 
-      // 15. Synchronize tables
+      // 16. Digital Signage Tables
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS advertising_videos (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          name TEXT NOT NULL,
+          file_url TEXT NOT NULL,
+          thumbnail_url TEXT,
+          duration INTEGER DEFAULT 0,
+          file_size NUMERIC(12, 2) DEFAULT 0,
+          active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS advertising_playlists (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          name TEXT NOT NULL,
+          active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS advertising_playlist_items (
+          id SERIAL PRIMARY KEY,
+          playlist_id INTEGER REFERENCES advertising_playlists(id) ON DELETE CASCADE NOT NULL,
+          video_id INTEGER REFERENCES advertising_videos(id) ON DELETE CASCADE NOT NULL,
+          position INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS advertising_displays (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          name TEXT NOT NULL,
+          token TEXT UNIQUE NOT NULL,
+          playlist_id INTEGER REFERENCES advertising_playlists(id) ON DELETE SET NULL,
+          active BOOLEAN DEFAULT TRUE,
+          last_seen TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+
+      await client.query(`
+        ALTER TABLE advertising_videos ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'video';
+        ALTER TABLE advertising_videos ADD COLUMN IF NOT EXISTS duration INTEGER DEFAULT 0;
+        ALTER TABLE advertising_videos ADD COLUMN IF NOT EXISTS file_size NUMERIC(12, 2) DEFAULT 0;
+        ALTER TABLE advertising_videos ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS is_paused BOOLEAN DEFAULT FALSE;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS volume INTEGER DEFAULT 100;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT TRUE;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS loop_mode BOOLEAN DEFAULT TRUE;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS orientation INTEGER DEFAULT 0;
+        ALTER TABLE advertising_displays ADD COLUMN IF NOT EXISTS command_action TEXT;
+      `);
+
+      // 17. Synchronize tables
       console.log('✅ PostgreSQL connection verified and database schemas synchronized');
     } finally {
       client.release();

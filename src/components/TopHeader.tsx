@@ -27,7 +27,7 @@ import { useAuth } from '../context/AuthContext.tsx';
 import { StoreConfig } from '../types.ts';
 
 export interface TopHeaderProps {
-  activeTab: 'customers' | 'suppliers' | 'store' | 'inventory' | 'purchases' | 'orders' | 'analytics' | 'payments' | 'messages' | 'categories';
+  activeTab: 'customers' | 'suppliers' | 'store' | 'inventory' | 'purchases' | 'orders' | 'analytics' | 'payments' | 'messages' | 'categories' | 'signage';
   storeSubTab?: 'catalog' | 'orders' | 'settings';
   onOpenMobileSidebar: () => void;
   onOpenAddProduct?: () => void;

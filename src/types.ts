@@ -893,3 +893,94 @@ export interface SriInvoiceRecord {
   updatedAt: string | Date;
 }
 
+export interface AdvertisingVideo {
+  id: number;
+  userId?: number;
+  name: string;
+  mediaType?: 'video' | 'image';
+  fileUrl: string;
+  thumbnailUrl?: string | null;
+  duration: number; // seconds
+  fileSize: number; // MB or bytes
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdvertisingPlaylistItem {
+  id: number;
+  playlistId: number;
+  videoId: number;
+  position: number;
+  video?: AdvertisingVideo;
+}
+
+export interface AdvertisingPlaylist {
+  id: number;
+  userId?: number;
+  name: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  items?: AdvertisingPlaylistItem[];
+  videoCount?: number;
+}
+
+export interface AdvertisingDisplay {
+  id: number;
+  userId?: number;
+  name: string;
+  token: string;
+  playlistId?: number | null;
+  playlistName?: string | null;
+  active: boolean;
+  isPaused?: boolean;
+  volume?: number;
+  isMuted?: boolean;
+  loopMode?: boolean;
+  orientation?: number; // 0, 90, 180, 270 degrees
+  commandAction?: string | null;
+  lastSeen?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PublicDisplayConfig {
+  display: {
+    id: number;
+    name: string;
+    token: string;
+    active: boolean;
+    isPaused?: boolean;
+    volume?: number;
+    isMuted?: boolean;
+    loopMode?: boolean;
+    orientation?: number;
+    commandAction?: string | null;
+    lastSeen?: string | null;
+  };
+  controls?: {
+    isPaused: boolean;
+    volume: number;
+    isMuted: boolean;
+    loopMode: boolean;
+    orientation?: number;
+    commandAction?: string | null;
+  };
+  playlist: {
+    id: number;
+    name: string;
+  } | null;
+  videos: Array<{
+    id: number;
+    name: string;
+    mediaType?: 'video' | 'image';
+    fileUrl: string;
+    thumbnailUrl?: string | null;
+    duration: number;
+    fileSize: number;
+    position: number;
+  }>;
+}
+
+

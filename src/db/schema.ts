@@ -495,3 +495,105 @@ export const telegramMessagesRelations = relations(telegramMessages, ({ one }) =
     references: [inventoryItems.id],
   }),
 }));
+
+// Digital Signage - Videos Publicitarios
+export const advertisingVideos = pgTable('advertising_videos', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: text('name').notNull(),
+  mediaType: text('media_type').default('video'),
+  fileUrl: text('file_url').notNull(),
+  thumbnailUrl: text('thumbnail_url'),
+  duration: integer('duration').default(0),
+  fileSize: numeric('file_size', { precision: 12, scale: 2 }).default('0.00'),
+  active: boolean('active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Digital Signage - Playlists
+export const advertisingPlaylists = pgTable('advertising_playlists', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: text('name').notNull(),
+  active: boolean('active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Digital Signage - Playlist Items (videos pertenecientes a cada playlist)
+export const advertisingPlaylistItems = pgTable('advertising_playlist_items', {
+  id: serial('id').primaryKey(),
+  playlistId: integer('playlist_id')
+    .references(() => advertisingPlaylists.id, { onDelete: 'cascade' })
+    .notNull(),
+  videoId: integer('video_id')
+    .references(() => advertisingVideos.id, { onDelete: 'cascade' })
+    .notNull(),
+  position: integer('position').notNull().default(0),
+});
+
+// Digital Signage - Pantallas / Displays
+export const advertisingDisplays = pgTable('advertising_displays', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
+    .notNull(),
+  name: text('name').notNull(),
+  token: text('token').unique().notNull(),
+  playlistId: integer('playlist_id').references(() => advertisingPlaylists.id, { onDelete: 'set null' }),
+  active: boolean('active').default(true),
+  isPaused: boolean('is_paused').default(false),
+  volume: integer('volume').default(100),
+  isMuted: boolean('is_muted').default(true),
+  loopMode: boolean('loop_mode').default(true),
+  orientation: integer('orientation').default(0), // 0, 90, 180, 270 degrees
+  commandAction: text('command_action'),
+  lastSeen: timestamp('last_seen'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const advertisingVideosRelations = relations(advertisingVideos, ({ one, many }) => ({
+  user: one(users, {
+    fields: [advertisingVideos.userId],
+    references: [users.id],
+  }),
+  playlistItems: many(advertisingPlaylistItems),
+}));
+
+export const advertisingPlaylistsRelations = relations(advertisingPlaylists, ({ one, many }) => ({
+  user: one(users, {
+    fields: [advertisingPlaylists.userId],
+    references: [users.id],
+  }),
+  items: many(advertisingPlaylistItems),
+  displays: many(advertisingDisplays),
+}));
+
+export const advertisingPlaylistItemsRelations = relations(advertisingPlaylistItems, ({ one }) => ({
+  playlist: one(advertisingPlaylists, {
+    fields: [advertisingPlaylistItems.playlistId],
+    references: [advertisingPlaylists.id],
+  }),
+  video: one(advertisingVideos, {
+    fields: [advertisingPlaylistItems.videoId],
+    references: [advertisingVideos.id],
+  }),
+}));
+
+export const advertisingDisplaysRelations = relations(advertisingDisplays, ({ one }) => ({
+  user: one(users, {
+    fields: [advertisingDisplays.userId],
+    references: [users.id],
+  }),
+  playlist: one(advertisingPlaylists, {
+    fields: [advertisingDisplays.playlistId],
+    references: [advertisingPlaylists.id],
+  }),
+}));
+

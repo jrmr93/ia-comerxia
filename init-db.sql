@@ -290,6 +290,55 @@ CREATE TABLE IF NOT EXISTS store_analytics_events (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- 13. Tablas de Publicidad Digital (Digital Signage)
+CREATE TABLE IF NOT EXISTS advertising_videos (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  media_type TEXT DEFAULT 'video',
+  file_url TEXT NOT NULL,
+  thumbnail_url TEXT,
+  duration INTEGER DEFAULT 0,
+  file_size NUMERIC(12, 2) DEFAULT 0,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS advertising_playlists (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS advertising_playlist_items (
+  id SERIAL PRIMARY KEY,
+  playlist_id INTEGER REFERENCES advertising_playlists(id) ON DELETE CASCADE NOT NULL,
+  video_id INTEGER REFERENCES advertising_videos(id) ON DELETE CASCADE NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS advertising_displays (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  token TEXT UNIQUE NOT NULL,
+  playlist_id INTEGER REFERENCES advertising_playlists(id) ON DELETE SET NULL,
+  active BOOLEAN DEFAULT TRUE,
+  is_paused BOOLEAN DEFAULT FALSE,
+  volume INTEGER DEFAULT 100,
+  is_muted BOOLEAN DEFAULT TRUE,
+  loop_mode BOOLEAN DEFAULT TRUE,
+  orientation INTEGER DEFAULT 0,
+  command_action TEXT,
+  last_seen TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Índices recomendados para optimización de consultas
 CREATE INDEX IF NOT EXISTS idx_inventory_items_sku ON inventory_items(sku);
 CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(category);
@@ -300,5 +349,8 @@ CREATE INDEX IF NOT EXISTS idx_purchases_purchase_number ON purchases(purchase_n
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON store_analytics_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_analytics_created_at ON store_analytics_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_advertising_displays_token ON advertising_displays(token);
+CREATE INDEX IF NOT EXISTS idx_advertising_playlist_items_playlist ON advertising_playlist_items(playlist_id);
+
 
 
