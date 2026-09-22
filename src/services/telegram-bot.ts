@@ -3,6 +3,7 @@ import {
   updateTelegramConfig,
   getAiConfig,
   createInventoryItem,
+  getInventoryItems,
   createTelegramMessageRecord,
   appendImageToInventoryItem,
   setInventoryItemVideo,
@@ -575,6 +576,41 @@ async function processCompleteProduct(
   let photosLocalUrls = photos.map((p) => p.localUrl || p.photoBase64);
   let primaryPhoto = photosLocalUrls[0] || null;
   const currencySym = config.currency === 'EUR' ? '€' : '$';
+
+  // 2b. Standalone Video Auto-Link Check: If only a video was sent without photos, link to recent item created in last 2 minutes
+  if (photosLocalUrls.length === 0 && videoUrl && (!caption || caption.trim().length < 10)) {
+    try {
+      const recentItems = await getInventoryItems(userId);
+      const now = Date.now();
+      const recentUnlinkedItem = recentItems.find((item) => {
+        const itemAge = now - new Date(item.createdAt).getTime();
+        return itemAge < 120000 && !item.videoUrl;
+      });
+
+      if (recentUnlinkedItem) {
+        await setInventoryItemVideo(recentUnlinkedItem.id, videoUrl);
+        console.log(
+          `[Telegram Bot] Standalone video auto-linked to recent product "${recentUnlinkedItem.name}" (ID: ${recentUnlinkedItem.id})`
+        );
+
+        if (chatId) {
+          const safeItemName = escapeTelegramMarkdown(recentUnlinkedItem.name);
+          const linkMsg =
+            `📹 *¡Video vinculado automáticamente!*\n\n` +
+            `Se ha adjuntado el video recibido al producto reciente "*${safeItemName}*" (SKU: \`${recentUnlinkedItem.sku}\`).`;
+          await sendTelegramChatMessage(token, chatId, linkMsg);
+        }
+
+        return {
+          status: 'video_linked_to_recent',
+          itemId: recentUnlinkedItem.id,
+          sku: recentUnlinkedItem.sku,
+        };
+      }
+    } catch (linkErr) {
+      console.warn('[Telegram Bot] Notice: Error attempting to auto-link standalone video to recent product:', linkErr);
+    }
+  }
 
   // 3. Fast Duplicate Check (before AI): If the same product text was already saved, prevent duplicate creation
   if (caption && caption.trim().length >= 10) {
@@ -1265,6 +1301,30 @@ export async function processTelegramMessage(
     return { status: 'command_handled' };
   }
 
+  const batchKey = chatId ? `chat_${chatId}` : `sender_${userId}_${senderName}`;
+  const hasVideoPayload = Boolean(
+    message.video || message.animation || (message.document && message.document.mime_type?.startsWith('video/'))
+  );
+
+  // Pre-buffering: If an active product batch exists, extend its timer IMMEDIATELY before starting heavy video network downloads
+  const activeBatchBeforeDownload = productBatchBuffers.get(batchKey);
+  if (activeBatchBeforeDownload) {
+    clearTimeout(activeBatchBeforeDownload.timer);
+    const extendMs = hasVideoPayload ? 10000 : BATCH_DEBOUNCE_MS;
+    activeBatchBeforeDownload.timer = setTimeout(() => {
+      productBatchBuffers.delete(batchKey);
+      enqueueBatchExecution(batchKey, async () => {
+        try {
+          await executeProductBatch(token, activeBatchBeforeDownload);
+        } catch (err) {
+          console.error('[Telegram Bot] Error executing queued product batch:', err);
+        }
+      }).catch((err) => {
+        console.error('[Telegram Bot] Queue error for batch:', err);
+      });
+    }, extendMs);
+  }
+
   // 2. Extract media from message (photos, videos, and voice/audio notes)
   const photoData = await extractPhotoFromMessage(token, message);
   const videoData = await extractVideoFromMessage(token, message);
@@ -1281,7 +1341,6 @@ export async function processTelegramMessage(
 
   // 3. Consecutive Multi-Message Batch Buffer (3 seconds debounce window)
   // Groups photos, video and text sent in two or more messages for the same product.
-  const batchKey = chatId ? `chat_${chatId}` : `sender_${userId}_${senderName}`;
   const existingBatch = productBatchBuffers.get(batchKey);
 
   if (existingBatch) {
