@@ -6,6 +6,7 @@ import {
   detectTaxStatus,
   calculateTaxAdjustment,
   adjustCostOptionsForTax,
+  buildCostOptionsWithTaxVariants,
 } from '../utils/tax-calculator.ts';
 
 let activeCustomApiKey: string | null = null;
@@ -763,12 +764,16 @@ function extractFallbackFromText(
     }
   }
 
-  const taxRate = detectedTaxStatus === 'NOT_SPECIFIED' ? 0 : (explicitTaxRate ?? (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15));
+  const effTaxRate = explicitTaxRate ?? (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
+  const taxRate = effTaxRate;
   const fallbackMargin = defaultMarginPercent || 30;
+
+  // When NOT_SPECIFIED, default option is INCLUDED (ya lleva IVA por defecto):
+  const effectiveTaxStatusForDefault = detectedTaxStatus === 'NOT_SPECIFIED' ? 'INCLUDED' : detectedTaxStatus;
 
   const taxAdjustment = calculateTaxAdjustment({
     costPrice,
-    taxStatus: detectedTaxStatus,
+    taxStatus: effectiveTaxStatusForDefault,
     taxPercent: taxRate,
     profitMarginPercent: fallbackMargin,
   });
@@ -779,6 +784,7 @@ function extractFallbackFromText(
   // 8. Utilidad (Profit Margin % / Profit Amount $) detection
   let finalProfitMarginPercent = fallbackMargin;
   let finalProfitAmount = Math.round(costWithoutTax * (fallbackMargin / 100) * 100) / 100;
+  let hasExplicitProfit = false;
 
   const profitPctMatch = textWithoutPhones.match(/(?:utilidad|ganancia|margen)\s*(?:de\s*|del\s*)?(\d+(?:[.,]\d{1,2})?)\s*%/i) ||
                          textWithoutPhones.match(/(\d+(?:[.,]\d{1,2})?)\s*%\s*(?:de\s*)?(?:utilidad|ganancia|margen)/i);
@@ -789,12 +795,14 @@ function extractFallbackFromText(
     if (!isNaN(parsedPct) && parsedPct > 0 && parsedPct < 1000) {
       finalProfitMarginPercent = parsedPct;
       finalProfitAmount = Math.round(costWithoutTax * (finalProfitMarginPercent / 100) * 100) / 100;
+      hasExplicitProfit = true;
     }
   } else if (profitDollarMatch && profitDollarMatch[1]) {
     const parsedDollar = parseFloat(profitDollarMatch[1].replace(',', '.'));
     if (!isNaN(parsedDollar) && parsedDollar > 0 && parsedDollar < 50000) {
       finalProfitAmount = Math.round(parsedDollar * 100) / 100;
       finalProfitMarginPercent = costWithoutTax > 0 ? Math.round((finalProfitAmount / costWithoutTax) * 100) : fallbackMargin;
+      hasExplicitProfit = true;
     }
   }
 
@@ -817,28 +825,8 @@ function extractFallbackFromText(
     }
   }
 
-  // 10. Cost options adjustment
-  const adjustedCostOptions = costOptions.map((opt) => {
-    let optWithout = opt.price;
-    let optWith = opt.price;
-    if (detectedTaxStatus === 'PLUS_TAX') {
-      optWithout = opt.price;
-      optWith = Math.round(opt.price * (1 + taxRate / 100) * 100) / 100;
-    } else if (detectedTaxStatus === 'INCLUDED') {
-      optWith = opt.price;
-      optWithout = Math.round((opt.price / (1 + taxRate / 100)) * 100) / 100;
-    } else {
-      // NOT_SPECIFIED: 0% IVA, cost is exactly what was read
-      optWith = opt.price;
-      optWithout = opt.price;
-    }
-    return {
-      label: opt.label,
-      price: optWith,
-      costWithoutTax: optWithout,
-      costWithTax: optWith,
-    };
-  });
+  // 10. Cost options adjustment with tax variants (NOT_SPECIFIED generates 2 options)
+  const adjustedCostOptions = buildCostOptionsWithTaxVariants(costOptions, detectedTaxStatus, taxRate);
 
   // 11. Tags
   const tags = [category.toLowerCase(), 'telegram', 'proveedor'];
@@ -848,7 +836,7 @@ function extractFallbackFromText(
 
   // 12. Calculate Published Sale Price (PVP) with discount protection formula
   let finalSale = 0;
-  if (detectedSalePrice && detectedSalePrice > costWithTax) {
+  if (!hasExplicitProfit && detectedSalePrice && detectedSalePrice > costWithTax) {
     finalSale = detectedSalePrice;
   } else {
     const targetNetBaseSinIVA = costWithoutTax + finalProfitAmount;
@@ -1215,77 +1203,42 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
       const modelTaxStatus = parsed.taxStatus === 'PLUS_TAX' || parsed.taxStatus === 'INCLUDED' ? parsed.taxStatus : 'NOT_SPECIFIED';
       const finalTaxStatus = contextTax !== 'NOT_SPECIFIED' ? contextTax : modelTaxStatus;
 
-      // When NOT_SPECIFIED: user rule: assume tax percentage is 0% and cost is what was read
-      const taxRate = finalTaxStatus === 'NOT_SPECIFIED'
-        ? 0
-        : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
+      const taxRate = typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15;
       let margin = Math.max(1, Number(parsed.profitMarginPercent) || defaultMarginPercent || 30);
+
+      // When NOT_SPECIFIED: default option is INCLUDED (ya lleva IVA por defecto)
+      const effectiveTaxStatusForDefault = finalTaxStatus === 'NOT_SPECIFIED' ? 'INCLUDED' : finalTaxStatus;
 
       const taxAdjustment = calculateTaxAdjustment({
         costPrice: finalHighestCost,
-        taxStatus: finalTaxStatus,
+        taxStatus: effectiveTaxStatusForDefault,
         taxPercent: taxRate,
         profitMarginPercent: margin,
       });
 
       // Synchronize costWithoutTax and costWithTax with mathematical precision
-      let finalCostWithoutTax = typeof parsed.costWithoutTax === 'number' && parsed.costWithoutTax > 0
-        ? parsed.costWithoutTax
-        : taxAdjustment.baseCostPrice;
-      let finalCostWithTax = typeof parsed.costWithTax === 'number' && parsed.costWithTax > 0
-        ? parsed.costWithTax
-        : taxAdjustment.costPrice;
+      let finalCostWithoutTax = taxAdjustment.baseCostPrice;
+      let finalCostWithTax = taxAdjustment.costPrice;
 
       if (finalTaxStatus === 'PLUS_TAX') {
-        // Explicitly without IVA: base is raw cost, final cost adds IVA
-        finalCostWithoutTax = Math.round((finalCostWithoutTax || finalHighestCost) * 100) / 100;
+        finalCostWithoutTax = Math.round(finalHighestCost * 100) / 100;
         finalCostWithTax = Math.round(finalCostWithoutTax * (1 + taxRate / 100) * 100) / 100;
-      } else if (finalTaxStatus === 'INCLUDED') {
-        // Explicitly with IVA: final cost is raw cost, cost without tax removes IVA
-        finalCostWithTax = (finalCostWithTax || finalHighestCost);
-        finalCostWithoutTax = (finalCostWithTax / (1 + taxRate / 100));
       } else {
-        // NOT_SPECIFIED: User rule: If the content does NOT specify if it has or not IVA,
-        // assume tax percentage is 0% and the cost of the product is the one read.
-        finalCostWithTax = (finalHighestCost || finalCostWithTax);
-        finalCostWithoutTax = finalCostWithTax;
+        // INCLUDED or NOT_SPECIFIED (defaults to INCLUDED selected)
+        finalCostWithTax = Math.round(finalHighestCost * 100) / 100;
+        finalCostWithoutTax = Math.round((finalCostWithTax / (1 + taxRate / 100)) * 100) / 100;
       }
+
+      // Build cost options with variants for NOT_SPECIFIED (INCLUDED default, PLUS_TAX option)
+      const adjustedCostOptions: CostOption[] = buildCostOptionsWithTaxVariants(costOptions, finalTaxStatus, taxRate);
 
       // Profit amount & Discount calculations
       const parsedProfitAmt = typeof parsed.profitAmount === 'number' && parsed.profitAmount > 0 ? parsed.profitAmount : undefined;
+      const profitAmt = parsedProfitAmt ?? Math.round(finalCostWithoutTax * (margin / 100) * 100) / 100;
       if (parsedProfitAmt && finalCostWithoutTax > 0) {
         margin = Math.round((parsedProfitAmt / finalCostWithoutTax) * 100);
       }
-      const profitAmt = parsedProfitAmt ?? Math.round(finalCostWithoutTax * (margin / 100) * 100) / 100;
       const discountPct = Math.max(0, Number(parsed.discountPercent) || 0);
-
-      // Populate costWithoutTax and costWithTax on each option
-      const adjustedCostOptions: CostOption[] = costOptions.map((opt) => {
-        let optWithout = opt.costWithoutTax;
-        let optWith = opt.costWithTax;
-        if (!optWithout && !optWith) {
-          if (finalTaxStatus === 'PLUS_TAX') {
-            optWithout = opt.price;
-            optWith = opt.price * (1 + taxRate / 100);
-          } else if (finalTaxStatus === 'INCLUDED') {
-            optWith = opt.price;
-            optWithout = opt.price / (1 + taxRate / 100);
-          } else {
-            // NOT_SPECIFIED: 0% IVA, cost is as read
-            optWith = opt.price;
-            optWithout = opt.price;
-          }
-        } else if (finalTaxStatus === 'NOT_SPECIFIED') {
-          optWith = opt.price;
-          optWithout = opt.price;
-        }
-        return {
-          label: opt.label,
-          price: optWith || opt.price,
-          costWithoutTax: optWithout ?? opt.price,
-          costWithTax: optWith || opt.price,
-        };
-      });
 
       // Compute Published PVP
       const targetBaseSinIVA = finalCostWithoutTax + profitAmt;
@@ -1294,7 +1247,7 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
       const calculatedSalePrice = Math.round((taxRate > 0 ? publishedSinIVA * (1 + taxRate / 100) : publishedSinIVA) * 100) / 100;
 
       let finalSalePrice = calculatedSalePrice;
-      if (parsed.salePrice) {
+      if (!parsedProfitAmt && parsed.salePrice) {
         const parsedSale = Number(parsed.salePrice);
         if (!isNaN(parsedSale) && parsedSale > finalCostWithTax) {
           finalSalePrice = parsedSale;
@@ -1324,8 +1277,10 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
           ...(parsed.attributes || {}),
           taxStatus: finalTaxStatus,
           taxPercent: taxRate,
-          hasPurchaseTax: finalTaxStatus !== 'NOT_SPECIFIED' && taxRate > 0,
+          hasPurchaseTax: true,
           purchaseTaxPercent: taxRate,
+          applySaleTax: true,
+          saleTaxPercent: taxRate,
           baseCostPrice: finalCostWithoutTax,
           costPriceWithTax: finalCostWithTax,
           costWithoutTax: finalCostWithoutTax,
@@ -1339,7 +1294,7 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
               ? `+${taxRate}% aplicado (Base: $${finalCostWithoutTax.toFixed(2)} ➔ Con IVA: $${finalCostWithTax.toFixed(2)})`
               : finalTaxStatus === 'INCLUDED'
               ? `Incluido en el costo ($${finalCostWithoutTax.toFixed(2)} sin IVA)`
-              : `0% IVA (No especificado - costo leído directo: $${finalCostWithTax.toFixed(2)})`,
+              : `Opción por defecto: Incluye IVA ($${finalCostWithoutTax.toFixed(2)} sin IVA | $${finalCostWithTax.toFixed(2)} con IVA)`,
         },
         supplierNotes: parsed.supplierNotes || '',
         confidenceScore: Number(parsed.confidenceScore) || 92,

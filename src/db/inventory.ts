@@ -1335,6 +1335,12 @@ export async function updateInventoryItem(
   if (data.extractedAttributes !== undefined && data.extractedAttributes !== null && data.extractedAttributes !== '') {
     try {
       const parsed = JSON.parse(data.extractedAttributes);
+      if (sanitizedPayload.costWithoutTax !== undefined) {
+        parsed.costWithoutTax = Number(sanitizedPayload.costWithoutTax);
+      }
+      if (sanitizedPayload.costWithTax !== undefined) {
+        parsed.costWithTax = Number(sanitizedPayload.costWithTax);
+      }
       if (Array.isArray(incomingImages) && incomingImages.length > 0) {
         parsed.images = incomingImages;
       }
@@ -1568,11 +1574,11 @@ export async function checkProductSalesAndPurchasesLink(id: number, productSku?:
 
     for (const oi of rawItems) {
       if (!oi) continue;
-      const oiId = oi.id || oi.inventoryItemId || oi.item?.id || oi.item?.inventoryItemId;
+      const oiId = oi.inventoryItemId || oi.item?.inventoryItemId || (oi.item && oi.item.id);
       const oiSku = (oi.sku || oi.item?.sku || '').trim().toLowerCase();
 
-      const idMatch = oiId && Number(oiId) === Number(id);
-      const skuMatch = targetSku && oiSku && oiSku === targetSku;
+      const idMatch = Boolean(oiId && Number(oiId) === Number(id));
+      const skuMatch = Boolean(targetSku && targetSku !== 'auto' && oiSku && oiSku !== 'auto' && oiSku === targetSku);
 
       if (idMatch || skuMatch) {
         matched = true;
@@ -1602,11 +1608,11 @@ export async function checkProductSalesAndPurchasesLink(id: number, productSku?:
 
     for (const pi of rawItems) {
       if (!pi) continue;
-      const piId = pi.inventoryItemId || pi.id;
+      const piId = pi.inventoryItemId || pi.item?.inventoryItemId || (pi.item && pi.item.id);
       const piSku = (pi.sku || '').trim().toLowerCase();
 
-      const idMatch = piId && Number(piId) === Number(id);
-      const skuMatch = targetSku && piSku && piSku === targetSku;
+      const idMatch = Boolean(piId && Number(piId) === Number(id));
+      const skuMatch = Boolean(targetSku && targetSku !== 'auto' && piSku && piSku !== 'auto' && piSku === targetSku);
 
       if (idMatch || skuMatch) {
         matched = true;

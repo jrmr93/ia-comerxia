@@ -379,13 +379,94 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const currentPhoto = productPhotos[activePhotoIndex] || currentItem.imageUrl || null;
 
   const cost = parseFloat(currentItem.costPrice) || 0;
-  const sale = parseFloat(currentItem.salePrice) || 0;
+  let sale = parseFloat(currentItem.salePrice) || 0;
+
+  const explicitApplySaleTax = currentItem.applySaleTax !== undefined ? Boolean(currentItem.applySaleTax) : parsedAttributes.applySaleTax !== undefined ? Boolean(parsedAttributes.applySaleTax) : undefined;
+  const explicitHasPurchaseTax = currentItem.hasPurchaseTax !== undefined ? Boolean(currentItem.hasPurchaseTax) : parsedAttributes.hasPurchaseTax !== undefined ? Boolean(parsedAttributes.hasPurchaseTax) : undefined;
+
+  const rawTaxRate =
+    currentItem.saleTaxPercent !== undefined && currentItem.saleTaxPercent !== null && !isNaN(Number(currentItem.saleTaxPercent))
+      ? Number(currentItem.saleTaxPercent)
+      : currentItem.taxRate !== undefined && currentItem.taxRate !== null && !isNaN(Number(currentItem.taxRate))
+      ? Number(currentItem.taxRate)
+      : currentItem.purchaseTaxPercent !== undefined && !isNaN(Number(currentItem.purchaseTaxPercent))
+      ? Number(currentItem.purchaseTaxPercent)
+      : parsedAttributes.purchaseTaxPercent !== undefined && !isNaN(Number(parsedAttributes.purchaseTaxPercent))
+      ? Number(parsedAttributes.purchaseTaxPercent)
+      : parsedAttributes.taxPercent !== undefined && !isNaN(Number(parsedAttributes.taxPercent))
+      ? Number(parsedAttributes.taxPercent)
+      : 15;
+
+  const applySaleTax = explicitApplySaleTax !== undefined ? explicitApplySaleTax : (explicitHasPurchaseTax !== undefined ? explicitHasPurchaseTax : rawTaxRate > 0);
+  const itemTaxRate = applySaleTax ? rawTaxRate : 0;
+
+  let costWithTax = currentItem.costWithTax !== undefined && currentItem.costWithTax !== null && !isNaN(Number(currentItem.costWithTax)) && Number(currentItem.costWithTax) > 0
+    ? Number(currentItem.costWithTax)
+    : (parsedAttributes.costWithTax !== undefined && !isNaN(Number(parsedAttributes.costWithTax)) && Number(parsedAttributes.costWithTax) > 0
+      ? Number(parsedAttributes.costWithTax)
+      : cost);
+
+  let costWithoutTax = currentItem.costWithoutTax !== undefined && currentItem.costWithoutTax !== null && !isNaN(Number(currentItem.costWithoutTax)) && Number(currentItem.costWithoutTax) > 0
+    ? Number(currentItem.costWithoutTax)
+    : (parsedAttributes.costWithoutTax !== undefined && !isNaN(Number(parsedAttributes.costWithoutTax)) && Number(parsedAttributes.costWithoutTax) > 0
+      ? Number(parsedAttributes.costWithoutTax)
+      : 0);
+
+  const hasExplicitSavedCost =
+    (currentItem.costWithoutTax !== undefined && currentItem.costWithoutTax !== null && String(currentItem.costWithoutTax).trim() !== '' && Number(currentItem.costWithoutTax) > 0) ||
+    (currentItem.costWithTax !== undefined && currentItem.costWithTax !== null && String(currentItem.costWithTax).trim() !== '' && Number(currentItem.costWithTax) > 0);
+
+  if (itemTaxRate > 0) {
+    const costOpts: any[] = Array.isArray(parsedAttributes.costOptions) ? parsedAttributes.costOptions : [];
+    if (costOpts.length > 0) {
+      const activeOpt = costOpts.find((o) => Math.abs((o.costWithTax ?? o.price) - costWithTax) < 0.02) || (!hasExplicitSavedCost ? costOpts[0] : undefined);
+      if (activeOpt && typeof activeOpt.costWithoutTax === 'number' && typeof activeOpt.costWithTax === 'number') {
+        costWithoutTax = activeOpt.costWithoutTax;
+        costWithTax = activeOpt.costWithTax;
+      }
+    }
+    if (!costWithoutTax) {
+      costWithoutTax = Math.round((costWithTax / (1 + itemTaxRate / 100)) * 100) / 100;
+    }
+    if (!costWithTax) {
+      costWithTax = Math.round((costWithoutTax * (1 + itemTaxRate / 100)) * 100) / 100;
+    }
+  } else {
+    const effCost = currentItem.costWithoutTax !== undefined && currentItem.costWithoutTax !== null && Number(currentItem.costWithoutTax) > 0
+      ? Number(currentItem.costWithoutTax)
+      : (currentItem.costWithTax !== undefined && currentItem.costWithTax !== null && Number(currentItem.costWithTax) > 0
+        ? Number(currentItem.costWithTax)
+        : (cost > 0 ? cost : (costWithTax || costWithoutTax || 0)));
+
+    costWithoutTax = effCost;
+    costWithTax = effCost;
+  }
+
+  if (!sale || sale <= 0) {
+    if (parsedAttributes.profitAmount !== undefined && !isNaN(Number(parsedAttributes.profitAmount))) {
+      const profitAmt = Math.max(0, Number(parsedAttributes.profitAmount));
+      const targetNetBaseSinIVA = costWithoutTax + profitAmt;
+      const discountPercent = Math.max(0, Math.min(100, Number(currentItem.discountPercent) || 0));
+      const discRate = Math.max(0, Math.min(0.99, discountPercent / 100));
+      const publishedSinIVA = discRate < 1 ? targetNetBaseSinIVA / (1 - discRate) : targetNetBaseSinIVA;
+      sale = Math.round((applySaleTax && itemTaxRate > 0 ? publishedSinIVA * (1 + itemTaxRate / 100) : publishedSinIVA) * 100) / 100;
+    } else if (parsedAttributes.profitMarginPercent !== undefined && !isNaN(Number(parsedAttributes.profitMarginPercent)) && costWithoutTax > 0) {
+      const marginPct = Number(parsedAttributes.profitMarginPercent);
+      const profitAmt = costWithoutTax * (marginPct / 100);
+      const targetNetBaseSinIVA = costWithoutTax + profitAmt;
+      const discountPercent = Math.max(0, Math.min(100, Number(currentItem.discountPercent) || 0));
+      const discRate = Math.max(0, Math.min(0.99, discountPercent / 100));
+      const publishedSinIVA = discRate < 1 ? targetNetBaseSinIVA / (1 - discRate) : targetNetBaseSinIVA;
+      sale = Math.round((applySaleTax && itemTaxRate > 0 ? publishedSinIVA * (1 + itemTaxRate / 100) : publishedSinIVA) * 100) / 100;
+    }
+  }
+
   const profitPerUnit = sale - cost;
   const storedMargin = Number(parsedAttributes.profitMarginPercent);
   const currentMarginPercent = !isNaN(storedMargin) && storedMargin > 0
     ? storedMargin
-    : cost > 0
-    ? Math.round((profitPerUnit / cost) * 100)
+    : costWithoutTax > 0
+    ? Math.round((profitPerUnit / costWithoutTax) * 100)
     : 30;
 
   const totalValuation = sale * (currentItem.stock || 0);
@@ -1072,12 +1153,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             ? Math.round(((sale - costWithout) / costWithout) * 100)
                             : 30;
 
+                        const explicitHasPurchaseTax =
+                          currentItem.hasPurchaseTax !== undefined
+                            ? Boolean(currentItem.hasPurchaseTax)
+                            : parsedAttr.hasPurchaseTax !== undefined
+                            ? Boolean(parsedAttr.hasPurchaseTax)
+                            : undefined;
                         const applySaleTax =
                           currentItem.applySaleTax !== undefined
                             ? Boolean(currentItem.applySaleTax)
                             : parsedAttr.applySaleTax !== undefined
                             ? Boolean(parsedAttr.applySaleTax)
-                            : false;
+                            : (explicitHasPurchaseTax !== undefined ? explicitHasPurchaseTax : itemTaxRate > 0);
                         const saleTaxPercent =
                           currentItem.saleTaxPercent !== undefined && !isNaN(Number(currentItem.saleTaxPercent))
                             ? Number(currentItem.saleTaxPercent)

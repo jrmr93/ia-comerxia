@@ -48,11 +48,11 @@ export function checkProductTransactionLink(
 
     for (const oi of rawItems) {
       if (!oi) continue;
-      const oiId = oi.id || oi.inventoryItemId || oi.item?.id || oi.item?.inventoryItemId;
+      const oiId = oi.inventoryItemId || oi.item?.inventoryItemId || (oi.item && oi.item.id);
       const oiSku = (oi.sku || oi.item?.sku || '').trim().toLowerCase();
 
-      const idMatch = oiId && Number(oiId) === targetId;
-      const skuMatch = targetSku && oiSku && oiSku === targetSku;
+      const idMatch = Boolean(oiId && Number(oiId) === targetId);
+      const skuMatch = Boolean(targetSku && targetSku !== 'auto' && oiSku && oiSku !== 'auto' && oiSku === targetSku);
 
       if (idMatch || skuMatch) {
         matched = true;
@@ -79,11 +79,11 @@ export function checkProductTransactionLink(
 
     for (const pi of rawItems) {
       if (!pi) continue;
-      const piId = pi.inventoryItemId || pi.id;
+      const piId = pi.inventoryItemId || pi.item?.inventoryItemId || (pi.item && pi.item.id);
       const piSku = (pi.sku || '').trim().toLowerCase();
 
-      const idMatch = piId && Number(piId) === targetId;
-      const skuMatch = targetSku && piSku && piSku === targetSku;
+      const idMatch = Boolean(piId && Number(piId) === targetId);
+      const skuMatch = Boolean(targetSku && targetSku !== 'auto' && piSku && piSku !== 'auto' && piSku === targetSku);
 
       if (idMatch || skuMatch) {
         matched = true;

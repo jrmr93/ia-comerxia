@@ -142,41 +142,93 @@ export function calculateTaxAdjustment(params: {
 
 /**
  * Adjusts an array of cost options to compute both costWithoutTax and costWithTax accurately.
+ * If taxStatus is NOT_SPECIFIED, generates 2 options per price:
+ * 1) Option 1: "Ya incluye IVA" (Base: price / (1 + effTax%), Con IVA: price) -> Default selected.
+ * 2) Option 2: "Sin IVA / Más IVA" (Base: price, Con IVA: price * (1 + effTax%)).
  */
+export function buildCostOptionsWithTaxVariants(
+  costOptions: Array<{ label: string; price: number; costWithoutTax?: number; costWithTax?: number; taxStatus?: TaxStatus }>,
+  taxStatus: TaxStatus,
+  taxPercent: number
+): Array<{ label: string; price: number; costWithoutTax?: number; costWithTax?: number; taxStatus?: TaxStatus }> {
+  if (!Array.isArray(costOptions) || costOptions.length === 0) return [];
+  const effTax = taxPercent >= 0 ? taxPercent : 15;
+
+  const result: Array<{ label: string; price: number; costWithoutTax?: number; costWithTax?: number; taxStatus?: TaxStatus }> = [];
+
+  for (const opt of costOptions) {
+    if (taxStatus === 'PLUS_TAX') {
+      const optWithout = Math.round(opt.price * 100) / 100;
+      const optWith = Math.round(opt.price * (1 + effTax / 100) * 100) / 100;
+      let cleanLabel = opt.label;
+      if (!cleanLabel.toLowerCase().includes('iva')) {
+        cleanLabel = `${cleanLabel} (+${effTax}% IVA)`;
+      }
+      result.push({
+        ...opt,
+        label: cleanLabel,
+        price: optWith,
+        costWithoutTax: optWithout,
+        costWithTax: optWith,
+        taxStatus: 'PLUS_TAX',
+      });
+    } else if (taxStatus === 'INCLUDED') {
+      const optWith = Math.round(opt.price * 100) / 100;
+      const optWithout = Math.round((opt.price / (1 + effTax / 100)) * 100) / 100;
+      let cleanLabel = opt.label;
+      if (!cleanLabel.toLowerCase().includes('iva')) {
+        cleanLabel = `${cleanLabel} (Incluye IVA)`;
+      }
+      result.push({
+        ...opt,
+        label: cleanLabel,
+        price: optWith,
+        costWithoutTax: optWithout,
+        costWithTax: optWith,
+        taxStatus: 'INCLUDED',
+      });
+    } else {
+      // NOT_SPECIFIED: User requirement #1: Generate two options for each price
+      // Option A: Default selected (Ya incluye IVA)
+      const opt1With = Math.round(opt.price * 100) / 100;
+      const opt1Without = Math.round((opt.price / (1 + effTax / 100)) * 100) / 100;
+      const baseLabel = opt.label.split(' ($')[0].split(' - ')[0];
+      const label1 = `${baseLabel} (Ya incluye IVA - $${opt1With.toFixed(2)})`;
+
+      // Option B: Sin IVA / Más IVA (+15% IVA)
+      const opt2Without = Math.round(opt.price * 100) / 100;
+      const opt2With = Math.round(opt.price * (1 + effTax / 100) * 100) / 100;
+      const label2 = `${baseLabel} (Sin IVA - +${effTax}% IVA = $${opt2With.toFixed(2)})`;
+
+      result.push({
+        ...opt,
+        label: label1,
+        price: opt1With,
+        costWithoutTax: opt1Without,
+        costWithTax: opt1With,
+        taxStatus: 'INCLUDED',
+      });
+
+      result.push({
+        ...opt,
+        label: label2,
+        price: opt2With,
+        costWithoutTax: opt2Without,
+        costWithTax: opt2With,
+        taxStatus: 'PLUS_TAX',
+      });
+    }
+  }
+
+  return result;
+}
+
 export function adjustCostOptionsForTax(
   costOptions: Array<{ label: string; price: number; costWithoutTax?: number; costWithTax?: number }>,
   taxStatus: TaxStatus,
   taxPercent: number
 ): Array<{ label: string; price: number; costWithoutTax?: number; costWithTax?: number }> {
-  if (!Array.isArray(costOptions) || costOptions.length === 0) return [];
-  const effTax = taxPercent >= 0 ? taxPercent : 15;
-
-  return costOptions.map((opt) => {
-    let optWithout: number;
-    let optWith: number;
-    let cleanLabel = opt.label;
-
-    if (taxStatus === 'PLUS_TAX') {
-      optWithout = Math.round(opt.price * 100) / 100;
-      optWith = Math.round(opt.price * (1 + effTax / 100) * 100) / 100;
-      if (!cleanLabel.includes('IVA')) cleanLabel = `${cleanLabel} (+${effTax}% IVA)`;
-    } else if (taxStatus === 'INCLUDED') {
-      optWith = Math.round(opt.price * 100) / 100;
-      optWithout = Math.round((opt.price / (1 + effTax / 100)) * 100) / 100;
-    } else {
-      // NOT_SPECIFIED: 0% IVA, cost is exactly what was read
-      optWith = Math.round(opt.price * 100) / 100;
-      optWithout = optWith;
-    }
-
-    return {
-      ...opt,
-      label: cleanLabel,
-      price: optWith,
-      costWithoutTax: optWithout,
-      costWithTax: optWith,
-    };
-  });
+  return buildCostOptionsWithTaxVariants(costOptions, taxStatus, taxPercent);
 }
 
 // Re-export SRI Ecuador Tax Engine primitives

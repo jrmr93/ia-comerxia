@@ -820,9 +820,15 @@ async function processCompleteProduct(
     ...attributesWithGallery,
     hasPurchaseTax: effectiveTaxRate > 0,
     purchaseTaxPercent: effectiveTaxRate,
+    applySaleTax: effectiveTaxRate > 0,
+    saleTaxPercent: effectiveTaxRate,
+    taxRate: effectiveTaxRate,
     discountPercent: parsed.discountPercent || 0,
     profitMarginPercent: parsed.profitMarginPercent,
     profitAmount: parsed.profitAmount,
+    costOptions: parsed.costOptions || [],
+    costWithoutTax: Number(effectiveCostWithout).toFixed(2),
+    costWithTax: effectiveCostWith.toFixed(2),
   };
 
   const inventoryItem = await createInventoryItem({

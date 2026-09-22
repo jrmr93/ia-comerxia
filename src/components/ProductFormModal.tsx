@@ -380,23 +380,47 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setTaxRate(effectiveUnifiedTaxRate);
 
       let initialCostWithout =
-        editingItem.costWithoutTax !== undefined && editingItem.costWithoutTax !== null
+        editingItem.costWithoutTax !== undefined && editingItem.costWithoutTax !== null && String(editingItem.costWithoutTax).trim() !== ''
           ? String(editingItem.costWithoutTax)
+          : parsedAttr.costWithoutTax !== undefined && parsedAttr.costWithoutTax !== null && String(parsedAttr.costWithoutTax).trim() !== ''
+          ? String(parsedAttr.costWithoutTax)
           : '';
       let initialCostWith =
-        editingItem.costWithTax !== undefined && editingItem.costWithTax !== null
+        editingItem.costWithTax !== undefined && editingItem.costWithTax !== null && String(editingItem.costWithTax).trim() !== ''
           ? String(editingItem.costWithTax)
+          : parsedAttr.costWithTax !== undefined && parsedAttr.costWithTax !== null && String(parsedAttr.costWithTax).trim() !== ''
+          ? String(parsedAttr.costWithTax)
           : editingItem.costPrice || '0.00';
+
+      const costOpts: CostOption[] = Array.isArray(parsedAttr.costOptions) && parsedAttr.costOptions.length > 0
+        ? parsedAttr.costOptions
+        : costNum > 0
+        ? [{ label: `Costo Principal ($${costNum.toFixed(2)})`, price: costNum }]
+        : [];
+
+      const hasExplicitSavedCost =
+        (editingItem.costWithoutTax !== undefined && editingItem.costWithoutTax !== null && String(editingItem.costWithoutTax).trim() !== '' && Number(editingItem.costWithoutTax) > 0) ||
+        (editingItem.costWithTax !== undefined && editingItem.costWithTax !== null && String(editingItem.costWithTax).trim() !== '' && Number(editingItem.costWithTax) > 0);
+
+      if (costOpts.length > 0) {
+        const activeOpt = costOpts.find((o) => Math.abs((o.costWithTax ?? o.price) - parseFloat(initialCostWith)) < 0.02) || (!hasExplicitSavedCost ? costOpts[0] : undefined);
+        if (activeOpt && typeof activeOpt.costWithoutTax === 'number' && typeof activeOpt.costWithTax === 'number') {
+          initialCostWithout = String(activeOpt.costWithoutTax.toFixed(2));
+          initialCostWith = String(activeOpt.costWithTax.toFixed(2));
+        }
+      }
 
       if (!unifiedHasTax) {
         const effCost = initialCostWith || initialCostWithout || editingItem.costPrice || '0.00';
         initialCostWithout = effCost;
         initialCostWith = effCost;
       } else {
-        if (!initialCostWithout && initialCostWith) {
-          initialCostWithout = (parseFloat(initialCostWith) / (1 + unifiedTaxPercent / 100)).toFixed(2);
+        const withNum = parseFloat(initialCostWith) || costNum;
+        const withoutNum = parseFloat(initialCostWithout) || 0;
+        if (!withoutNum) {
+          initialCostWithout = (withNum / (1 + unifiedTaxPercent / 100)).toFixed(2);
         }
-        if (!initialCostWith && initialCostWithout) {
+        if (!initialCostWith || parseFloat(initialCostWith) === 0) {
           initialCostWith = (parseFloat(initialCostWithout) * (1 + unifiedTaxPercent / 100)).toFixed(2);
         }
       }
@@ -404,16 +428,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCostWithoutTax(initialCostWithout || '0.00');
       setCostWithTax(initialCostWith || editingItem.costPrice || '0.00');
       setCostPrice(initialCostWith || editingItem.costPrice || '0.00');
-      setSalePrice(editingItem.salePrice || '0.00');
-
-      // Extract cost options
-      if (Array.isArray(parsedAttr.costOptions) && parsedAttr.costOptions.length > 0) {
-        setCostOptions(parsedAttr.costOptions);
-      } else if (costNum > 0) {
-        setCostOptions([{ label: `Costo Principal ($${costNum.toFixed(2)})`, price: costNum }]);
-      } else {
-        setCostOptions([]);
-      }
+      setCostOptions(costOpts);
 
       // Calculate initial margin & profit based on net cost without IVA
       const costWithoutNum = parseFloat(initialCostWithout) || 0;
@@ -438,13 +453,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setMarginPercent(initMargin);
       setProfitAmount(initProfit.toFixed(2));
 
-      setDiscountPercent(
+      const initDiscount =
         editingItem.discountPercent !== undefined && editingItem.discountPercent !== null
           ? Number(editingItem.discountPercent)
           : parsedAttr.discountPercent !== undefined && !isNaN(Number(parsedAttr.discountPercent))
           ? Number(parsedAttr.discountPercent)
-          : 0
-      );
+          : 0;
+      setDiscountPercent(initDiscount);
+
+      // Compute published PVP using initial cost options and target profit so financial breakdown is 100% synchronized from start
+      const computedInitialPvp = computePublishedPvp(costWithoutNum, initProfit, initDiscount, unifiedHasTax, unifiedTaxPercent);
+      setSalePrice(computedInitialPvp.toFixed(2));
       setStock(editingItem.stock ?? 0);
 
       // Collect all available photos for the item safely without dropping cover or secondary photos
@@ -674,28 +693,37 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Handle selecting a specific cost option
   const handleSelectCostOption = (opt: CostOption) => {
-    const optPrice = opt.price;
-    const activeTax = hasPurchaseTax ? purchaseTaxPercent : 0;
+    const activeTax = (hasPurchaseTax || applySaleTax) ? (purchaseTaxPercent > 0 ? purchaseTaxPercent : saleTaxPercent > 0 ? saleTaxPercent : (defaultTelegramTaxPercent ?? telegramTaxPercent ?? 15)) : 15;
     let optWithout: number;
     let optWith: number;
 
-    if (typeof opt.costWithoutTax === 'number') {
+    if (typeof opt.costWithoutTax === 'number' && typeof opt.costWithTax === 'number') {
       optWithout = opt.costWithoutTax;
-      optWith = typeof opt.costWithTax === 'number' ? opt.costWithTax : optWithout * (1 + activeTax / 100);
+      optWith = opt.costWithTax;
+    } else if (typeof opt.costWithoutTax === 'number') {
+      optWithout = opt.costWithoutTax;
+      optWith = activeTax > 0 ? optWithout * (1 + activeTax / 100) : optWithout;
     } else if (typeof opt.costWithTax === 'number') {
       optWith = opt.costWithTax;
       optWithout = activeTax > 0 ? optWith / (1 + activeTax / 100) : optWith;
     } else {
-      optWith = optPrice;
-      optWithout = activeTax > 0 ? optPrice / (1 + activeTax / 100) : optPrice;
+      optWith = opt.price;
+      optWithout = activeTax > 0 ? opt.price / (1 + activeTax / 100) : opt.price;
     }
 
     setCostWithoutTax(optWithout.toFixed(2));
     setCostWithTax(optWith.toFixed(2));
     setCostPrice(optWith.toFixed(2));
 
-    const profitNum = Math.round((optWithout * (marginPercent / 100)) * 100) / 100;
+    const currentProfitNum = parseFloat(profitAmount);
+    const profitNum = !isNaN(currentProfitNum) && currentProfitNum > 0
+      ? currentProfitNum
+      : Math.round((optWithout * (marginPercent / 100)) * 100) / 100;
+
     setProfitAmount(profitNum.toFixed(2));
+    if (optWithout > 0) {
+      setMarginPercent(Math.round((profitNum / optWithout) * 100));
+    }
 
     const newPvp = computePublishedPvp(optWithout, profitNum, discountPercent, applySaleTax, saleTaxPercent);
     setSalePrice(newPvp.toFixed(2));
@@ -830,6 +858,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const mergedAttributes = {
         ...existingAttr,
         costOptions,
+        costWithoutTax: isSupplierGift ? 0 : (parseFloat(costWithoutTax) || 0),
+        costWithTax: isSupplierGift ? 0 : (parseFloat(costWithTax || costPrice) || 0),
         profitMarginPercent: marginPercent,
         profitAmount: parseFloat(profitAmount) || 0,
         discountPercent: Number(discountPercent) || 0,
@@ -1088,12 +1118,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {costOptions.map((opt, idx) => {
-                    const optPrice = opt.price;
-                    const isSelected = Math.abs(parseFloat(costWithTax || costPrice) - optPrice) < 0.01;
+                    const optWith = typeof opt.costWithTax === 'number' ? opt.costWithTax : opt.price;
                     const optWithout =
                       typeof opt.costWithoutTax === 'number'
                         ? opt.costWithoutTax
-                        : optPrice / (1 + taxRate / 100);
+                        : optWith / (1 + (taxRate > 0 ? taxRate : 15) / 100);
+
+                    const isSelected =
+                      Math.abs(parseFloat(costWithTax || costPrice) - optWith) < 0.02 &&
+                      Math.abs(parseFloat(costWithoutTax) - optWithout) < 0.02;
+
                     return (
                       <button
                         key={idx}
@@ -1109,9 +1143,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           <p className="font-semibold text-xs truncate">{opt.label}</p>
                           <div className="flex items-center space-x-2 mt-0.5">
                             <span className="text-xs text-amber-900 font-mono font-black">
-                              Con IVA: ${optPrice.toFixed(2)}
+                              Con IVA: ${optWith.toFixed(2)}
                             </span>
-                            <span className="text-[10px] text-slate-500 font-mono">
+                            <span className="text-[10px] text-slate-500 font-mono font-semibold">
                               (Sin IVA: ${optWithout.toFixed(2)})
                             </span>
                           </div>
