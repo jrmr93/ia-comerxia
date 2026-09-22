@@ -1649,7 +1649,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                   </div>
                   <div className="relative">
                     <input
-                      type="url"
+                      type="text"
                       value={courier.quoteUrl || ''}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -1681,7 +1681,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                 className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-sky-500"
               />
               <input
-                type="url"
+                type="text"
                 value={newCourierQuoteUrl}
                 onChange={(e) => setNewCourierQuoteUrl(e.target.value)}
                 placeholder="URL de cotizador web (Opcional)"
@@ -2353,7 +2353,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                   Enlace URL de Destino:
                 </label>
                 <input
-                  type="url"
+                  type="text"
                   value={promoActionUrl}
                   onChange={(e) => setPromoActionUrl(e.target.value)}
                   placeholder="https://tutienda.com/ofertas"

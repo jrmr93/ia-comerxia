@@ -1,5 +1,6 @@
 import { pool } from './index.ts';
 import crypto from 'crypto';
+import { deleteMediaFileIfUnreferenced } from '../services/media-storage.ts';
 
 export interface AdvertisingVideo {
   id: number;
@@ -241,11 +242,25 @@ export async function updateAdvertisingVideo(
 }
 
 export async function deleteAdvertisingVideo(id: number, userId: number): Promise<boolean> {
+  const existingList = await getAdvertisingVideos(userId);
+  const video = existingList.find((v) => v.id === id);
+
   const res = await pool.query(
     `DELETE FROM advertising_videos WHERE id = $1 AND user_id = $2 RETURNING id`,
     [id, userId]
   );
-  return (res.rowCount ?? 0) > 0;
+  const deleted = (res.rowCount ?? 0) > 0;
+
+  if (deleted && video) {
+    if (video.fileUrl) {
+      deleteMediaFileIfUnreferenced(video.fileUrl).catch(() => {});
+    }
+    if (video.thumbnailUrl) {
+      deleteMediaFileIfUnreferenced(video.thumbnailUrl).catch(() => {});
+    }
+  }
+
+  return deleted;
 }
 
 // ----------------------------------------------------

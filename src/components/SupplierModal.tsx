@@ -773,7 +773,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                   <div className="relative">
                     <Globe className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
-                      type="url"
+                      type="text"
                       value={website}
                       onChange={(e) => setWebsite(e.target.value)}
                       placeholder="https://www.proveedor.com"

@@ -805,7 +805,7 @@ export async function setInventoryItemVideo(id: number, rawVideoUrl: string | nu
       } catch {}
     }
 
-    const oldVideoUrl = item.videoUrl;
+    const oldVideoUrl = item.videoUrl || parsedAttr.videoUrl || parsedAttr.video;
 
     if (finalVideoUrl) {
       parsedAttr.videoUrl = finalVideoUrl;
@@ -1350,6 +1350,10 @@ export async function updateInventoryItem(
       }
       if (sanitizedPayload.videoUrl) {
         parsed.videoUrl = sanitizedPayload.videoUrl;
+        parsed.video = sanitizedPayload.videoUrl;
+      } else if (sanitizedPayload.videoUrl === null || sanitizedPayload.videoUrl === '') {
+        delete parsed.videoUrl;
+        delete parsed.video;
       }
       if ((data as any).applySaleTax !== undefined) {
         parsed.applySaleTax = Boolean((data as any).applySaleTax);

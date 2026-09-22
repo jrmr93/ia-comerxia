@@ -521,10 +521,10 @@ export const ProductAiVideoPickerModal: React.FC<ProductAiVideoPickerModalProps>
                 </label>
                 <div className="flex gap-2">
                   <input
-                    type="url"
+                    type="text"
                     value={manualUrlInput}
                     onChange={(e) => setManualUrlInput(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=... o https://www.tiktok.com/@..."
+                    placeholder="https://www.youtube.com/watch?v=... o https://www.tiktok.com/@... o /uploads/video.mp4"
                     className="flex-1 px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-sky-500 transition"
                   />
                   <button

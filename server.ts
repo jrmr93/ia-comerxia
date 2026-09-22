@@ -165,6 +165,7 @@ import {
   getUploadsStats,
   createUploadsZipBuffer,
   restoreUploadsFromZipBuffer,
+  deleteMediaFileIfUnreferenced,
 } from './src/services/media-storage.ts';
 import {
   getAdvertisingVideos,
@@ -3758,6 +3759,28 @@ async function startServer() {
       });
     } catch (error: any) {
       res.status(500).json({ error: 'Error al consultar estado del almacenamiento multimedia' });
+    }
+  });
+
+  app.post('/api/media/delete-file', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { fileUrl, mediaUrl, path: targetPath } = req.body || {};
+      const target = fileUrl || mediaUrl || targetPath;
+      if (!target || typeof target !== 'string') {
+        return res.status(400).json({ error: 'Se requiere una URL o ruta de archivo multimedia' });
+      }
+
+      const wasDeleted = await deleteMediaFileIfUnreferenced(target);
+      res.json({
+        success: true,
+        deleted: wasDeleted,
+        message: wasDeleted
+          ? 'Archivo eliminado físicamente de la carpeta uploads'
+          : 'El archivo no se eliminó (no existe o sigue en uso por otro producto)',
+      });
+    } catch (error: any) {
+      console.error('Error deleting media file:', error);
+      res.status(500).json({ error: error.message || 'Error al eliminar el archivo multimedia' });
     }
   });
 

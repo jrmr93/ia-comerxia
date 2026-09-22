@@ -2260,10 +2260,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </label>
                   <div className="flex items-center space-x-2">
                     <input
-                      type="url"
+                      type="text"
                       value={videoUrl}
                       onChange={(e) => setVideoUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=... o https://www.tiktok.com/@..."
+                      placeholder="https://www.youtube.com/watch?v=... o https://www.tiktok.com/@... o /uploads/video.mp4"
                       className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 transition"
                     />
                     {videoUrl && (
