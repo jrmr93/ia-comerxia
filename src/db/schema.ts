@@ -66,6 +66,7 @@ export const inventoryItems = pgTable('inventory_items', {
   imageUrl: text('image_url'),
   videoUrl: text('video_url'),
   supplierName: text('supplier_name').default('Proveedor Telegram'),
+  supplierCode: text('supplier_code'),
   tags: text('tags'), // Comma separated or json tags
   extractedAttributes: text('extracted_attributes'), // JSON string: colors, sizes, specs
   status: text('status').notNull().default('available'), // 'available', 'low_stock', 'sold_out', 'archived'

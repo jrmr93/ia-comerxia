@@ -66,6 +66,7 @@ export interface InventoryItem {
   images?: string[];
   videoUrl?: string | null;
   supplierName: string | null;
+  supplierCode?: string | null;
   tags: string | null;
   extractedAttributes: string | null;
   status: 'available' | 'low_stock' | 'sold_out' | 'archived';
@@ -247,6 +248,7 @@ export interface CustomerOrderItem {
   stockDeducted?: number;
   imageUrl?: string | null;
   supplierName?: string | null;
+  supplierCode?: string | null;
   isCustomOrder?: boolean;
   isSupplierGift?: boolean;
 }
@@ -365,6 +367,7 @@ export interface PurchaseItem {
   deliveredFromWarehouse?: number;
   imageUrl?: string | null;
   supplierName?: string | null;
+  supplierCode?: string | null;
   customerOrderId?: number | null;
   orderNumber?: string | null;
   customerName?: string | null;

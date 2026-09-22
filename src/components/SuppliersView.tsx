@@ -44,6 +44,7 @@ interface SuppliersViewProps {
   onOpenNewPurchaseForSupplier?: (supplierName: string, supplierPhone?: string) => void;
   onOpenItemDetail?: (item: InventoryItem) => void;
   onSuppliersCountChange?: (count: number) => void;
+  onSuppliersChange?: (suppliers: Supplier[]) => void;
   dbCustomers?: any[];
 }
 
@@ -54,6 +55,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
   onOpenNewPurchaseForSupplier,
   onOpenItemDetail,
   onSuppliersCountChange,
+  onSuppliersChange,
   dbCustomers = [],
 }) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -84,6 +86,12 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
         const data = await res.json();
         if (Array.isArray(data)) {
           setSuppliers(data);
+          if (onSuppliersCountChange) {
+            onSuppliersCountChange(data.length);
+          }
+          if (onSuppliersChange) {
+            onSuppliersChange(data);
+          }
         }
       } else {
         if (!silent) console.error('Error fetching suppliers:', res.statusText);

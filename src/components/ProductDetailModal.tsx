@@ -489,6 +489,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <span className="font-mono text-xs font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
                   {currentItem.sku}
                 </span>
+                {currentItem.supplierCode && (
+                  <span className="font-mono text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300" title="Código / SKU del Proveedor">
+                    Ref Prov: {currentItem.supplierCode}
+                  </span>
+                )}
                 <span className="text-xs px-2 py-0.5 rounded-md font-medium bg-slate-100 text-slate-700 border border-slate-200">
                   {currentItem.category}
                 </span>
@@ -1073,6 +1078,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </span>
                   </div>
                 </div>
+                {currentItem.supplierCode && (
+                  <div className="text-right shrink-0 bg-white px-2.5 py-1 rounded-xl border border-amber-300">
+                    <span className="text-[9px] text-amber-800 font-bold uppercase tracking-wider block">
+                      SKU Proveedor
+                    </span>
+                    <span className="font-mono text-xs font-black text-amber-950">
+                      {currentItem.supplierCode}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Pricing & Commercial Info Box (Cost price is private and only visible/editable in Edit Modal) */}

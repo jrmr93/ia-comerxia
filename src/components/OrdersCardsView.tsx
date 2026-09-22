@@ -537,18 +537,39 @@ const SingleOrderCardItem: React.FC<SingleOrderCardItemProps> = ({
             </div>
 
             <div className="flex flex-wrap gap-2 text-xs">
-              {parsedItems.map((it: any, idx: number) => (
-                <span
-                  key={idx}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 text-[11px]"
-                >
-                  <span className="font-bold text-sky-700">{it.quantity || 1}x</span>
-                  <span className="truncate max-w-[200px]">{it.name || it.item?.name || 'Producto'}</span>
-                  <span className="text-slate-400 font-mono text-[10px]">
-                    (${Number(it.salePrice || it.item?.salePrice || 0).toFixed(2)})
+              {parsedItems.map((it: any, idx: number) => {
+                const itemSku = it.sku || it.item?.sku;
+                const invMatch = (inventoryItems || []).find((inv: any) =>
+                  (it.id && String(inv.id) === String(it.id)) ||
+                  (itemSku && inv.sku === itemSku)
+                );
+                const supplierCode = it.supplierCode || it.item?.supplierCode || invMatch?.supplierCode;
+
+                return (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 text-[11px]"
+                  >
+                    <span className="font-bold text-sky-700">{it.quantity || 1}x</span>
+                    <span className="truncate max-w-[200px]">{it.name || it.item?.name || 'Producto'}</span>
+                    {itemSku && <span className="font-mono text-[10px] text-slate-400">({itemSku})</span>}
+                    {supplierCode && (
+                      <button
+                        type="button"
+                        onClick={() => copyTextToClipboard(supplierCode, `✓ SKU Proveedor (${supplierCode}) copiado`)}
+                        className="inline-flex items-center gap-1 font-mono text-[10px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1.5 py-0.2 rounded font-semibold cursor-pointer transition"
+                        title="Copiar SKU Proveedor al portapapeles"
+                      >
+                        <span>Prov: {supplierCode}</span>
+                        <Copy className="w-2.5 h-2.5 text-indigo-500" />
+                      </button>
+                    )}
+                    <span className="text-slate-400 font-mono text-[10px]">
+                      (${Number(it.salePrice || it.item?.salePrice || 0).toFixed(2)})
+                    </span>
                   </span>
-                </span>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

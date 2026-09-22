@@ -1785,6 +1785,8 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                   currency={currency}
                   storeConfig={storeConfig}
                   customerOrders={allCustomerOrders}
+                  inventoryItems={inventoryItems}
+                  suppliers={suppliers}
                   showToast={showToast}
                   onConfirmPay={(p) => {
                     const isAuto = Boolean(p.linkedCustomerOrderId || p.linkedCustomerOrderNumber);
@@ -3144,6 +3146,26 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                                 placeholder="Auto"
                                 className="w-20 bg-sky-50 border border-sky-200 rounded px-1.5 py-0.5 font-mono text-sky-900 font-bold text-[11px] focus:outline-none focus:border-sky-500 disabled:text-slate-600 disabled:bg-slate-100"
                               />
+                              {(() => {
+                                const supplierCode = it.supplierCode || (inventoryItems?.find((inv) => inv.id === it.inventoryItemId || (it.sku && inv.sku && inv.sku.toLowerCase() === it.sku.toLowerCase())) as any)?.supplierCode;
+                                if (!supplierCode) return null;
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigator.clipboard.writeText(supplierCode);
+                                      if (showToast) showToast(`📋 SKU Proveedor ${supplierCode} copiado al portapapeles`);
+                                    }}
+                                    className="mt-1 font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
+                                    title="Haz clic para copiar el SKU Proveedor al portapapeles"
+                                  >
+                                    <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
+                                    <span className="max-w-[70px] truncate">{supplierCode}</span>
+                                    <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                                  </button>
+                                );
+                              })()}
                             </td>
                             <td className="p-2.5 text-center">
                               <div className="flex items-center justify-center space-x-1">

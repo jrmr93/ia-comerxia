@@ -97,6 +97,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
+  const [supplierCode, setSupplierCode] = useState('');
   const [category, setCategory] = useState('General');
   const [isSupplierGift, setIsSupplierGift] = useState<boolean>(false);
   const [costPrice, setCostPrice] = useState('0.00');
@@ -347,14 +348,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   useEffect(() => {
     if (editingItem) {
-      setName(editingItem.name || '');
-      setSku(editingItem.sku || '');
-      setBarcode(editingItem.barcode || '');
-      setCategory(editingItem.category || 'General');
-      
-      const costNum = parseFloat(editingItem.costPrice) || 0;
-      const saleNum = parseFloat(editingItem.salePrice) || 0;
-
       let parsedAttr: Record<string, any> = {};
       if (editingItem.extractedAttributes) {
         try {
@@ -364,6 +357,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               : editingItem.extractedAttributes;
         } catch {}
       }
+
+      setName(editingItem.name || '');
+      setSku(editingItem.sku || '');
+      setBarcode(editingItem.barcode || '');
+      setSupplierCode(editingItem.supplierCode || parsedAttr.supplierCode || '');
+      setCategory(editingItem.category || 'General');
+      
+      const costNum = parseFloat(editingItem.costPrice) || 0;
+      const saleNum = parseFloat(editingItem.salePrice) || 0;
 
       setIsSupplierGift(Boolean(editingItem.isSupplierGift || parsedAttr.isSupplierGift));
 
@@ -523,6 +525,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setVideoUrl(editingItem.videoUrl || '');
       setIsPlayingVideoPreview(false);
       setSupplierName(editingItem.supplierName || 'Proveedor Telegram');
+      setSupplierCode(editingItem.supplierCode || parsedAttr.supplierCode || '');
       setDescription(editingItem.description || '');
       setTags(editingItem.tags || '');
       setRawTelegramMessage(editingItem.rawTelegramMessage || '');
@@ -531,6 +534,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setName('');
       setSku('');
       setBarcode('');
+      setSupplierCode('');
       setCategory('General');
       const defaultTax = defaultTelegramTaxPercent ?? telegramTaxPercent ?? 15;
       setHasPurchaseTax(true);
@@ -919,6 +923,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         images: allPhotos,
         totalPhotos: allPhotos.length,
         isSupplierGift,
+        supplierCode: supplierCode.trim() || null,
       };
 
       const url = editingItem ? `/api/inventory/${editingItem.id}` : '/api/inventory';
@@ -931,6 +936,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           name: name.trim(),
           sku: sku.trim(),
           barcode: barcode.trim() || null,
+          supplierCode: supplierCode.trim() || null,
           category,
           costPrice: isSupplierGift ? '0.00' : String(parseFloat(costWithTax || costPrice) || 0),
           costWithoutTax: isSupplierGift ? '0.00' : String(parseFloat(costWithoutTax) || 0),
@@ -1141,6 +1147,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               />
               <p className="text-[10px] text-slate-500 mt-1">
                 Identificador interno de catálogo de tu negocio.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Código del Proveedor (SKU Proveedor)
+              </label>
+              <input
+                type="text"
+                value={supplierCode}
+                onChange={(e) => setSupplierCode(e.target.value)}
+                placeholder="Ej. PROV-99823 o REF-881"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-sky-500 placeholder:text-slate-400 transition"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Código o referencia original asignado por el fabricante o proveedor.
               </p>
             </div>
 

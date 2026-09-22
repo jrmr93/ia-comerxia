@@ -7,6 +7,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Copy,
   CreditCard,
   Download,
   Edit3,
@@ -493,6 +494,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
       quantity: number;
       imageUrl?: string | null;
       saleTaxPercent?: number;
+      supplierCode?: string;
     }>
   >([]);
 
@@ -2895,9 +2897,26 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">#{idx + 1}</span>
                         </div>
 
-                        {/* 2. Código de barras / SKU */}
-                        <div className="col-span-2 flex items-center gap-1 font-mono font-bold text-purple-900 text-xs truncate mb-1 lg:mb-0">
-                          <span className="truncate" title={it.barcode || it.sku}>{it.barcode || it.sku || (it.id ? `PRD-${it.id}` : '—')}</span>
+                        {/* 2. Código de barras / SKU / SKU Proveedor */}
+                        <div className="col-span-2 flex flex-col font-mono text-xs truncate mb-1 lg:mb-0">
+                          <span className="truncate font-bold text-purple-900" title={it.barcode || it.sku}>{it.barcode || it.sku || (it.id ? `PRD-${it.id}` : '—')}</span>
+                          {((it as any).supplierCode || match?.supplierCode) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const supplierCode = (it as any).supplierCode || match?.supplierCode;
+                                if (supplierCode) {
+                                  navigator.clipboard.writeText(supplierCode);
+                                  showToast(`✓ SKU Proveedor (${supplierCode}) copiado`);
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1 py-0.2 rounded font-semibold cursor-pointer w-max transition"
+                              title="Copiar SKU Proveedor al portapapeles"
+                            >
+                              <span className="truncate max-w-[75px]">Prov: {(it as any).supplierCode || match?.supplierCode}</span>
+                              <Copy className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                            </button>
+                          )}
                         </div>
 
                         {/* 3. Nombre del producto */}

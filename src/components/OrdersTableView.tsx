@@ -266,6 +266,7 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
             costPrice: cPrice,
             marginPercent: marginPct,
             supplierName: it.supplierName || (matchingProduct as any)?.supplier || undefined,
+            supplierCode: it.supplierCode || matchingProduct?.supplierCode || (matchingProduct as any)?.extractedAttributes?.supplierCode || undefined,
             salePrice: baseSalePrice,
             discount: discVal,
             discountPercent: it.discountPercent ? Number(it.discountPercent) : (matchingProduct?.discountPercent ? Number(matchingProduct.discountPercent) : 0),
@@ -340,6 +341,7 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
           return {
             ...lineResult,
             imageUrl: it.imageUrl,
+            supplierCode: it.supplierCode,
           };
         });
 
@@ -622,9 +624,25 @@ export const OrdersTableView: React.FC<OrdersTableViewProps> = ({
                           </div>
                         </td>
                         <td className="p-3 font-mono text-[11px]">
-                          <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-bold text-sky-800">
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-bold text-sky-800 block w-fit">
                             {item.sku || '-'}
                           </span>
+                          {item.supplierCode && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(item.supplierCode);
+                                showToast(`📋 SKU Proveedor ${item.supplierCode} copiado al portapapeles`);
+                              }}
+                              className="mt-1 font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
+                              title="Haz clic para copiar el SKU Proveedor al portapapeles"
+                            >
+                              <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
+                              <span className="max-w-[90px] truncate">{item.supplierCode}</span>
+                              <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                            </button>
+                          )}
                         </td>
                         <td className="p-3 text-center font-mono font-bold text-slate-900">{item.quantity} u.</td>
                         <td className="p-3 text-right font-mono font-bold text-slate-800">${item.unitPriceWithoutTax.toFixed(2)}</td>

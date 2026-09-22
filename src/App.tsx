@@ -1635,6 +1635,7 @@ function InventoryApp() {
             }}
             currency={config?.currency || 'USD'}
             onSuppliersCountChange={setSuppliersCount}
+            onSuppliersChange={setSuppliers}
             onOpenItemDetail={(item) => setSelectedItemDetail(item)}
             onOpenNewPurchaseForSupplier={(supplierName) => {
               setActiveTab('purchases');

@@ -30,16 +30,20 @@ import {
   Plus,
   Trash2,
   MapPin,
+  Lock,
   Loader2,
   Globe,
   Star,
   UploadCloud,
+  Palette,
+  Layers,
 } from 'lucide-react';
 import { InventoryItem, ProductMarketingCopy } from '../types.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import { downloadImage, downloadMultipleImages, copyImageToClipboard } from '../utils/image-drag-copy.ts';
 import { ProductWebImagePicker } from './ProductWebImagePicker.tsx';
 import { getPublicStoreUrl, getPublicProductUrl } from '../utils/storeUrls.ts';
+import { generateSocialFlyer, FlyerTemplateStyle } from '../utils/socialFlyerGenerator.ts';
 
 /**
  * Strips trailing hashtags or tag lists from universal post text so the universal
@@ -92,6 +96,23 @@ export const ProductMarketingCopyModal: React.FC<ProductMarketingCopyModalProps>
   const [showWebsite, setShowWebsite] = useState<boolean>(true);
 
   // Dynamic store link derived from 'Compartir Tienda'
+  const [storeConfigData, setStoreConfigData] = useState<any>(null);
+
+  // Social Flyer Generator Modal state
+  const [showFlyerModal, setShowFlyerModal] = useState<boolean>(false);
+  const [flyerStyle, setFlyerStyle] = useState<FlyerTemplateStyle>('studio');
+  const [flyerPrice, setFlyerPrice] = useState<string>('');
+  const [flyerOriginalPrice, setFlyerOriginalPrice] = useState<string>('');
+  const [flyerDiscountPercent, setFlyerDiscountPercent] = useState<number>(0);
+  const [flyerTitle, setFlyerTitle] = useState<string>('');
+  const [flyerTagline, setFlyerTagline] = useState<string>('Envíos a todo el país 🚚');
+  const [flyerPhotoCount, setFlyerPhotoCount] = useState<number>(1);
+  const [selectedFlyerPhotos, setSelectedFlyerPhotos] = useState<string[]>([]);
+  const [generatedFlyerB64, setGeneratedFlyerB64] = useState<string | null>(null);
+  const [isGeneratingFlyer, setIsGeneratingFlyer] = useState<boolean>(false);
+  const [isSavingFlyerDb, setIsSavingFlyerDb] = useState<boolean>(false);
+  const [copyingFlyer, setCopyingFlyer] = useState<boolean>(false);
+
   const dynamicStoreUrl = React.useMemo(() => {
     if (typeof window === 'undefined') return '';
     if (currentItem?.id) {
@@ -334,8 +355,10 @@ export const ProductMarketingCopyModal: React.FC<ProductMarketingCopyModalProps>
         .then((res) => (res.ok ? res.json() : null))
         .then((config) => {
           if (config) {
-            if (config.whatsappNumber && !whatsappContact) {
-              setWhatsappContact(config.whatsappNumber);
+            setStoreConfigData(config);
+            const advisorPhone = config.whatsappNumber || config.phone || '';
+            if (advisorPhone) {
+              setWhatsappContact(advisorPhone);
             }
             if (config.address) {
               setStoreAddress((prev) => (prev ? prev : (config.address || '')));
@@ -393,6 +416,122 @@ export const ProductMarketingCopyModal: React.FC<ProductMarketingCopyModalProps>
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
+  };
+
+  const handleOpenFlyerModal = () => {
+    const defaultPvp = currentItem?.salePrice || (item?.salePrice ? String(item.salePrice) : '0.00');
+    const defaultTitle = currentItem?.name || item?.name || '';
+    const defaultDisc = currentItem?.discountPercent || item?.discountPercent || 0;
+    
+    let defaultOrig = '';
+    if (defaultDisc > 0 && parseFloat(defaultPvp) > 0) {
+      defaultOrig = (parseFloat(defaultPvp) / (1 - defaultDisc / 100)).toFixed(2);
+    }
+
+    const availablePhotos = productPhotos.length > 0 ? productPhotos : (item?.images || []);
+    const initialSelectedPhotos = availablePhotos.slice(0, 1);
+
+    setFlyerPrice(defaultPvp);
+    setFlyerOriginalPrice(defaultOrig);
+    setFlyerDiscountPercent(defaultDisc);
+    setFlyerTitle(defaultTitle);
+    setFlyerPhotoCount(1);
+    setSelectedFlyerPhotos(initialSelectedPhotos);
+    setShowFlyerModal(true);
+
+    generateFlyerCanvas('studio', defaultTitle, defaultPvp, defaultOrig, defaultDisc, 1, initialSelectedPhotos, flyerTagline);
+  };
+
+  const generateFlyerCanvas = async (
+    style: FlyerTemplateStyle = flyerStyle,
+    title: string = flyerTitle,
+    price: string = flyerPrice,
+    origPrice: string = flyerOriginalPrice,
+    discPct: number = flyerDiscountPercent,
+    photoCount: number = flyerPhotoCount,
+    chosenPhotos: string[] = selectedFlyerPhotos,
+    taglineStr: string = flyerTagline
+  ) => {
+    setIsGeneratingFlyer(true);
+    try {
+      const photosPool = chosenPhotos.length > 0 ? chosenPhotos : productPhotos;
+      const targetPhotos = photosPool.slice(0, photoCount);
+      const fallbackPhoto = productPhotos[0] || currentItem?.imageUrl || item?.imageUrl || '';
+
+      const b64 = await generateSocialFlyer({
+        productImageUrls: targetPhotos.length > 0 ? targetPhotos : [fallbackPhoto],
+        productName: title || currentItem?.name || item?.name || 'Producto',
+        salePrice: price || currentItem?.salePrice || '0.00',
+        originalPrice: origPrice || null,
+        discountPercent: discPct,
+        currency,
+        storeName: storeConfigData?.storeName || 'COMERXIA STORE',
+        storeLogoUrl: storeConfigData?.logoDesktopUrl || storeConfigData?.logoUrl || null,
+        templateStyle: style,
+        tagline: taglineStr,
+      });
+      setGeneratedFlyerB64(b64);
+    } catch (err) {
+      console.error('Error al generar flyer:', err);
+      showToast('⚠️ No se pudo generar el flyer promocional');
+    } finally {
+      setIsGeneratingFlyer(false);
+    }
+  };
+
+  const handleSaveFlyerToDatabase = async () => {
+    if (!generatedFlyerB64 || !item) return;
+    setIsSavingFlyerDb(true);
+    showToast('💾 Guardando imagen promocional en la base de datos...');
+    try {
+      const res = await authFetch(`/api/inventory/${item.id}/add-images`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          images: [generatedFlyerB64],
+          setAsCover: false,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.item) {
+          setCurrentItem(data.item);
+          onItemUpdated?.(data.item);
+        }
+      }
+
+      showToast('✅ ¡Imagen promocional guardada permanentemente en la base de datos!');
+    } catch (err) {
+      console.error('Error al guardar flyer en BD:', err);
+      showToast('⚠️ Error al guardar flyer en la base de datos');
+    } finally {
+      setIsSavingFlyerDb(false);
+    }
+  };
+
+  const handleCopyFlyerToClipboard = async () => {
+    if (!generatedFlyerB64) return;
+    setCopyingFlyer(true);
+    try {
+      const ok = await copyImageToClipboard(generatedFlyerB64);
+      if (ok) {
+        showToast('📋 ¡Imagen promocional copiada al portapapeles! Presiona Ctrl+V en WhatsApp o Redes.');
+      } else {
+        showToast('⚠️ No se pudo copiar la imagen al portapapeles');
+      }
+    } catch {
+      showToast('⚠️ Error al copiar imagen');
+    } finally {
+      setCopyingFlyer(false);
+    }
+  };
+
+  const handleDownloadFlyer = () => {
+    if (!generatedFlyerB64) return;
+    const filename = `Flyer_${(currentItem?.name || 'Producto').replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+    downloadImage(generatedFlyerB64, filename);
+    showToast('📥 Flyer promocional descargado en 1080x1080px');
   };
 
   const handleGenerate = async (selectedTone = tone) => {
@@ -1089,16 +1228,24 @@ ${shippingBullets}${addressSectionFallback}${websiteSectionFallback}`.trim();
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 flex items-center mb-1">
-                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600 mr-1" />
-                  WhatsApp de Contacto:
+                <label className="font-bold text-slate-700 flex items-center justify-between mb-1">
+                  <span className="flex items-center">
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600 mr-1" />
+                    Teléfono Directo del Asesor:
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-slate-400" />
+                    (No editable)
+                  </span>
                 </label>
                 <input
                   type="text"
-                  value={whatsappContact}
-                  onChange={(e) => setWhatsappContact(e.target.value)}
-                  placeholder="Ej. +593983302390"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-sky-500 text-xs"
+                  value={whatsappContact || storeConfigData?.whatsappNumber || storeConfigData?.phone || ''}
+                  readOnly={true}
+                  disabled={true}
+                  placeholder="Sin número en Teléfono Directo del Asesor"
+                  className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-600 font-mono text-xs cursor-not-allowed select-none opacity-80"
+                  title="Teléfono registrado en 'Teléfono Directo del Asesor' (No editable desde este modal)"
                 />
               </div>
               <div>
@@ -1204,6 +1351,17 @@ ${shippingBullets}${addressSectionFallback}${websiteSectionFallback}`.trim();
               </span>
             </div>
             <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+              {/* Button to Generate Social Media Flyer */}
+              <button
+                type="button"
+                onClick={handleOpenFlyerModal}
+                className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[11px] font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                title="Generar flyer promocional de alta resolución (1080x1080) con plantilla, PVP y logo de la tienda"
+              >
+                <Palette className="w-3.5 h-3.5 text-emerald-200" />
+                <span>🎨 Crear Imagen Promocional</span>
+              </button>
+
               {/* Single Button to Search Web Images with AI */}
               <button
                 type="button"
@@ -1844,6 +2002,293 @@ ${shippingBullets}${addressSectionFallback}${websiteSectionFallback}`.trim();
                   <span>{isDeletingCopy ? 'Eliminando...' : 'Sí, Eliminar'}</span>
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Social Flyer Generator Modal Overlay */}
+        {showFlyerModal && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-100 flex flex-col space-y-4 max-h-[94vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-xs">
+                    <Palette className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                      <span>Generar Imagen Promocional para Redes</span>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        ⚡ 0 Consumo IA
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Crea un flyer promocional HD (1080x1080px) con la foto del producto, ofertas, logo 2X y plantillas exclusivas.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFlyerModal(false)}
+                  className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Template Style Selectors (8 Styles: Classic + 4 Feminine) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center space-x-1">
+                  <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Seleccionar Estilo de Plantilla (8 Estilos):</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {[
+                    { id: 'studio', label: '🌟 Studio Gradiente', color: 'from-slate-900 to-indigo-900 text-white' },
+                    { id: 'dark', label: '⚡ Minimalista Oscuro', color: 'from-slate-950 to-slate-800 text-amber-400' },
+                    { id: 'clean', label: '🟢 Oferta Limpia', color: 'bg-white border-slate-300 text-slate-900' },
+                    { id: 'neon', label: '🔥 Neón Redes', color: 'from-indigo-950 to-emerald-950 text-emerald-400' },
+                    { id: 'rose_gold', label: '🌸 Rosa Gold Chic', color: 'from-rose-950 via-rose-900 to-rose-950 text-amber-200' },
+                    { id: 'pastel_pink', label: '💖 Pastel Boutique', color: 'bg-pink-100 border-pink-300 text-pink-900' },
+                    { id: 'lavender_glam', label: '💜 Lavanda Glam', color: 'from-indigo-950 via-purple-900 to-fuchsia-950 text-purple-200' },
+                    { id: 'coral_sunset', label: '🌺 Coral Soft', color: 'bg-orange-50 border-orange-200 text-rose-900' },
+                  ].map((styleItem) => (
+                    <button
+                      key={styleItem.id}
+                      type="button"
+                      onClick={() => {
+                        const newStyle = styleItem.id as FlyerTemplateStyle;
+                        setFlyerStyle(newStyle);
+                        generateFlyerCanvas(newStyle);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center justify-center text-center cursor-pointer ${
+                        flyerStyle === styleItem.id
+                          ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md font-extrabold scale-[1.02]'
+                          : 'border-slate-200 hover:border-slate-300'
+                      } ${styleItem.color}`}
+                    >
+                      {styleItem.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Photo Layout Count Selector (1, 2, 3, or 4 Photos) */}
+              <div className="space-y-2 bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-xs">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="font-bold text-slate-800 flex items-center space-x-1">
+                    <ImageIcon className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Cantidad de Fotos en la Imagen Promocional:</span>
+                  </label>
+                  <div className="flex items-center space-x-1">
+                    {[
+                      { count: 1, label: '📷 1 Foto' },
+                      { count: 2, label: '📷📷 2 Fotos' },
+                      { count: 3, label: '🖼️ 3 Fotos' },
+                      { count: 4, label: '🖼️ 4 Fotos' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.count}
+                        type="button"
+                        onClick={() => {
+                          setFlyerPhotoCount(opt.count);
+                          const targetPhotos = productPhotos.slice(0, opt.count);
+                          setSelectedFlyerPhotos(targetPhotos);
+                          generateFlyerCanvas(flyerStyle, flyerTitle, flyerPrice, flyerOriginalPrice, flyerDiscountPercent, opt.count, targetPhotos);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                          flyerPhotoCount === opt.count
+                            ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Available Photo Thumbnails Selection */}
+                {productPhotos.length > 1 && (
+                  <div className="pt-2 border-t border-slate-200/60">
+                    <span className="text-[11px] font-semibold text-slate-600 mb-1.5 block">
+                      Seleccionar fotos a incluir (se usarán las primeras {flyerPhotoCount} seleccionadas):
+                    </span>
+                    <div className="flex items-center space-x-2 overflow-x-auto py-1">
+                      {productPhotos.map((photoUrl, idx) => {
+                        const isSelected = selectedFlyerPhotos.includes(photoUrl);
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              let next: string[];
+                              if (isSelected) {
+                                next = selectedFlyerPhotos.filter((p) => p !== photoUrl);
+                                if (next.length === 0) next = [productPhotos[0]];
+                              } else {
+                                next = [...selectedFlyerPhotos, photoUrl];
+                              }
+                              setSelectedFlyerPhotos(next);
+                              generateFlyerCanvas(flyerStyle, flyerTitle, flyerPrice, flyerOriginalPrice, flyerDiscountPercent, flyerPhotoCount, next);
+                            }}
+                            className={`relative rounded-xl border-2 p-0.5 cursor-pointer transition flex-shrink-0 ${
+                              isSelected ? 'border-sky-500 ring-2 ring-sky-500/20' : 'border-slate-200 opacity-60 hover:opacity-100'
+                            }`}
+                          >
+                            <img
+                              src={photoUrl}
+                              alt={`Foto ${idx + 1}`}
+                              className="w-12 h-12 object-cover rounded-lg"
+                            />
+                            {isSelected && (
+                              <div className="absolute top-0.5 right-0.5 bg-sky-600 text-white rounded-full p-0.5">
+                                <Check className="w-2.5 h-2.5" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Offer Pricing Customization Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">PVP Final (Oferta):</label>
+                  <input
+                    type="text"
+                    value={flyerPrice}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFlyerPrice(val);
+                      const pNum = parseFloat(val) || 0;
+                      const oNum = parseFloat(flyerOriginalPrice) || 0;
+                      if (oNum > pNum && oNum > 0) {
+                        setFlyerDiscountPercent(Math.round(((oNum - pNum) / oNum) * 100));
+                      } else {
+                        setFlyerDiscountPercent(0);
+                      }
+                    }}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500"
+                    placeholder="Ej. 45.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">PVP Lista (Tachado):</label>
+                  <input
+                    type="text"
+                    value={flyerOriginalPrice}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFlyerOriginalPrice(val);
+                      const oNum = parseFloat(val) || 0;
+                      const pNum = parseFloat(flyerPrice) || 0;
+                      if (oNum > pNum && oNum > 0) {
+                        setFlyerDiscountPercent(Math.round(((oNum - pNum) / oNum) * 100));
+                      } else {
+                        setFlyerDiscountPercent(0);
+                      }
+                    }}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-slate-900 font-medium focus:outline-none focus:border-emerald-500"
+                    placeholder="Ej. 60.00 (Opcional)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Lema / Distintivo:</label>
+                  <input
+                    type="text"
+                    value={flyerTagline}
+                    onChange={(e) => setFlyerTagline(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-slate-900 font-medium focus:outline-none focus:border-emerald-500"
+                    placeholder="Ej. Envíos a todo el país 🚚"
+                  />
+                </div>
+
+                <div className="sm:col-span-3 flex items-center justify-between pt-1">
+                  <div className="text-[11px] font-semibold text-amber-700">
+                    {flyerDiscountPercent > 0 ? (
+                      <span>⚡ Descuento aplicado: <strong>-{flyerDiscountPercent}% OFF</strong> (PVP Original: ${flyerOriginalPrice})</span>
+                    ) : (
+                      <span>Para mostrar precio tachado e insignia de oferta, ingresa el PVP Lista arriba.</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => generateFlyerCanvas()}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingFlyer ? 'animate-spin' : ''}`} />
+                    <span>Actualizar Vista Previa</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Flyer Live Canvas Preview Area */}
+              <div className="flex flex-col items-center justify-center p-3 bg-slate-100/80 rounded-2xl border border-slate-200 min-h-[300px]">
+                {isGeneratingFlyer ? (
+                  <div className="py-12 flex flex-col items-center justify-center space-y-2 text-slate-500">
+                    <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                    <span className="text-xs font-bold">Generando flyer promocional HD...</span>
+                  </div>
+                ) : generatedFlyerB64 ? (
+                  <img
+                    src={generatedFlyerB64}
+                    alt="Vista previa flyer promocional"
+                    className="w-full max-w-sm aspect-square object-contain rounded-2xl shadow-xl border border-slate-300 bg-white"
+                  />
+                ) : (
+                  <div className="text-xs text-slate-400">Sin vista previa disponible</div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isSavingFlyerDb || !generatedFlyerB64}
+                  onClick={handleSaveFlyerToDatabase}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+                  title="Guardar permanentemente en la base de datos del producto"
+                >
+                  {isSavingFlyerDb ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>{isSavingFlyerDb ? 'Guardando en BD...' : '💾 Guardar Permanentemente en BD'}</span>
+                </button>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    disabled={copyingFlyer || !generatedFlyerB64}
+                    onClick={handleCopyFlyerToClipboard}
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    title="Copiar imagen al portapapeles para pegar con Ctrl+V"
+                  >
+                    {copyingFlyer ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                    <span>Copiar Imagen</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!generatedFlyerB64}
+                    onClick={handleDownloadFlyer}
+                    className="px-3.5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md shadow-sky-600/20 transition flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    title="Descargar archivo PNG en alta definición (1080x1080)"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Descargar PNG</span>
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
         )}

@@ -22,10 +22,11 @@ import {
   Receipt,
   FileText,
   Calendar,
+  Globe,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { PurchaseOrder, StoreConfig, CustomerOrder } from '../types.ts';
+import { PurchaseOrder, StoreConfig, CustomerOrder, Supplier } from '../types.ts';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
 
 interface PurchaseRecordCardProps {
@@ -35,6 +36,8 @@ interface PurchaseRecordCardProps {
   currency: string;
   storeConfig?: Partial<StoreConfig> | null;
   customerOrders?: CustomerOrder[];
+  inventoryItems?: any[];
+  suppliers?: Supplier[];
   showToast?: (msg: string) => void;
   onConfirmPay: (purchase: PurchaseOrder) => void;
   isConfirming?: boolean;
@@ -64,6 +67,8 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
   currency,
   storeConfig,
   customerOrders,
+  inventoryItems,
+  suppliers,
   showToast,
   onConfirmPay,
   isConfirming = false,
@@ -107,6 +112,158 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
 
   // La compra al proveedor no puede confirmarse si no se confirma el pedido de venta vinculado
   const isLinkedOrderUnconfirmed = Boolean(isAutoFromSales && !isLinkedOrderConfirmed);
+
+  const getItemSupplierCode = (item: any) => {
+    if (item.supplierCode) return item.supplierCode;
+    if (item.item?.supplierCode) return item.item.supplierCode;
+    if (inventoryItems && Array.isArray(inventoryItems)) {
+      const match = inventoryItems.find(
+        (inv) =>
+          (item.id && String(inv.id) === String(item.id)) ||
+          (item.inventoryItemId && String(inv.id) === String(item.inventoryItemId)) ||
+          (item.sku && inv.sku && inv.sku.toLowerCase() === String(item.sku).toLowerCase())
+      );
+      if (match?.supplierCode) return match.supplierCode;
+    }
+    return null;
+  };
+
+  const getSupplierWebsite = (): string | null => {
+    const rawName = purchase.supplierName ? purchase.supplierName.trim() : '';
+    const targetName = rawName.toLowerCase();
+
+    const cleanStr = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\b(sa|s a|cia|ltda|inc|corp|corporation|distribuidora|importadora|proveedor|oficial|tienda|store)\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const cleanTarget = cleanStr(rawName);
+
+    const getWebFromObj = (obj: any): string | null => {
+      if (!obj) return null;
+      const w = obj.website || obj.websiteUrl || obj.website_url || obj.catalogUrl || obj.catalog_url || obj.url;
+      if (w && typeof w === 'string' && w.trim().length > 0) return w.trim();
+      return null;
+    };
+
+    // PRIORIDAD 1: Consultar la configuración activa del proveedor en el módulo de Proveedores (suppliers)
+    if (suppliers && Array.isArray(suppliers) && suppliers.length > 0) {
+      if ((purchase as any).supplierId || (purchase as any).supplier_id) {
+        const supId = Number((purchase as any).supplierId || (purchase as any).supplier_id);
+        const matchById = suppliers.find((s) => Number(s.id) === supId);
+        const web = getWebFromObj(matchById);
+        if (web) return web;
+      }
+
+      if (targetName) {
+        const exactMatch = suppliers.find(
+          (s) =>
+            (s.name && s.name.trim().toLowerCase() === targetName) ||
+            (s.tradeName && s.tradeName.trim().toLowerCase() === targetName)
+        );
+        const web = getWebFromObj(exactMatch);
+        if (web) return web;
+      }
+
+      if (targetName) {
+        const subMatch = suppliers.find((s) => {
+          const sName = s.name ? s.name.trim().toLowerCase() : '';
+          const sTrade = s.tradeName ? s.tradeName.trim().toLowerCase() : '';
+          return (
+            (sName && (targetName.includes(sName) || sName.includes(targetName))) ||
+            (sTrade && (targetName.includes(sTrade) || sTrade.includes(targetName)))
+          );
+        });
+        const web = getWebFromObj(subMatch);
+        if (web) return web;
+      }
+
+      if (cleanTarget.length > 1) {
+        const fuzzyMatch = suppliers.find((s) => {
+          const cName = cleanStr(s.name || '');
+          const cTrade = cleanStr(s.tradeName || '');
+          return (
+            (cName && (cleanTarget.includes(cName) || cName.includes(cleanTarget))) ||
+            (cTrade && (cleanTarget.includes(cTrade) || cTrade.includes(cleanTarget)))
+          );
+        });
+        const web = getWebFromObj(fuzzyMatch);
+        if (web) return web;
+      }
+
+      if (purchase.supplierContact && purchase.supplierContact.trim()) {
+        const contactDigits = purchase.supplierContact.replace(/\D/g, '');
+        if (contactDigits.length >= 7) {
+          const phoneMatch = suppliers.find((s) => {
+            const sPhone = (s.phone || '').replace(/\D/g, '');
+            const sContactPhone = (s.contactPersonPhone || '').replace(/\D/g, '');
+            return (
+              (sPhone.length >= 7 && (contactDigits.includes(sPhone) || sPhone.includes(contactDigits))) ||
+              (sContactPhone.length >= 7 && (contactDigits.includes(sContactPhone) || sContactPhone.includes(contactDigits)))
+            );
+          });
+          const web = getWebFromObj(phoneMatch);
+          if (web) return web;
+        }
+      }
+    }
+
+    // PRIORIDAD 2: Propiedades guardadas estáticamente en la orden de compra o sus ítems
+    if ((purchase as any).supplierWebsite) return (purchase as any).supplierWebsite;
+    if ((purchase as any).supplier_website) return (purchase as any).supplier_website;
+    if ((purchase as any).supplierCatalogUrl) return (purchase as any).supplierCatalogUrl;
+
+    if (Array.isArray(purchase.items)) {
+      for (const item of purchase.items) {
+        const webDirect = getWebFromObj(item) || getWebFromObj((item as any).item);
+        if (webDirect) return webDirect;
+
+        if (inventoryItems && Array.isArray(inventoryItems)) {
+          const matchedInv = inventoryItems.find(
+            (inv) =>
+              ((item as any).id && String(inv.id) === String((item as any).id)) ||
+              ((item as any).inventoryItemId && String(inv.id) === String((item as any).inventoryItemId)) ||
+              (item.sku && inv.sku && inv.sku.toLowerCase() === String(item.sku).toLowerCase())
+          );
+          const webInv = getWebFromObj(matchedInv) || getWebFromObj((matchedInv as any)?.supplier);
+          if (webInv) return webInv;
+        }
+      }
+    }
+
+    // PRIORIDAD 3: URL incrustada en contacto o notas
+    const textToScan = `${purchase.supplierContact || ''} ${purchase.notes || ''}`;
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/i;
+    const matchUrl = textToScan.match(urlRegex);
+    if (matchUrl) return matchUrl[0].trim();
+
+    return null;
+  };
+
+  const formatWebUrl = (url: string): string => {
+    let clean = url.trim();
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      clean = `https://${clean}`;
+    }
+    return clean;
+  };
+
+  const handleOpenSupplierWeb = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const supplierWeb = getSupplierWebsite();
+    if (supplierWeb) {
+      const url = formatWebUrl(supplierWeb);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      showToast?.(`⚠️ El proveedor "${purchase.supplierName || 'seleccionado'}" no tiene registrado un Sitio Web / Catálogo Virtual. Puedes agregarlo en el módulo Proveedores.`);
+    }
+  };
 
   const totalOrderedCount = Array.isArray(purchase.items)
     ? purchase.items.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0)
@@ -301,9 +458,29 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
                         </div>
                       </td>
                       <td className="p-3 font-mono text-[11px]">
-                        <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-bold text-sky-800">
+                        <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-bold text-sky-800 block w-fit">
                           {item.sku || '-'}
                         </span>
+                        {(() => {
+                          const suppCode = getItemSupplierCode(item);
+                          if (!suppCode) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(suppCode);
+                                showToast?.(`📋 SKU Proveedor ${suppCode} copiado al portapapeles`);
+                              }}
+                              className="mt-1 font-mono text-[10px] font-black text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
+                              title="Haz clic para copiar el SKU Proveedor al portapapeles"
+                            >
+                              <span className="text-[9px] text-indigo-700 font-bold">Prov:</span>
+                              <span className="max-w-[100px] truncate">{suppCode}</span>
+                              <Copy className="w-2.5 h-2.5 text-indigo-700 opacity-70 group-hover/copy:opacity-100" />
+                            </button>
+                          );
+                        })()}
                       </td>
                       <td className="p-3 text-center font-mono font-bold text-slate-900">{ordered} u.</td>
                       <td className="p-3 text-center font-mono font-bold text-emerald-700 bg-emerald-50/60">{rec} u.</td>
@@ -451,6 +628,31 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
               <MessageCircle className="w-3.5 h-3.5 fill-current" />
               <span>WhatsApp Proveedor</span>
             </button>
+
+            {(() => {
+              const supplierWeb = getSupplierWebsite();
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (supplierWeb) {
+                      window.open(formatWebUrl(supplierWeb), '_blank', 'noopener,noreferrer');
+                    } else {
+                      showToast?.(`⚠️ El proveedor "${purchase.supplierName}" no tiene registrado un Sitio Web / Catálogo Virtual.`);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer ${
+                    supplierWeb
+                      ? 'bg-sky-600 hover:bg-sky-700 text-white border border-sky-700'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-300'
+                  }`}
+                  title={supplierWeb ? `Abrir catálogo web: ${supplierWeb}` : 'Sin Sitio Web / Catálogo Virtual registrado para este proveedor'}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Web Proveedor</span>
+                </button>
+              );
+            })()}
 
             <button
               type="button"
@@ -618,6 +820,33 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
             <MessageCircle className="w-3.5 h-3.5 fill-current flex-shrink-0" />
             <span>WhatsApp Proveedor</span>
           </button>
+
+          {/* 3.5. Web Proveedor */}
+          {(() => {
+            const supplierWeb = getSupplierWebsite();
+            return (
+              <button
+                type="button"
+                id={`btn-purchase-website-${purchase.id}`}
+                onClick={() => {
+                  if (supplierWeb) {
+                    window.open(formatWebUrl(supplierWeb), '_blank', 'noopener,noreferrer');
+                  } else {
+                    showToast?.(`⚠️ El proveedor "${purchase.supplierName}" no tiene registrado un Sitio Web / Catálogo Virtual.`);
+                  }
+                }}
+                className={`${btnPurchaseStyle} ${
+                  supplierWeb
+                    ? 'bg-sky-600 hover:bg-sky-700 text-white border border-sky-700 shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-300'
+                }`}
+                title={supplierWeb ? `Abrir catálogo web: ${supplierWeb}` : 'Sin Sitio Web / Catálogo Virtual registrado para este proveedor'}
+              >
+                <Globe className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Web Proveedor</span>
+              </button>
+            );
+          })()}
 
           {/* 4. Copiar Portadas */}
           <button
@@ -884,7 +1113,7 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
                           <div className="font-bold text-xs text-slate-900 truncate" title={item.name}>
                             {item.name}
                           </div>
-                          <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 mt-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
                             {item.sku && (
                               <span className="font-mono bg-white px-1 rounded border border-slate-200">
                                 SKU: {item.sku}
@@ -895,6 +1124,25 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
                                 EAN: {item.barcode}
                               </span>
                             )}
+                            {(() => {
+                              const suppCode = getItemSupplierCode(item);
+                              if (!suppCode) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(suppCode);
+                                    showToast?.(`📋 SKU Proveedor (${suppCode}) copiado al portapapeles`);
+                                  }}
+                                  className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.2 rounded border border-indigo-200 flex items-center gap-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
+                                  title="Haz clic para copiar el SKU Proveedor al portapapeles"
+                                >
+                                  <span>Prov: {suppCode}</span>
+                                  <Copy className="w-2.5 h-2.5 text-indigo-500 opacity-70 group-hover/copy:opacity-100" />
+                                </button>
+                              );
+                            })()}
                           </div>
                         </div>
 
