@@ -270,14 +270,14 @@ export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item:
 export function formatItemWithAllImages<T extends Record<string, any>>(item: T): T {
   if (!item) return item;
   const images = getProductPhotosWithFallback(item);
-  let videoUrl = item.videoUrl || null;
+  let videoUrl = item.videoUrl || item.video_url || null;
   if (!videoUrl && item.extractedAttributes) {
     try {
       const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
-      videoUrl = parsed?.videoUrl || parsed?.video || null;
+      videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
     } catch {}
   }
-  const effectiveImageUrl = normalizeMediaUrl(item.imageUrl) || images[0] || null;
+  const effectiveImageUrl = normalizeMediaUrl(item.imageUrl || item.image_url) || images[0] || null;
   return normalizeItemTaxesAndPrices({
     ...item,
     imageUrl: effectiveImageUrl,
@@ -856,11 +856,11 @@ export async function setInventoryItemVideo(id: number, rawVideoUrl: string | nu
       });
     }
 
-    return {
+    return formatItemWithAllImages({
       ...(updatedRow || item),
       videoUrl: finalVideoUrl,
       extractedAttributes: JSON.stringify(parsedAttr),
-    };
+    });
   } catch (error) {
     console.error('Error setting product video:', error);
     return null;

@@ -1271,7 +1271,7 @@ export const GoogleAiConfigModal: React.FC<GoogleAiConfigModalProps> = ({
                     </div>
                   </div>
 
-                  {extractionResult.costOptions && extractionResult.costOptions.length > 1 && (
+                  {extractionResult?.costOptions && Array.isArray(extractionResult.costOptions) && extractionResult.costOptions.length > 1 && (
                     <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px]">
                       <span className="text-slate-700 font-semibold block mb-1">
                         Múltiples opciones de costo detectadas:

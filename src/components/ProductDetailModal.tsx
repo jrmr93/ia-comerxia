@@ -349,10 +349,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   let parsedAttributes: Record<string, any> = {};
   if (currentItem.extractedAttributes) {
     try {
-      parsedAttributes =
+      const parsed =
         typeof currentItem.extractedAttributes === 'string'
           ? JSON.parse(currentItem.extractedAttributes)
           : currentItem.extractedAttributes;
+      if (parsed && typeof parsed === 'object') parsedAttributes = parsed;
     } catch (e) {
       console.warn('Could not parse attributes json:', e);
     }
@@ -508,10 +509,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <span>{productPhotos.length} fotos</span>
                   </span>
                 )}
-                {currentItem.videoUrl && (
+                {currentItem.videoUrl && parseVideoUrl(currentItem.videoUrl) && (
                   <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center space-x-1">
                     <Film className="w-3 h-3 text-indigo-600" />
-                    <span>Video {parseVideoUrl(currentItem.videoUrl).platform.toUpperCase()}</span>
+                    <span>Video {(parseVideoUrl(currentItem.videoUrl)?.platform || 'video').toUpperCase()}</span>
                   </span>
                 )}
               </div>
@@ -572,7 +573,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {mediaMode === 'video' && currentItem.videoUrl ? (
                 /* Video Player Container */
                 <div className="aspect-square rounded-2xl overflow-hidden bg-black border border-slate-800 relative flex items-center justify-center shadow-2xs">
-                  {parseVideoUrl(currentItem.videoUrl).isDirect ? (
+                  {parseVideoUrl(currentItem.videoUrl)?.isDirect ? (
                     <video
                       ref={(el) => {
                         if (el) {
@@ -601,7 +602,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         v.muted = false;
                         v.volume = 1.0;
                       }}
-                      src={parseVideoUrl(currentItem.videoUrl).embedUrl}
+                      src={parseVideoUrl(currentItem.videoUrl)?.embedUrl}
                       controls
                       controlsList="nodownload novolume"
                       autoPlay
@@ -609,9 +610,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       playsInline
                       className="w-full h-full object-contain"
                     />
-                  ) : parseVideoUrl(currentItem.videoUrl).embedUrl ? (
+                  ) : parseVideoUrl(currentItem.videoUrl)?.embedUrl ? (
                     <iframe
-                      src={parseVideoUrl(currentItem.videoUrl).embedUrl}
+                      src={parseVideoUrl(currentItem.videoUrl)?.embedUrl}
                       title={currentItem.name}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
@@ -633,7 +634,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   )}
 
                   <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/70 backdrop-blur-xs text-sky-300 border border-white/20">
-                    {parseVideoUrl(currentItem.videoUrl).platform.toUpperCase()}
+                    {(parseVideoUrl(currentItem.videoUrl)?.platform || 'video').toUpperCase()}
                   </div>
                 </div>
               ) : (

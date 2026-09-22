@@ -592,7 +592,7 @@ export const TelegramSimulatorModal: React.FC<TelegramSimulatorModalProps> = ({
               )}
 
               {/* Multiple Cost Options Detected */}
-              {result.extracted.costOptions && result.extracted.costOptions.length > 1 && (
+              {result.extracted?.costOptions && Array.isArray(result.extracted.costOptions) && result.extracted.costOptions.length > 1 && (
                 <div className="p-3 rounded-xl bg-white border border-emerald-200 space-y-2 text-xs">
                   <div className="flex justify-between items-center">
                     <span className="text-[11px] font-bold text-emerald-900 flex items-center space-x-1">

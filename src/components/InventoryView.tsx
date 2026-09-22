@@ -65,7 +65,8 @@ export function calculateItemFinancials(item: InventoryItem) {
   let parsedAttr: Record<string, any> = {};
   if (item.extractedAttributes) {
     try {
-      parsedAttr = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
+      const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
+      if (parsed && typeof parsed === 'object') parsedAttr = parsed;
     } catch {}
   }
 

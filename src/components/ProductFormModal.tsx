@@ -351,10 +351,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       let parsedAttr: Record<string, any> = {};
       if (editingItem.extractedAttributes) {
         try {
-          parsedAttr =
+          const parsed =
             typeof editingItem.extractedAttributes === 'string'
               ? JSON.parse(editingItem.extractedAttributes)
               : editingItem.extractedAttributes;
+          if (parsed && typeof parsed === 'object') parsedAttr = parsed;
         } catch {}
       }
 
@@ -2132,7 +2133,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <div className="min-w-0">
                         <div className="flex items-center space-x-1.5">
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-400/20 text-sky-300 border border-sky-400/30">
-                            {parseVideoUrl(videoUrl).platform.toUpperCase()}
+                            {(parseVideoUrl(videoUrl)?.platform || 'video').toUpperCase()}
                           </span>
                           <span className="text-xs font-bold text-slate-200">Video Activo</span>
                         </div>
