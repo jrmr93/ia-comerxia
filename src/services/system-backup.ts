@@ -56,18 +56,18 @@ export interface FullSystemBackupManifest {
   system: string;
   exportDate: string;
   summary: {
-    usersCount: number;
-    inventoryCount: number;
-    ordersCount: number;
-    customersCount: number;
-    suppliersCount: number;
-    purchasesCount: number;
-    paymentsCount: number;
-    telegramMessagesCount: number;
-    ecuadorApiConfigsCount: number;
-    payphoneConfigsCount: number;
-    sriConfigsCount: number;
-    sriInvoicesCount: number;
+    usersCount?: number;
+    inventoryCount?: number;
+    ordersCount?: number;
+    customersCount?: number;
+    suppliersCount?: number;
+    purchasesCount?: number;
+    paymentsCount?: number;
+    telegramMessagesCount?: number;
+    ecuadorApiConfigsCount?: number;
+    payphoneConfigsCount?: number;
+    sriConfigsCount?: number;
+    sriInvoicesCount?: number;
     mediaFilesCount: number;
     mediaTotalSizeBytes: number;
   };
@@ -637,6 +637,8 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  show_out_of_stock BOOLEAN DEFAULT TRUE,\n`;
   sql += `  enable_pagination BOOLEAN DEFAULT FALSE,\n`;
   sql += `  items_per_page INTEGER DEFAULT 12,\n`;
+  sql += `  default_product_sort TEXT DEFAULT 'date_desc',\n`;
+  sql += `  default_initial_category TEXT,\n`;
   sql += `  instagram_url TEXT,\n`;
   sql += `  website_url TEXT,\n`;
   sql += `  address TEXT,\n`;
@@ -901,7 +903,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
       const rawPromo = sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup;
       const promoStr = typeof rawPromo === 'object' && rawPromo !== null ? JSON.stringify(rawPromo) : (rawPromo || null);
 
-      sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, enable_pagination, items_per_page, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${sc.enablePagination ? 'TRUE' : 'FALSE'}, ${sc.itemsPerPage || 12}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl || sc.logo_url))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(normCourierLogos)}, ${escapeSqlString(normPaymentLogos)}, ${escapeSqlString(effectiveThemeSql)}, ${escapeSqlString(promoStr)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, enable_pagination = EXCLUDED.enable_pagination, items_per_page = EXCLUDED.items_per_page, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, promo_popup = EXCLUDED.promo_popup, updated_at = NOW();\n`;
+      sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, enable_pagination, items_per_page, default_product_sort, default_initial_category, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${sc.enablePagination ? 'TRUE' : 'FALSE'}, ${sc.itemsPerPage || 12}, ${escapeSqlString(sc.defaultProductSort || 'date_desc')}, ${escapeSqlString(sc.defaultInitialCategory)}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl || sc.logo_url))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(normCourierLogos)}, ${escapeSqlString(normPaymentLogos)}, ${escapeSqlString(effectiveThemeSql)}, ${escapeSqlString(promoStr)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, enable_pagination = EXCLUDED.enable_pagination, items_per_page = EXCLUDED.items_per_page, default_product_sort = EXCLUDED.default_product_sort, default_initial_category = EXCLUDED.default_initial_category, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, promo_popup = EXCLUDED.promo_popup, updated_at = NOW();\n`;
     }
     sql += `\n`;
   }
@@ -1033,12 +1035,7 @@ export async function createFullSystemMasterZip(userId?: number): Promise<Buffer
   const sqlContent = await generateCompleteSqlDump(userId);
   zip.addFile('comerxia_backup_completo.sql', Buffer.from(sqlContent, 'utf-8'));
 
-  // 2. Generate JSON dump
-  const data = await getFullSystemData(userId);
-  const jsonContent = JSON.stringify(data, null, 2);
-  zip.addFile('comerxia_backup_completo.json', Buffer.from(jsonContent, 'utf-8'));
-
-  // 3. Add all physical media and files from uploads/ directory (recursively)
+  // 2. Add all physical media and files from uploads/ directory (recursively)
   let mediaCount = 0;
   let mediaTotalBytes = 0;
 
@@ -1072,18 +1069,6 @@ export async function createFullSystemMasterZip(userId?: number): Promise<Buffer
     system: 'Comerxia Cloud & Self-Hosted E-Commerce Suite',
     exportDate: new Date().toISOString(),
     summary: {
-      usersCount: data.users.length,
-      inventoryCount: data.inventoryItems.length,
-      ordersCount: data.customerOrders.length,
-      customersCount: data.customers.length,
-      suppliersCount: data.suppliers.length,
-      purchasesCount: data.purchases.length,
-      paymentsCount: data.payments.length,
-      telegramMessagesCount: data.telegramMessages.length,
-      ecuadorApiConfigsCount: data.ecuadorApiConfigs.length,
-      payphoneConfigsCount: data.payphoneConfigs.length,
-      sriConfigsCount: data.sriConfigs.length,
-      sriInvoicesCount: data.sriInvoices.length,
       mediaFilesCount: mediaCount,
       mediaTotalSizeBytes: mediaTotalBytes,
     },
@@ -2334,20 +2319,25 @@ export async function restoreMasterFullSystemZip(
 
   let restoredMediaCount = 0;
   const errors: string[] = [];
-  let backupJsonData: any = null;
+  let sqlDumpText: string | null = null;
 
   for (const entry of entries) {
     if (entry.isDirectory) continue;
     const name = entry.entryName;
 
-    // Check for database JSON dump
-    if (name === 'comerxia_backup_completo.json' || name === 'database.json') {
+    // Check for database SQL dump
+    if (name === 'comerxia_backup_completo.sql' || name.endsWith('.sql')) {
       try {
-        const text = entry.getData().toString('utf-8');
-        backupJsonData = JSON.parse(text);
+        sqlDumpText = entry.getData().toString('utf-8');
       } catch (err: any) {
-        errors.push(`Error al leer archivo JSON de base de datos: ${err?.message}`);
+        errors.push(`Error al leer archivo SQL de base de datos: ${err?.message}`);
       }
+      continue;
+    }
+
+    // Explicitly reject JSON database files
+    if (name === 'comerxia_backup_completo.json' || name === 'database.json') {
+      errors.push('Aviso: Los respaldos en formato JSON ya no son admitidos. El sistema opera exclusivamente con PostgreSQL.');
       continue;
     }
 
@@ -2374,7 +2364,7 @@ export async function restoreMasterFullSystemZip(
     const cleanFilename = path.basename(name);
     if (!cleanFilename || cleanFilename.startsWith('.')) continue;
 
-    if (/\.(jpg|jpeg|png|webp|gif|svg|avif|mp4|webm|mov|ogg|m4v|p12|pdf|ico|json|txt)$/i.test(cleanFilename)) {
+    if (/\.(jpg|jpeg|png|webp|gif|svg|avif|mp4|webm|mov|ogg|m4v|p12|pdf|ico|txt)$/i.test(cleanFilename)) {
       try {
         const destPath = path.join(UPLOADS_DIR, cleanFilename);
         const data = entry.getData();
@@ -2386,22 +2376,27 @@ export async function restoreMasterFullSystemZip(
     }
   }
 
-  // Restore database rows if JSON was in ZIP
+  // Restore SQL database dump into PostgreSQL
   let restoredDbCounts: Record<string, number> = {};
-  if (backupJsonData) {
+  if (sqlDumpText) {
     try {
-      const dbResult = await restoreCompleteJsonDump(backupJsonData, targetUserId);
-      restoredDbCounts = dbResult.counts;
-      if (dbResult.errors && dbResult.errors.length > 0) {
-        errors.push(...dbResult.errors);
+      if (isPostgresConfigured()) {
+        await pool.query(sqlDumpText);
+        restoredDbCounts.sqlExecuted = 1;
+        console.log('[System Backup] Master ZIP SQL dump executed successfully on PostgreSQL.');
+      } else {
+        errors.push('No se pudo ejecutar el script SQL: PostgreSQL no se encuentra configurado.');
       }
     } catch (err: any) {
-      errors.push(`Error al restaurar datos de base de datos: ${err?.message}`);
+      console.error('[System Backup] Error executing SQL dump from Master ZIP:', err);
+      errors.push(`Error al ejecutar script SQL en PostgreSQL: ${err?.message}`);
     }
+  } else {
+    errors.push('El archivo ZIP no contiene un script de base de datos SQL válido (comerxia_backup_completo.sql).');
   }
 
   return {
-    success: true,
+    success: errors.length === 0 || restoredDbCounts.sqlExecuted === 1,
     restoredMediaCount,
     restoredDbCounts,
     errors,

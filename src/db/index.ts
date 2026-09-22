@@ -278,6 +278,7 @@ export async function ensureTablesCreated() {
           image_url TEXT,
           video_url TEXT,
           supplier_name TEXT DEFAULT 'Proveedor Telegram',
+          supplier_code TEXT,
           tags TEXT,
           extracted_attributes TEXT,
           status TEXT NOT NULL DEFAULT 'available',
@@ -304,6 +305,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS image_url TEXT;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS video_url TEXT;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_name TEXT DEFAULT 'Proveedor Telegram';
+        ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS supplier_code TEXT;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS tags TEXT;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS extracted_attributes TEXT;
         ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'available';
@@ -546,6 +548,10 @@ export async function ensureTablesCreated() {
           allow_catalog_browsing BOOLEAN DEFAULT FALSE,
           show_stock BOOLEAN DEFAULT TRUE,
           show_out_of_stock BOOLEAN DEFAULT TRUE,
+          enable_pagination BOOLEAN DEFAULT FALSE,
+          items_per_page INTEGER DEFAULT 12,
+          default_product_sort TEXT DEFAULT 'date_desc',
+          default_initial_category TEXT,
           instagram_url TEXT,
           website_url TEXT,
           address TEXT,
@@ -574,6 +580,10 @@ export async function ensureTablesCreated() {
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS allow_catalog_browsing BOOLEAN DEFAULT FALSE;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS show_stock BOOLEAN DEFAULT TRUE;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS show_out_of_stock BOOLEAN DEFAULT TRUE;
+        ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS enable_pagination BOOLEAN DEFAULT FALSE;
+        ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS items_per_page INTEGER DEFAULT 12;
+        ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS default_product_sort TEXT DEFAULT 'date_desc';
+        ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS default_initial_category TEXT;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS instagram_url TEXT;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS website_url TEXT;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS address TEXT;

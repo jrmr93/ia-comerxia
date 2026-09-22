@@ -2563,7 +2563,7 @@ server {
                     Respaldo Maestro 100% (Base de Datos + Fotos y Videos)
                   </h4>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Descarga en un solo archivo ZIP todo el sistema: Dump SQL para PostgreSQL, JSON estructurado, script <code className="font-mono bg-black/40 text-emerald-300 px-1 py-0.5 rounded">restaurar.sh</code> y la carpeta física completa de imágenes y videos <code className="font-mono bg-black/40 text-emerald-300 px-1 py-0.5 rounded">/uploads</code> para que nunca falte ninguna foto al migrar.
+                    Descarga en un solo archivo ZIP todo el sistema: Dump SQL para PostgreSQL, script <code className="font-mono bg-black/40 text-emerald-300 px-1 py-0.5 rounded">restaurar.sh</code> y la carpeta física completa de imágenes y videos <code className="font-mono bg-black/40 text-emerald-300 px-1 py-0.5 rounded">/uploads</code> para que nunca falte ninguna foto ni configuración al migrar a otro servidor.
                   </p>
                 </div>
 
@@ -2589,7 +2589,7 @@ server {
               </div>
 
               {/* Individual Download Action Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 {/* 1. Backup SQL Dump */}
                 <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
@@ -2620,37 +2620,7 @@ server {
                   </button>
                 </div>
 
-                {/* 2. Backup JSON Snapshot */}
-                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
-                      <FileCode className="w-5 h-5" />
-                    </div>
-                    <h4 className="text-sm font-bold text-slate-900">Catálogo JSON (.json)</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      Copia estructurada con metadatos completos y tablas relacionadas en formato JSON para migraciones rápidas.
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleDownloadJson}
-                    disabled={downloadingType !== null}
-                    className="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-75 text-white font-bold text-xs flex items-center justify-center space-x-2 transition shadow-xs cursor-pointer"
-                  >
-                    {downloadingType === 'json' ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Descargando JSON...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-4 h-4" />
-                        <span>Descargar JSON</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* 3. Backup Images ZIP */}
+                {/* 2. Backup Images ZIP */}
                 <div className="p-5 rounded-2xl bg-slate-50 border border-indigo-200 bg-indigo-50/30 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">

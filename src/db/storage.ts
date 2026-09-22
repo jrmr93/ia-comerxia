@@ -518,109 +518,21 @@ class StorageManager {
   }
 
   private init() {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-
-      if (fs.existsSync(DB_FILE)) {
-        const raw = fs.readFileSync(DB_FILE, 'utf8');
-        if (raw && raw.trim()) {
-          const parsed = JSON.parse(raw);
-          this.state = {
-            ...this.getDefaultState(),
-            ...parsed,
-            suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [],
-            purchases: Array.isArray(parsed.purchases) ? parsed.purchases : [],
-            payments: Array.isArray(parsed.payments) ? parsed.payments : [],
-            nextId: {
-              ...this.getDefaultState().nextId,
-              ...(parsed.nextId || {}),
-              suppliers: (parsed.nextId && parsed.nextId.suppliers) || 1,
-              purchases: (parsed.nextId && parsed.nextId.purchases) || 1,
-              payments: (parsed.nextId && parsed.nextId.payments) || 1,
-            },
-          };
-        }
-      } else {
-        this.save();
-      }
-      this.isLoaded = true;
-    } catch (err) {
-      console.warn('StorageManager init error, using memory fallback:', err);
-      this.state = this.getDefaultState();
-    }
+    // Memory state only - No disk file database.json creation
+    this.state = this.getDefaultState();
+    this.isLoaded = true;
   }
 
-  private saveTimeout: NodeJS.Timeout | null = null;
-  private isSaving: boolean = false;
-  private pendingSave: boolean = false;
-
-  private sanitizeStateBeforeSave() {
-    // Keep max 200 telegram messages in local JSON to prevent unbounded disk/memory growth
-    if (Array.isArray(this.state.telegramMessages) && this.state.telegramMessages.length > 200) {
-      this.state.telegramMessages = this.state.telegramMessages.slice(0, 200);
-    }
-    // Keep max 500 analytics events
-    if (Array.isArray(this.state.storeAnalyticsEvents) && this.state.storeAnalyticsEvents.length > 500) {
-      this.state.storeAnalyticsEvents = this.state.storeAnalyticsEvents.slice(0, 500);
-    }
-  }
-
-  /**
-   * Asynchronous, non-blocking debounced save to prevent event-loop freezing.
-   */
   public save() {
-    if (this.saveTimeout) {
-      clearTimeout(this.saveTimeout);
-    }
-    this.saveTimeout = setTimeout(() => {
-      this.saveTimeout = null;
-      this.executeAsyncSave();
-    }, 200);
+    // Memory state only - Disk persistence to database.json is disabled
   }
 
-  /**
-   * Synchronous flush for graceful shutdowns (SIGINT/SIGTERM/beforeExit)
-   */
   public saveSync() {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      this.sanitizeStateBeforeSave();
-      const tmpFile = `${DB_FILE}.tmp.${Date.now()}`;
-      fs.writeFileSync(tmpFile, JSON.stringify(this.state, null, 2), 'utf8');
-      fs.renameSync(tmpFile, DB_FILE);
-    } catch (err) {
-      console.error('Failed to persist database.json to disk synchronously:', err);
-    }
+    // Memory state only - Disk persistence to database.json is disabled
   }
 
   private async executeAsyncSave() {
-    if (this.isSaving) {
-      this.pendingSave = true;
-      return;
-    }
-    this.isSaving = true;
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        await fs.promises.mkdir(DATA_DIR, { recursive: true });
-      }
-      this.sanitizeStateBeforeSave();
-      const serialized = JSON.stringify(this.state, null, 2);
-      const tmpFile = `${DB_FILE}.tmp.${Date.now()}`;
-      await fs.promises.writeFile(tmpFile, serialized, 'utf8');
-      await fs.promises.rename(tmpFile, DB_FILE);
-    } catch (err) {
-      console.error('Failed to persist database.json to disk asynchronously:', err);
-    } finally {
-      this.isSaving = false;
-      if (this.pendingSave) {
-        this.pendingSave = false;
-        this.save();
-      }
-    }
+    // Memory state only - Disk persistence to database.json is disabled
   }
 
   public getState(): DatabaseState {
@@ -629,8 +541,3 @@ class StorageManager {
 }
 
 export const storage = new StorageManager();
-
-// Register graceful shutdown hook to flush any pending writes
-process.on('beforeExit', () => {
-  storage.saveSync();
-});

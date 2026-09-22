@@ -5414,18 +5414,9 @@ async function startServer() {
   app.get('/api/export-sql', optionalAuth, handleExportSql);
   app.get('/api/export-backup-sql', optionalAuth, handleExportSql);
 
-  // 14. Export Complete JSON Backup (100% full system data)
-  app.get('/api/export-backup-json', optionalAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const fullData = await getFullSystemData(req.dbUserId);
-      const filename = `comerxia_backup_completo_${new Date().toISOString().slice(0, 10)}.json`;
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(JSON.stringify(fullData, null, 2));
-    } catch (error: any) {
-      console.error('Error exporting full JSON:', error);
-      res.status(500).json({ error: error.message || 'Error al exportar JSON' });
-    }
+  // 14. Export Complete JSON Backup - Disabled (SQL is exclusive)
+  app.get('/api/export-backup-json', optionalAuth, async (_req: Request, res: Response) => {
+    res.status(400).json({ error: 'La exportación en formato JSON ya no está disponible. El sistema opera exclusivamente con PostgreSQL (SQL).' });
   });
 
   // 14a. Export All-in-One Master ZIP (SQL + JSON + All Photos & Videos in uploads/ + Manifest + Restore script)

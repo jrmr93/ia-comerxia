@@ -78,7 +78,21 @@ export async function resolveValidUserId(preferredUserId?: number): Promise<numb
     if (anyUser.length > 0) {
       return anyUser[0].id;
     }
-    // If no user exists yet in the database, return preferred ID without modifying table
+    // If no user exists yet in the database, insert default admin user in PostgreSQL
+    const inserted = await db
+      .insert(users)
+      .values({
+        username: 'admin',
+        email: 'admin@comerxia.com',
+        password: 'admin',
+        name: 'Administrador Principal',
+        role: 'admin',
+      })
+      .returning({ id: users.id });
+
+    if (inserted && inserted.length > 0) {
+      return inserted[0].id;
+    }
     return preferredUserId || 1;
   } catch (err) {
     console.warn('Error resolving valid user ID in PostgreSQL:', err);
@@ -3204,11 +3218,20 @@ export async function getStoreConfig(userId: number = 1) {
   }
 
   try {
-    const configs = await db
+    let configs = await db
       .select()
       .from(storeConfigs)
+      .where(eq(storeConfigs.userId, userId))
       .orderBy(desc(storeConfigs.updatedAt), desc(storeConfigs.id))
       .limit(1);
+
+    if (configs.length === 0) {
+      configs = await db
+        .select()
+        .from(storeConfigs)
+        .orderBy(desc(storeConfigs.updatedAt), desc(storeConfigs.id))
+        .limit(1);
+    }
 
     if (configs.length > 0) {
       const cfg = configs[0];
@@ -3238,10 +3261,11 @@ export async function getStoreConfig(userId: number = 1) {
       };
     }
 
+    const targetUserId = await resolveValidUserId(userId);
     const created = await db
       .insert(storeConfigs)
       .values({
-        userId: userId || 1,
+        userId: targetUserId,
         storeName: 'Comerxia Store',
         whatsappNumber: '',
         description: 'Catálogo digital con envíos y pedidos directos por WhatsApp',
@@ -3470,6 +3494,7 @@ export async function updateStoreConfig(
 
   try {
     const existing = await getStoreConfig(userId);
+    let updatedRow: any = null;
 
     if (existing && existing.id) {
       const updated = await db
@@ -3478,10 +3503,12 @@ export async function updateStoreConfig(
         .where(eq(storeConfigs.id, existing.id))
         .returning();
 
-      const cfg = updated[0];
-      const { theme, themeColors } = parseThemeAndColors(cfg.theme);
-      return { ...cfg, theme, themeColors };
-    } else {
+      if (updated && updated.length > 0) {
+        updatedRow = updated[0];
+      }
+    }
+
+    if (!updatedRow) {
       const targetUserId = await resolveValidUserId(userId);
       const created = await db
         .insert(storeConfigs)
@@ -3489,7 +3516,7 @@ export async function updateStoreConfig(
           userId: targetUserId,
           storeName: updatePayload.storeName || 'Comerxia Store',
           whatsappNumber: updatePayload.whatsappNumber || '',
-          description: updatePayload.description || 'Catálogo digital con envíos y pedidos directos',
+          description: updatePayload.description || 'Catálogo digital con envíos y pedidos directos por WhatsApp',
           bannerText: updatePayload.bannerText || '🔥 ¡Catálogo actualizado con las últimas novedades en stock!',
           deliveryFee: updatePayload.deliveryFee || '0.00',
           minOrderAmount: updatePayload.minOrderAmount || '0.00',
@@ -3498,10 +3525,11 @@ export async function updateStoreConfig(
         })
         .returning();
 
-      const cfg = created[0];
-      const { theme, themeColors } = parseThemeAndColors(cfg.theme);
-      return { ...cfg, theme, themeColors };
+      updatedRow = created[0];
     }
+
+    const { theme, themeColors } = parseThemeAndColors(updatedRow.theme);
+    return { ...updatedRow, theme, themeColors };
   } catch (error) {
     console.warn('Error updating store config in SQL, fallback to local store:', error);
     const state = storage.getState();
