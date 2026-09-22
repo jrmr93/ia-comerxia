@@ -356,9 +356,17 @@ export const ProductMarketingCopyModal: React.FC<ProductMarketingCopyModalProps>
         .then((config) => {
           if (config) {
             setStoreConfigData(config);
-            const advisorPhone = config.whatsappNumber || config.phone || '';
+            const advisorPhone =
+              config.whatsappNumber ||
+              config.whatsapp_number ||
+              config.phone ||
+              config.whatsapp ||
+              config.advisorPhone ||
+              safeLocalStorage.getItem('store_whatsapp_number') ||
+              '';
             if (advisorPhone) {
               setWhatsappContact(advisorPhone);
+              safeLocalStorage.setItem('store_whatsapp_number', advisorPhone);
             }
             if (config.address) {
               setStoreAddress((prev) => (prev ? prev : (config.address || '')));
@@ -458,6 +466,15 @@ export const ProductMarketingCopyModal: React.FC<ProductMarketingCopyModalProps>
       const targetPhotos = photosPool.slice(0, photoCount);
       const fallbackPhoto = productPhotos[0] || currentItem?.imageUrl || item?.imageUrl || '';
 
+      const activeWhatsappNumber =
+        whatsappContact ||
+        storeConfigData?.whatsappNumber ||
+        storeConfigData?.whatsapp_number ||
+        storeConfigData?.phone ||
+        storeConfigData?.whatsapp ||
+        storeConfigData?.advisorPhone ||
+        null;
+
       const b64 = await generateSocialFlyer({
         productImageUrls: targetPhotos.length > 0 ? targetPhotos : [fallbackPhoto],
         productName: title || currentItem?.name || item?.name || 'Producto',
@@ -467,6 +484,7 @@ export const ProductMarketingCopyModal: React.FC<ProductMarketingCopyModalProps>
         currency,
         storeName: storeConfigData?.storeName || 'COMERXIA STORE',
         storeLogoUrl: storeConfigData?.logoDesktopUrl || storeConfigData?.logoUrl || null,
+        whatsappNumber: activeWhatsappNumber,
         templateStyle: style,
         tagline: taglineStr,
       });
@@ -1240,7 +1258,16 @@ ${shippingBullets}${addressSectionFallback}${websiteSectionFallback}`.trim();
                 </label>
                 <input
                   type="text"
-                  value={whatsappContact || storeConfigData?.whatsappNumber || storeConfigData?.phone || ''}
+                  value={
+                    whatsappContact ||
+                    storeConfigData?.whatsappNumber ||
+                    storeConfigData?.whatsapp_number ||
+                    storeConfigData?.phone ||
+                    storeConfigData?.whatsapp ||
+                    storeConfigData?.advisorPhone ||
+                    safeLocalStorage.getItem('store_whatsapp_number') ||
+                    ''
+                  }
                   readOnly={true}
                   disabled={true}
                   placeholder="Sin número en Teléfono Directo del Asesor"

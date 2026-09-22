@@ -1,3 +1,5 @@
+import { safeLocalStorage } from './safeStorage.ts';
+
 export type FlyerTemplateStyle =
   | 'studio'
   | 'dark'
@@ -18,8 +20,90 @@ export interface SocialFlyerOptions {
   currency?: string;
   storeName?: string;
   storeLogoUrl?: string | null;
+  whatsappNumber?: string | null;
   templateStyle?: FlyerTemplateStyle;
   tagline?: string;
+}
+
+/**
+ * Formats phone numbers cleanly for promotional flyer display (e.g. 098 330 2390).
+ */
+function formatFlyerPhone(phone: string): string {
+  if (!phone) return '';
+  let raw = phone.trim();
+  if (raw.startsWith('+593')) {
+    raw = '0' + raw.slice(4);
+  }
+  const digits = raw.replace(/\D/g, '');
+  let cleanDigits = digits;
+  if (cleanDigits.startsWith('593') && cleanDigits.length === 12) {
+    cleanDigits = '0' + cleanDigits.slice(3);
+  }
+  if (cleanDigits.length === 10 && cleanDigits.startsWith('0')) {
+    return `${cleanDigits.slice(0, 3)} ${cleanDigits.slice(3, 6)} ${cleanDigits.slice(6)}`;
+  }
+  if (cleanDigits.length > 0) {
+    return cleanDigits;
+  }
+  return raw;
+}
+
+/**
+ * Draws a crisp vector WhatsApp icon badge on Canvas context.
+ */
+function drawWhatsAppVectorIcon(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number = 36
+) {
+  ctx.save();
+  const r = size / 2;
+
+  // Outer white circular background badge
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  // Green inner circle
+  const greenR = r * 0.84;
+  ctx.beginPath();
+  ctx.arc(cx, cy, greenR, 0, Math.PI * 2);
+  ctx.fillStyle = '#25D366';
+  ctx.fill();
+
+  // Speech bubble pointer tail on bottom left
+  ctx.beginPath();
+  ctx.moveTo(cx - greenR * 0.45, cy + greenR * 0.45);
+  ctx.lineTo(cx - greenR * 0.95, cy + greenR * 0.95);
+  ctx.lineTo(cx - greenR * 0.05, cy + greenR * 0.85);
+  ctx.closePath();
+  ctx.fillStyle = '#25D366';
+  ctx.fill();
+
+  // White phone handset receiver
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-Math.PI / 10);
+  ctx.fillStyle = '#ffffff';
+
+  // Curved handset body
+  ctx.beginPath();
+  ctx.arc(0, 0, greenR * 0.48, 0.15, Math.PI * 1.35, false);
+  ctx.lineWidth = greenR * 0.32;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Earpiece and mouthpiece caps
+  ctx.beginPath();
+  ctx.arc(greenR * 0.35, greenR * 0.28, greenR * 0.16, 0, Math.PI * 2);
+  ctx.arc(-greenR * 0.32, -greenR * 0.32, greenR * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+  ctx.restore();
 }
 
 /**
@@ -122,6 +206,7 @@ export async function generateSocialFlyer(options: SocialFlyerOptions): Promise<
     currency = 'USD',
     storeName = 'COMERXIA STORE',
     storeLogoUrl,
+    whatsappNumber,
     templateStyle = 'studio',
     tagline = 'Envíos a todo el país 🚚',
   } = options;
@@ -458,15 +543,81 @@ export async function generateSocialFlyer(options: SocialFlyerOptions): Promise<
   ctx.font = '600 22px system-ui, -apple-system, sans-serif';
   ctx.fillText('¡Pídelo hoy con entrega rápida y garantía garantizada!', size / 2, footerY + 85);
 
-  // Footer bar with Store Brand
-  const footerBarBg = isLightTemplate ? 'rgba(15, 23, 42, 0.06)' : 'rgba(255, 255, 255, 0.1)';
-  ctx.fillStyle = footerBarBg;
-  drawRoundedRect(ctx, 100, size - 90, size - 200, 52, 26);
-  ctx.fill();
+  // Footer bar with Store Brand & WhatsApp Number
+  const rawPhone =
+    whatsappNumber ||
+    safeLocalStorage.getItem('store_whatsapp_number') ||
+    safeLocalStorage.getItem('advisor_whatsapp_number') ||
+    '';
+  const displayPhone = rawPhone ? formatFlyerPhone(rawPhone) : '';
+  const pillY = size - 90;
+  const pillH = 54;
 
-  ctx.fillStyle = isLightTemplate ? '#0f172a' : '#38bdf8';
-  ctx.font = 'bold 19px system-ui, -apple-system, sans-serif';
-  ctx.fillText(`🛒 Disponible en ${storeName}`, size / 2, size - 57);
+  if (displayPhone) {
+    const storeText = `🛒 ${storeName}`;
+    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+    const storeTextW = ctx.measureText(storeText).width;
+    const storePillW = Math.max(320, storeTextW + 50);
+
+    const waLabel = `WhatsApp: ${displayPhone}`;
+    ctx.font = '900 22px system-ui, -apple-system, sans-serif';
+    const waTextW = ctx.measureText(waLabel).width;
+    const iconSize = 36;
+    const paddingLR = 22;
+    const iconGap = 12;
+    const waPillW = iconSize + iconGap + waTextW + paddingLR * 2;
+
+    const totalW = storePillW + waPillW + 20;
+    const startX = (size - totalW) / 2;
+
+    // Left Pill: Store Name
+    const storePillBg = isLightTemplate ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.12)';
+    ctx.fillStyle = storePillBg;
+    drawRoundedRect(ctx, startX, pillY, storePillW, pillH, 27);
+    ctx.fill();
+
+    ctx.fillStyle = isLightTemplate ? '#0f172a' : '#ffffff';
+    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(storeText, startX + storePillW / 2, pillY + 34);
+
+    // Right Pill: Green WhatsApp Badge
+    const waX = startX + storePillW + 20;
+    const waGrad = ctx.createLinearGradient(waX, pillY, waX + waPillW, pillY + pillH);
+    waGrad.addColorStop(0, '#25D366');
+    waGrad.addColorStop(1, '#128C7E');
+    ctx.fillStyle = waGrad;
+
+    ctx.shadowColor = 'rgba(37, 211, 102, 0.4)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 4;
+    drawRoundedRect(ctx, waX, pillY, waPillW, pillH, 27);
+    ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+
+    // Draw Vector WhatsApp Icon
+    const logoCx = waX + paddingLR + iconSize / 2;
+    const logoCy = pillY + pillH / 2;
+    drawWhatsAppVectorIcon(ctx, logoCx, logoCy, iconSize);
+
+    // Draw WhatsApp Phone Text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 22px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(waLabel, waX + paddingLR + iconSize + iconGap, pillY + 35);
+  } else {
+    // Single Center Pill for Store Name
+    const footerBarBg = isLightTemplate ? 'rgba(15, 23, 42, 0.06)' : 'rgba(255, 255, 255, 0.1)';
+    ctx.fillStyle = footerBarBg;
+    drawRoundedRect(ctx, 100, pillY, size - 200, pillH, 27);
+    ctx.fill();
+
+    ctx.fillStyle = isLightTemplate ? '#0f172a' : '#38bdf8';
+    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`🛒 Disponible en ${storeName}`, size / 2, pillY + 34);
+  }
   ctx.restore();
 
   return canvas.toDataURL('image/png', 0.95);

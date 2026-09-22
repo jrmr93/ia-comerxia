@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { StoreConfig, StoreTheme, CourierPartner, PaymentMethodPartner, StorePromoPopupConfig, InventoryItem } from '../types.ts';
 import { useAuth } from '../context/AuthContext.tsx';
+import { safeLocalStorage } from '../utils/safeStorage.ts';
 import {
   DEFAULT_THEME_COLORS,
   COLOR_ROLE_NAMES,
@@ -362,7 +363,11 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           if (data.allowCatalogBrowsing !== undefined) setAllowCatalogBrowsing(Boolean(data.allowCatalogBrowsing));
 
           if (data.storeName) setStoreName(data.storeName);
-          if (data.whatsappNumber) setWhatsappNumber(data.whatsappNumber);
+          const storePhone = data.whatsappNumber || data.whatsapp_number || data.phone || '';
+          if (storePhone) {
+            setWhatsappNumber(storePhone);
+            safeLocalStorage.setItem('store_whatsapp_number', storePhone);
+          }
           if (data.description) setDescription(data.description);
           if (data.bannerText) setBannerText(data.bannerText);
           if (data.deliveryFee !== undefined) setDeliveryFee(String(data.deliveryFee));
