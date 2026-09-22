@@ -1858,6 +1858,7 @@ function InventoryApp() {
         onSaved={() => fetchData(true)}
         editingItem={editingItem}
         defaultTelegramTaxPercent={config?.taxPercent ?? 15}
+        suppliers={suppliers}
       />
 
       {/* 5. Local Server Deployment & Unified PostgreSQL Database Explorer Modal */}
