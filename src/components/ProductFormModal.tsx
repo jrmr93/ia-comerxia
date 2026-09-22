@@ -60,6 +60,7 @@ interface ProductFormModalProps {
   editingItem: InventoryItem | null;
   defaultTelegramTaxPercent?: number;
   suppliers?: Supplier[];
+  existingItems?: InventoryItem[];
 }
 
 const CATEGORIES = [
@@ -85,6 +86,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   editingItem,
   defaultTelegramTaxPercent,
   suppliers: propsSuppliers,
+  existingItems: propsExistingItems,
 }) => {
   const { authFetch } = useAuth();
   const [telegramTaxPercent, setTelegramTaxPercent] = useState<number>(defaultTelegramTaxPercent ?? 15);
@@ -312,6 +314,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       if (s.name && s.name.trim()) set.add(s.name.trim());
     });
 
+    (propsExistingItems || []).forEach((it) => {
+      if (it.supplierName && it.supplierName.trim()) set.add(it.supplierName.trim());
+    });
+
     if (editingItem?.supplierName && editingItem.supplierName.trim()) {
       set.add(editingItem.supplierName.trim());
     }
@@ -321,7 +327,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
 
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [activeSuppliersList, editingItem?.supplierName, supplierName]);
+  }, [activeSuppliersList, propsExistingItems, editingItem?.supplierName, supplierName]);
 
   // Synchronize default Telegram tax rate from props or API
   useEffect(() => {
@@ -953,6 +959,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Error al guardar el producto');
+      }
+
+      // Auto-register supplier in ERP catalog so it is permanently saved for selection in future products
+      const cleanSupplier = supplierName.trim();
+      if (cleanSupplier) {
+        try {
+          await authFetch('/api/suppliers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: cleanSupplier }),
+          });
+        } catch (e) {
+          console.warn('Auto-supplier registration silent notice:', e);
+        }
       }
 
       onSaved();

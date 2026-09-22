@@ -1859,6 +1859,7 @@ function InventoryApp() {
         editingItem={editingItem}
         defaultTelegramTaxPercent={config?.taxPercent ?? 15}
         suppliers={suppliers}
+        existingItems={items}
       />
 
       {/* 5. Local Server Deployment & Unified PostgreSQL Database Explorer Modal */}
