@@ -617,6 +617,9 @@ export async function ensureTablesCreated() {
         ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS model_name TEXT DEFAULT 'gemini-3.7-flash';
         ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS temperature NUMERIC(3, 2) DEFAULT 0.20;
         ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+        ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'google';
+        ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS local_endpoint TEXT DEFAULT 'http://localhost:1234/v1';
+        ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS local_model_name TEXT DEFAULT 'qwen2.5-coder-7b-instruct';
         ALTER TABLE ai_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
       `);
 

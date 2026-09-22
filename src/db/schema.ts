@@ -264,6 +264,9 @@ export const aiConfigs = pgTable('ai_configs', {
   modelName: text('model_name').default('gemini-3.6-flash'),
   temperature: numeric('temperature', { precision: 3, scale: 2 }).default('0.20'),
   isActive: boolean('is_active').default(true),
+  provider: text('provider').default('google'),
+  localEndpoint: text('local_endpoint').default('http://localhost:1234/v1'),
+  localModelName: text('local_model_name').default('qwen2.5-coder-7b-instruct'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

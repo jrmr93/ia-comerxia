@@ -318,6 +318,10 @@ export interface DatabaseState {
   payphoneConfigs?: LocalPayphoneConfig[];
   sriConfigs?: any[];
   sriInvoices?: any[];
+  advertisingVideos?: any[];
+  advertisingPlaylists?: any[];
+  advertisingPlaylistItems?: any[];
+  advertisingDisplays?: any[];
   storeConfigs: LocalStoreConfig[];
   serverDomainConfigs: LocalServerDomainConfig[];
   customers: LocalCustomer[];

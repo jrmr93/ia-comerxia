@@ -23,6 +23,10 @@ import {
   payphoneConfigs,
   sriConfigs,
   sriInvoices,
+  advertisingVideos,
+  advertisingPlaylists,
+  advertisingPlaylistItems,
+  advertisingDisplays,
 } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { getAllUsers } from '../db/users.ts';
@@ -44,6 +48,11 @@ import {
   getSriConfig,
   getSriInvoicesByUser,
 } from '../db/inventory.ts';
+import {
+  getAdvertisingVideos,
+  getAdvertisingPlaylists,
+  getAdvertisingDisplays,
+} from '../db/digitalSignage.ts';
 import { getEmailConfig } from './email.ts';
 import { ensureUploadsDirExists } from './media-storage.ts';
 import { normalizeMediaUrl, normalizeJsonMediaArray } from '../utils/media-helper.ts';
@@ -68,6 +77,11 @@ export interface FullSystemBackupManifest {
     payphoneConfigsCount?: number;
     sriConfigsCount?: number;
     sriInvoicesCount?: number;
+    aiConfigsCount?: number;
+    advertisingVideosCount?: number;
+    advertisingPlaylistsCount?: number;
+    advertisingPlaylistItemsCount?: number;
+    advertisingDisplaysCount?: number;
     mediaFilesCount: number;
     mediaTotalSizeBytes: number;
   };
@@ -92,6 +106,10 @@ export interface FullSystemData {
   sriConfigs: any[];
   sriInvoices: any[];
   storeAnalyticsEvents: any[];
+  advertisingVideos: any[];
+  advertisingPlaylists: any[];
+  advertisingPlaylistItems: any[];
+  advertisingDisplays: any[];
 }
 
 /**
@@ -172,6 +190,9 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     payphoneCfg,
     sriCfg,
     sriInvs,
+    advVideos,
+    advPlaylists,
+    advDisplays,
   ] = await Promise.all([
     getAllUsers(),
     getInventoryItems(userId),
@@ -190,6 +211,9 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     getPayphoneConfig(targetId),
     getSriConfig(targetId),
     getSriInvoicesByUser(targetId),
+    getAdvertisingVideos(targetId).catch(() => []),
+    getAdvertisingPlaylists(targetId).catch(() => []),
+    getAdvertisingDisplays(targetId).catch(() => []),
   ]);
 
   // Ensure tokens & keys from process.env are captured in configurations if empty
@@ -226,6 +250,10 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
       apiKey: process.env.GEMINI_API_KEY.trim(),
       modelName: 'gemini-3.6-flash',
       temperature: '0.20',
+      isActive: true,
+      provider: 'google',
+      localEndpoint: 'http://localhost:1234/v1',
+      localModelName: 'qwen2.5-coder-7b-instruct',
     };
   }
 
@@ -238,6 +266,10 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
   let allPayphoneConfigs: any[] = payphoneCfg ? [payphoneCfg] : [];
   let allSriConfigs: any[] = sriCfg ? [sriCfg] : [];
   let allSriInvoices: any[] = sriInvs ? sriInvs : [];
+  let allAdvVideos: any[] = advVideos || [];
+  let allAdvPlaylists: any[] = advPlaylists || [];
+  let allAdvPlaylistItems: any[] = [];
+  let allAdvDisplays: any[] = advDisplays || [];
 
   if (isPostgresConfigured()) {
     try {
@@ -260,7 +292,10 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
       if (dbAis && dbAis.length > 0) {
         allAiConfigs = dbAis.map((a) => ({
           ...a,
-          apiKey: a.apiKey || process.env.GEMINI_API_KEY?.trim() || null,
+          apiKey: a.apiKey || effectiveAiConfig?.apiKey || process.env.GEMINI_API_KEY?.trim() || null,
+          provider: a.provider || effectiveAiConfig?.provider || 'google',
+          localEndpoint: a.localEndpoint || effectiveAiConfig?.localEndpoint || 'http://localhost:1234/v1',
+          localModelName: a.localModelName || effectiveAiConfig?.localModelName || 'qwen2.5-coder-7b-instruct',
         }));
       }
     } catch {}
@@ -294,6 +329,26 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
       const dbSriInvs = await db.select().from(sriInvoices);
       if (dbSriInvs && dbSriInvs.length > 0) allSriInvoices = dbSriInvs;
     } catch {}
+
+    try {
+      const dbAdvVids = await db.select().from(advertisingVideos);
+      if (dbAdvVids && dbAdvVids.length > 0) allAdvVideos = dbAdvVids;
+    } catch {}
+
+    try {
+      const dbAdvPls = await db.select().from(advertisingPlaylists);
+      if (dbAdvPls && dbAdvPls.length > 0) allAdvPlaylists = dbAdvPls;
+    } catch {}
+
+    try {
+      const dbAdvItems = await db.select().from(advertisingPlaylistItems);
+      if (dbAdvItems && dbAdvItems.length > 0) allAdvPlaylistItems = dbAdvItems;
+    } catch {}
+
+    try {
+      const dbAdvDisps = await db.select().from(advertisingDisplays);
+      if (dbAdvDisps && dbAdvDisps.length > 0) allAdvDisplays = dbAdvDisps;
+    } catch {}
   } else {
     // Fallback to local storage state if available
     const localState = storage.getState();
@@ -323,6 +378,18 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     }
     if (localState.sriInvoices && localState.sriInvoices.length > 0) {
       allSriInvoices = localState.sriInvoices;
+    }
+    if (localState.advertisingVideos && localState.advertisingVideos.length > 0) {
+      allAdvVideos = localState.advertisingVideos;
+    }
+    if (localState.advertisingPlaylists && localState.advertisingPlaylists.length > 0) {
+      allAdvPlaylists = localState.advertisingPlaylists;
+    }
+    if (localState.advertisingPlaylistItems && localState.advertisingPlaylistItems.length > 0) {
+      allAdvPlaylistItems = localState.advertisingPlaylistItems;
+    }
+    if (localState.advertisingDisplays && localState.advertisingDisplays.length > 0) {
+      allAdvDisplays = localState.advertisingDisplays;
     }
   }
 
@@ -375,6 +442,14 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     sriConfigs: allSriConfigs,
     sriInvoices: allSriInvoices,
     storeAnalyticsEvents: analyticsEvents,
+    advertisingVideos: (allAdvVideos || []).map((v: any) => ({
+      ...v,
+      fileUrl: normalizeMediaUrl(v.fileUrl || v.file_url) || null,
+      thumbnailUrl: normalizeMediaUrl(v.thumbnailUrl || v.thumbnail_url) || null,
+    })),
+    advertisingPlaylists: allAdvPlaylists || [],
+    advertisingPlaylistItems: allAdvPlaylistItems || [],
+    advertisingDisplays: allAdvDisplays || [],
   };
 }
 
@@ -675,6 +750,9 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  model_name TEXT DEFAULT 'gemini-3.6-flash',\n`;
   sql += `  temperature NUMERIC(3, 2) DEFAULT 0.20,\n`;
   sql += `  is_active BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  provider TEXT DEFAULT 'google',\n`;
+  sql += `  local_endpoint TEXT DEFAULT 'http://localhost:1234/v1',\n`;
+  sql += `  local_model_name TEXT DEFAULT 'qwen2.5-coder-7b-instruct',\n`;
   sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
   sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
   sql += `);\n\n`;
@@ -785,6 +863,63 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  device_type TEXT DEFAULT 'desktop',\n`;
   sql += `  metadata TEXT,\n`;
   sql += `  created_at TIMESTAMP DEFAULT NOW()\n`;
+  sql += `);\n\n`;
+
+  // 19. advertising_videos
+  sql += `-- 19. TABLA: advertising_videos (Publicidad Digital - Videos/Fotos)\n`;
+  sql += `CREATE TABLE IF NOT EXISTS advertising_videos (\n`;
+  sql += `  id SERIAL PRIMARY KEY,\n`;
+  sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  name TEXT NOT NULL,\n`;
+  sql += `  media_type TEXT DEFAULT 'video',\n`;
+  sql += `  file_url TEXT NOT NULL,\n`;
+  sql += `  thumbnail_url TEXT,\n`;
+  sql += `  duration INTEGER DEFAULT 0,\n`;
+  sql += `  file_size NUMERIC(12, 2) DEFAULT 0.00,\n`;
+  sql += `  active BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
+  sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
+  sql += `);\n\n`;
+
+  // 20. advertising_playlists
+  sql += `-- 20. TABLA: advertising_playlists (Publicidad Digital - Playlists)\n`;
+  sql += `CREATE TABLE IF NOT EXISTS advertising_playlists (\n`;
+  sql += `  id SERIAL PRIMARY KEY,\n`;
+  sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  name TEXT NOT NULL,\n`;
+  sql += `  active BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
+  sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
+  sql += `);\n\n`;
+
+  // 21. advertising_playlist_items
+  sql += `-- 21. TABLA: advertising_playlist_items (Publicidad Digital - Items de Playlist)\n`;
+  sql += `CREATE TABLE IF NOT EXISTS advertising_playlist_items (\n`;
+  sql += `  id SERIAL PRIMARY KEY,\n`;
+  sql += `  playlist_id INTEGER REFERENCES advertising_playlists(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  video_id INTEGER REFERENCES advertising_videos(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  position INTEGER NOT NULL DEFAULT 0\n`;
+  sql += `);\n\n`;
+
+  // 22. advertising_displays
+  sql += `-- 22. TABLA: advertising_displays (Publicidad Digital - Pantallas / Displays)\n`;
+  sql += `CREATE TABLE IF NOT EXISTS advertising_displays (\n`;
+  sql += `  id SERIAL PRIMARY KEY,\n`;
+  sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
+  sql += `  name TEXT NOT NULL,\n`;
+  sql += `  token TEXT UNIQUE NOT NULL,\n`;
+  sql += `  playlist_id INTEGER REFERENCES advertising_playlists(id) ON DELETE SET NULL,\n`;
+  sql += `  active BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  is_paused BOOLEAN DEFAULT FALSE,\n`;
+  sql += `  volume INTEGER DEFAULT 100,\n`;
+  sql += `  is_muted BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  loop_mode BOOLEAN DEFAULT TRUE,\n`;
+  sql += `  orientation INTEGER DEFAULT 0,\n`;
+  sql += `  command_action TEXT,\n`;
+  sql += `  current_index INTEGER DEFAULT 0,\n`;
+  sql += `  last_seen TIMESTAMP,\n`;
+  sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
+  sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;
   sql += `);\n\n`;
 
   // DATA INSERTS
@@ -921,7 +1056,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.aiConfigs.length > 0) {
     sql += `-- Datos: ai_configs\n`;
     for (const aic of data.aiConfigs) {
-      sql += `INSERT INTO ai_configs (id, user_id, api_key, account_email, model_name, temperature, is_active) VALUES (${aic.id || 1}, ${aic.userId || 1}, ${escapeSqlString(aic.apiKey)}, ${escapeSqlString(aic.accountEmail)}, ${escapeSqlString(aic.modelName || 'gemini-3.6-flash')}, ${aic.temperature || 0.20}, ${aic.isActive !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, account_email = EXCLUDED.account_email, model_name = EXCLUDED.model_name, temperature = EXCLUDED.temperature, is_active = EXCLUDED.is_active;\n`;
+      sql += `INSERT INTO ai_configs (id, user_id, api_key, account_email, model_name, temperature, is_active, provider, local_endpoint, local_model_name) VALUES (${aic.id || 1}, ${aic.userId || 1}, ${escapeSqlString(aic.apiKey)}, ${escapeSqlString(aic.accountEmail)}, ${escapeSqlString(aic.modelName || 'gemini-3.6-flash')}, ${aic.temperature || 0.20}, ${aic.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(aic.provider || 'google')}, ${escapeSqlString(aic.localEndpoint || 'http://localhost:1234/v1')}, ${escapeSqlString(aic.localModelName || 'qwen2.5-coder-7b-instruct')}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, account_email = EXCLUDED.account_email, model_name = EXCLUDED.model_name, temperature = EXCLUDED.temperature, is_active = EXCLUDED.is_active, provider = EXCLUDED.provider, local_endpoint = EXCLUDED.local_endpoint, local_model_name = EXCLUDED.local_model_name;\n`;
     }
     sql += `\n`;
   }
@@ -982,7 +1117,44 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
     sql += `\n`;
   }
 
-  // RESET SEQUENCES FOR ALL 18 TABLES
+  // 19. advertising_videos
+  if (data.advertisingVideos && data.advertisingVideos.length > 0) {
+    sql += `-- Datos: advertising_videos (${data.advertisingVideos.length} registros)\n`;
+    for (const v of data.advertisingVideos) {
+      sql += `INSERT INTO advertising_videos (id, user_id, name, media_type, file_url, thumbnail_url, duration, file_size, active) VALUES (${v.id}, ${v.userId || 1}, ${escapeSqlString(v.name)}, ${escapeSqlString(v.mediaType || 'video')}, ${escapeSqlString(v.fileUrl || v.file_url)}, ${escapeSqlString(v.thumbnailUrl || v.thumbnail_url)}, ${v.duration || 0}, ${v.fileSize || 0}, ${v.active !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, name = EXCLUDED.name, media_type = EXCLUDED.media_type, file_url = EXCLUDED.file_url, thumbnail_url = EXCLUDED.thumbnail_url, duration = EXCLUDED.duration, file_size = EXCLUDED.file_size, active = EXCLUDED.active;\n`;
+    }
+    sql += `\n`;
+  }
+
+  // 20. advertising_playlists
+  if (data.advertisingPlaylists && data.advertisingPlaylists.length > 0) {
+    sql += `-- Datos: advertising_playlists (${data.advertisingPlaylists.length} registros)\n`;
+    for (const pl of data.advertisingPlaylists) {
+      sql += `INSERT INTO advertising_playlists (id, user_id, name, active) VALUES (${pl.id}, ${pl.userId || 1}, ${escapeSqlString(pl.name)}, ${pl.active !== false ? 'TRUE' : 'FALSE'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, name = EXCLUDED.name, active = EXCLUDED.active;\n`;
+    }
+    sql += `\n`;
+  }
+
+  // 21. advertising_playlist_items
+  if (data.advertisingPlaylistItems && data.advertisingPlaylistItems.length > 0) {
+    sql += `-- Datos: advertising_playlist_items (${data.advertisingPlaylistItems.length} registros)\n`;
+    for (const pli of data.advertisingPlaylistItems) {
+      sql += `INSERT INTO advertising_playlist_items (id, playlist_id, video_id, position) VALUES (${pli.id}, ${pli.playlistId || pli.playlist_id}, ${pli.videoId || pli.video_id}, ${pli.position || 0}) ON CONFLICT (id) DO UPDATE SET playlist_id = EXCLUDED.playlist_id, video_id = EXCLUDED.video_id, position = EXCLUDED.position;\n`;
+    }
+    sql += `\n`;
+  }
+
+  // 22. advertising_displays
+  if (data.advertisingDisplays && data.advertisingDisplays.length > 0) {
+    sql += `-- Datos: advertising_displays (${data.advertisingDisplays.length} registros)\n`;
+    for (const disp of data.advertisingDisplays) {
+      const playlistVal = disp.playlistId || disp.playlist_id;
+      sql += `INSERT INTO advertising_displays (id, user_id, name, token, playlist_id, active, is_paused, volume, is_muted, loop_mode, orientation, command_action, current_index, last_seen) VALUES (${disp.id}, ${disp.userId || 1}, ${escapeSqlString(disp.name)}, ${escapeSqlString(disp.token)}, ${playlistVal ? playlistVal : 'NULL'}, ${disp.active !== false ? 'TRUE' : 'FALSE'}, ${disp.isPaused ? 'TRUE' : 'FALSE'}, ${disp.volume ?? 100}, ${disp.isMuted !== false ? 'TRUE' : 'FALSE'}, ${disp.loopMode !== false ? 'TRUE' : 'FALSE'}, ${disp.orientation || 0}, ${escapeSqlString(disp.commandAction || disp.command_action)}, ${disp.currentIndex || disp.current_index || 0}, ${disp.lastSeen || disp.last_seen ? escapeSqlDate(disp.lastSeen || disp.last_seen) : 'NULL'}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, name = EXCLUDED.name, token = EXCLUDED.token, playlist_id = EXCLUDED.playlist_id, active = EXCLUDED.active, is_paused = EXCLUDED.is_paused, volume = EXCLUDED.volume, is_muted = EXCLUDED.is_muted, loop_mode = EXCLUDED.loop_mode, orientation = EXCLUDED.orientation, command_action = EXCLUDED.command_action, current_index = EXCLUDED.current_index, last_seen = EXCLUDED.last_seen;\n`;
+    }
+    sql += `\n`;
+  }
+
+  // RESET SEQUENCES FOR ALL 22 TABLES
   sql += `-- =========================================================================\n`;
   sql += `-- ACTUALIZACIÓN DE SECUENCIAS (EVITA ERRORES DE ID DUPLICADO EN NUEVAS INSERCIONES)\n`;
   sql += `-- =========================================================================\n`;
@@ -1005,6 +1177,10 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
     'sri_configs',
     'sri_invoices',
     'store_analytics_events',
+    'advertising_videos',
+    'advertising_playlists',
+    'advertising_playlist_items',
+    'advertising_displays',
   ];
   for (const t of tables) {
     sql += `SELECT setval(pg_get_serial_sequence('${t}', 'id'), COALESCE((SELECT MAX(id) FROM ${t}), 1), (SELECT COUNT(*) > 0 FROM ${t}));\n`;
@@ -1064,11 +1240,29 @@ export async function createFullSystemMasterZip(userId?: number): Promise<Buffer
   addDirectoryToZip(UPLOADS_DIR, 'uploads');
 
   // 4. Create Manifest
+  const sysData = await getFullSystemData(userId);
   const manifest: FullSystemBackupManifest = {
     version: '2.0.0',
     system: 'Comerxia Cloud & Self-Hosted E-Commerce Suite',
     exportDate: new Date().toISOString(),
     summary: {
+      usersCount: sysData.users.length,
+      inventoryCount: sysData.inventoryItems.length,
+      ordersCount: sysData.customerOrders.length,
+      customersCount: sysData.customers.length,
+      suppliersCount: sysData.suppliers.length,
+      purchasesCount: sysData.purchases.length,
+      paymentsCount: sysData.payments.length,
+      telegramMessagesCount: sysData.telegramMessages.length,
+      ecuadorApiConfigsCount: sysData.ecuadorApiConfigs.length,
+      payphoneConfigsCount: sysData.payphoneConfigs.length,
+      sriConfigsCount: sysData.sriConfigs.length,
+      sriInvoicesCount: sysData.sriInvoices.length,
+      aiConfigsCount: sysData.aiConfigs.length,
+      advertisingVideosCount: sysData.advertisingVideos.length,
+      advertisingPlaylistsCount: sysData.advertisingPlaylists.length,
+      advertisingPlaylistItemsCount: sysData.advertisingPlaylistItems.length,
+      advertisingDisplaysCount: sysData.advertisingDisplays.length,
       mediaFilesCount: mediaCount,
       mediaTotalSizeBytes: mediaTotalBytes,
     },
@@ -1831,6 +2025,9 @@ export async function restoreCompleteJsonDump(
             modelName: aic.modelName || 'gemini-3.6-flash',
             temperature: String(aic.temperature || '0.20'),
             isActive: aic.isActive !== false,
+            provider: aic.provider || 'google',
+            localEndpoint: aic.localEndpoint || 'http://localhost:1234/v1',
+            localModelName: aic.localModelName || 'qwen2.5-coder-7b-instruct',
             updatedAt: new Date(),
           };
 
@@ -2255,10 +2452,216 @@ export async function restoreCompleteJsonDump(
       }
     }
 
+    // 17. Advertising Videos
+    if (Array.isArray(backupData.advertisingVideos) && backupData.advertisingVideos.length > 0) {
+      if (!localState.advertisingVideos) localState.advertisingVideos = [];
+      for (const v of backupData.advertisingVideos) {
+        try {
+          const validUserId = await resolveValidUserId(v.userId || targetUserId);
+          const videoValues: any = {
+            userId: validUserId,
+            name: v.name,
+            mediaType: v.mediaType || 'video',
+            fileUrl: normalizeMediaUrl(v.fileUrl || v.file_url),
+            thumbnailUrl: normalizeMediaUrl(v.thumbnailUrl || v.thumbnail_url) || null,
+            duration: Number(v.duration || 0),
+            fileSize: String(v.fileSize || '0.00'),
+            active: v.active !== false,
+            updatedAt: new Date(),
+          };
+
+          if (isPostgresConfigured()) {
+            let existing: any = null;
+            if (v.id) {
+              const [foundById] = await db.select({ id: advertisingVideos.id }).from(advertisingVideos).where(eq(advertisingVideos.id, v.id)).limit(1);
+              if (foundById) existing = foundById;
+            }
+
+            if (existing) {
+              await db.update(advertisingVideos).set(videoValues).where(eq(advertisingVideos.id, existing.id));
+            } else {
+              if (v.id && typeof v.id === 'number') {
+                videoValues.id = v.id;
+              }
+              videoValues.createdAt = v.createdAt ? new Date(v.createdAt) : new Date();
+              await db.insert(advertisingVideos).values(videoValues).onConflictDoNothing();
+            }
+          }
+
+          const localIdx = localState.advertisingVideos.findIndex((item: any) => item.id === v.id);
+          const localRecord = {
+            id: v.id || localState.advertisingVideos.length + 1,
+            ...videoValues,
+            createdAt: v.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.advertisingVideos[localIdx] = localRecord;
+          else localState.advertisingVideos.push(localRecord);
+
+          counts.advertisingVideos = (counts.advertisingVideos || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar video publicitario ${v.name}: ${err?.message}`);
+        }
+      }
+    }
+
+    // 18. Advertising Playlists
+    if (Array.isArray(backupData.advertisingPlaylists) && backupData.advertisingPlaylists.length > 0) {
+      if (!localState.advertisingPlaylists) localState.advertisingPlaylists = [];
+      for (const pl of backupData.advertisingPlaylists) {
+        try {
+          const validUserId = await resolveValidUserId(pl.userId || targetUserId);
+          const playlistValues: any = {
+            userId: validUserId,
+            name: pl.name,
+            active: pl.active !== false,
+            updatedAt: new Date(),
+          };
+
+          if (isPostgresConfigured()) {
+            let existing: any = null;
+            if (pl.id) {
+              const [foundById] = await db.select({ id: advertisingPlaylists.id }).from(advertisingPlaylists).where(eq(advertisingPlaylists.id, pl.id)).limit(1);
+              if (foundById) existing = foundById;
+            }
+
+            if (existing) {
+              await db.update(advertisingPlaylists).set(playlistValues).where(eq(advertisingPlaylists.id, existing.id));
+            } else {
+              if (pl.id && typeof pl.id === 'number') {
+                playlistValues.id = pl.id;
+              }
+              playlistValues.createdAt = pl.createdAt ? new Date(pl.createdAt) : new Date();
+              await db.insert(advertisingPlaylists).values(playlistValues).onConflictDoNothing();
+            }
+          }
+
+          const localIdx = localState.advertisingPlaylists.findIndex((item: any) => item.id === pl.id);
+          const localRecord = {
+            id: pl.id || localState.advertisingPlaylists.length + 1,
+            ...playlistValues,
+            createdAt: pl.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.advertisingPlaylists[localIdx] = localRecord;
+          else localState.advertisingPlaylists.push(localRecord);
+
+          counts.advertisingPlaylists = (counts.advertisingPlaylists || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar playlist publicitaria ${pl.name}: ${err?.message}`);
+        }
+      }
+    }
+
+    // 19. Advertising Playlist Items
+    if (Array.isArray(backupData.advertisingPlaylistItems) && backupData.advertisingPlaylistItems.length > 0) {
+      if (!localState.advertisingPlaylistItems) localState.advertisingPlaylistItems = [];
+      for (const pli of backupData.advertisingPlaylistItems) {
+        try {
+          const itemValues: any = {
+            playlistId: pli.playlistId || pli.playlist_id,
+            videoId: pli.videoId || pli.video_id,
+            position: Number(pli.position || 0),
+          };
+
+          if (isPostgresConfigured()) {
+            let existing: any = null;
+            if (pli.id) {
+              const [foundById] = await db.select({ id: advertisingPlaylistItems.id }).from(advertisingPlaylistItems).where(eq(advertisingPlaylistItems.id, pli.id)).limit(1);
+              if (foundById) existing = foundById;
+            }
+
+            if (existing) {
+              await db.update(advertisingPlaylistItems).set(itemValues).where(eq(advertisingPlaylistItems.id, existing.id));
+            } else {
+              if (pli.id && typeof pli.id === 'number') {
+                itemValues.id = pli.id;
+              }
+              await db.insert(advertisingPlaylistItems).values(itemValues).onConflictDoNothing();
+            }
+          }
+
+          const localIdx = localState.advertisingPlaylistItems.findIndex((item: any) => item.id === pli.id);
+          const localRecord = {
+            id: pli.id || localState.advertisingPlaylistItems.length + 1,
+            ...itemValues,
+          };
+          if (localIdx !== -1) localState.advertisingPlaylistItems[localIdx] = localRecord;
+          else localState.advertisingPlaylistItems.push(localRecord);
+
+          counts.advertisingPlaylistItems = (counts.advertisingPlaylistItems || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar item de playlist publicitaria: ${err?.message}`);
+        }
+      }
+    }
+
+    // 20. Advertising Displays
+    if (Array.isArray(backupData.advertisingDisplays) && backupData.advertisingDisplays.length > 0) {
+      if (!localState.advertisingDisplays) localState.advertisingDisplays = [];
+      for (const disp of backupData.advertisingDisplays) {
+        try {
+          const validUserId = await resolveValidUserId(disp.userId || targetUserId);
+          const displayValues: any = {
+            userId: validUserId,
+            name: disp.name,
+            token: disp.token,
+            playlistId: disp.playlistId || disp.playlist_id || null,
+            active: disp.active !== false,
+            isPaused: Boolean(disp.isPaused),
+            volume: Number(disp.volume ?? 100),
+            isMuted: disp.isMuted !== false,
+            loopMode: disp.loopMode !== false,
+            orientation: Number(disp.orientation || 0),
+            commandAction: disp.commandAction || disp.command_action || null,
+            currentIndex: Number(disp.currentIndex || disp.current_index || 0),
+            lastSeen: disp.lastSeen ? new Date(disp.lastSeen) : null,
+            updatedAt: new Date(),
+          };
+
+          if (isPostgresConfigured()) {
+            let existing: any = null;
+            if (disp.id) {
+              const [foundById] = await db.select({ id: advertisingDisplays.id }).from(advertisingDisplays).where(eq(advertisingDisplays.id, disp.id)).limit(1);
+              if (foundById) existing = foundById;
+            }
+            if (!existing && disp.token) {
+              const [foundByToken] = await db.select({ id: advertisingDisplays.id }).from(advertisingDisplays).where(eq(advertisingDisplays.token, disp.token)).limit(1);
+              if (foundByToken) existing = foundByToken;
+            }
+
+            if (existing) {
+              await db.update(advertisingDisplays).set(displayValues).where(eq(advertisingDisplays.id, existing.id));
+            } else {
+              if (disp.id && typeof disp.id === 'number') {
+                displayValues.id = disp.id;
+              }
+              displayValues.createdAt = disp.createdAt ? new Date(disp.createdAt) : new Date();
+              await db.insert(advertisingDisplays).values(displayValues).onConflictDoNothing();
+            }
+          }
+
+          const localIdx = localState.advertisingDisplays.findIndex((item: any) => item.token === disp.token || item.id === disp.id);
+          const localRecord = {
+            id: disp.id || localState.advertisingDisplays.length + 1,
+            ...displayValues,
+            createdAt: disp.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          if (localIdx !== -1) localState.advertisingDisplays[localIdx] = localRecord;
+          else localState.advertisingDisplays.push(localRecord);
+
+          counts.advertisingDisplays = (counts.advertisingDisplays || 0) + 1;
+        } catch (err: any) {
+          errors.push(`Error al restaurar pantalla publicitaria ${disp.name}: ${err?.message}`);
+        }
+      }
+    }
+
     // Save local JSON storage state
     storage.save();
 
-    // Reset PostgreSQL serial sequences for all 18 tables
+    // Reset PostgreSQL serial sequences for all 22 tables
     if (isPostgresConfigured()) {
       const tableNames = [
         'users',
@@ -2279,6 +2682,10 @@ export async function restoreCompleteJsonDump(
         'sri_configs',
         'sri_invoices',
         'store_analytics_events',
+        'advertising_videos',
+        'advertising_playlists',
+        'advertising_playlist_items',
+        'advertising_displays',
       ];
       for (const tbl of tableNames) {
         try {
