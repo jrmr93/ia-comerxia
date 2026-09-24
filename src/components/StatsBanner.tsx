@@ -5,7 +5,6 @@ import {
   TrendingUp,
   CheckCircle2,
   Tag,
-  Scale,
   Bot,
   AlertTriangle,
   BadgeDollarSign,
@@ -222,47 +221,6 @@ export const StatsBanner: React.FC<StatsBannerProps> = ({
         </div>
       </div>
 
-      {/* 7. Ganancia Total con Descuentos */}
-      <div className="bg-white border border-slate-200 hover:border-teal-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between relative overflow-hidden group min-h-[130px]">
-        <div className={`absolute top-0 left-0 right-0 h-1 ${isLoss ? 'bg-rose-600 animate-pulse' : 'bg-teal-500'}`} />
-        <div className="flex items-start justify-between gap-2 min-h-[36px]">
-          <span className="text-xs font-bold text-slate-700 leading-snug" title="Margen con Ofertas">
-            Margen con Ofertas
-          </span>
-          <div
-            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
-              isLoss
-                ? 'bg-rose-50 text-rose-600 border-rose-100'
-                : 'bg-teal-50 text-teal-600 border-teal-100'
-            }`}
-          >
-            {isLoss ? <AlertTriangle className="w-4 h-4" /> : <Scale className="w-4 h-4" />}
-          </div>
-        </div>
-        <div className="mt-2">
-          <div
-            className={`font-mono leading-tight whitespace-nowrap ${
-              isLoss
-                ? 'text-rose-600 animate-pulse'
-                : profitWithDiscounts > 0
-                ? 'text-teal-900'
-                : 'text-slate-900'
-            } ${getMetricFontSizeClass(profitWithDiscountsDisplay)}`}
-            title={`Valor exacto: ${profitWithDiscountsExact}`}
-          >
-            {profitWithDiscountsDisplay}
-          </div>
-          <p className="text-[11px] font-medium mt-1 leading-tight">
-            {isLoss ? (
-              <span className="text-rose-700 font-bold">⚠️ En pérdida ({realMarginPercent}%)</span>
-            ) : totalDiscount > 0 ? (
-              <span className="text-teal-700 font-semibold">{realMarginPercent}% margen neto real</span>
-            ) : (
-              <span className="text-slate-500">Igual a ganancia regular</span>
-            )}
-          </p>
-        </div>
-      </div>
 
       {/* 8. Mensajes Proveedor */}
       <div className="bg-white border border-slate-200 hover:border-purple-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between relative overflow-hidden group min-h-[130px]">

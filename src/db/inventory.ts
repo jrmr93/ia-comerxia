@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db, isPostgresConfigured } from './index.ts';
 import { aiConfigs, customerOrders, customers, ecuadorApiConfigs, payphoneConfigs, inventoryItems, payments, purchases, serverDomainConfigs, sriConfigs, sriInvoices, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
@@ -29,6 +29,7 @@ import {
 } from '../services/media-storage.ts';
 import { parseSupplierTelegramMessage } from '../services/gemini-parser.ts';
 import { getProductPhotosWithFallback, normalizeMediaUrl } from '../utils/media-helper.ts';
+import { getItemUnitNetProfit } from '../utils/tax-calculator.ts';
 
 /**
  * Sanitizes numeric strings to guarantee valid SQL NUMERIC/DECIMAL values (e.g., '12.50')
@@ -330,7 +331,7 @@ export async function getInventoryItems(
       );
     }
 
-    list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    list.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
 
     const processed = list.map((item) => formatItemWithAllImages(item));
 
@@ -370,7 +371,7 @@ export async function getInventoryItems(
       .select()
       .from(inventoryItems)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(inventoryItems.createdAt));
+      .orderBy(desc(inventoryItems.id));
 
     const rows = await query;
     const processed = rows.map((item) => formatItemWithAllImages(item));
@@ -380,7 +381,9 @@ export async function getInventoryItems(
   } catch (error) {
     console.warn('Error fetching inventory items from SQL, using local store:', error);
     const state = storage.getState();
-    const processed = state.inventoryItems.map((item) => formatItemWithAllImages(item));
+    const processed = [...state.inventoryItems]
+      .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))
+      .map((item) => formatItemWithAllImages(item));
     return attachErpStockMetricsToItems(processed, state.customerOrders, state.purchases);
   }
 }
@@ -3070,28 +3073,37 @@ export async function getInventoryStats(userId?: number) {
       (acc, it) => acc + (Number(it.salePrice) || 0) * (Number(it.stock) || 0),
       0
     );
-    const estimatedProfit = totalSaleValue - totalCostValue;
+    // Sum of exact net unit profits per product (profitAmount * stock)
+    const estimatedProfit = items.reduce(
+      (acc, it) => acc + getItemUnitNetProfit(it) * (Number(it.stock) || 0),
+      0
+    );
 
     let totalDiscountValue = 0;
     let totalDiscountedSaleValue = 0;
     let discountedProductsCount = 0;
+    let profitWithDiscounts = 0;
 
     items.forEach((it) => {
       const regular = Number(it.salePrice) || 0;
       const stock = Number(it.stock) || 0;
+      const unitProfit = getItemUnitNetProfit(it);
       const disc = Math.max(0, Math.min(100, Number(it.discountPercent) || 0));
+
       if (disc > 0) {
         discountedProductsCount += 1;
         const discountAmountPerUnit = regular * (disc / 100);
         totalDiscountValue += discountAmountPerUnit * stock;
         const effectiveSalePerUnit = regular * (1 - disc / 100);
         totalDiscountedSaleValue += effectiveSalePerUnit * stock;
+
+        const unitProfitWithDisc = Math.max(-100000, unitProfit - discountAmountPerUnit);
+        profitWithDiscounts += unitProfitWithDisc * stock;
       } else {
         totalDiscountedSaleValue += regular * stock;
+        profitWithDiscounts += unitProfit * stock;
       }
     });
-
-    const profitWithDiscounts = totalDiscountedSaleValue - totalCostValue;
 
     const categoryMap: Record<string, { count: number; stock: number }> = {};
     for (const item of items) {

@@ -231,6 +231,70 @@ export function adjustCostOptionsForTax(
   return buildCostOptionsWithTaxVariants(costOptions, taxStatus, taxPercent);
 }
 
+/**
+ * Calculates the exact net unit profit (utilidad neta sin IVA) for an inventory product item.
+ * For 0% IVA items: salePrice - costPrice (or profitAmount).
+ * For 15% IVA items: salePriceWithoutTax - costWithoutTax (or profitAmount).
+ * This prevents double-taxing the profit margin when computing aggregate inventory estimated profit.
+ */
+export function getItemUnitNetProfit(it: any): number {
+  if (!it) return 0;
+
+  // Parse extractedAttributes if string
+  let attrs: any = {};
+  if (typeof it.extractedAttributes === 'string' && it.extractedAttributes.trim()) {
+    try {
+      attrs = JSON.parse(it.extractedAttributes);
+    } catch {}
+  } else if (it.extractedAttributes && typeof it.extractedAttributes === 'object') {
+    attrs = it.extractedAttributes;
+  }
+
+  // If item is a gift, profit is 0 (or salePrice if explicit gift sale price exists)
+  if (attrs.isGift || it.isSupplierGift) {
+    const sale = Number(it.salePrice) || 0;
+    return Math.max(0, sale);
+  }
+
+  // 1. Explicit profitAmount stored in extractedAttributes or item
+  if (typeof attrs.profitAmount === 'number' && !isNaN(attrs.profitAmount) && attrs.profitAmount >= 0) {
+    return Math.round(attrs.profitAmount * 100) / 100;
+  }
+  if (typeof it.profitAmount === 'number' && !isNaN(it.profitAmount) && it.profitAmount >= 0) {
+    return Math.round(it.profitAmount * 100) / 100;
+  }
+
+  // 2. Tax rate & zero tax status
+  const rawTaxRate = attrs.taxRate ?? attrs.saleTaxPercent ?? attrs.purchaseTaxPercent ?? it.taxRate ?? it.purchaseTaxPercent ?? 15;
+  const taxRate = typeof rawTaxRate === 'number' ? rawTaxRate : (parseFloat(String(rawTaxRate)) || 0);
+  const isZeroTax = attrs.taxStatus === 'EXEMPT' || taxRate === 0;
+
+  // 3. Determine costWithoutTax
+  let costWithoutTax = 0;
+  const rawCostWithout = attrs.costWithoutTax ?? it.costWithoutTax;
+  if (rawCostWithout !== undefined && rawCostWithout !== null && !isNaN(Number(rawCostWithout)) && Number(rawCostWithout) >= 0) {
+    costWithoutTax = Number(rawCostWithout);
+  } else {
+    const costWithTax = Number(attrs.costWithTax ?? it.costWithTax ?? it.costPrice) || 0;
+    costWithoutTax = (!isZeroTax && taxRate > 0) ? costWithTax / (1 + taxRate / 100) : costWithTax;
+  }
+
+  // 4. Determine salePrice (PVP) and salePriceWithoutTax (subtotal sin IVA)
+  const salePriceWithTax = Number(it.salePrice) || 0;
+  let salePriceWithoutTax = 0;
+  if (attrs.subtotalSinIVA !== undefined && attrs.subtotalSinIVA !== null && !isNaN(Number(attrs.subtotalSinIVA)) && Number(attrs.subtotalSinIVA) >= 0) {
+    salePriceWithoutTax = Number(attrs.subtotalSinIVA);
+  } else if (!isZeroTax && taxRate > 0) {
+    salePriceWithoutTax = salePriceWithTax / (1 + taxRate / 100);
+  } else {
+    salePriceWithoutTax = salePriceWithTax;
+  }
+
+  // 5. Net Profit = salePriceWithoutTax - costWithoutTax
+  const netProfit = Math.max(0, salePriceWithoutTax - costWithoutTax);
+  return Math.round(netProfit * 100) / 100;
+}
+
 // Re-export SRI Ecuador Tax Engine primitives
 export * from './ecuadorTaxCalculator.ts';
 

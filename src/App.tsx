@@ -26,6 +26,7 @@ import { DisplayPlayer } from './components/DisplayPlayer.tsx';
 import { CustomerOrder, GoogleAiConfig, InventoryItem, InventoryStats, ServerDomainConfig, StoreConfig, StoreTheme, TelegramConfig, TelegramMessage, Supplier } from './types.ts';
 import { parseThemePalettes, getThemeColors } from './utils/themeColors.ts';
 import { safeLocalStorage, safeSessionStorage } from './utils/safeStorage.ts';
+import { getItemUnitNetProfit } from './utils/tax-calculator.ts';
 import {
   Bot,
   Database,
@@ -78,28 +79,37 @@ function InventoryApp() {
       (acc, it) => acc + (Number(it.salePrice) || 0) * (Number(it.stock) || 0),
       0
     );
-    const estimatedProfit = totalSaleValue - totalCostValue;
+    // Sum of exact net unit profits per product (profitAmount * stock)
+    const estimatedProfit = items.reduce(
+      (acc, it) => acc + getItemUnitNetProfit(it) * (Number(it.stock) || 0),
+      0
+    );
 
     let totalDiscountValue = 0;
     let totalDiscountedSaleValue = 0;
     let discountedProductsCount = 0;
+    let profitWithDiscounts = 0;
 
     items.forEach((it) => {
       const regular = Number(it.salePrice) || 0;
       const stock = Number(it.stock) || 0;
+      const unitProfit = getItemUnitNetProfit(it);
       const disc = Math.max(0, Math.min(100, Number(it.discountPercent) || 0));
+
       if (disc > 0) {
         discountedProductsCount += 1;
         const discountAmountPerUnit = regular * (disc / 100);
         totalDiscountValue += discountAmountPerUnit * stock;
         const effectiveSalePerUnit = regular * (1 - disc / 100);
         totalDiscountedSaleValue += effectiveSalePerUnit * stock;
+
+        const unitProfitWithDisc = Math.max(-100000, unitProfit - discountAmountPerUnit);
+        profitWithDiscounts += unitProfitWithDisc * stock;
       } else {
         totalDiscountedSaleValue += regular * stock;
+        profitWithDiscounts += unitProfit * stock;
       }
     });
-
-    const profitWithDiscounts = totalDiscountedSaleValue - totalCostValue;
 
     const categoryMap: Record<string, { count: number; stock: number }> = {};
     for (const item of items) {
