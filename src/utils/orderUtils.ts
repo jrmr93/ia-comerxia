@@ -159,12 +159,13 @@ export function isOrderConfirmed(order: any): boolean {
 
 /**
  * Checks whether a sale order can be annulled (canceled with inventory & treasury reversal).
- * Any order that is not already cancelled can be annulled.
+ * Sales can only be annulled when they are confirmed, shipped, or delivered.
  */
 export function canOrderBeAnnulled(order: any): boolean {
   if (!order) return false;
   const status = String(order.status || '').toLowerCase().trim();
-  return status !== 'cancelled';
+  if (status === 'cancelled' || status === 'pending') return false;
+  return isOrderConfirmed(order);
 }
 
 /**
@@ -210,12 +211,16 @@ export function getOrderCancellationBlockReason(order: any, isExplicitAnnulment 
  */
 export function getOrderDeletionBlockReason(order: any): string | null {
   if (!order) return null;
+  const status = String(order.status || '').toLowerCase().trim();
+  if (status === 'cancelled') {
+    return 'Las ventas anuladas no se pueden eliminar para mantener el historial contable y la trazabilidad de auditoría ERP.';
+  }
   const isConfirmed = isOrderConfirmed(order);
   const isPartial = isOrderPartiallyDelivered(order);
   if (isConfirmed && isPartial) {
     return 'Una venta no puede borrarse cuando está confirmada y/o se encuentra entregada parcialmente. Utilice "Anular Venta" en su lugar.';
   }
-  if (order.status === 'delivered') {
+  if (status === 'delivered') {
     return 'Los pedidos entregados no se pueden eliminar. Utilice "Anular Venta" para revertir el inventario y saldo contable.';
   }
   if (isConfirmed) {

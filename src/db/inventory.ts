@@ -5881,6 +5881,9 @@ export async function deleteCustomerOrder(id: number, purchaseAction?: 'cancel' 
   }
 
   if (existingOrder) {
+    if (existingOrder.status === 'cancelled') {
+      throw new Error('Integridad de Datos ERP: Las ventas anuladas no se pueden eliminar para mantener el historial contable y la trazabilidad de auditoría ERP.');
+    }
     if (existingOrder.status === 'delivered') {
       throw new Error('Integridad de Datos ERP: Los pedidos entregados y cerrados no se pueden eliminar.');
     }

@@ -137,6 +137,7 @@ import {
   isOrderLockedFromCancellationOrDeletion,
   isOrderLockedFromEditing,
   getOrderEditBlockReason,
+  getOrderDeletionBlockReason,
   canOrderBeMarkedAsShipped,
   canGenerateShippingGuide,
   isPickupDeliveryOrder,
@@ -2391,18 +2392,9 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   // Confirm delete order handler
   const handleConfirmDeleteOrder = async (purchaseAction?: 'cancel' | 'keep') => {
     if (!orderToDelete) return;
-    if (orderToDelete.status === 'delivered') {
-      showToast('🔒 Integridad ERP: Los pedidos entregados y cerrados no se pueden eliminar.');
-      setOrderToDelete(null);
-      return;
-    }
-    if (orderToDelete.status === 'confirmed' || orderToDelete.status === 'shipped') {
-      showToast('🔒 Integridad ERP: Una venta no puede borrarse cuando está confirmada.');
-      setOrderToDelete(null);
-      return;
-    }
-    if (isOrderPartiallyDelivered(orderToDelete)) {
-      showToast('🔒 Integridad ERP: Una venta no puede borrarse cuando se encuentra entregada parcialmente.');
+    const blockReason = getOrderDeletionBlockReason(orderToDelete);
+    if (blockReason) {
+      showToast(`🔒 Integridad ERP: ${blockReason}`);
       setOrderToDelete(null);
       return;
     }

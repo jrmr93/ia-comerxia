@@ -761,6 +761,85 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
             )}
           </div>
         </div>
+
+        {/* Modal de Anulación de Compra (Vista Tipo Factura / Tabla) */}
+        {showAnnulModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200 my-auto text-left">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 tracking-tight">
+                      Anular Compra #{purchase.purchaseNumber}
+                    </h3>
+                    <p className="text-[11px] text-slate-500">{purchase.supplierName}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAnnulModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1.5">
+                <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>¿Deseas anular esta orden de compra?</span>
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Al anular esta compra, si la mercadería ya fue recibida se restará el stock ingresado a la bodega (-1) y se anularán los egresos correspondientes registrados en Tesorería.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Motivo de la anulación (opcional):
+                </label>
+                <textarea
+                  value={annulReason}
+                  onChange={(e) => setAnnulReason(e.target.value)}
+                  placeholder="Ej. Mercadería defectuosa, error en orden, cancelación..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none h-20"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isAnnulling}
+                  onClick={() => setShowAnnulModal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isAnnulling}
+                  onClick={handleConfirmAnnulPurchase}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-black transition cursor-pointer shadow-md flex items-center gap-2"
+                >
+                  {isAnnulling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Anulando Compra...</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-4 h-4 text-white" />
+                      <span>Sí, Anular Compra</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

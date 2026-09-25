@@ -21,6 +21,8 @@ import {
   isPickupDeliveryOrder,
   isOrderWaitingForWarehouseProducts,
   isOrderConfirmed,
+  getOrderDeletionBlockReason,
+  canOrderBeAnnulled,
 } from '../utils/orderUtils.ts';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
 
@@ -86,6 +88,7 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
   const isDelivered = status === 'delivered';
   const isCancelled = status === 'cancelled';
   const isPastConfirmation = isConfirmed || isShipped || isDelivered;
+  const deletionBlockReason = getOrderDeletionBlockReason(ord);
 
   const isShipping = isShippingDeliveryOrder(ord);
   const isPickup = isPickupDeliveryOrder(ord);
@@ -155,6 +158,10 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
   }, [ord?.id]);
 
   const handleStartSriInvoice = () => {
+    if (isCancelled) {
+      showToast('🔒 Venta anulada: No se permiten acciones de facturación SRI.');
+      return;
+    }
     if (!isPastConfirmation) {
       showToast('🔒 Facturación SRI disponible solo para ventas confirmadas.');
       return;
@@ -163,6 +170,10 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
   };
 
   const handleConfirmAndEmitSriInvoice = async () => {
+    if (isCancelled) {
+      showToast('🔒 Venta anulada: No se permiten acciones de facturación SRI.');
+      return;
+    }
     setSriEmitting(true);
     try {
       const res = await fetch(`/api/sri/emitir/${ord.id}`, {
@@ -212,6 +223,11 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
 
   // 1. Manejo de la acción dinámica del Botón 1 (Ciclo de Confirmación, Bodega, Guía y Entrega)
   const handlePrimaryAction = () => {
+    if (isCancelled) {
+      showToast('🔒 Venta anulada: No se permiten acciones sobre pedidos anulados.');
+      return;
+    }
+
     // 1. Estado Pendiente -> Confirmar Pedido
     if (isPending) {
       if (onOpenPendingShipping) {
@@ -268,16 +284,14 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
       showToast('✓ Este pedido ya fue entregado y completado exitosamente.');
       return;
     }
-
-    // Caso de orden cancelada
-    if (isCancelled) {
-      showToast('⚠️ Este pedido se encuentra anulado/cancelado.');
-      return;
-    }
   };
 
   // 2. Abrir chat con cliente
   const handleOpenDirectWhatsApp = () => {
+    if (isCancelled) {
+      showToast('🔒 Venta anulada: Chat con cliente inhabilitado para pedidos anulados.');
+      return;
+    }
     const norm = normalizeEcuadorPhone(ord.customerPhone);
     if (!norm.whatsappDigits || !norm.isValid) {
       showToast('⚠️ Este pedido no tiene registrado un número de WhatsApp válido.');
@@ -290,8 +304,12 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
     window.open(url, '_blank');
   };
 
-  // 3. Imprimir Pedido (Siempre imprime sin importar el estado del pedido)
+  // 3. Imprimir Pedido
   const handlePrintOrder = () => {
+    if (isCancelled) {
+      showToast('🔒 Venta anulada: Impresión inhabilitada para ventas anuladas.');
+      return;
+    }
     if (onOpenPrintA4Order) {
       onOpenPrintA4Order(ord);
     } else {
@@ -307,8 +325,8 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
 
   // 4. Eliminar pedido
   const handleDeleteOrder = () => {
-    if (isPastConfirmation) {
-      showToast('🔒 Integridad ERP: Los pedidos confirmados o entregados no se pueden eliminar.');
+    if (deletionBlockReason) {
+      showToast(`🔒 ${deletionBlockReason}`);
       return;
     }
     onDeleteOrder(ord);
@@ -326,7 +344,14 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
     title: 'Confirmar Pedido: Validar datos, comprobante y confirmar venta',
   };
 
-  if (isPending) {
+  if (isCancelled) {
+    primaryBtnConfig = {
+      label: 'Venta Anulada',
+      className: 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60 font-bold',
+      icon: <Lock className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />,
+      title: '🔒 Venta anulada: Sin acciones operativas disponibles',
+    };
+  } else if (isPending) {
     primaryBtnConfig = {
       label: 'Confirmar Pedido',
       className: 'bg-purple-700 hover:bg-purple-800 text-white border border-purple-800 shadow-xs',
@@ -365,21 +390,15 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
       icon: <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-emerald-600" />,
       title: 'Pedido entregado y completado exitosamente',
     };
-  } else if (isCancelled) {
-    primaryBtnConfig = {
-      label: 'Cancelado',
-      className: 'bg-rose-50 text-rose-700 border border-rose-200 cursor-default opacity-95',
-      icon: <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-rose-500" />,
-      title: 'Pedido cancelado',
-    };
   }
 
   return (
     <div className="flex flex-col gap-1.5 w-full md:w-[160px] flex-shrink-0">
-      {/* 1. Botón Principal Dinámico (Confirmar Pedido -> Esperando en bodega -> Ingresar guía / Entregar Pedido -> Entregado) */}
+      {/* 1. Botón Principal Dinámico (Confirmar Pedido -> Esperando en bodega -> Ingresar guía / Entregar Pedido -> Entregado / Venta Anulada) */}
       <button
         type="button"
         id={`btn-primary-action-${ord.id}`}
+        disabled={isCancelled}
         onClick={handlePrimaryAction}
         className={`${btnStyle} ${primaryBtnConfig.className}`}
         title={primaryBtnConfig.title}
@@ -392,7 +411,12 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
       {sriInvoiceRecord ? (
         <button
           type="button"
+          disabled={isCancelled}
           onClick={() => {
+            if (isCancelled) {
+              showToast('🔒 Venta anulada: No se permiten acciones SRI.');
+              return;
+            }
             setSriEmissionResultData({
               autorizado: true,
               estado: 'AUTORIZADO',
@@ -402,30 +426,38 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
             });
             setShowSriResultModal(true);
           }}
-          className={`${btnStyle} bg-sky-700 hover:bg-sky-800 text-white border border-sky-800 shadow-xs`}
-          title={`Ver e imprimir RIDE oficial de la Factura SRI #${sriInvoiceRecord.secuencial}`}
+          className={`${btnStyle} ${
+            isCancelled
+              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+              : 'bg-sky-700 hover:bg-sky-800 text-white border border-sky-800 shadow-xs'
+          }`}
+          title={isCancelled ? '🔒 Venta anulada: Facturación SRI inhabilitada' : `Ver e imprimir RIDE oficial de la Factura SRI #${sriInvoiceRecord.secuencial}`}
         >
-          <Receipt className="w-3.5 h-3.5 text-sky-200 flex-shrink-0" />
+          {isCancelled ? <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /> : <Receipt className="w-3.5 h-3.5 text-sky-200 flex-shrink-0" />}
           <span>RIDE SRI #{sriInvoiceRecord.secuencial}</span>
         </button>
       ) : (
         <button
           type="button"
           id={`btn-sri-invoice-${ord.id}`}
-          disabled={!isPastConfirmation || sriEmitting}
+          disabled={!isPastConfirmation || sriEmitting || isCancelled}
           onClick={handleStartSriInvoice}
           className={`${btnStyle} ${
-            !isPastConfirmation
+            !isPastConfirmation || isCancelled
               ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
               : 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white border border-sky-700 shadow-xs'
           }`}
           title={
-            !isPastConfirmation
+            isCancelled
+              ? '🔒 Venta anulada: Facturación SRI inhabilitada'
+              : !isPastConfirmation
               ? 'Facturación SRI disponible solo para ventas confirmadas'
               : 'Emitir y firmar Factura Electrónica oficialmente en el SRI'
           }
         >
-          {sriEmitting ? (
+          {isCancelled ? (
+            <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+          ) : sriEmitting ? (
             <>
               <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-200 flex-shrink-0" />
               <span>Firmando SRI...</span>
@@ -443,11 +475,20 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
       <button
         type="button"
         id={`btn-chat-client-${ord.id}`}
+        disabled={isCancelled}
         onClick={handleOpenDirectWhatsApp}
-        className={`${btnStyle} bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-xs`}
-        title="Abrir chat de WhatsApp con el cliente"
+        className={`${btnStyle} ${
+          isCancelled
+            ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+            : 'bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 shadow-xs'
+        }`}
+        title={isCancelled ? '🔒 Venta anulada: Chat con cliente inhabilitado' : 'Abrir chat de WhatsApp con el cliente'}
       >
-        <MessageCircle className="w-3.5 h-3.5 fill-current flex-shrink-0" />
+        {isCancelled ? (
+          <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+        ) : (
+          <MessageCircle className="w-3.5 h-3.5 fill-current flex-shrink-0" />
+        )}
         <span>Abrir chat con cliente</span>
       </button>
 
@@ -455,16 +496,25 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
       <button
         type="button"
         id={`btn-print-order-${ord.id}`}
+        disabled={isCancelled}
         onClick={handlePrintOrder}
-        className={`${btnStyle} bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300`}
-        title="Imprimir prefactura"
+        className={`${btnStyle} ${
+          isCancelled
+            ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+            : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300'
+        }`}
+        title={isCancelled ? '🔒 Venta anulada: Impresión inhabilitada' : 'Imprimir prefactura'}
       >
-        <Printer className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
+        {isCancelled ? (
+          <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+        ) : (
+          <Printer className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
+        )}
         <span>Imprimir Prefactura</span>
       </button>
 
-      {/* 5. Anular Venta (disponible para cualquier pedido no anulado) */}
-      {!isCancelled && (
+      {/* 5. Anular Venta (disponible únicamente cuando la venta está confirmada o entregada) */}
+      {canOrderBeAnnulled(ord) && (
         <button
           type="button"
           id={`btn-annul-order-${ord.id}`}
@@ -481,16 +531,16 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
       <button
         type="button"
         id={`btn-delete-order-${ord.id}`}
-        disabled={isPastConfirmation}
+        disabled={Boolean(deletionBlockReason)}
         onClick={handleDeleteOrder}
         className={`${btnStyle} ${
-          isPastConfirmation
+          deletionBlockReason
             ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
             : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 hover:border-rose-300'
         }`}
-        title={isPastConfirmation ? '🔒 No se puede eliminar: Pedido confirmado o entregado (Utilice Anular Venta)' : 'Eliminar pedido'}
+        title={deletionBlockReason || 'Eliminar pedido'}
       >
-        {isPastConfirmation ? (
+        {deletionBlockReason ? (
           <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
         ) : (
           <Trash2 className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />

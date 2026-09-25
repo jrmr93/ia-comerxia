@@ -963,6 +963,8 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                   <tbody className="divide-y divide-slate-100">
                     {filteredPayments.map((payment) => {
                       const isVoided = payment.status === 'voided';
+                      const isPurchaseReversal = payment.notes?.includes('[REVERSO ASIENTO - Pago a proveedores]') || payment.notes?.includes('[REVERSO ASIENTO - Cuentas por pagar]');
+                      const isSaleReversal = payment.notes?.includes('[REVERSO ASIENTO - Cobro a clientes]') || payment.notes?.includes('[REVERSO ASIENTO - Cuentas por cobrar]');
                       const isInflow = payment.type === 'inflow';
                       const isOutflow = payment.type === 'outflow';
                       const isRefund = payment.type === 'refund';
@@ -994,33 +996,31 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                           {/* Tipo & Concepto */}
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-1.5">
-                              {isInflow ? (
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                                  payment.notes?.includes('[REVERSO ASIENTO')
-                                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                }`}>
+                              {isPurchaseReversal ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                   <ArrowDownLeft className="w-3 h-3 text-emerald-600" />
+                                  {payment.notes?.includes('[REVERSO ASIENTO - Cuentas por pagar]')
+                                    ? '[Reverso] Cuentas por pagar'
+                                    : '[Reverso] Pago a proveedores'}
+                                </span>
+                              ) : isSaleReversal ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ArrowUpRight className="w-3 h-3 text-rose-600" />
                                   {payment.notes?.includes('[REVERSO ASIENTO - Cuentas por cobrar]')
                                     ? '[Reverso] Cuentas por cobrar'
-                                    : payment.notes?.includes('[REVERSO ASIENTO - Cobro a clientes]')
-                                    ? '[Reverso] Cobro a clientes'
-                                    : payment.notes?.includes('Cuentas por cobrar')
+                                    : '[Reverso] Cobro a clientes'}
+                                </span>
+                              ) : isInflow ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <ArrowDownLeft className="w-3 h-3 text-emerald-600" />
+                                  {payment.notes?.includes('Cuentas por cobrar')
                                     ? 'Cuentas por cobrar'
                                     : 'Cobro a clientes'}
                                 </span>
                               ) : isOutflow ? (
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                                  payment.notes?.includes('[REVERSO ASIENTO')
-                                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                    : 'bg-amber-100 text-amber-900 border border-amber-200'
-                                }`}>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                   <ArrowUpRight className="w-3 h-3 text-amber-700" />
-                                  {payment.notes?.includes('[REVERSO ASIENTO - Cuentas por pagar]')
-                                    ? '[Reverso] Cuentas por pagar'
-                                    : payment.notes?.includes('[REVERSO ASIENTO - Pago a proveedores]')
-                                    ? '[Reverso] Pago a proveedores'
-                                    : payment.notes?.includes('Cuentas por pagar')
+                                  {payment.notes?.includes('Cuentas por pagar')
                                     ? 'Cuentas por pagar'
                                     : 'Pago a proveedores'}
                                 </span>
@@ -1090,15 +1090,19 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                               className={`text-base font-black font-mono tracking-tight ${
                                 isVoided
                                   ? 'line-through text-slate-400'
-                                  : payment.notes?.includes('[REVERSO ASIENTO')
+                                  : isPurchaseReversal
+                                  ? 'text-emerald-600'
+                                  : isSaleReversal
                                   ? 'text-rose-700'
                                   : isInflow
                                   ? 'text-emerald-600'
                                   : 'text-slate-900'
                               }`}
                             >
-                              {payment.notes?.includes('[REVERSO ASIENTO')
-                                ? `$${Math.abs(numAmount).toFixed(2)}`
+                              {isPurchaseReversal
+                                ? `+$${Math.abs(numAmount).toFixed(2)}`
+                                : isSaleReversal
+                                ? `-$${Math.abs(numAmount).toFixed(2)}`
                                 : isInflow
                                 ? `+$${Math.abs(numAmount).toFixed(2)}`
                                 : `-$${Math.abs(numAmount).toFixed(2)}`}
@@ -1900,13 +1904,19 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {accountsFilteredPayments.map((p) => {
+                      const isPurchaseRev = p.notes?.includes('[REVERSO ASIENTO - Pago a proveedores]') || p.notes?.includes('[REVERSO ASIENTO - Cuentas por pagar]');
+                      const isSaleRev = p.notes?.includes('[REVERSO ASIENTO - Cobro a clientes]') || p.notes?.includes('[REVERSO ASIENTO - Cuentas por cobrar]');
                       const isOut = p.type === 'outflow' || p.type === 'expense' || p.type === 'refund';
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="px-4 py-3 font-mono font-bold text-slate-900 whitespace-nowrap">
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-bold ${
-                                isOut
+                                isPurchaseRev
+                                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                                  : isSaleRev
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  : isOut
                                   ? 'bg-amber-100 text-amber-900'
                                   : 'bg-emerald-100 text-emerald-900'
                               }`}
@@ -1982,9 +1992,11 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                             )}
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-black text-sm whitespace-nowrap">
-                            <span className={p.notes?.includes('[REVERSO ASIENTO') ? 'text-rose-700' : isOut ? 'text-amber-800' : 'text-emerald-700'}>
-                              {p.notes?.includes('[REVERSO ASIENTO')
-                                ? `$${Math.abs(Number(p.amount || 0)).toFixed(2)}`
+                            <span className={isPurchaseRev ? 'text-emerald-700' : isSaleRev ? 'text-rose-700' : isOut ? 'text-amber-800' : 'text-emerald-700'}>
+                              {isPurchaseRev
+                                ? `+$${Math.abs(Number(p.amount || 0)).toFixed(2)}`
+                                : isSaleRev
+                                ? `-$${Math.abs(Number(p.amount || 0)).toFixed(2)}`
                                 : `${isOut ? '-' : '+'}$${Math.abs(Number(p.amount || 0)).toFixed(2)}`}
                             </span>
                           </td>
@@ -2982,21 +2994,46 @@ const PaymentDetailModal: React.FC<PaymentDetailModalProps> = ({
           )}
 
           {/* Amount Badge */}
-          <div className="text-center py-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
-              {isInflow ? 'Monto Cobrado (Ingreso)' : 'Monto Desembolsado (Egreso)'}
-            </span>
-            <div
-              className={`text-2xl sm:text-3xl font-black font-mono tracking-tight mt-1 ${
-                isVoided ? 'line-through text-slate-400' : isInflow ? 'text-emerald-600' : 'text-slate-900'
-              }`}
-            >
-              ${numAmount.toFixed(2)} USD
-            </div>
-            <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
-              {payment.category.replace(/_/g, ' ').toUpperCase()}
-            </span>
-          </div>
+          {(() => {
+            const isPurchaseReversal = payment.notes?.includes('[REVERSO ASIENTO - Pago a proveedores]') || payment.notes?.includes('[REVERSO ASIENTO - Cuentas por pagar]');
+            const isSaleReversal = payment.notes?.includes('[REVERSO ASIENTO - Cobro a clientes]') || payment.notes?.includes('[REVERSO ASIENTO - Cuentas por cobrar]');
+
+            return (
+              <div className="text-center py-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                  {isPurchaseReversal
+                    ? 'Monto Revertido (Ingreso / Retorno a Caja)'
+                    : isSaleReversal
+                    ? 'Monto Revertido (Egreso / Devolución)'
+                    : isInflow
+                    ? 'Monto Cobrado (Ingreso)'
+                    : 'Monto Desembolsado (Egreso)'}
+                </span>
+                <div
+                  className={`text-2xl sm:text-3xl font-black font-mono tracking-tight mt-1 ${
+                    isVoided
+                      ? 'line-through text-slate-400'
+                      : isPurchaseReversal
+                      ? 'text-emerald-600'
+                      : isSaleReversal
+                      ? 'text-rose-700'
+                      : isInflow
+                      ? 'text-emerald-600'
+                      : 'text-slate-900'
+                  }`}
+                >
+                  {isPurchaseReversal
+                    ? `+$${numAmount.toFixed(2)} USD`
+                    : isSaleReversal
+                    ? `-$${numAmount.toFixed(2)} USD`
+                    : `$${numAmount.toFixed(2)} USD`}
+                </div>
+                <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
+                  {payment.category.replace(/_/g, ' ').toUpperCase()}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Information Rows */}
           <div className="space-y-2 border-t border-b border-slate-100 py-2.5">
