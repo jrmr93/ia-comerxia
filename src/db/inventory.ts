@@ -3747,16 +3747,16 @@ export function isFinalizedSaleStatus(status?: string | null): boolean {
  */
 export const ALLOWED_ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'cancelled'],
-  confirmed: ['shipped', 'delivered'],
-  shipped: ['delivered'],
-  delivered: [],
+  confirmed: ['shipped', 'delivered', 'cancelled'],
+  shipped: ['delivered', 'cancelled'],
+  delivered: ['cancelled'],
   cancelled: [],
 };
 
 export function isValidOrderStatusTransition(currentStatus: string, nextStatus: string): boolean {
   const curr = String(currentStatus || '').toLowerCase().trim();
   const next = String(nextStatus || '').toLowerCase().trim();
-  if (curr === next) return true; // No status change is always permitted (metadata updates)
+  if (curr === next) return true;
   const allowed = ALLOWED_ORDER_STATUS_TRANSITIONS[curr];
   if (!allowed) return false;
   return allowed.includes(next);
@@ -3767,14 +3767,11 @@ export function getOrderStatusTransitionError(currentStatus: string, nextStatus:
   const next = String(nextStatus || '').toLowerCase().trim();
   if (curr === next) return '';
 
-  if (curr === 'delivered') {
-    return 'Integridad de Datos ERP: El pedido ya se encuentra ENTREGADO y cerrado. No es posible alterar su estado para salvaguardar los balances financieros y el inventario.';
+  if (curr === 'delivered' && next !== 'cancelled') {
+    return 'Integridad de Datos ERP: El pedido ya se encuentra ENTREGADO y cerrado. Solo puede ser ANULADO utilizando la opción "Anular Venta".';
   }
   if (curr === 'cancelled') {
-    return 'Integridad de Datos ERP: El pedido fue CANCELADO y su stock fue restituido al inventario. No se puede reactivar un pedido anulado; genere un nuevo pedido.';
-  }
-  if ((curr === 'confirmed' || curr === 'shipped') && next === 'cancelled') {
-    return 'Integridad de Datos ERP: Una venta no puede cancelarse cuando está confirmada y/o se encuentra entregada parcialmente.';
+    return 'Integridad de Datos ERP: El pedido fue CANCELADO y su stock fue restituido al inventario. No se puede reactivar un pedido anulado.';
   }
   if (curr === 'shipped' && (next === 'pending' || next === 'confirmed')) {
     return 'Integridad de Datos ERP: La mercadería ya fue despachada y está en tránsito. No puede retroceder a pendiente o confirmado.';
@@ -4505,15 +4502,11 @@ export async function updateCustomerOrderStatus(
       );
     }
     if (status === 'cancelled') {
-      if (prevStatus === 'confirmed' || prevStatus === 'shipped' || prevStatus === 'delivered') {
-        throw new Error(
-          'Integridad de Datos ERP: Una venta no puede cancelarse cuando está confirmada y/o se encuentra entregada parcialmente.'
-        );
-      }
-      if (isOrderPartiallyDelivered(existingOrder)) {
-        throw new Error(
-          'Integridad de Datos ERP: Una venta no puede cancelarse cuando se encuentra entregada parcialmente. Ya se han entregado unidades al cliente desde bodega.'
-        );
+      // Explicit annulment is allowed for sales in any state. Stock will be restored and treasury voided.
+      try {
+        await voidPaymentsForOrder(id, `Anulación del pedido de venta #${existingOrder.orderNumber}`, existingOrder.userId);
+      } catch (payErr) {
+        console.warn('Could not void payments on order annulment:', payErr);
       }
     }
   }
@@ -4618,18 +4611,25 @@ export async function updateCustomerOrderStatus(
     }
   }
   // Case 2: Sale un-finalized/cancelled (confirmed/shipped/delivered -> pending/cancelled) -> restore stock (+1)
-  else if (wasFinalized && !isNowFinalized) {
+  else if (status === 'cancelled' || (wasFinalized && !isNowFinalized)) {
     const rawItems = safeParseOrderItems(existingOrder.items);
     const itemsToRestore: any[] = [];
     const updatedItems = rawItems.map((it: any) => {
+      const isShippingLine =
+        it.sku === 'ENVIO-DOMICILIO' ||
+        it.id === -999 ||
+        (it.name && String(it.name).trim().toLowerCase() === 'servicios de entrega');
+
       const prevDeducted = Number(it.stockDeducted || 0);
-      if (prevDeducted > 0) {
+      const qtyToRestore = prevDeducted > 0 ? prevDeducted : Number(it.quantity || 1);
+
+      if (!isShippingLine && qtyToRestore > 0) {
         itemsToRestore.push({
           id: it.inventoryItemId || it.id,
           sku: it.sku,
           name: it.name,
-          quantity: prevDeducted,
-          deductQuantity: prevDeducted,
+          quantity: qtyToRestore,
+          deductQuantity: qtyToRestore,
           salePrice: it.salePrice,
         });
       }
@@ -5063,15 +5063,11 @@ export async function updateCustomerOrder(
         );
       }
       if (newStatus === 'cancelled') {
-        if (prevStatus === 'confirmed' || prevStatus === 'shipped' || prevStatus === 'delivered') {
-          throw new Error(
-            'Integridad de Datos ERP: Una venta no puede cancelarse cuando está confirmada y/o se encuentra entregada parcialmente.'
-          );
-        }
-        if (isOrderPartiallyDelivered(existingOrder)) {
-          throw new Error(
-            'Integridad de Datos ERP: Una venta no puede cancelarse cuando se encuentra entregada parcialmente. Ya se han entregado unidades al cliente desde bodega.'
-          );
+        // Explicit annulment is allowed for sales in any state. Stock will be restored and treasury voided.
+        try {
+          await voidPaymentsForOrder(id, `Anulación del pedido de venta #${existingOrder.orderNumber}`, existingOrder.userId);
+        } catch (payErr) {
+          console.warn('Could not void payments on order annulment SQL:', payErr);
         }
       }
     }
@@ -5187,10 +5183,10 @@ export async function updateCustomerOrder(
         const itemsToDeduct = data.items !== undefined ? data.items : existingOrder.items;
         await adjustInventoryStockForItems(itemsToDeduct, -1);
       }
-    } else if (wasFinalized && !isNowFinalized) {
-      // Transitioning away from finalized sale
+    } else if (newStatus === 'cancelled' || (wasFinalized && !isNowFinalized)) {
+      // Transitioning away from finalized sale or cancelling sale order
       if (!wasSuppliedByReservedPurchase) {
-        await adjustInventoryStockForItems(existingOrder.items, 1);
+        await adjustInventoryStockForItems(existingOrder.items, 1, existingOrder.userId);
       }
     }
 
@@ -8028,14 +8024,14 @@ export const ALLOWED_PURCHASE_STATUS_TRANSITIONS: Record<string, string[]> = {
   confirmed: ['ordered', 'in_transit', 'partially_received', 'received', 'cancelled'],
   in_transit: ['partially_received', 'received', 'cancelled'],
   partially_received: ['partially_received', 'received', 'cancelled'],
-  received: [],
+  received: ['cancelled'],
   cancelled: [],
 };
 
 export function isValidPurchaseStatusTransition(currentStatus: string, nextStatus: string): boolean {
   const curr = String(currentStatus || '').toLowerCase().trim();
   const next = String(nextStatus || '').toLowerCase().trim();
-  if (curr === next) return true; // Mantener el mismo estado para actualizaciones de notas/voucher
+  if (curr === next) return true;
   const allowed = ALLOWED_PURCHASE_STATUS_TRANSITIONS[curr];
   if (!allowed) return false;
   return allowed.includes(next);
@@ -8046,8 +8042,8 @@ export function getPurchaseStatusTransitionError(currentStatus: string, nextStat
   const next = String(nextStatus || '').toLowerCase().trim();
   if (curr === next) return '';
 
-  if (curr === 'received') {
-    return 'Integridad de Datos ERP: La orden de compra ya se encuentra RECIBIDA en bodega (Cerrada e Inmutable). El ingreso físico de stock y costo histórico ya fueron asentados. Si requieres devolver productos, utiliza el flujo de Devolución a Proveedor.';
+  if (curr === 'received' && next !== 'cancelled') {
+    return 'Integridad de Datos ERP: La orden de compra ya se encuentra RECIBIDA en bodega. Solo puede ser ANULADA utilizando la opción "Anular Compra".';
   }
   if (curr === 'cancelled') {
     return 'Integridad de Datos ERP: La orden de compra fue CANCELADA y anulada. No se puede reactivar una orden descartada; genere una nueva orden de compra.';
@@ -8462,6 +8458,8 @@ export async function updatePurchase(
 
   const prevStatus = existingPurchase.status;
   const newStatus = data.status !== undefined ? data.status : prevStatus;
+  const wasReceived = prevStatus === 'received';
+  const isNowReceived = newStatus === 'received';
 
   // Regla ERP #1: Si el estado resultante es 'pending', el estado de pago SIEMPRE es 'unpaid' (por pagar)
   if (newStatus === 'pending') {
@@ -8501,27 +8499,37 @@ export async function updatePurchase(
     }
   }
 
-  const wasReceived = prevStatus === 'received';
-  const isNowReceived = newStatus === 'received';
-
   if (!wasReceived && isNowReceived) {
     // Goods arrived
     const isLinkedOrderPurchase = Boolean(existingPurchase.linkedCustomerOrderId);
     const itemsToAdd = data.items !== undefined ? data.items : existingPurchase.items;
 
     if (isLinkedOrderPurchase) {
-      // Products were bought specifically for the linked customer order.
-      // They are tagged as RESERVED for that customer, so they are NOT added to general available stock.
-      // This prevents them from being sold to other online store buyers.
-      console.log(`[Purchases] Compra #${existingPurchase.purchaseNumber} vinculada al Pedido #${existingPurchase.linkedCustomerOrderNumber || existingPurchase.linkedCustomerOrderId}. Stock RESERVADO para el cliente (no ingresa al stock general de venta).`);
+      console.log(`[Purchases] Compra #${existingPurchase.purchaseNumber} vinculada al Pedido #${existingPurchase.linkedCustomerOrderNumber || existingPurchase.linkedCustomerOrderId}. Stock RESERVADO para el cliente.`);
     } else {
-      // General inventory replenishment purchase -> increase general available catalog stock
       await adjustInventoryStockForItems(itemsToAdd, 1);
     }
 
     if (!updatePayload.receivedDate) {
       updatePayload.receivedDate = new Date().toISOString();
     }
+  } else if (newStatus === 'cancelled' && prevStatus !== 'cancelled') {
+    // Annulment of a purchase:
+    // 1. If purchase was received in warehouse, deduct stock back out of inventory (-1)
+    if (wasReceived) {
+      const itemsToDeduct = data.items !== undefined ? data.items : existingPurchase.items;
+      if (!existingPurchase.linkedCustomerOrderId) {
+        await adjustInventoryStockForItems(itemsToDeduct, -1);
+      }
+    }
+    // 2. Void payments and generate accounting seat reversals
+    try {
+      await voidPaymentsForPurchase(id, `Anulación de la Orden de Compra #${existingPurchase.purchaseNumber}`, existingPurchase.userId);
+    } catch (payErr) {
+      console.warn('Could not void payments on purchase annulment:', payErr);
+    }
+    const timestamp = new Date().toLocaleDateString('es-EC');
+    updatePayload.notes = (existingPurchase.notes ? existingPurchase.notes + '\n' : '') + `[${timestamp} ANULACIÓN COMPRA] ⚠️ Orden de compra anulada. ${wasReceived ? 'Stock restado de bodega. ' : ''}Asientos contables revertidos.`;
   }
 
   if (!isPostgresConfigured()) {
@@ -11564,6 +11572,184 @@ export async function voidPayment(id: number, voidReason?: string) {
 }
 
 /**
+ * Voids all payments associated with a customer order
+ */
+export async function voidPaymentsForOrder(orderId: number, voidReason?: string, userId?: number) {
+  try {
+    const validUserId = await resolveValidUserId(userId);
+    const order = await getCustomerOrderById(orderId);
+    if (!order) return;
+
+    const allPayments = await getPayments(validUserId);
+    const orderPayments = allPayments.filter(
+      (p: any) => Number(p.orderId) === Number(orderId)
+    );
+
+    const hasExistingReversal = orderPayments.some((p: any) =>
+      p.notes?.includes('[REVERSO ASIENTO')
+    );
+    if (hasExistingReversal) return;
+
+    const activeCollectionPayments = orderPayments.filter(
+      (p: any) => p.type === 'inflow' && p.status !== 'voided' && Number(p.amount) > 0
+    );
+
+    const isCollected = activeCollectionPayments.length > 0 || (order as any).paymentStatus === 'paid' || Boolean(order.paymentVoucher);
+    const orderTotal = Number(order.totalAmount || 0);
+
+    if (isCollected) {
+      // Si la venta estaba cobrada: Revierte 'Cobro a clientes' y anula el comprobante original
+      if (activeCollectionPayments.length > 0) {
+        for (const pay of activeCollectionPayments) {
+          await voidPayment(pay.id, voidReason || `Anulación por cancelación de Pedido #${order.orderNumber}`);
+
+          const payAmt = Number(pay.amount || 0);
+          await createPayment(validUserId, {
+            type: 'inflow',
+            category: 'customer_sale',
+            amount: Math.abs(payAmt),
+            paymentMethod: pay.paymentMethod || order.paymentMethod || 'transferencia_bancaria',
+            bankOrAccount: pay.bankOrAccount || 'Banco Pichincha',
+            referenceNumber: `REV-COB-${pay.referenceNumber || pay.paymentNumber || order.orderNumber}`,
+            paymentDate: new Date().toISOString(),
+            status: 'completed',
+            notes: `[REVERSO ASIENTO - Cobro a clientes] Anulación de Cobro a Clientes por Pedido #${order.orderNumber}. Referencia Asiento Original ID: #${pay.id} (${pay.paymentNumber}). Motivo: ${voidReason || 'Anulación de venta'}`,
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            customerName: order.customerName || pay.customerName,
+          });
+        }
+      } else if (orderTotal > 0) {
+        await createPayment(validUserId, {
+          type: 'inflow',
+          category: 'customer_sale',
+          amount: Math.abs(orderTotal),
+          paymentMethod: order.paymentMethod || 'transferencia_bancaria',
+          bankOrAccount: 'Banco Pichincha',
+          referenceNumber: `REV-COB-${order.orderNumber}`,
+          paymentDate: new Date().toISOString(),
+          status: 'completed',
+          notes: `[REVERSO ASIENTO - Cobro a clientes] Anulación de Cobro a Clientes por Pedido #${order.orderNumber}. Referencia Asiento Original ID: #${order.id}. Motivo: ${voidReason || 'Anulación de venta'}`,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+        });
+      }
+    } else {
+      // Si la venta NO estaba cobrada: Solo revierte 'Cuentas por cobrar'
+      if (orderTotal > 0) {
+        await createPayment(validUserId, {
+          type: 'inflow',
+          category: 'customer_sale',
+          amount: Math.abs(orderTotal),
+          paymentMethod: order.paymentMethod || 'transferencia_bancaria',
+          bankOrAccount: 'Banco Pichincha',
+          referenceNumber: `REV-CXC-${order.orderNumber}`,
+          paymentDate: new Date().toISOString(),
+          status: 'completed',
+          notes: `[REVERSO ASIENTO - Cuentas por cobrar] Anulación de asiento Cuentas por cobrar por Pedido #${order.orderNumber}. Referencia Asiento Original ID: #${order.id}. Motivo: ${voidReason || 'Anulación de venta'}`,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Error voiding order payments:', err);
+  }
+}
+
+/**
+ * Voids all payments associated with a purchase and creates accounting seat reversals (Reverso de Asientos)
+ * 4 Existing seat types: 'Cuentas por pagar', 'Pago a proveedores', 'Cuentas por cobrar', 'Cobro a clientes'
+ * Reverts 'Cuentas por pagar'. If paid (pagada), also reverts 'Pago a proveedores'.
+ */
+export async function voidPaymentsForPurchase(purchaseId: number, voidReason?: string, userId?: number) {
+  try {
+    const validUserId = await resolveValidUserId(userId);
+    const purchase = await getPurchaseById(purchaseId);
+    if (!purchase) return;
+
+    const allPayments = await getPayments(validUserId);
+    const purchasePayments = allPayments.filter(
+      (p: any) => Number(p.purchaseId) === Number(purchaseId)
+    );
+
+    const hasExistingReversal = purchasePayments.some((p: any) =>
+      p.notes?.includes('[REVERSO ASIENTO')
+    );
+    if (hasExistingReversal) return;
+
+    const activeDisbursementPayments = purchasePayments.filter(
+      (p: any) => p.type === 'outflow' && p.status !== 'voided' && Number(p.amount) > 0
+    );
+
+    const isPaid = activeDisbursementPayments.length > 0 || purchase.paymentStatus === 'paid' || Boolean(purchase.receiptVoucher);
+    const purchaseTotal = getPurchaseGrandTotal(purchase) || Number(purchase.totalCost || 0);
+
+    if (isPaid) {
+      // Si la compra YA estaba pagada: Revierte 'Pago a proveedores' y anula el comprobante original
+      if (activeDisbursementPayments.length > 0) {
+        for (const pay of activeDisbursementPayments) {
+          await voidPayment(pay.id, voidReason || `Anulación por cancelación de Compra #${purchase.purchaseNumber}`);
+
+          const payAmt = Number(pay.amount || 0);
+          await createPayment(validUserId, {
+            type: 'outflow',
+            category: 'supplier_purchase',
+            amount: Math.abs(payAmt),
+            paymentMethod: pay.paymentMethod || 'transferencia_bancaria',
+            bankOrAccount: pay.bankOrAccount || 'Banco Pichincha',
+            referenceNumber: `REV-PAG-${pay.referenceNumber || pay.paymentNumber || purchase.purchaseNumber}`,
+            paymentDate: new Date().toISOString(),
+            status: 'completed',
+            notes: `[REVERSO ASIENTO - Pago a proveedores] Anulación de Pago a Proveedores por Compra #${purchase.purchaseNumber}. Referencia Asiento Original ID: #${pay.id} (${pay.paymentNumber}). Motivo: ${voidReason || 'Anulación de compra'}`,
+            purchaseId: purchase.id,
+            purchaseNumber: purchase.purchaseNumber,
+            supplierName: purchase.supplierName || pay.supplierName,
+          });
+        }
+      } else if (purchaseTotal > 0) {
+        await createPayment(validUserId, {
+          type: 'outflow',
+          category: 'supplier_purchase',
+          amount: Math.abs(purchaseTotal),
+          paymentMethod: 'transferencia_bancaria',
+          bankOrAccount: 'Banco Pichincha',
+          referenceNumber: `REV-PAG-${purchase.purchaseNumber}`,
+          paymentDate: new Date().toISOString(),
+          status: 'completed',
+          notes: `[REVERSO ASIENTO - Pago a proveedores] Anulación de Pago a Proveedores por Compra #${purchase.purchaseNumber}. Referencia Asiento Original ID: #${purchase.id}. Motivo: ${voidReason || 'Anulación de compra'}`,
+          purchaseId: purchase.id,
+          purchaseNumber: purchase.purchaseNumber,
+          supplierName: purchase.supplierName,
+        });
+      }
+    } else {
+      // Si la compra NO estaba pagada: Solo revierte 'Cuentas por pagar'
+      if (purchaseTotal > 0) {
+        await createPayment(validUserId, {
+          type: 'outflow',
+          category: 'supplier_purchase',
+          amount: Math.abs(purchaseTotal),
+          paymentMethod: 'transferencia_bancaria',
+          bankOrAccount: 'Banco Pichincha',
+          referenceNumber: `REV-CXP-${purchase.purchaseNumber}`,
+          paymentDate: new Date().toISOString(),
+          status: 'completed',
+          notes: `[REVERSO ASIENTO - Cuentas por pagar] Anulación de asiento Cuentas por pagar por Compra #${purchase.purchaseNumber}. Referencia Asiento Original ID: #${purchase.id}. Motivo: ${voidReason || 'Anulación de compra'}`,
+          purchaseId: purchase.id,
+          purchaseNumber: purchase.purchaseNumber,
+          supplierName: purchase.supplierName,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Error voiding purchase payments:', err);
+  }
+}
+
+/**
  * Deletes a payment record
  */
 export async function deletePayment(id: number) {
@@ -11804,11 +11990,32 @@ export async function getAccountsReceivable(userId?: number) {
 
   return orders.map((ord: any) => {
     const totalAmount = Number(ord.totalAmount || 0);
-    const ordInflows = allInflows.filter((p) => Number(p.orderId) === Number(ord.id));
+
+    if (ord.status === 'cancelled') {
+      return {
+        orderId: ord.id,
+        orderNumber: ord.orderNumber,
+        customerName: ord.customerName,
+        customerPhone: ord.customerPhone,
+        orderDate: ord.createdAt,
+        orderStatus: ord.status,
+        fulfillmentStatus: ord.fulfillmentStatus,
+        totalAmount,
+        totalPaid: 0,
+        totalRefunded: 0,
+        pendingBalance: 0,
+        paymentStatus: 'refunded',
+        paymentsCount: 0,
+        lastPaymentDate: undefined,
+        payments: [],
+      };
+    }
+
+    const ordInflows = allInflows.filter((p) => Number(p.orderId) === Number(ord.id) && !p.notes?.includes('[REVERSO ASIENTO'));
     const ordRefunds = allRefunds.filter((p) => Number(p.orderId) === Number(ord.id));
 
-    const totalPaid = ordInflows.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
-    const totalRefunded = ordRefunds.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
+    const totalPaid = ordInflows.reduce((acc: number, p: any) => acc + Math.max(0, Number(p.amount || 0)), 0);
+    const totalRefunded = ordRefunds.reduce((acc: number, p: any) => acc + Math.max(0, Number(p.amount || 0)), 0);
 
     const pendingBalance = Math.max(0, totalAmount - totalPaid);
 
@@ -11861,13 +12068,49 @@ export async function getAccountsPayable(userId?: number) {
     const totalReturned = returns.reduce((acc: number, ret: any) => acc + Number(ret.refundAmount || 0), 0);
     const netCost = Math.max(0, totalCost - totalReturned);
 
-    const poOutflows = allOutflows.filter((p) => Number(p.purchaseId) === Number(po.id));
+    const parsedItems = Array.isArray(po.items)
+      ? po.items
+      : typeof po.items === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(po.items);
+          } catch {
+            return [];
+          }
+        })()
+      : [];
+
+    if (po.status === 'cancelled') {
+      return {
+        purchaseId: po.id,
+        purchaseNumber: po.purchaseNumber,
+        supplierName: po.supplierName,
+        supplierContact: po.supplierContact,
+        purchaseDate: po.purchaseDate || po.createdAt,
+        purchaseStatus: po.status,
+        totalCost,
+        totalReturned,
+        netCost,
+        totalPaid: 0,
+        totalRefunded: 0,
+        pendingBalance: 0,
+        paymentStatus: 'refunded',
+        paymentsCount: 0,
+        lastPaymentDate: undefined,
+        payments: [],
+        returns,
+        items: parsedItems,
+        taxBreakdown,
+      };
+    }
+
+    const poOutflows = allOutflows.filter((p) => Number(p.purchaseId) === Number(po.id) && !p.notes?.includes('[REVERSO ASIENTO'));
     const poRefunds = allPayments.filter(
       (p) => Number(p.purchaseId) === Number(po.id) && (p.category === 'supplier_refund' || p.type === 'refund')
     );
 
-    const totalPaid = poOutflows.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
-    const totalRefunded = poRefunds.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
+    const totalPaid = poOutflows.reduce((acc: number, p: any) => acc + Math.max(0, Number(p.amount || 0)), 0);
+    const totalRefunded = poRefunds.reduce((acc: number, p: any) => acc + Math.max(0, Number(p.amount || 0)), 0);
 
     const pendingBalance = Math.max(0, netCost - totalPaid);
 
@@ -11883,18 +12126,6 @@ export async function getAccountsPayable(userId?: number) {
     }
 
     const lastPayment = poOutflows.length > 0 ? poOutflows[0].paymentDate : (poRefunds.length > 0 ? poRefunds[0].paymentDate : undefined);
-
-    const parsedItems = Array.isArray(po.items)
-      ? po.items
-      : typeof po.items === 'string'
-      ? (() => {
-          try {
-            return JSON.parse(po.items);
-          } catch {
-            return [];
-          }
-        })()
-      : [];
 
     return {
       purchaseId: po.id,
@@ -11943,7 +12174,9 @@ export async function getTreasuryDashboard(userId?: number) {
   > = {};
 
   completedPayments.forEach((p) => {
-    const amt = Number(p.amount || 0);
+    if (p.notes?.includes('[REVERSO ASIENTO')) return;
+
+    const amt = Math.max(0, Number(p.amount || 0));
     const method = p.paymentMethod || 'transferencia_bancaria';
     const bank = p.bankOrAccount || 'Banco Pichincha';
 

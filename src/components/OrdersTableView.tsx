@@ -49,7 +49,7 @@ interface OrdersTableViewProps {
     trackingNumber?: string,
     trackingCarrier?: string,
     trackingNotes?: string
-  ) => Promise<void>;
+  ) => Promise<any>;
   onDeleteOrder: (order: any) => void;
   showToast: (msg: string) => void;
   buildWhatsAppLink: (phone: string, text?: string) => string;

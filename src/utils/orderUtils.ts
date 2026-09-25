@@ -158,32 +158,49 @@ export function isOrderConfirmed(order: any): boolean {
 }
 
 /**
- * Checks whether an order is locked from being cancelled or deleted under ERP data integrity rules:
- * "una venta no puede cancelarse ni borrarse cuando este confirmada y/o se encuntra entregada parcialmente"
+ * Checks whether a sale order can be annulled (canceled with inventory & treasury reversal).
+ * Any order that is not already cancelled can be annulled.
+ */
+export function canOrderBeAnnulled(order: any): boolean {
+  if (!order) return false;
+  const status = String(order.status || '').toLowerCase().trim();
+  return status !== 'cancelled';
+}
+
+/**
+ * Checks whether a purchase can be annulled (canceled with inventory & treasury reversal).
+ * Any purchase that is not already cancelled can be annulled.
+ */
+export function canPurchaseBeAnnulled(purchase: any): boolean {
+  if (!purchase) return false;
+  const status = String(purchase.status || '').toLowerCase().trim();
+  return status !== 'cancelled';
+}
+
+/**
+ * Checks whether an order is locked from being cancelled or deleted under default routine checks.
  */
 export function isOrderLockedFromCancellationOrDeletion(order: any): boolean {
   if (!order) return false;
-  return isOrderConfirmed(order) || isOrderPartiallyDelivered(order);
+  // Non-explicit cancellations still respect status lock, but annulments use canOrderBeAnnulled
+  return order.status === 'cancelled';
 }
 
 /**
  * Returns user-friendly explanation why an order cannot be cancelled.
  */
-export function getOrderCancellationBlockReason(order: any): string | null {
+export function getOrderCancellationBlockReason(order: any, isExplicitAnnulment = false): string | null {
   if (!order) return null;
-  const isConfirmed = isOrderConfirmed(order);
-  const isPartial = isOrderPartiallyDelivered(order);
-  if (isConfirmed && isPartial) {
-    return 'Una venta no puede cancelarse cuando está confirmada y/o se encuentra entregada parcialmente.';
+  const status = String(order.status || '').toLowerCase().trim();
+  if (status === 'cancelled') {
+    return 'El pedido ya se encuentra anulado/cancelado.';
   }
-  if (isConfirmed) {
-    return 'Una venta no puede cancelarse cuando está confirmada.';
-  }
-  if (isPartial) {
-    return 'Una venta no puede cancelarse cuando se encuentra entregada parcialmente (ya salieron unidades de bodega).';
-  }
-  if (order.status === 'delivered') {
-    return 'Un pedido entregado y cerrado no puede cancelarse.';
+  if (!isExplicitAnnulment) {
+    const isConfirmed = isOrderConfirmed(order);
+    const isPartial = isOrderPartiallyDelivered(order);
+    if (isConfirmed || isPartial || status === 'delivered') {
+      return 'Para cancelar esta venta entregada o confirmada, utilice la opción explícita "Anular Venta" para revertir el inventario y la tesorería.';
+    }
   }
   return null;
 }
@@ -196,16 +213,16 @@ export function getOrderDeletionBlockReason(order: any): string | null {
   const isConfirmed = isOrderConfirmed(order);
   const isPartial = isOrderPartiallyDelivered(order);
   if (isConfirmed && isPartial) {
-    return 'Una venta no puede borrarse cuando está confirmada y/o se encuentra entregada parcialmente.';
+    return 'Una venta no puede borrarse cuando está confirmada y/o se encuentra entregada parcialmente. Utilice "Anular Venta" en su lugar.';
   }
   if (order.status === 'delivered') {
-    return 'Los pedidos entregados y cerrados no se pueden eliminar para preservar el balance contable y de inventario.';
+    return 'Los pedidos entregados no se pueden eliminar. Utilice "Anular Venta" para revertir el inventario y saldo contable.';
   }
   if (isConfirmed) {
-    return 'Una venta no puede borrarse cuando está confirmada.';
+    return 'Una venta confirmada no se puede eliminar. Utilice "Anular Venta" para revertir sus valores.';
   }
   if (isPartial) {
-    return 'Una venta no puede borrarse cuando se encuentra entregada parcialmente (ya salieron unidades de bodega).';
+    return 'Una venta entregada parcialmente no se puede eliminar. Utilice "Anular Venta" en su lugar.';
   }
   return null;
 }

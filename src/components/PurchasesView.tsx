@@ -1824,6 +1824,37 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                   }}
                   onOpenPrintA4={(p) => setPurchaseToPrintA4(p)}
                   onDelete={(p) => setPurchaseToDelete(p)}
+                  onAnnulPurchase={async (p, reason) => {
+                    const reasonText = reason?.trim()
+                      ? `[ANULACIÓN COMPRA] Motivo: ${reason.trim()}`
+                      : '[ANULACIÓN COMPRA] Anulación explícita de la orden de compra.';
+                    const updatedNotes = (p.notes ? p.notes + '\n' : '') + reasonText;
+                    if (onUpdatePurchase) {
+                      const success = await onUpdatePurchase(p.id, {
+                        status: 'cancelled',
+                        notes: updatedNotes,
+                      });
+                      if (!success) {
+                        throw new Error('No se pudo anular la orden de compra.');
+                      }
+                    } else {
+                      const res = await authFetch(`/api/purchases/${p.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          status: 'cancelled',
+                          notes: updatedNotes,
+                        }),
+                      });
+                      if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || 'No se pudo anular la compra');
+                      }
+                    }
+                    if (onRefreshPurchases) {
+                      await onRefreshPurchases();
+                    }
+                  }}
                   onGoToStoreOrders={onGoToStoreOrders}
                   statusStyles={statusStyles}
                 />

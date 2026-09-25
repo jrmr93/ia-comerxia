@@ -55,7 +55,7 @@ export interface OrderActionButtonsProps {
     trackingNumber?: string,
     trackingCarrier?: string,
     trackingNotes?: string
-  ) => Promise<void>;
+  ) => Promise<any>;
   onDeleteOrder: (order: any) => void;
   showToast: (msg: string) => void;
   buildWhatsAppLink: (phone: string, text?: string) => string;
@@ -111,6 +111,34 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
     invoiceId?: number | string;
     emisorUsado?: any;
   } | null>(null);
+
+  // Annulment Modal State
+  const [showAnnulModal, setShowAnnulModal] = useState(false);
+  const [annulReason, setAnnulReason] = useState('');
+  const [isAnnulling, setIsAnnulling] = useState(false);
+
+  const handleConfirmAnnulOrder = async () => {
+    setIsAnnulling(true);
+    try {
+      const reasonText = annulReason.trim()
+        ? `[ANULACIÓN VENTA] Motivo: ${annulReason.trim()}`
+        : '[ANULACIÓN VENTA] Anulación explícita del pedido por administración.';
+      const updatedNotes = (ord.notes ? ord.notes + '\n' : '') + reasonText;
+      if (onUpdateStatus) {
+        const ok = await onUpdateStatus(ord.id, 'cancelled', undefined, updatedNotes);
+        if (ok === false) {
+          throw new Error('No se pudo anular la venta en el servidor.');
+        }
+      }
+      showToast(`✓ Venta #${ord.orderNumber || ord.id} anulada correctamente. Stock devuelto a bodega.`);
+      setShowAnnulModal(false);
+      setAnnulReason('');
+    } catch (err: any) {
+      showToast(`❌ Error al anular la venta: ${err?.message || 'Error desconocido'}`);
+    } finally {
+      setIsAnnulling(false);
+    }
+  };
 
   useEffect(() => {
     if (ord && ord.id) {
@@ -435,7 +463,21 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
         <span>Imprimir Prefactura</span>
       </button>
 
-      {/* 5. Eliminar pedido */}
+      {/* 5. Anular Venta (disponible para cualquier pedido no anulado) */}
+      {!isCancelled && (
+        <button
+          type="button"
+          id={`btn-annul-order-${ord.id}`}
+          onClick={() => setShowAnnulModal(true)}
+          className={`${btnStyle} bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 hover:border-amber-400`}
+          title="Anular venta: restituye el stock a la bodega (+1) y revierte los ingresos en tesorería"
+        >
+          <X className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+          <span>Anular Venta</span>
+        </button>
+      )}
+
+      {/* 6. Eliminar pedido */}
       <button
         type="button"
         id={`btn-delete-order-${ord.id}`}
@@ -446,7 +488,7 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
             ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
             : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 hover:border-rose-300'
         }`}
-        title={isPastConfirmation ? '🔒 No se puede eliminar: Pedido confirmado o entregado' : 'Eliminar pedido'}
+        title={isPastConfirmation ? '🔒 No se puede eliminar: Pedido confirmado o entregado (Utilice Anular Venta)' : 'Eliminar pedido'}
       >
         {isPastConfirmation ? (
           <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
@@ -642,6 +684,85 @@ export const OrderActionButtons: React.FC<OrderActionButtonsProps> = ({
                 className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer shadow-xs"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL UI 3: CONFIRMACIÓN DE ANULACIÓN DE VENTA ================= */}
+      {showAnnulModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200 my-auto text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 tracking-tight">
+                    Anular Venta #{ord.orderNumber || ord.id}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">{ord.customerName || 'Cliente'}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAnnulModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1.5">
+              <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>¿Deseas anular esta venta?</span>
+              </p>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Al anular esta venta se devolverá automáticamente el stock de los productos a bodega (+1) y se marcarán como anulados los cobros asociados en Tesorería.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Motivo de la anulación (opcional):
+              </label>
+              <textarea
+                value={annulReason}
+                onChange={(e) => setAnnulReason(e.target.value)}
+                placeholder="Ej. Devolución por cliente, garantía, error en pedido..."
+                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none h-20"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isAnnulling}
+                onClick={() => setShowAnnulModal(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isAnnulling}
+                onClick={handleConfirmAnnulOrder}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-black transition cursor-pointer shadow-md flex items-center gap-2"
+              >
+                {isAnnulling ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Anulando Venta...</span>
+                  </>
+                ) : (
+                  <>
+                    <X className="w-4 h-4 text-white" />
+                    <span>Sí, Anular Venta</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

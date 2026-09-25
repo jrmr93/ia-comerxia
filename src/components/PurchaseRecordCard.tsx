@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Package,
   Truck,
@@ -25,6 +25,7 @@ import {
   Globe,
   ChevronDown,
   ChevronUp,
+  X,
 } from 'lucide-react';
 import { PurchaseOrder, StoreConfig, CustomerOrder, Supplier } from '../types.ts';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
@@ -50,6 +51,7 @@ interface PurchaseRecordCardProps {
   onEditOrDetail: (purchase: PurchaseOrder) => void;
   onOpenPrintA4?: (purchase: PurchaseOrder) => void;
   onDelete: (purchase: PurchaseOrder) => void;
+  onAnnulPurchase?: (purchase: PurchaseOrder, reason?: string) => Promise<void> | void;
   onGoToStoreOrders?: (orderNumber?: string) => void;
   statusStyles: {
     label: string;
@@ -81,12 +83,50 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
   onEditOrDetail,
   onOpenPrintA4,
   onDelete,
+  onAnnulPurchase,
   onGoToStoreOrders,
   statusStyles,
 }) => {
   const isReceived = purchase.status === 'received';
   const isPartiallyReceived = purchase.status === 'partially_received';
   const isCancelled = purchase.status === 'cancelled';
+
+  const [showAnnulModal, setShowAnnulModal] = useState(false);
+  const [annulReason, setAnnulReason] = useState('');
+  const [isAnnulling, setIsAnnulling] = useState(false);
+
+  const handleConfirmAnnulPurchase = async () => {
+    setIsAnnulling(true);
+    try {
+      if (onAnnulPurchase) {
+        await onAnnulPurchase(purchase, annulReason);
+      } else {
+        const reasonText = annulReason.trim()
+          ? `[ANULACIÓN COMPRA] Motivo: ${annulReason.trim()}`
+          : '[ANULACIÓN COMPRA] Anulación explícita de la orden de compra.';
+        const updatedNotes = (purchase.notes ? purchase.notes + '\n' : '') + reasonText;
+        const res = await fetch(`/api/purchases/${purchase.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'cancelled',
+            notes: updatedNotes,
+          }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'No se pudo anular la compra');
+        }
+      }
+      showToast?.(`✓ Orden de compra #${purchase.purchaseNumber} anulada correctamente. Stock restado de bodega.`);
+      setShowAnnulModal(false);
+      setAnnulReason('');
+    } catch (err: any) {
+      showToast?.(`❌ Error al anular la compra: ${err?.message || 'Error desconocido'}`);
+    } finally {
+      setIsAnnulling(false);
+    }
+  };
   const isPending = purchase.status === 'pending';
   const isAutoFromSales = Boolean(purchase.linkedCustomerOrderId || purchase.linkedCustomerOrderNumber);
   const linkedOrderNumber = purchase.linkedCustomerOrderNumber || purchase.linkedCustomerOrderId;
@@ -620,6 +660,18 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
               </button>
             )}
 
+            {!isCancelled && (
+              <button
+                type="button"
+                onClick={() => setShowAnnulModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                title="Anular compra: restará el stock ingresado a la bodega (-1) y anulará los egresos en tesorería"
+              >
+                <X className="w-3.5 h-3.5 text-amber-700" />
+                <span>Anular Compra</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onOpenWhatsapp(purchase, 'whatsapp')}
@@ -806,6 +858,20 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
             >
               <Boxes className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
               <span>Recepción Parcial</span>
+            </button>
+          )}
+
+          {/* 2.5. Anular Compra (disponible en ambas vistas para cualquier compra no anulada) */}
+          {!isCancelled && (
+            <button
+              type="button"
+              id={`btn-purchase-annul-${purchase.id}`}
+              onClick={() => setShowAnnulModal(true)}
+              className={`${btnPurchaseStyle} bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 hover:border-amber-400`}
+              title="Anular compra: restará el stock ingresado a la bodega (-1) y anulará los egresos en tesorería"
+            >
+              <X className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+              <span>Anular Compra</span>
             </button>
           )}
 
@@ -1233,6 +1299,85 @@ export const PurchaseRecordCard: React.FC<PurchaseRecordCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Modal de Anulación de Compra */}
+      {showAnnulModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-200 my-auto text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 tracking-tight">
+                    Anular Compra #{purchase.purchaseNumber}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">{purchase.supplierName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAnnulModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1.5">
+              <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>¿Deseas anular esta orden de compra?</span>
+              </p>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Al anular esta compra, si la mercadería ya fue recibida se restará el stock ingresado a la bodega (-1) y se anularán los egresos correspondientes registrados en Tesorería.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Motivo de la anulación (opcional):
+              </label>
+              <textarea
+                value={annulReason}
+                onChange={(e) => setAnnulReason(e.target.value)}
+                placeholder="Ej. Mercadería defectuosa, error en orden, cancelación..."
+                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none h-20"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isAnnulling}
+                onClick={() => setShowAnnulModal(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isAnnulling}
+                onClick={handleConfirmAnnulPurchase}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-black transition cursor-pointer shadow-md flex items-center gap-2"
+              >
+                {isAnnulling ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Anulando Compra...</span>
+                  </>
+                ) : (
+                  <>
+                    <X className="w-4 h-4 text-white" />
+                    <span>Sí, Anular Compra</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -2453,21 +2453,6 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   // Confirm cancel order handler (with linked supplier purchase choice)
   const handleConfirmCancelOrder = async (purchaseAction?: 'cancel' | 'keep') => {
     if (!orderToCancel) return;
-    if (orderToCancel.status === 'delivered') {
-      showToast('🔒 Integridad ERP: Un pedido entregado y cerrado no puede cancelarse.');
-      setOrderToCancel(null);
-      return;
-    }
-    if (orderToCancel.status === 'confirmed' || orderToCancel.status === 'shipped') {
-      showToast('🔒 Integridad ERP: Una venta no puede cancelarse cuando está confirmada.');
-      setOrderToCancel(null);
-      return;
-    }
-    if (isOrderPartiallyDelivered(orderToCancel)) {
-      showToast('🔒 Integridad ERP: Una venta no puede cancelarse cuando se encuentra entregada parcialmente.');
-      setOrderToCancel(null);
-      return;
-    }
     setIsCancellingOrder(true);
     try {
       const ok = await onUpdateOrderStatus(
@@ -4781,7 +4766,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               onOpenPrintA4Order={(ord) => setOrderToPrintA4(ord)}
               onOpenRequestShippingData={(ord) => setOrderToRequestShippingData(ord)}
               onUpdateStatus={async (orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes) => {
-                await onUpdateOrderStatus(orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes);
+                return await onUpdateOrderStatus(orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes);
               }}
               onDeleteOrder={(ord) => setOrderToDelete(ord)}
               purchases={purchases}
@@ -4811,7 +4796,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               onOpenPrintA4Order={(ord) => setOrderToPrintA4(ord)}
               onOpenRequestShippingData={(ord) => setOrderToRequestShippingData(ord)}
               onUpdateStatus={async (orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes) => {
-                await onUpdateOrderStatus(orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes);
+                return await onUpdateOrderStatus(orderId, status, voucher, notes, trackingNumber, trackingCarrier, trackingNotes);
               }}
               onDeleteOrder={(ord) => setOrderToDelete(ord)}
               purchases={purchases}

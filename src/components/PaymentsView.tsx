@@ -995,14 +995,34 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-1.5">
                               {isInflow ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                  payment.notes?.includes('[REVERSO ASIENTO')
+                                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                }`}>
                                   <ArrowDownLeft className="w-3 h-3 text-emerald-600" />
-                                  Cobro Venta
+                                  {payment.notes?.includes('[REVERSO ASIENTO - Cuentas por cobrar]')
+                                    ? '[Reverso] Cuentas por cobrar'
+                                    : payment.notes?.includes('[REVERSO ASIENTO - Cobro a clientes]')
+                                    ? '[Reverso] Cobro a clientes'
+                                    : payment.notes?.includes('Cuentas por cobrar')
+                                    ? 'Cuentas por cobrar'
+                                    : 'Cobro a clientes'}
                                 </span>
                               ) : isOutflow ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                  payment.notes?.includes('[REVERSO ASIENTO')
+                                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                    : 'bg-amber-100 text-amber-900 border border-amber-200'
+                                }`}>
                                   <ArrowUpRight className="w-3 h-3 text-amber-700" />
-                                  Pago Proveedor
+                                  {payment.notes?.includes('[REVERSO ASIENTO - Cuentas por pagar]')
+                                    ? '[Reverso] Cuentas por pagar'
+                                    : payment.notes?.includes('[REVERSO ASIENTO - Pago a proveedores]')
+                                    ? '[Reverso] Pago a proveedores'
+                                    : payment.notes?.includes('Cuentas por pagar')
+                                    ? 'Cuentas por pagar'
+                                    : 'Pago a proveedores'}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
@@ -1070,12 +1090,18 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                               className={`text-base font-black font-mono tracking-tight ${
                                 isVoided
                                   ? 'line-through text-slate-400'
+                                  : payment.notes?.includes('[REVERSO ASIENTO')
+                                  ? 'text-rose-700'
                                   : isInflow
                                   ? 'text-emerald-600'
                                   : 'text-slate-900'
                               }`}
                             >
-                              {isInflow ? '+' : '-'}${numAmount.toFixed(2)}
+                              {payment.notes?.includes('[REVERSO ASIENTO')
+                                ? `$${Math.abs(numAmount).toFixed(2)}`
+                                : isInflow
+                                ? `+$${Math.abs(numAmount).toFixed(2)}`
+                                : `-$${Math.abs(numAmount).toFixed(2)}`}
                             </div>
                           </td>
 
@@ -1893,12 +1919,28 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-bold text-slate-900">
-                              {p.category === 'supplier_purchase'
-                                ? 'Pago a Proveedor'
+                              {p.notes?.includes('[REVERSO ASIENTO - Cuentas por pagar]')
+                                ? '[Reverso] Cuentas por pagar'
+                                : p.notes?.includes('[REVERSO ASIENTO - Pago a proveedores]')
+                                ? '[Reverso] Pago a proveedores'
+                                : p.notes?.includes('[REVERSO ASIENTO - Cuentas por cobrar]')
+                                ? '[Reverso] Cuentas por cobrar'
+                                : p.notes?.includes('[REVERSO ASIENTO - Cobro a clientes]')
+                                ? '[Reverso] Cobro a clientes'
+                                : p.notes?.includes('Cuentas por pagar')
+                                ? 'Cuentas por pagar'
+                                : p.notes?.includes('Pago a proveedores')
+                                ? 'Pago a proveedores'
+                                : p.notes?.includes('Cuentas por cobrar')
+                                ? 'Cuentas por cobrar'
+                                : p.notes?.includes('Cobro a clientes')
+                                ? 'Cobro a clientes'
+                                : p.category === 'supplier_purchase'
+                                ? 'Pago a proveedores'
                                 : p.category === 'operational_expense'
                                 ? 'Gasto Operacional'
                                 : p.category === 'customer_sale'
-                                ? 'Cobro de Venta'
+                                ? 'Cobro a clientes'
                                 : p.category === 'customer_refund'
                                 ? 'Reembolso Cliente'
                                 : p.category === 'supplier_refund'
@@ -1940,8 +1982,10 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                             )}
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-black text-sm whitespace-nowrap">
-                            <span className={isOut ? 'text-amber-800' : 'text-emerald-700'}>
-                              {isOut ? '-' : '+'}${Number(p.amount || 0).toFixed(2)}
+                            <span className={p.notes?.includes('[REVERSO ASIENTO') ? 'text-rose-700' : isOut ? 'text-amber-800' : 'text-emerald-700'}>
+                              {p.notes?.includes('[REVERSO ASIENTO')
+                                ? `$${Math.abs(Number(p.amount || 0)).toFixed(2)}`
+                                : `${isOut ? '-' : '+'}$${Math.abs(Number(p.amount || 0)).toFixed(2)}`}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center whitespace-nowrap">

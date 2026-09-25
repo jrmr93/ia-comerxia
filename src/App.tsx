@@ -1287,7 +1287,14 @@ function InventoryApp() {
   const handleUpdatePurchase = async (purchaseId: number, purchaseData: any) => {
     try {
       const existing = purchases.find((p) => p.id === purchaseId);
-      if (existing && (existing.linkedCustomerOrderId || existing.linkedCustomerOrderNumber)) {
+      const isEditingData =
+        purchaseData.items !== undefined ||
+        purchaseData.totalCost !== undefined ||
+        purchaseData.supplierName !== undefined ||
+        purchaseData.supplierContact !== undefined ||
+        purchaseData.purchaseDate !== undefined;
+
+      if (existing && (existing.linkedCustomerOrderId || existing.linkedCustomerOrderNumber) && isEditingData) {
         setSyncFeedback(`⚠️ Las compras generadas automáticamente por pedidos de venta no pueden ser editadas desde el menú de compras.`);
         setTimeout(() => setSyncFeedback(null), 5000);
         return false;
