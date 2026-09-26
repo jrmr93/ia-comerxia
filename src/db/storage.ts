@@ -111,6 +111,7 @@ export interface LocalStoreConfig {
   allowCatalogBrowsing?: boolean | null;
   showStock?: boolean | null;
   showOutOfStock?: boolean | null;
+  prioritizeOffersFirst?: boolean | null;
   websiteUrl?: string | null;
   website_url?: string | null;
   instagramUrl?: string | null;
@@ -459,6 +460,7 @@ class StorageManager {
           currency: 'USD',
           showStock: true,
           showOutOfStock: true,
+          prioritizeOffersFirst: true,
           instagramUrl: null,
           address: null,
           logoUrl: null,

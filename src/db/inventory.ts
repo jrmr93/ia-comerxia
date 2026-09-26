@@ -3214,6 +3214,7 @@ export async function getStoreConfig(userId: number = 1) {
       const cfg = state.storeConfigs[0];
       const { theme, themeColors } = parseThemeAndColors(cfg.theme);
       const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
+      const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : true;
       const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3223,6 +3224,7 @@ export async function getStoreConfig(userId: number = 1) {
         theme,
         themeColors,
         showOutOfStock: Boolean(showOutOfStock),
+        prioritizeOffersFirst: Boolean(prioritizeOffersFirst),
         isActive: Boolean(isActive),
         maintenanceTitle,
         maintenanceMessage,
@@ -3245,6 +3247,7 @@ export async function getStoreConfig(userId: number = 1) {
       allowCatalogBrowsing: false,
       showStock: true,
       showOutOfStock: true,
+      prioritizeOffersFirst: true,
       instagramUrl: null,
       websiteUrl: null,
       address: null,
@@ -3281,6 +3284,7 @@ export async function getStoreConfig(userId: number = 1) {
       const cfg = configs[0];
       const { theme, themeColors } = parseThemeAndColors(cfg.theme);
       const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
+      const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
       const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3294,6 +3298,7 @@ export async function getStoreConfig(userId: number = 1) {
         theme,
         themeColors,
         showOutOfStock: Boolean(showOutOfStock),
+        prioritizeOffersFirst: Boolean(prioritizeOffersFirst),
         isActive: Boolean(isActive),
         maintenanceTitle,
         maintenanceMessage,
@@ -3323,6 +3328,7 @@ export async function getStoreConfig(userId: number = 1) {
         allowCatalogBrowsing: false,
         showStock: true,
         showOutOfStock: true,
+        prioritizeOffersFirst: true,
         websiteUrl: null,
         logoUrl: null,
         logoDesktopUrl: null,
@@ -3337,6 +3343,7 @@ export async function getStoreConfig(userId: number = 1) {
     const cfg = created[0];
     const { theme, themeColors } = parseThemeAndColors(cfg.theme);
     const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
+    const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
     const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
     const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
     const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3350,6 +3357,7 @@ export async function getStoreConfig(userId: number = 1) {
       theme,
       themeColors,
       showOutOfStock: Boolean(showOutOfStock),
+      prioritizeOffersFirst: Boolean(prioritizeOffersFirst),
       isActive: Boolean(isActive),
       maintenanceTitle,
       maintenanceMessage,
@@ -3366,6 +3374,7 @@ export async function getStoreConfig(userId: number = 1) {
     if (cfg) {
       const { theme, themeColors } = parseThemeAndColors(cfg.theme);
       const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
+      const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
       const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3379,6 +3388,7 @@ export async function getStoreConfig(userId: number = 1) {
         theme,
         themeColors,
         showOutOfStock: Boolean(showOutOfStock),
+        prioritizeOffersFirst: Boolean(prioritizeOffersFirst),
         isActive: Boolean(isActive),
         maintenanceTitle,
         maintenanceMessage,
@@ -3438,6 +3448,10 @@ export async function updateStoreConfig(
   if (data.showOutOfStock !== undefined || data.show_out_of_stock !== undefined) {
     const rawVal = data.showOutOfStock !== undefined ? data.showOutOfStock : data.show_out_of_stock;
     updatePayload.showOutOfStock = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === '1';
+  }
+  if (data.prioritizeOffersFirst !== undefined || data.prioritize_offers_first !== undefined) {
+    const rawVal = data.prioritizeOffersFirst !== undefined ? data.prioritizeOffersFirst : data.prioritize_offers_first;
+    updatePayload.prioritizeOffersFirst = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === '1';
   }
   if (data.enablePagination !== undefined || data.enable_pagination !== undefined) {
     const rawVal = data.enablePagination !== undefined ? data.enablePagination : data.enable_pagination;

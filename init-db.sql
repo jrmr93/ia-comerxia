@@ -225,6 +225,7 @@ CREATE TABLE IF NOT EXISTS store_configs (
   currency TEXT DEFAULT 'USD',
   show_stock BOOLEAN DEFAULT TRUE,
   show_out_of_stock BOOLEAN DEFAULT TRUE,
+  prioritize_offers_first BOOLEAN DEFAULT TRUE,
   instagram_url TEXT,
   website_url TEXT,
   address TEXT,

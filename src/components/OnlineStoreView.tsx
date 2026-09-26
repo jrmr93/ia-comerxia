@@ -2081,14 +2081,17 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         const hasDiscA = discA > 0;
         const hasDiscB = discB > 0;
 
-        // Prioritize products with active discount percentage
-        if (hasDiscA !== hasDiscB) {
-          return hasDiscB ? 1 : -1;
-        }
+        // Prioritize products with active discount percentage (if configured)
+        const prioritizeOffers = storeConfig?.prioritizeOffersFirst !== false;
+        if (prioritizeOffers) {
+          if (hasDiscA !== hasDiscB) {
+            return hasDiscB ? 1 : -1;
+          }
 
-        // If both have discounts and sorting is default/featured, sort by highest discount first
-        if (hasDiscA && hasDiscB && (!sortBy || sortBy === 'featured')) {
-          if (discB !== discA) return discB - discA;
+          // If both have discounts and sorting is default/featured, sort by highest discount first
+          if (hasDiscA && hasDiscB && (!sortBy || sortBy === 'featured')) {
+            if (discB !== discA) return discB - discA;
+          }
         }
 
         const priceA = getEffectivePrice(a);
@@ -2122,7 +2125,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         }
         return 0; // featured default
       });
-  }, [products, searchQuery, selectedCategory, inStockOnly, showOffersOnly, sortBy, storeConfig?.showOutOfStock, storeConfig?.defaultInitialCategory, randomOrderSeedMap]);
+  }, [products, searchQuery, selectedCategory, inStockOnly, showOffersOnly, sortBy, storeConfig?.showOutOfStock, storeConfig?.defaultInitialCategory, storeConfig?.prioritizeOffersFirst, randomOrderSeedMap]);
 
   // Active payment methods configured in store settings
   const activeConfiguredPayments = useMemo(() => {

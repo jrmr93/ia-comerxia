@@ -578,6 +578,7 @@ export interface StoreConfig {
   allowCatalogBrowsing?: boolean;
   showStock?: boolean;
   showOutOfStock?: boolean;
+  prioritizeOffersFirst?: boolean;
   instagramUrl?: string;
   websiteUrl?: string | null;
   address?: string;

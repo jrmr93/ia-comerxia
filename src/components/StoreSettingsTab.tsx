@@ -213,6 +213,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   const [currency, setCurrency] = useState('USD');
   const [showStock, setShowStock] = useState(true);
   const [showOutOfStock, setShowOutOfStock] = useState(true);
+  const [prioritizeOffersFirst, setPrioritizeOffersFirst] = useState(true);
   const [enablePagination, setEnablePagination] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState<number>(12);
   const [defaultProductSort, setDefaultProductSort] = useState<string>('date_desc');
@@ -375,6 +376,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           if (data.currency) setCurrency(data.currency);
           if (data.showStock !== undefined) setShowStock(Boolean(data.showStock));
           if (data.showOutOfStock !== undefined) setShowOutOfStock(Boolean(data.showOutOfStock));
+          if (data.prioritizeOffersFirst !== undefined) setPrioritizeOffersFirst(Boolean(data.prioritizeOffersFirst));
+          else if (data.prioritize_offers_first !== undefined) setPrioritizeOffersFirst(Boolean(data.prioritize_offers_first));
           if (data.enablePagination !== undefined) setEnablePagination(Boolean(data.enablePagination));
           if (data.itemsPerPage !== undefined) setItemsPerPage(Number(data.itemsPerPage) || 12);
           if (data.defaultProductSort) setDefaultProductSort(data.defaultProductSort);
@@ -669,6 +672,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
         currency: currency.trim() || 'USD',
         showStock,
         showOutOfStock,
+        prioritizeOffersFirst,
         enablePagination,
         itemsPerPage: Number(itemsPerPage) || 12,
         defaultProductSort,
@@ -931,10 +935,12 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
         )}
       </div>
 
-      {/* 1. INFORMACIÓN PRINCIPAL & LOGO */}
+      {/* 1. INFORMACIÓN PRINCIPAL, LOGOS Y VISUALIZACIÓN DEL CATÁLOGO */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left 2 Cols: Form Fields */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
+        {/* Left 2 Cols: Datos Básicos del Comercio & Logos de la Tienda (Horizontal & Responsivo) */}
+        <div className="lg:col-span-2 space-y-5">
+          {/* Panel 1: Datos Básicos del Comercio */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
           <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
             <Store className="w-4 h-4 text-sky-600" />
             Datos Básicos del Comercio
@@ -1046,39 +1052,41 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           </div>
         </div>
 
-        {/* Right 1 Col: Dual Logo Uploader (Móvil & PC) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <Camera className="w-4 h-4 text-sky-600" />
-                Logos de la Tienda (2 Formatos)
-              </h4>
-              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200/80">
-                Móvil & PC
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">
-              Sube ambos formatos para que tu marca luzca profesional tanto en celulares como en computadoras.
-            </p>
+        {/* Panel 2: Logos de la Tienda (2 Formatos) - Ubicado Horizontalmente bajo Datos Básicos */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xs min-w-0 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-3 gap-2 min-w-0">
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 min-w-0">
+              <Camera className="w-4 h-4 text-sky-600 shrink-0" />
+              <span className="truncate">Logos de la Tienda (2 Formatos)</span>
+            </h4>
+            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200/80 shrink-0">
+              Móvil & PC
+            </span>
+          </div>
+          <p className="text-xs text-slate-500">
+            Sube ambos formatos para que tu marca luzca profesional tanto en celulares como en computadoras.
+          </p>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 min-w-0">
             {/* 1. Logo Cuadrado - Vista Celular */}
-            <div className="mt-3.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-1.5">
-                  <Smartphone className="w-3.5 h-3.5 text-sky-600" />
-                  <span className="text-xs font-bold text-slate-800">1. Logo Cuadrado (Móvil)</span>
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 flex flex-col justify-between min-w-0 overflow-hidden">
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-1.5 min-w-0">
+                  <div className="flex items-center space-x-1.5 min-w-0">
+                    <Smartphone className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                    <span className="text-xs font-bold text-slate-800 truncate">1. Logo Cuadrado (Móvil)</span>
+                  </div>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 shrink-0">
+                    1:1 Celular
+                  </span>
                 </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800">
-                  1:1 Celular
-                </span>
+                <p className="text-[11px] text-slate-500 leading-tight mt-1">
+                  Se muestra en la cabecera en celulares, tickets de envío y pedidos de WhatsApp.
+                </p>
               </div>
-              <p className="text-[11px] text-slate-500 leading-tight">
-                Se muestra en la cabecera en celulares, tickets de envío y pedidos de WhatsApp.
-              </p>
 
-              <div className="flex items-center space-x-3 pt-1">
-                <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center overflow-hidden p-1 flex-shrink-0">
+              <div className="flex flex-col xs:flex-row sm:flex-col md:flex-row items-center gap-3 pt-2 min-w-0">
+                <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center overflow-hidden p-1 shrink-0">
                   {logoUrl ? (
                     <img src={logoUrl} alt="Logo Móvil" className="w-full h-full object-contain" />
                   ) : (
@@ -1089,10 +1097,10 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                   )}
                 </div>
 
-                <div className="flex-1 space-y-1.5">
-                  <label className="w-full py-1.5 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs active:scale-95">
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    <span>{logoUrl ? 'Cambiar Cuadrado' : 'Subir Cuadrado'}</span>
+                <div className="flex-1 w-full min-w-0 space-y-1.5">
+                  <label className="w-full py-1.5 px-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs active:scale-95 text-center">
+                    <UploadCloud className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{logoUrl ? 'Cambiar Cuadrado' : 'Subir Cuadrado'}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1117,8 +1125,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                       onClick={() => setLogoUrl(null)}
                       className="w-full py-1 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold transition cursor-pointer flex items-center justify-center space-x-1"
                     >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Quitar</span>
+                      <Trash2 className="w-3 h-3 shrink-0" />
+                      <span className="truncate">Quitar</span>
                     </button>
                   )}
                 </div>
@@ -1126,36 +1134,38 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
             </div>
 
             {/* 2. Logo Rectangular - Vista PC */}
-            <div className="mt-3.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-1.5">
-                  <Laptop className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-800">2. Logo Rectangular (PC)</span>
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 flex flex-col justify-between min-w-0 overflow-hidden">
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-1.5 min-w-0">
+                  <div className="flex items-center space-x-1.5 min-w-0">
+                    <Laptop className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <span className="text-xs font-bold text-slate-800 truncate">2. Logo Rectangular (PC)</span>
+                  </div>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 shrink-0">
+                    Horizontal PC
+                  </span>
                 </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
-                  Horizontal PC
-                </span>
+                <p className="text-[11px] text-slate-500 leading-tight mt-1">
+                  Formato panorámico horizontal para monitores de computadora y laptops.
+                </p>
               </div>
-              <p className="text-[11px] text-slate-500 leading-tight">
-                Formato panorámico horizontal para monitores de computadora y laptops.
-              </p>
 
-              <div className="space-y-2 pt-1">
-                <div className="w-full h-14 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center overflow-hidden p-1.5">
+              <div className="flex flex-col xs:flex-row sm:flex-col md:flex-row items-center gap-3 pt-2 min-w-0">
+                <div className="w-24 h-14 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center overflow-hidden p-1 shrink-0">
                   {logoDesktopUrl ? (
                     <img src={logoDesktopUrl} alt="Logo PC" className="w-full h-full object-contain" />
                   ) : (
-                    <div className="flex items-center justify-center space-x-2 text-slate-300">
-                      <Laptop className="w-4 h-4 text-slate-300" />
-                      <span className="text-[10px] font-medium">Sin logo PC (Usa el móvil de respaldo)</span>
+                    <div className="text-center text-slate-300">
+                      <Laptop className="w-5 h-5 mx-auto mb-0.5 text-slate-300" />
+                      <span className="text-[8px] font-bold block">Sin logo PC</span>
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <label className="flex-1 py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs active:scale-95">
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    <span>{logoDesktopUrl ? 'Cambiar Rectangular' : 'Subir Rectangular (PC)'}</span>
+                <div className="flex-1 w-full min-w-0 space-y-1.5">
+                  <label className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs active:scale-95 text-center">
+                    <UploadCloud className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{logoDesktopUrl ? 'Cambiar Rectangular' : 'Subir Rectangular'}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1178,156 +1188,204 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                     <button
                       type="button"
                       onClick={() => setLogoDesktopUrl(null)}
-                      className="py-1.5 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition cursor-pointer flex items-center justify-center space-x-1"
+                      className="w-full py-1 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold transition cursor-pointer flex items-center justify-center space-x-1"
                       title="Quitar logo rectangular"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Quitar</span>
+                      <Trash2 className="w-3 h-3 shrink-0" />
+                      <span className="truncate">Quitar</span>
                     </button>
                   )}
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div className="space-y-2.5">
-            <div className="hidden">
-              <label className="flex items-start space-x-2.5 cursor-pointer text-xs font-bold text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={showStock}
-                  onChange={(e) => setShowStock(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded text-sky-600 focus:ring-sky-500"
-                />
-                <div className="space-y-0.5">
-                  <span>Mostrar cantidad de existencias / stock disponible</span>
-                  <p className="text-[11px] font-normal text-slate-500">Muestra la etiqueta con el número exacto de unidades disponibles a los clientes.</p>
-                </div>
-              </label>
-            </div>
+      {/* Right 1 Col: Opciones de Visualización y Catálogo (Responsivo) */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xs h-fit min-w-0 overflow-hidden">
+        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+          <Sliders className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="truncate">Visualización del Catálogo</span>
+        </h4>
 
-            <div className="p-3 bg-amber-50/60 border border-amber-100/80 rounded-xl">
-              <label className="flex items-start space-x-2.5 cursor-pointer text-xs font-bold text-slate-800">
-                <input
-                  type="checkbox"
-                  id="switch-show-out-of-stock"
-                  checked={showOutOfStock}
-                  onChange={(e) => setShowOutOfStock(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded text-amber-600 focus:ring-amber-500"
-                />
-                <div className="space-y-0.5">
-                  <div className="flex items-center space-x-1.5">
-                    <span>Mostrar productos agotados en la tienda</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${showOutOfStock ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                      {showOutOfStock ? 'Visibles' : 'Ocultos'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-normal text-slate-500">
-                    {showOutOfStock
-                      ? 'Los productos con stock en 0 se mostrarán marcados con la etiqueta "Agotado".'
-                      : 'Los productos con stock en 0 se ocultarán automáticamente del catálogo para los clientes.'}
-                  </p>
-                </div>
-              </label>
-            </div>
-
-            {/* Paginación de Productos en el Catálogo */}
-            <div className="p-3 bg-sky-50/60 border border-sky-100/80 rounded-xl space-y-2.5">
-              <label className="flex items-start space-x-2.5 cursor-pointer text-xs font-bold text-slate-800">
-                <input
-                  type="checkbox"
-                  id="switch-enable-pagination"
-                  checked={enablePagination}
-                  onChange={(e) => setEnablePagination(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded text-sky-600 focus:ring-sky-500"
-                />
-                <div className="space-y-0.5 flex-1">
-                  <div className="flex items-center space-x-1.5 justify-between">
-                    <span>Activar paginación de productos en el catálogo</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${enablePagination ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-slate-200 text-slate-600'}`}>
-                      {enablePagination ? 'Paginación Activada' : 'Lista Continua'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-normal text-slate-500">
-                    {enablePagination
-                      ? 'El catálogo se dividirá en páginas ordenadas con navegación ("Anterior" / "Siguiente").'
-                      : 'Todos los productos se mostrarán en una sola lista continua.'}
-                  </p>
-                </div>
-              </label>
-
-              {enablePagination && (
-                <div className="pt-2 border-t border-sky-100/80 flex items-center justify-between">
-                  <label htmlFor="items-per-page-select" className="text-[11px] font-bold text-slate-700">
-                    Productos a mostrar por página:
-                  </label>
-                  <select
-                    id="items-per-page-select"
-                    value={itemsPerPage}
-                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                    className="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1 font-bold text-slate-800 focus:outline-none focus:border-sky-500 cursor-pointer"
-                  >
-                    <option value={6}>6 productos por página</option>
-                    <option value={12}>12 productos por página</option>
-                    <option value={20}>20 productos por página</option>
-                    <option value={24}>24 productos por página</option>
-                    <option value={36}>36 productos por página</option>
-                    <option value={48}>48 productos por página</option>
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Orden Inicial Predeterminado de Productos */}
-            <div className="p-3 bg-amber-50/60 border border-amber-100/80 rounded-xl space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="default-product-sort-select" className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Orden inicial de productos en vista cliente</span>
-                </label>
+        <div className="space-y-3 min-w-0">
+          <div className="hidden">
+            <label className="flex items-start space-x-2.5 cursor-pointer text-xs font-bold text-slate-800">
+              <input
+                type="checkbox"
+                checked={showStock}
+                onChange={(e) => setShowStock(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded text-sky-600 focus:ring-sky-500 shrink-0"
+              />
+              <div className="space-y-0.5 min-w-0 flex-1">
+                <span>Mostrar cantidad de existencias / stock disponible</span>
+                <p className="text-[11px] font-normal text-slate-500">Muestra la etiqueta con el número exacto de unidades disponibles a los clientes.</p>
               </div>
-              <p className="text-[11px] text-slate-500 font-normal">
-                Selecciona cómo se mostrarán ordenados tus productos la primera vez que un cliente abra la tienda. No afecta la libertad de usar los filtros interactivos.
-              </p>
-              <select
-                id="default-product-sort-select"
-                value={defaultProductSort}
-                onChange={(e) => setDefaultProductSort(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer shadow-xs"
-              >
-                <option value="price_desc">📈 Precio: Mayor a Menor</option>
-                <option value="price_asc">📉 Precio: Menor a Mayor</option>
-                <option value="category">🏷️ Por Categoría (Alfabético)</option>
-                <option value="date_desc">📅 Por Fecha de Agregación (Más Recientes)</option>
-                <option value="random">🎲 Aleatorio / Mezclado (Novedad cada apertura)</option>
-              </select>
+            </label>
+          </div>
 
-              {defaultProductSort === 'category' && (
-                <div className="pt-2 border-t border-amber-100/80 space-y-1.5">
-                  <label htmlFor="default-initial-category-select" className="block text-[11px] font-bold text-amber-900">
-                    📌 Categoría destacada a mostrar primero:
-                  </label>
-                  <select
-                    id="default-initial-category-select"
-                    value={defaultInitialCategory}
-                    onChange={(e) => setDefaultInitialCategory(e.target.value)}
-                    className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-1.5 font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
-                  >
-                    <option value="all">Todas las categorías (Orden alfabético)</option>
-                    {Array.from(new Set(storeProducts.map((p) => p.category).filter(Boolean))).map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-amber-800/80">
-                    Los productos pertenecientes a esta categoría encabezarán el catálogo la primera vez que el cliente abra la tienda.
-                  </p>
+          {/* Mostrar productos agotados */}
+          <div className="p-3 bg-amber-50/60 border border-amber-100/80 rounded-xl min-w-0">
+            <label className="flex items-start space-x-2.5 cursor-pointer text-xs font-bold text-slate-800">
+              <input
+                type="checkbox"
+                id="switch-show-out-of-stock"
+                checked={showOutOfStock}
+                onChange={(e) => setShowOutOfStock(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded text-amber-600 focus:ring-amber-500 shrink-0"
+              />
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="break-words">Mostrar productos agotados</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md shrink-0 ${showOutOfStock ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                    {showOutOfStock ? 'Visibles' : 'Ocultos'}
+                  </span>
                 </div>
-              )}
+                <p className="text-[11px] font-normal text-slate-500 leading-tight">
+                  {showOutOfStock
+                    ? 'Los productos con stock en 0 se mostrarán marcados con la etiqueta "Agotado".'
+                    : 'Los productos con stock en 0 se ocultarán automáticamente del catálogo para los clientes.'}
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Priorizar Productos en Oferta al Inicio */}
+          <div className="p-3 bg-rose-50/60 border border-rose-100/80 rounded-xl transition-all min-w-0">
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span className="text-xs font-bold text-slate-800 break-words">
+                    Mostrar primero las ofertas
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md shrink-0 ${
+                      prioritizeOffersFirst
+                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                        : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {prioritizeOffersFirst ? 'Activado' : 'Desactivado'}
+                  </span>
+                </div>
+                <p className="text-[11px] font-normal text-slate-500 leading-tight">
+                  {prioritizeOffersFirst
+                    ? 'Los productos con descuento se ubicarán al inicio del catálogo.'
+                    : 'Los productos seguirán únicamente el orden seleccionado.'}
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5" htmlFor="switch-prioritize-offers">
+                <input
+                  type="checkbox"
+                  id="switch-prioritize-offers"
+                  checked={prioritizeOffersFirst}
+                  onChange={(e) => setPrioritizeOffersFirst(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600 shadow-xs"></div>
+              </label>
             </div>
           </div>
+
+          {/* Paginación de Productos en el Catálogo */}
+          <div className="p-3 bg-sky-50/60 border border-sky-100/80 rounded-xl space-y-2.5 min-w-0">
+            <label className="flex items-start space-x-2.5 cursor-pointer text-xs font-bold text-slate-800">
+              <input
+                type="checkbox"
+                id="switch-enable-pagination"
+                checked={enablePagination}
+                onChange={(e) => setEnablePagination(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded text-sky-600 focus:ring-sky-500 shrink-0"
+              />
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <span className="break-words">Activar paginación</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md shrink-0 ${enablePagination ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-slate-200 text-slate-600'}`}>
+                    {enablePagination ? 'Activada' : 'Lista Continua'}
+                  </span>
+                </div>
+                <p className="text-[11px] font-normal text-slate-500 leading-tight">
+                  {enablePagination
+                    ? 'El catálogo se dividirá en páginas ordenadas con navegación.'
+                    : 'Todos los productos se mostrarán en una lista continua.'}
+                </p>
+              </div>
+            </label>
+
+            {enablePagination && (
+              <div className="pt-2 border-t border-sky-100/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 min-w-0">
+                <label htmlFor="items-per-page-select" className="text-[11px] font-bold text-slate-700 shrink-0">
+                  Productos por página:
+                </label>
+                <select
+                  id="items-per-page-select"
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="w-full sm:w-auto text-xs bg-white border border-slate-300 rounded-lg px-2 py-1 font-bold text-slate-800 focus:outline-none focus:border-sky-500 cursor-pointer max-w-full"
+                >
+                  <option value={6}>6 productos</option>
+                  <option value={12}>12 productos</option>
+                  <option value={20}>20 productos</option>
+                  <option value={24}>24 productos</option>
+                  <option value={36}>36 productos</option>
+                  <option value={48}>48 productos</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Orden Inicial Predeterminado de Productos */}
+          <div className="p-3 bg-amber-50/60 border border-amber-100/80 rounded-xl space-y-2 min-w-0">
+            <div className="flex items-center justify-between gap-1.5 min-w-0">
+              <label htmlFor="default-product-sort-select" className="text-xs font-bold text-slate-800 flex items-center gap-1.5 min-w-0">
+                <Sliders className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="break-words">Orden inicial de productos</span>
+              </label>
+            </div>
+            <p className="text-[11px] text-slate-500 font-normal leading-tight">
+              Orden inicial predeterminado al abrir la tienda por primera vez.
+            </p>
+            <select
+              id="default-product-sort-select"
+              value={defaultProductSort}
+              onChange={(e) => setDefaultProductSort(e.target.value)}
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer shadow-xs max-w-full truncate"
+            >
+              <option value="price_desc">📈 Precio: Mayor a Menor</option>
+              <option value="price_asc">📉 Precio: Menor a Mayor</option>
+              <option value="category">🏷️ Por Categoría (Alfabético)</option>
+              <option value="date_desc">📅 Por Fecha (Más Recientes)</option>
+              <option value="random">🎲 Aleatorio / Mezclado</option>
+            </select>
+
+            {defaultProductSort === 'category' && (
+              <div className="pt-2 border-t border-amber-100/80 space-y-1.5 min-w-0">
+                <label htmlFor="default-initial-category-select" className="block text-[11px] font-bold text-amber-900 leading-tight">
+                  📌 Categoría destacada al inicio:
+                </label>
+                <select
+                  id="default-initial-category-select"
+                  value={defaultInitialCategory}
+                  onChange={(e) => setDefaultInitialCategory(e.target.value)}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer max-w-full truncate"
+                >
+                  <option value="all">Todas las categorías (Alfabético)</option>
+                  {Array.from(new Set(storeProducts.map((p) => p.category).filter(Boolean))).map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-amber-800/80 leading-tight">
+                  Los productos de esta categoría se mostrarán primero.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
       </div>
 
       {/* 2. MÉTODOS DE PAGO Y LOGÍSTICA */}
