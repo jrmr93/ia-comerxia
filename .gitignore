@@ -7,5 +7,6 @@ coverage/
 .env*
 !.env.example
 uploads/
+backups/
 data/database.json
 .vscode/launch.json
