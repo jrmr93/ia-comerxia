@@ -655,3 +655,33 @@ export async function cleanupUnreferencedMediaList(
   return { deleted, retained };
 }
 
+/**
+ * Deletes all files and subdirectories inside the uploads directory, leaving it clean and empty.
+ */
+export async function clearAllUploadsFolder(): Promise<number> {
+  const uploadsDir = ensureUploadsDirExists();
+  let deletedCount = 0;
+  try {
+    const entries = await fs.promises.readdir(uploadsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(uploadsDir, entry.name);
+      try {
+        if (entry.isDirectory()) {
+          await fs.promises.rm(fullPath, { recursive: true, force: true });
+          deletedCount++;
+        } else {
+          await fs.promises.unlink(fullPath);
+          deletedCount++;
+        }
+      } catch (e) {
+        console.error(`[Media Storage] Error al eliminar ${fullPath}:`, e);
+      }
+    }
+    console.log(`[Media Storage] Se borró por completo el contenido de /uploads (${deletedCount} elementos eliminados).`);
+  } catch (err) {
+    console.error(`[Media Storage] Error al acceder a la carpeta /uploads:`, err);
+  }
+  return deletedCount;
+}
+
+

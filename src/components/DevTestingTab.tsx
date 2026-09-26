@@ -433,9 +433,9 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
       color: 'rose',
       badge: 'Reset Total + Productos',
       description:
-        'Elimina absolutamente TODO: Todos los productos del catálogo, pedidos de clientes, compras, movimientos de tesorería, clientes CRM, proveedores, mensajes y analítica.',
+        'Elimina absolutamente TODO: Todos los productos del catálogo, pedidos de clientes, compras, movimientos de tesorería, clientes CRM, proveedores, mensajes, analítica y el contenido completo de la carpeta uploads.',
       preserves: 'Conserva únicamente tus usuarios administradores y llaves de configuración.',
-      countLabel: stats ? `${stats.productsCount} productos + tablas operativas` : 'Reset de fábrica completo',
+      countLabel: stats ? `${stats.productsCount} productos + tablas operativas + carpeta uploads` : 'Reset de fábrica completo',
     },
   ];
 

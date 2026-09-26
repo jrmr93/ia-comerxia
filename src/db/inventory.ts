@@ -26,6 +26,7 @@ import {
   extractMediaUrlsFromProduct,
   cleanupUnreferencedMediaList,
   deleteMediaFileIfUnreferenced,
+  clearAllUploadsFolder,
 } from '../services/media-storage.ts';
 import { parseSupplierTelegramMessage } from '../services/gemini-parser.ts';
 import { getProductPhotosWithFallback, normalizeMediaUrl } from '../utils/media-helper.ts';
@@ -10303,6 +10304,7 @@ export async function cleanTestData(
     clearedSriInvoices: number;
     clearedAnalytics: boolean;
     stockResetProducts: number;
+    clearedUploadsFiles?: number;
     message: string;
   } = {
     clearedOrders: 0,
@@ -10315,6 +10317,7 @@ export async function cleanTestData(
     clearedSriInvoices: 0,
     clearedAnalytics: false,
     stockResetProducts: 0,
+    clearedUploadsFiles: 0,
     message: '',
   };
 
@@ -10456,6 +10459,11 @@ export async function cleanTestData(
     state.nextId.inventoryItems = 1;
   }
 
+  // 5b. Limpieza de Archivos Multimedia (Carpeta Uploads)
+  if (action === 'reset_all_with_products') {
+    summary.clearedUploadsFiles = await clearAllUploadsFolder();
+  }
+
   // 6. Limpiar Mensajes / Registro de Telegram
   if (action === 'telegram' || action === 'reset_all' || action === 'reset_all_with_products') {
     summary.clearedTelegram = state.telegramMessages ? state.telegramMessages.length : 0;
@@ -10555,7 +10563,7 @@ export async function cleanTestData(
   } else if (action === 'reset_stock') {
     summary.message = `✓ Se ajustó el stock a ${options?.targetStockQuantity ?? 0} unidades en todos los ${summary.stockResetProducts} productos del catálogo.`;
   } else if (action === 'reset_all_with_products') {
-    summary.message = `✓ Limpieza absoluta completada: ${summary.clearedProducts} productos, ${summary.clearedOrders} pedidos, ${summary.clearedPurchases} compras, ${summary.clearedPayments} pagos, ${summary.clearedCustomers} clientes y ${summary.clearedSuppliers} proveedores eliminados. Base de datos reseteada a 0 (usuarios administradores protegidos).`;
+    summary.message = `✓ Limpieza absoluta completada: ${summary.clearedProducts} productos, ${summary.clearedOrders} pedidos, ${summary.clearedPurchases} compras, ${summary.clearedPayments} pagos, ${summary.clearedCustomers} clientes, ${summary.clearedSuppliers} proveedores y ${summary.clearedUploadsFiles || 0} archivos/imágenes de la carpeta uploads eliminados. Base de datos reseteada a 0 (usuarios administradores protegidos).`;
   } else {
     summary.message = `✓ Entorno de pruebas limpio: ${summary.clearedOrders} pedidos, ${summary.clearedPurchases} compras, ${summary.clearedPayments} pagos y registros de prueba reseteados. Tu catálogo de productos y usuarios administradores se mantienen 100% intactos.`;
   }
