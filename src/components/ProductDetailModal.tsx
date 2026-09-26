@@ -20,6 +20,7 @@ import {
   EyeOff,
   Film,
   Flame,
+  Globe,
   ImageOff,
   Images,
   Layers,
@@ -810,16 +811,30 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     )}
                   </div>
 
-                  {/* Botón Buscar más fotos con IA */}
-                  <button
-                    type="button"
-                    onClick={() => setShowWebImagePicker(true)}
-                    className="w-full py-1.5 px-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[11px] font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs"
-                    title="Buscar fotos de alta calidad con IA en Google y Bing"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Buscar Más Fotos con IA</span>
-                  </button>
+                  {/* Botón Buscar más fotos con IA y Google */}
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowWebImagePicker(true)}
+                      className="flex-1 py-1.5 px-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[11px] font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs"
+                      title="Buscar fotos de alta calidad con IA o por URL"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Fotos (IA / Internet)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const q = (currentItem?.name || '').trim();
+                        if (q) window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`, '_blank');
+                      }}
+                      className="py-1.5 px-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[11px] font-bold transition flex items-center justify-center space-x-1 cursor-pointer shadow-2xs shrink-0"
+                      title="Abrir búsqueda directa en Google Imágenes"
+                    >
+                      <Globe className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Google ↗</span>
+                    </button>
+                  </div>
                 </div>
               )}
 

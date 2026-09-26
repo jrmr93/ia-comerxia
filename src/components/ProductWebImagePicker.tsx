@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   Globe,
@@ -19,6 +19,10 @@ import {
   ChevronDown,
   Tag,
   Eye,
+  Link as LinkIcon,
+  Upload,
+  ShoppingBag,
+  Clipboard,
 } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -75,6 +79,140 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
+  // Manual image URL search / paste state
+  const [manualUrl, setManualUrl] = useState<string>('');
+  const [showManualUrlPanel, setShowManualUrlPanel] = useState<boolean>(false);
+  const [manualUrlNotice, setManualUrlNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Clipboard paste detection for quick manual image additions
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const activeEl = document.activeElement;
+      // Allow normal typing inside input boxes unless it looks like a direct image URL or base64
+      const isInputActive = activeEl && activeEl.tagName === 'INPUT';
+
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.startsWith('image/')) {
+            const file = items[i].getAsFile();
+            if (file) {
+              e.preventDefault();
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const base64 = event.target?.result as string;
+                if (base64) {
+                  setManualUrl(base64);
+                  setShowManualUrlPanel(true);
+                  setSuccessToast('📋 ¡Imagen capturada del portapapeles! Clic en Guardar Foto para agregar.');
+                }
+              };
+              reader.readAsDataURL(file);
+              return;
+            }
+          }
+        }
+      }
+
+      const pastedText = e.clipboardData?.getData('text')?.trim();
+      if (pastedText && (pastedText.startsWith('http://') || pastedText.startsWith('https://') || pastedText.startsWith('data:image/'))) {
+        if (!isInputActive) {
+          e.preventDefault();
+        }
+        setManualUrl(pastedText);
+        setShowManualUrlPanel(true);
+        setSuccessToast('📋 ¡Enlace de imagen pegado! Clic en Agregar Foto o Guardar Portada.');
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isOpen]);
+
+  // Launchers for manual web search engines
+  const handleOpenGoogleImages = () => {
+    const q = (searchQuery || item.name || '').trim();
+    if (!q) return;
+    window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`, '_blank');
+    setManualUrlNotice(
+      '🌐 Se abrió Google Imágenes en una nueva pestaña. Copia la dirección de cualquier foto (Clic derecho ➔ "Copiar dirección de imagen") y pégala aquí abajo o presiona Ctrl+V.'
+    );
+    setShowManualUrlPanel(true);
+  };
+
+  const handleOpenBingImages = () => {
+    const q = (searchQuery || item.name || '').trim();
+    if (!q) return;
+    window.open(`https://www.bing.com/images/search?q=${encodeURIComponent(q)}`, '_blank');
+    setManualUrlNotice(
+      '🔍 Se abrió Bing Imágenes en una pestaña nueva. Copia el enlace directo de la imagen deseada y pégalo abajo.'
+    );
+    setShowManualUrlPanel(true);
+  };
+
+  const handleOpenMercadoLibre = () => {
+    const q = (searchQuery || item.name || '').trim();
+    if (!q) return;
+    window.open(`https://listado.mercadolibre.com.ec/${encodeURIComponent(q)}`, '_blank');
+    setShowManualUrlPanel(true);
+  };
+
+  // Local files upload handler inside modal
+  const handleLocalFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+
+    fileArray.forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        if (base64) {
+          const newResult: WebImageResult = {
+            url: base64,
+            thumbnailUrl: base64,
+            title: file.name || 'Foto subida desde equipo',
+            source: 'Archivo Local',
+            tag: 'Subida Local',
+            confidence: 'Local',
+          };
+          setResults((prev) => [newResult, ...prev]);
+          setSelectedUrls((prev) => [base64, ...prev]);
+          setSuccessToast(`📁 Foto "${file.name}" cargada correctamente.`);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Manual URL submit helper
+  const handleAddManualUrlSubmit = async (makeCover: boolean = true) => {
+    const clean = sanitizeUrl(manualUrl);
+    if (!clean) {
+      setErrorMsg('Por favor ingresa o pega un enlace de imagen válido (http:// o https://)');
+      return;
+    }
+
+    const existing = results.find((r) => r.url === clean);
+    if (!existing) {
+      const customRes: WebImageResult = {
+        url: clean,
+        thumbnailUrl: clean,
+        title: 'Imagen de URL manual',
+        source: 'Enlace Directo Web',
+        tag: 'Manual Web',
+        confidence: 'Exacto',
+      };
+      setResults((prev) => [customRes, ...prev]);
+    }
+
+    await handleAddSingleImage(clean, makeCover);
+    setManualUrl('');
+  };
+
   // Helper to ensure clean, full URL
   const sanitizeUrl = (rawUrl: string, fallbackThumb?: string): string => {
     let clean = (rawUrl || '').trim();
@@ -97,6 +235,9 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
       setSetAsCover(true);
       setErrorMsg(null);
       setSuccessToast(null);
+      setManualUrl('');
+      setManualUrlNotice(null);
+      setShowManualUrlPanel(false);
       setActiveFilter('all');
       handleSearch(item.name || '');
     }
@@ -474,6 +615,168 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
                 </button>
               ))}
           </div>
+
+          {/* Manual Web Search & Manual Image Options Toolbar */}
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div className="flex items-center space-x-1.5 overflow-x-auto py-0.5 scrollbar-thin">
+              <span className="font-bold text-slate-600 shrink-0 flex items-center space-x-1">
+                <Globe className="w-3.5 h-3.5 text-blue-600" />
+                <span>Buscar manualmente en:</span>
+              </span>
+              
+              <button
+                type="button"
+                onClick={handleOpenGoogleImages}
+                className="px-2.5 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0"
+                title="Abrir Google Imágenes en una pestaña nueva con el término actual"
+              >
+                <Globe className="w-3 h-3 text-blue-600" />
+                <span>Google Imágenes ↗</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenBingImages}
+                className="px-2.5 py-1 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80 font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0"
+                title="Abrir Bing Imágenes en una pestaña nueva"
+              >
+                <Search className="w-3 h-3 text-teal-600" />
+                <span>Bing Imágenes ↗</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenMercadoLibre}
+                className="px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0"
+                title="Buscar producto en Mercado Libre Ecuador"
+              >
+                <ShoppingBag className="w-3 h-3 text-amber-600" />
+                <span>Mercado Libre ↗</span>
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowManualUrlPanel(!showManualUrlPanel)}
+                className={`px-2.5 py-1 rounded-xl font-bold border transition flex items-center space-x-1 cursor-pointer text-[11px] ${
+                  showManualUrlPanel || manualUrl
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+                title="Pegar enlace directo de imagen o presionar Ctrl+V"
+              >
+                <LinkIcon className="w-3 h-3" />
+                <span>{showManualUrlPanel ? 'Ocultar URL Directo' : '🔗 Pegar URL Directo / Ctrl+V'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold transition flex items-center space-x-1 cursor-pointer text-[11px]"
+                title="Cargar archivos de imagen desde tu equipo"
+              >
+                <Upload className="w-3 h-3 text-slate-600" />
+                <span>📁 Subir local</span>
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => handleLocalFilesSelected(e.target.files)}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          {/* Manual URL / Clipboard Image Input Panel */}
+          {showManualUrlPanel && (
+            <div className="p-3 bg-gradient-to-r from-sky-50/80 via-indigo-50/50 to-purple-50/30 border border-indigo-200/90 rounded-2xl space-y-2 shadow-xs animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                  <LinkIcon className="w-4 h-4 text-indigo-600" />
+                  <span>Pegar enlace o URL directo de la imagen encontrada en internet:</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowManualUrlPanel(false)}
+                  className="text-slate-400 hover:text-slate-600 p-0.5 rounded"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {manualUrlNotice && (
+                <div className="p-2 bg-indigo-100/70 border border-indigo-200 rounded-xl text-[11px] text-indigo-900 font-medium flex items-start space-x-1.5">
+                  <Globe className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  <span>{manualUrlNotice}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                <div className="relative flex-1 w-full">
+                  <input
+                    type="text"
+                    value={manualUrl}
+                    onChange={(e) => setManualUrl(e.target.value)}
+                    placeholder="Ej: https://ejemplo.com/foto-producto.jpg (o presiona Ctrl+V)"
+                    className="w-full pl-3 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:outline-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs"
+                  />
+                  {manualUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setManualUrl('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    disabled={!manualUrl.trim() || saving}
+                    onClick={() => handleAddManualUrlSubmit(false)}
+                    className="flex-1 sm:flex-none px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50 shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar Foto</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!manualUrl.trim() || saving}
+                    onClick={() => handleAddManualUrlSubmit(true)}
+                    className="flex-1 sm:flex-none px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50 shadow-2xs"
+                  >
+                    <Star className="w-3.5 h-3.5 fill-slate-900" />
+                    <span>Guardar Portada</span>
+                  </button>
+                </div>
+              </div>
+
+              {manualUrl && (
+                <div className="flex items-center space-x-3 pt-1 border-t border-indigo-100">
+                  <div className="w-12 h-12 rounded-lg border border-slate-200 overflow-hidden bg-white shrink-0 flex items-center justify-center">
+                    <img
+                      src={manualUrl}
+                      alt="Vista previa manual"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-600 flex-1 truncate">
+                    <span className="font-bold text-slate-800 block">Vista previa detectada</span>
+                    <span className="truncate block font-mono text-[10px] text-slate-400">{manualUrl}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* View Category Filter Chips & Selection Summary Bar */}

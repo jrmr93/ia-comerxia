@@ -1751,15 +1751,31 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </span>
                   )}
                 </label>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                   <button
                     type="button"
                     onClick={() => setShowWebImagePicker(true)}
                     className="text-[11px] text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 font-bold px-2.5 py-1 rounded-xl flex items-center space-x-1 cursor-pointer transition shadow-2xs"
-                    title="Buscar fotos oficiales del producto en Google/Bing con IA"
+                    title="Buscar fotos del producto en internet con IA (Gemini) o por URL"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>🔍 Buscar fotos con IA</span>
+                    <span>🔍 Buscar fotos (IA / Internet)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q = (name || sku || '').trim();
+                      if (q) {
+                        window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`, '_blank');
+                      } else {
+                        setShowWebImagePicker(true);
+                      }
+                    }}
+                    className="text-[11px] text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 font-bold px-2.5 py-1 rounded-xl flex items-center space-x-1 cursor-pointer transition shadow-2xs"
+                    title="Abrir búsqueda en Google Imágenes en una pestaña nueva"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-blue-600" />
+                    <span>🌐 Google Imágenes</span>
                   </button>
                   <button
                     type="button"
