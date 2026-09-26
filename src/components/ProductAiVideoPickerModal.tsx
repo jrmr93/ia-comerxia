@@ -18,6 +18,7 @@ import {
   Youtube,
   Radio,
   FileVideo,
+  Globe,
 } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -60,7 +61,37 @@ export const ProductAiVideoPickerModal: React.FC<ProductAiVideoPickerModalProps>
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [noticeMsg, setNoticeMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handlers for manual video search on external platforms
+  const handleOpenGoogleVideos = () => {
+    const q = (searchQuery || item.name || '').trim();
+    if (!q) return;
+    window.open(`https://www.google.com/search?tbm=vid&q=${encodeURIComponent(q)}`, '_blank', 'noopener,noreferrer');
+    setNoticeMsg('🌐 Se abrió Google Videos en una nueva pestaña. Copia la URL del video deseado y pégalo en "Pegar Enlace Directo".');
+  };
+
+  const handleOpenYouTube = () => {
+    const q = (searchQuery || item.name || '').trim();
+    if (!q) return;
+    window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`, '_blank', 'noopener,noreferrer');
+    setNoticeMsg('🎬 Se abrió YouTube en una pestaña nueva. Copia la dirección del video o Short y pégalo abajo.');
+  };
+
+  const handleOpenTikTok = () => {
+    const q = (searchQuery || item.name || '').trim();
+    if (!q) return;
+    window.open(`https://www.tiktok.com/search?q=${encodeURIComponent(q)}`, '_blank', 'noopener,noreferrer');
+    setNoticeMsg('🎵 Se abrió TikTok en una nueva pestaña. Copia el enlace del video de TikTok y pégalo abajo.');
+  };
+
+  const handleOpenVimeo = () => {
+    const q = (searchQuery || item.name || '').trim();
+    if (!q) return;
+    window.open(`https://vimeo.com/search?q=${encodeURIComponent(q)}`, '_blank', 'noopener,noreferrer');
+    setNoticeMsg('🎥 Se abrió Vimeo en una pestaña nueva. Copia el enlace del video deseado y pégalo abajo.');
+  };
 
   // Auto trigger search when opening
   useEffect(() => {
@@ -396,6 +427,68 @@ export const ProductAiVideoPickerModal: React.FC<ProductAiVideoPickerModalProps>
                 <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 font-medium">Vimeo</span>
                 <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">Archivos MP4</span>
               </div>
+
+              {/* External Video Platforms Toolbar */}
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <div className="flex items-center space-x-1.5 overflow-x-auto py-0.5 scrollbar-thin">
+                  <span className="font-bold text-slate-600 shrink-0 flex items-center space-x-1">
+                    <Globe className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Buscar video manualmente en:</span>
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenGoogleVideos}
+                    className="px-2.5 py-1 rounded-xl bg-red-50 hover:bg-red-100 text-red-800 border border-red-200/80 font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0"
+                    title="Abrir Google Videos en una pestaña nueva con el término actual"
+                  >
+                    <Globe className="w-3 h-3 text-red-600" />
+                    <span>Google Videos ↗</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenYouTube}
+                    className="px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200/80 font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0"
+                    title="Abrir YouTube en una pestaña nueva"
+                  >
+                    <Youtube className="w-3 h-3 text-rose-600 fill-current" />
+                    <span>YouTube ↗</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenTikTok}
+                    className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-300 font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0"
+                    title="Buscar en TikTok en una pestaña nueva"
+                  >
+                    <Video className="w-3 h-3 text-slate-800" />
+                    <span>TikTok ↗</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenVimeo}
+                    className="px-2.5 py-1 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/80 font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0"
+                    title="Buscar en Vimeo en una pestaña nueva"
+                  >
+                    <Film className="w-3 h-3 text-sky-600" />
+                    <span>Vimeo ↗</span>
+                  </button>
+                </div>
+              </div>
+
+              {noticeMsg && (
+                <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 font-medium flex items-center justify-between animate-fadeIn">
+                  <div className="flex items-center space-x-2">
+                    <Globe className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span>{noticeMsg}</span>
+                  </div>
+                  <button type="button" onClick={() => setNoticeMsg(null)} className="text-indigo-400 hover:text-indigo-700">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
               {/* Results Grid */}
               {loading ? (

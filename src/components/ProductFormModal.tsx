@@ -368,7 +368,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const costNum = parseFloat(editingItem.costPrice) || 0;
       const saleNum = parseFloat(editingItem.salePrice) || 0;
 
-      setIsSupplierGift(Boolean(editingItem.isSupplierGift || parsedAttr.isSupplierGift));
+      const isGift = Boolean(editingItem.isSupplierGift || parsedAttr.isSupplierGift || (editingItem as any).isGift || costNum === 0);
+      setIsSupplierGift(isGift);
 
       // Unified product tax rate determination (single IVA for both purchases and sales)
       const explicitSaleTax =
@@ -453,7 +454,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         (editingItem.costWithoutTax !== undefined && editingItem.costWithoutTax !== null && String(editingItem.costWithoutTax).trim() !== '' && Number(editingItem.costWithoutTax) > 0) ||
         (editingItem.costWithTax !== undefined && editingItem.costWithTax !== null && String(editingItem.costWithTax).trim() !== '' && Number(editingItem.costWithTax) > 0);
 
-      if (costOpts.length > 0) {
+      if (!isGift && costOpts.length > 0) {
         const activeOpt = costOpts.find((o) => Math.abs((o.costWithTax ?? o.price) - parseFloat(initialCostWith)) < 0.02) || (!hasExplicitSavedCost ? costOpts[0] : undefined);
         if (activeOpt && typeof activeOpt.costWithoutTax === 'number' && typeof activeOpt.costWithTax === 'number') {
           initialCostWithout = String(activeOpt.costWithoutTax.toFixed(2));
@@ -461,10 +462,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         }
       }
 
-      if (!unifiedHasTax) {
+      if (isGift) {
+        initialCostWithout = '0.00';
+        initialCostWith = '0.00';
+        setCostWithoutTax('0.00');
+        setCostWithTax('0.00');
+        setCostPrice('0.00');
+      } else if (!unifiedHasTax) {
         const effCost = initialCostWith || initialCostWithout || editingItem.costPrice || '0.00';
         initialCostWithout = effCost;
         initialCostWith = effCost;
+        setCostWithoutTax(effCost);
+        setCostWithTax(effCost);
+        setCostPrice(effCost);
       } else {
         const withNum = parseFloat(initialCostWith) || costNum;
         const withoutNum = parseFloat(initialCostWithout) || 0;
@@ -474,18 +484,25 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         if (!initialCostWith || parseFloat(initialCostWith) === 0) {
           initialCostWith = (parseFloat(initialCostWithout) * (1 + unifiedTaxPercent / 100)).toFixed(2);
         }
+        setCostWithoutTax(initialCostWithout || '0.00');
+        setCostWithTax(initialCostWith || editingItem.costPrice || '0.00');
+        setCostPrice(initialCostWith || editingItem.costPrice || '0.00');
       }
 
-      setCostWithoutTax(initialCostWithout || '0.00');
-      setCostWithTax(initialCostWith || editingItem.costPrice || '0.00');
-      setCostPrice(initialCostWith || editingItem.costPrice || '0.00');
       setCostOptions(costOpts);
 
       // Calculate initial margin & profit based on net cost without IVA
-      const costWithoutNum = parseFloat(initialCostWithout) || 0;
+      const costWithoutNum = isGift ? 0 : (parseFloat(initialCostWithout) || 0);
       let initMargin = 30;
       let initProfit = 0;
-      if (parsedAttr.profitAmount !== undefined && !isNaN(Number(parsedAttr.profitAmount))) {
+
+      if (isGift) {
+        const itemApplyTax = unifiedHasTax;
+        const itemTaxPct = unifiedTaxPercent;
+        const baseSale = saleNum > 0 ? (itemApplyTax && itemTaxPct > 0 ? saleNum / (1 + itemTaxPct / 100) : saleNum) : 0;
+        initProfit = baseSale;
+        initMargin = 100;
+      } else if (parsedAttr.profitAmount !== undefined && !isNaN(Number(parsedAttr.profitAmount))) {
         initProfit = Number(parsedAttr.profitAmount);
         initMargin = costWithoutNum > 0 ? Math.round((initProfit / costWithoutNum) * 100) : (parsedAttr.profitMarginPercent ? Number(parsedAttr.profitMarginPercent) : 30);
       } else if (parsedAttr.profitMarginPercent !== undefined && !isNaN(Number(parsedAttr.profitMarginPercent))) {
@@ -2458,7 +2475,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             if (candidateImages.length > 0) {
               setExtraImages(candidateImages);
             }
-            setShowWebImagePicker(false);
           }}
         />
       )}

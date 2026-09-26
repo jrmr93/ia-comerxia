@@ -89,14 +89,17 @@ export function extractHeuristicProductProfile(product: {
 
   // Recommended search queries
   const queries: string[] = [];
-  const baseTerm = detectedBrand ? `${detectedBrand} ${cleanModel}` : cleanName;
+  const baseTerm = (cleanName || '').trim();
 
-  queries.push(`${baseTerm} fondo blanco producto`);
-  queries.push(`${baseTerm} catalogo oficial`);
-  queries.push(`${baseTerm} white background product photography`);
-  queries.push(`${baseTerm} packshot`);
-  if (sku && sku.length >= 3) {
-    queries.push(`${baseTerm} ${sku}`);
+  // Primary query MUST be exact clean product name first
+  if (baseTerm) {
+    queries.push(baseTerm);
+    queries.push(`${baseTerm} packshot`);
+    queries.push(`${baseTerm} fondo blanco`);
+    queries.push(`${baseTerm} oficial`);
+    if (sku && sku.length >= 3 && sku !== 'N/A') {
+      queries.push(`${baseTerm} ${sku}`);
+    }
   }
 
   return {
@@ -209,7 +212,6 @@ Devuelve JSON:
       return profile;
     } catch (err: any) {
       const errMsg = err?.message || err?.toString() || '';
-      // If quota or rate limit, pause briefly and continue to next model
       if (
         errMsg.includes('429') ||
         errMsg.includes('RESOURCE_EXHAUSTED') ||
@@ -224,25 +226,24 @@ Devuelve JSON:
     }
   }
 
-  // Graceful fallback to heuristic profile without failing
   profileCache.set(cacheKey, { profile: fallbackProfile, timestamp: Date.now() });
   return fallbackProfile;
 }
 
 /**
- * Searches Bing Async for real, high-resolution product catalog images.
- * Works with 100% reliability on VPS, cloud containers, local servers and AI Studio.
+ * Searches Bing Web Images for high-resolution, official product catalog photos.
+ * Uses desktop Macintosh user agent for 100% reliable 35+ item result cards.
  */
-async function fetchBingImages(query: string, maxItems: number = 24): Promise<WebImageResult[]> {
+async function fetchBingImages(query: string, maxItems: number = 32): Promise<WebImageResult[]> {
   const cleanQuery = query.trim();
   if (!cleanQuery) return [];
 
   try {
-    const searchUrl = `https://www.bing.com/images/async?q=${encodeURIComponent(cleanQuery)}&first=1&count=40&adlt=off`;
+    const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(cleanQuery)}&first=1&FORM=HDRSC2`;
     const res = await fetch(searchUrl, {
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
       },
@@ -254,13 +255,15 @@ async function fetchBingImages(query: string, maxItems: number = 24): Promise<We
     const items: WebImageResult[] = [];
     const seen = new Set<string>();
 
-    // Atomic extraction of JSON metadata attached to each Bing image item
-    // Each item contains murl (original), turl (thumbnail), t (title), desc, purl (publisher)
-    const mMatches = [...html.matchAll(/m="({[^"]+})"/g)];
+    const iuscMatches = [...html.matchAll(/class="iusc"[^>]*m="([^"]+)"/gi)];
 
-    for (const match of mMatches) {
+    for (const match of iuscMatches) {
       try {
-        const rawJson = match[1].replace(/&quot;/g, '"');
+        const rawJson = match[1]
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&#39;/g, "'");
+
         const parsed = JSON.parse(rawJson);
 
         let murl = parsed.murl;
@@ -274,7 +277,8 @@ async function fetchBingImages(query: string, maxItems: number = 24): Promise<We
         if (
           murl.includes('doubleclick') ||
           murl.includes('googleadservices') ||
-          murl.includes('facebook.com/tr')
+          murl.includes('facebook.com/tr') ||
+          murl.includes('analytics')
         ) {
           continue;
         }
@@ -290,9 +294,10 @@ async function fetchBingImages(query: string, maxItems: number = 24): Promise<We
         let title = (parsed.t || parsed.desc || cleanQuery)
           .replace(/[\uE000-\uE001]/g, '')
           .replace(/&#(\d+);/g, (_: any, code: string) => String.fromCharCode(Number(code)))
+          .replace(/<[^>]+>/g, '')
           .trim();
 
-        let source = 'Catálogo Oficial';
+        let source = 'Catálogo Web';
         if (parsed.purl) {
           try {
             source = new URL(parsed.purl).hostname.replace(/^www\./, '');

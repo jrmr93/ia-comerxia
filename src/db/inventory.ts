@@ -1101,30 +1101,34 @@ export async function createInventoryItem(data: {
     : 15.0;
   const cleanTaxRate = taxRateNum.toFixed(2);
 
-  let cleanCostWithoutTax: string | null = null;
-  let cleanCostWithTax: string | null = null;
+  const isGift = Boolean((data as any).isSupplierGift || (data.costPrice !== undefined && parseFloat(String(data.costPrice)) === 0 && (data as any).isSupplierGift !== false));
 
-  if (data.costWithoutTax !== undefined && data.costWithoutTax !== null && String(data.costWithoutTax).trim() !== '') {
-    cleanCostWithoutTax = cleanNumericString(String(data.costWithoutTax), '0.00');
-  }
-  if (data.costWithTax !== undefined && data.costWithTax !== null && String(data.costWithTax).trim() !== '') {
-    cleanCostWithTax = cleanNumericString(String(data.costWithTax), '0.00');
+  let cleanCostWithoutTax: string | null = isGift ? '0.00' : null;
+  let cleanCostWithTax: string | null = isGift ? '0.00' : null;
+
+  if (!isGift) {
+    if (data.costWithoutTax !== undefined && data.costWithoutTax !== null && String(data.costWithoutTax).trim() !== '') {
+      cleanCostWithoutTax = cleanNumericString(String(data.costWithoutTax), '0.00');
+    }
+    if (data.costWithTax !== undefined && data.costWithTax !== null && String(data.costWithTax).trim() !== '') {
+      cleanCostWithTax = cleanNumericString(String(data.costWithTax), '0.00');
+    }
+
+    // If one is provided and the other isn't, calculate the other
+    if (!cleanCostWithoutTax && cleanCostWithTax) {
+      const numWith = parseFloat(cleanCostWithTax) || 0;
+      cleanCostWithoutTax = (numWith / (1 + taxRateNum / 100)).toFixed(2);
+    } else if (!cleanCostWithTax && cleanCostWithoutTax) {
+      const numWithout = parseFloat(cleanCostWithoutTax) || 0;
+      cleanCostWithTax = (numWithout * (1 + taxRateNum / 100)).toFixed(2);
+    } else if (!cleanCostWithoutTax && !cleanCostWithTax) {
+      const costNum = parseFloat(cleanCost) || 0;
+      cleanCostWithTax = costNum.toFixed(2);
+      cleanCostWithoutTax = (costNum / (1 + taxRateNum / 100)).toFixed(2);
+    }
   }
 
-  // If one is provided and the other isn't, calculate the other
-  if (!cleanCostWithoutTax && cleanCostWithTax) {
-    const numWith = parseFloat(cleanCostWithTax) || 0;
-    cleanCostWithoutTax = (numWith / (1 + taxRateNum / 100)).toFixed(2);
-  } else if (!cleanCostWithTax && cleanCostWithoutTax) {
-    const numWithout = parseFloat(cleanCostWithoutTax) || 0;
-    cleanCostWithTax = (numWithout * (1 + taxRateNum / 100)).toFixed(2);
-  } else if (!cleanCostWithoutTax && !cleanCostWithTax) {
-    const costNum = parseFloat(cleanCost) || 0;
-    cleanCostWithTax = costNum.toFixed(2);
-    cleanCostWithoutTax = (costNum / (1 + taxRateNum / 100)).toFixed(2);
-  }
-
-  const effectiveCostPrice = cleanCostWithTax || cleanCost;
+  const effectiveCostPrice = isGift ? '0.00' : (cleanCostWithTax || cleanCost);
 
   // Automatically persist image locally in /uploads/
   let effectiveImageUrl = data.imageUrl || null;
@@ -1144,6 +1148,12 @@ export async function createInventoryItem(data: {
   if (effectiveExtractedAttributes) {
     try {
       const parsed = JSON.parse(effectiveExtractedAttributes);
+      if (isGift) {
+        parsed.isSupplierGift = true;
+        parsed.costWithoutTax = 0;
+        parsed.costWithTax = 0;
+        parsed.selectedCostPrice = 0;
+      }
       if (Array.isArray(parsed.images) && parsed.images.length > 0) {
         parsed.images = await persistImageListLocally(parsed.images);
       }
@@ -1166,12 +1176,7 @@ export async function createInventoryItem(data: {
       }
       effectiveExtractedAttributes = JSON.stringify(parsed);
     } catch {}
-  } else if (
-    (data as any).applySaleTax !== undefined ||
-    (data as any).saleTaxPercent !== undefined ||
-    (data as any).hasPurchaseTax !== undefined ||
-    (data as any).purchaseTaxPercent !== undefined
-  ) {
+  } else {
     const rawRate = (data as any).saleTaxPercent !== undefined
       ? Number((data as any).saleTaxPercent)
       : ((data as any).purchaseTaxPercent !== undefined ? Number((data as any).purchaseTaxPercent) : taxRateNum);
@@ -1187,6 +1192,9 @@ export async function createInventoryItem(data: {
       saleTaxPercent: effectiveRate,
       hasPurchaseTax: hasTax,
       purchaseTaxPercent: effectiveRate,
+      isSupplierGift: isGift,
+      costWithoutTax: isGift ? 0 : undefined,
+      costWithTax: isGift ? 0 : undefined,
     });
   }
 
@@ -1218,7 +1226,7 @@ export async function createInventoryItem(data: {
       status: data.status || 'available',
       rawTelegramMessage: data.rawTelegramMessage || null,
       marketingCopy: data.marketingCopy || null,
-      isSupplierGift: Boolean((data as any).isSupplierGift),
+      isSupplierGift: isGift,
       createdAt: now,
       updatedAt: now,
     };
@@ -1254,12 +1262,11 @@ export async function createInventoryItem(data: {
         status: data.status || 'available',
         rawTelegramMessage: data.rawTelegramMessage || null,
         marketingCopy: data.marketingCopy || null,
-        isSupplierGift: Boolean((data as any).isSupplierGift),
+        isSupplierGift: isGift,
       })
       .returning();
 
     const created = result[0];
-    // Sync with local memory/disk cache as well
     const state = storage.getState();
     const existingIdx = state.inventoryItems.findIndex((it) => it.id === created.id);
     if (existingIdx !== -1) {
@@ -1298,7 +1305,7 @@ export async function createInventoryItem(data: {
       status: data.status || 'available',
       rawTelegramMessage: data.rawTelegramMessage || null,
       marketingCopy: data.marketingCopy || null,
-      isSupplierGift: Boolean((data as any).isSupplierGift),
+      isSupplierGift: isGift,
       createdAt: now,
       updatedAt: now,
     };
@@ -1318,13 +1325,28 @@ export async function updateInventoryItem(
   data: Partial<typeof inventoryItems.$inferInsert>
 ) {
   const sanitizedPayload: Record<string, any> = { ...data };
-  if (data.costPrice !== undefined) sanitizedPayload.costPrice = cleanNumericString(data.costPrice, '0.00');
-  if (data.costWithoutTax !== undefined && data.costWithoutTax !== null && String(data.costWithoutTax).trim() !== '') {
-    sanitizedPayload.costWithoutTax = cleanNumericString(String(data.costWithoutTax), '0.00');
+
+  const isGift = Boolean(
+    data.isSupplierGift ||
+    (data as any).isSupplierGift ||
+    (data.costPrice !== undefined && parseFloat(String(data.costPrice)) === 0 && (data as any).isSupplierGift !== false)
+  );
+
+  if (isGift) {
+    sanitizedPayload.isSupplierGift = true;
+    sanitizedPayload.costPrice = '0.00';
+    sanitizedPayload.costWithoutTax = '0.00';
+    sanitizedPayload.costWithTax = '0.00';
+  } else {
+    if (data.costPrice !== undefined) sanitizedPayload.costPrice = cleanNumericString(data.costPrice, '0.00');
+    if (data.costWithoutTax !== undefined && data.costWithoutTax !== null && String(data.costWithoutTax).trim() !== '') {
+      sanitizedPayload.costWithoutTax = cleanNumericString(String(data.costWithoutTax), '0.00');
+    }
+    if (data.costWithTax !== undefined && data.costWithTax !== null && String(data.costWithTax).trim() !== '') {
+      sanitizedPayload.costWithTax = cleanNumericString(String(data.costWithTax), '0.00');
+    }
   }
-  if (data.costWithTax !== undefined && data.costWithTax !== null && String(data.costWithTax).trim() !== '') {
-    sanitizedPayload.costWithTax = cleanNumericString(String(data.costWithTax), '0.00');
-  }
+
   if (data.taxRate !== undefined && data.taxRate !== null && String(data.taxRate).trim() !== '') {
     sanitizedPayload.taxRate = cleanNumericString(String(data.taxRate), '0.00');
   }
@@ -1353,11 +1375,18 @@ export async function updateInventoryItem(
   if (data.extractedAttributes !== undefined && data.extractedAttributes !== null && data.extractedAttributes !== '') {
     try {
       const parsed = JSON.parse(data.extractedAttributes);
-      if (sanitizedPayload.costWithoutTax !== undefined) {
-        parsed.costWithoutTax = Number(sanitizedPayload.costWithoutTax);
-      }
-      if (sanitizedPayload.costWithTax !== undefined) {
-        parsed.costWithTax = Number(sanitizedPayload.costWithTax);
+      if (isGift) {
+        parsed.isSupplierGift = true;
+        parsed.costWithoutTax = 0;
+        parsed.costWithTax = 0;
+        parsed.selectedCostPrice = 0;
+      } else {
+        if (sanitizedPayload.costWithoutTax !== undefined) {
+          parsed.costWithoutTax = Number(sanitizedPayload.costWithoutTax);
+        }
+        if (sanitizedPayload.costWithTax !== undefined) {
+          parsed.costWithTax = Number(sanitizedPayload.costWithTax);
+        }
       }
       if (Array.isArray(incomingImages) && incomingImages.length > 0) {
         parsed.images = incomingImages;
@@ -1388,11 +1417,13 @@ export async function updateInventoryItem(
       totalPhotos: persistedImages.length,
       ...( (data as any).applySaleTax !== undefined ? { applySaleTax: Boolean((data as any).applySaleTax) } : {} ),
       ...( (data as any).saleTaxPercent !== undefined ? { saleTaxPercent: Number((data as any).saleTaxPercent) } : {} ),
+      ...( isGift ? { isSupplierGift: true, costWithoutTax: 0, costWithTax: 0 } : {} ),
     });
-  } else if ((data as any).applySaleTax !== undefined || (data as any).saleTaxPercent !== undefined) {
+  } else if ((data as any).applySaleTax !== undefined || (data as any).saleTaxPercent !== undefined || isGift) {
     sanitizedPayload.extractedAttributes = JSON.stringify({
       applySaleTax: Boolean((data as any).applySaleTax),
       saleTaxPercent: Number((data as any).saleTaxPercent),
+      ...( isGift ? { isSupplierGift: true, costWithoutTax: 0, costWithTax: 0 } : {} ),
     });
   }
 

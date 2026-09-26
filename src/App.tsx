@@ -1759,6 +1759,7 @@ function InventoryApp() {
             setSelectedCategory={setSelectedCategory}
             selectedSupplier={selectedSupplier}
             setSelectedSupplier={setSelectedSupplier}
+            suppliersList={suppliers}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             statusFilter={statusFilter}

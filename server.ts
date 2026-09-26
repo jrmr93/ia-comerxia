@@ -2095,6 +2095,7 @@ async function startServer() {
         supplierName,
         tags,
         extractedAttributes,
+        isSupplierGift,
         status,
       } = req.body;
 
@@ -2106,6 +2107,21 @@ async function startServer() {
         ? sku.trim()
         : await generateNextSku(supplierName || 'PF');
 
+      const isGift = Boolean(isSupplierGift || parseFloat(costPrice) === 0);
+
+      let parsedExtracted: any = {};
+      if (typeof extractedAttributes === 'object' && extractedAttributes !== null) {
+        parsedExtracted = { ...extractedAttributes };
+      } else if (typeof extractedAttributes === 'string' && extractedAttributes.trim()) {
+        try { parsedExtracted = JSON.parse(extractedAttributes); } catch {}
+      }
+      if (isGift) {
+        parsedExtracted.isSupplierGift = true;
+        parsedExtracted.costWithoutTax = 0;
+        parsedExtracted.costWithTax = 0;
+        parsedExtracted.selectedCostPrice = 0;
+      }
+
       const item = await createInventoryItem({
         userId: req.dbUserId || 1,
         name,
@@ -2113,9 +2129,9 @@ async function startServer() {
         barcode: barcode?.trim() || null,
         description,
         category: category || 'General',
-        costPrice: String(costPrice || '0.00'),
-        costWithoutTax: costWithoutTax !== undefined ? String(costWithoutTax) : undefined,
-        costWithTax: costWithTax !== undefined ? String(costWithTax) : undefined,
+        costPrice: isGift ? '0.00' : String(costPrice || '0.00'),
+        costWithoutTax: isGift ? '0.00' : (costWithoutTax !== undefined ? String(costWithoutTax) : undefined),
+        costWithTax: isGift ? '0.00' : (costWithTax !== undefined ? String(costWithTax) : undefined),
         taxRate: taxRate !== undefined ? String(taxRate) : undefined,
         salePrice: String(salePrice || '0.00'),
         discountPercent: Number(discountPercent) || 0,
@@ -2123,10 +2139,8 @@ async function startServer() {
         imageUrl,
         supplierName,
         tags: Array.isArray(tags) ? tags.join(', ') : tags,
-        extractedAttributes:
-          typeof extractedAttributes === 'object'
-            ? JSON.stringify(extractedAttributes)
-            : extractedAttributes,
+        extractedAttributes: JSON.stringify(parsedExtracted),
+        isSupplierGift: isGift,
         status: status || 'available',
       });
 
@@ -2147,6 +2161,14 @@ async function startServer() {
       // Strip manual stock modifications: stock can strictly ONLY be modified via Purchases or Orders
       const updatePayload = { ...req.body };
       delete updatePayload.stock;
+
+      const isGift = Boolean(updatePayload.isSupplierGift || (updatePayload.costPrice !== undefined && parseFloat(updatePayload.costPrice) === 0 && updatePayload.isSupplierGift !== false));
+      if (isGift) {
+        updatePayload.costPrice = '0.00';
+        updatePayload.costWithoutTax = '0.00';
+        updatePayload.costWithTax = '0.00';
+        updatePayload.isSupplierGift = true;
+      }
 
       const updated = await updateInventoryItem(id, updatePayload);
       res.json(updated);
@@ -3400,6 +3422,252 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error searching images globally:', error);
       res.status(500).json({ error: error.message || 'Error al buscar imágenes con IA' });
+    }
+  });
+
+  // 8i. Embedded Web Browser Image Extractor (Fetch & extract images from any URL or search)
+  app.post('/api/web-browser/extract-images', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { url, query } = req.body || {};
+      let targetUrl = (url || '').trim();
+
+      if (!targetUrl && query && typeof query === 'string' && query.trim()) {
+        targetUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query.trim())}`;
+      }
+
+      if (!targetUrl) {
+        return res.status(400).json({ error: 'Se requiere una URL de sitio web o término de búsqueda' });
+      }
+
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = `https://${targetUrl}`;
+      }
+
+      let hostName = 'sitio web';
+      try {
+        hostName = new URL(targetUrl).hostname;
+      } catch (e) {
+        // invalid url fallback
+      }
+
+      // First check if it's a Google Images or Bing search query, use Gemini AI search if so for high precision
+      if (hostName.includes('google.') || hostName.includes('bing.')) {
+        let searchQueryToUse = query;
+        if (!searchQueryToUse) {
+          try {
+            const parsed = new URL(targetUrl);
+            searchQueryToUse = parsed.searchParams.get('q') || parsed.searchParams.get('query') || '';
+          } catch (e) {}
+        }
+
+        if (searchQueryToUse && searchQueryToUse.trim()) {
+          const aiResults = await searchProductImagesWithAI({
+            name: searchQueryToUse.trim(),
+            limit: 30,
+          });
+          return res.json({
+            success: true,
+            url: targetUrl,
+            hostname: hostName,
+            title: `Búsqueda Web: "${searchQueryToUse}"`,
+            images: aiResults.images || [],
+            count: (aiResults.images || []).length,
+          });
+        }
+      }
+
+      // Fetch webpage content
+      const resp = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!resp.ok) {
+        throw new Error(`El sitio respondió con estado HTTP ${resp.status}`);
+      }
+
+      const html = await resp.text();
+      const imagesSet = new Set<string>();
+
+      // Extract <img> src
+      const imgRegex = /<img[^>]+src=["']([^"']+)["']/gi;
+      let match;
+      while ((match = imgRegex.exec(html)) !== null) {
+        let src = match[1];
+        if (src && !src.startsWith('data:image/svg')) {
+          if (src.startsWith('//')) src = `https:${src}`;
+          else if (src.startsWith('/')) {
+            try {
+              const parsed = new URL(targetUrl);
+              src = `${parsed.origin}${src}`;
+            } catch (e) {}
+          }
+          if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:image/')) {
+            imagesSet.add(src);
+          }
+        }
+      }
+
+      // Extract meta og:image, twitter:image, data-src, etc.
+      const metaRegex = /(?:og:image|twitter:image|data-src|data-original)=["']([^"']+)["']/gi;
+      while ((match = metaRegex.exec(html)) !== null) {
+        let src = match[1];
+        if (src) {
+          if (src.startsWith('//')) src = `https:${src}`;
+          else if (src.startsWith('/')) {
+            try {
+              const parsed = new URL(targetUrl);
+              src = `${parsed.origin}${src}`;
+            } catch (e) {}
+          }
+          if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:image/')) {
+            imagesSet.add(src);
+          }
+        }
+      }
+
+      // Extract direct image file URLs (.jpg, .jpeg, .png, .webp) in page scripts/json
+      const directUrlRegex = /(https?:\/\/[^"'\s\>\<\)\}\\]+\.(?:jpg|jpeg|png|webp))/gi;
+      while ((match = directUrlRegex.exec(html)) !== null) {
+        imagesSet.add(match[1]);
+      }
+
+      const extractedList = Array.from(imagesSet)
+        .filter((u) => !u.includes('favicon') && !u.includes('logo') && !u.includes('1x1') && !u.includes('pixel'))
+        .slice(0, 48)
+        .map((u) => ({
+          url: u,
+          thumbnailUrl: u,
+          title: `Foto de ${hostName}`,
+          source: hostName,
+        }));
+      res.json({
+        success: true,
+        url: targetUrl,
+        hostname: hostName,
+        title: `Página Web: ${hostName}`,
+        images: extractedList,
+        count: extractedList.length,
+      });
+    } catch (error: any) {
+      console.error('Error in embedded web browser extractor:', error);
+      res.status(500).json({ error: error.message || 'No se pudieron extraer las imágenes de esa página web' });
+    }
+  });
+
+  // 8j. Live Web Browser Iframe Proxy (Strips X-Frame-Options/CSP, injects image selector & link handler)
+  app.get('/api/web-browser/proxy', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      let rawUrl = (req.query.url as string || '').trim();
+      if (!rawUrl) {
+        return res.status(400).send('URL requerida');
+      }
+
+      if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+        rawUrl = `https://${rawUrl}`;
+      }
+
+      const targetObj = new URL(rawUrl);
+
+      const resp = await fetch(rawUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        },
+        signal: AbortSignal.timeout(12000),
+      });
+
+      const contentType = resp.headers.get('content-type') || 'text/html';
+
+      if (!contentType.includes('text/html')) {
+        const buffer = await resp.arrayBuffer();
+        res.setHeader('Content-Type', contentType);
+        return res.send(Buffer.from(buffer));
+      }
+
+      let html = await resp.text();
+
+      // Base URL tag injection for relative URLs
+      const baseUrlTag = `<base href="${targetObj.origin}${targetObj.pathname}">`;
+      if (html.includes('<head>')) {
+        html = html.replace('<head>', `<head>${baseUrlTag}`);
+      } else {
+        html = `${baseUrlTag}${html}`;
+      }
+
+      // Script to handle image clicks inside iframe & send message to parent modal
+      const linkProxyScript = `
+        <script id="comerxia-embedded-browser-script">
+          (function() {
+            function getCleanImageUrl(el) {
+              if (!el) return null;
+              var src = el.getAttribute('src') || el.getAttribute('data-src') || el.getAttribute('data-original') || el.src;
+              if (!src) return null;
+              if (src.startsWith('//')) return 'https:' + src;
+              if (src.startsWith('/')) return '${targetObj.origin}' + src;
+              return src;
+            }
+
+            document.addEventListener('click', function(e) {
+              var target = e.target;
+              var img = target.tagName === 'IMG' ? target : target.querySelector('img');
+              if (img) {
+                var imgSrc = getCleanImageUrl(img);
+                if (imgSrc && !imgSrc.includes('data:image/svg')) {
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  img.classList.toggle('comerxia-selected-img');
+                  if (!document.getElementById('comerxia-style')) {
+                    var style = document.createElement('style');
+                    style.id = 'comerxia-style';
+                    style.innerHTML = '.comerxia-selected-img { outline: 4px solid #0284c7 !important; outline-offset: -2px !important; box-shadow: 0 0 18px rgba(2,132,199,0.9) !important; filter: brightness(1.08) !important; transform: scale(1.02); transition: all 0.15s ease; }';
+                    document.head.appendChild(style);
+                  }
+
+                  window.parent.postMessage({
+                    type: 'COMERXIA_IMAGE_TOGGLE',
+                    url: imgSrc,
+                  }, '*');
+                }
+              } else {
+                var a = target.closest('a');
+                if (a && a.href) {
+                  var href = a.href;
+                  if (href.startsWith('http://') || href.startsWith('https://')) {
+                    e.preventDefault();
+                    window.location.href = '/api/web-browser/proxy?url=' + encodeURIComponent(href);
+                  }
+                }
+              }
+            }, true);
+          })();
+        </script>
+      `;
+
+      if (html.includes('</body>')) {
+        html = html.replace('</body>', `${linkProxyScript}</body>`);
+      } else {
+        html = `${html}${linkProxyScript}`;
+      }
+
+      res.removeHeader('X-Frame-Options');
+      res.removeHeader('Content-Security-Policy');
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (error: any) {
+      console.error('Error proxying web browser URL:', error);
+      res.status(500).send(`
+        <div style="font-family: system-ui, sans-serif; padding: 2rem; text-align: center; color: #475569;">
+          <h3>⚠️ No se pudo cargar esta página en el navegador integrado</h3>
+          <p style="font-size: 14px;">${error.message || 'Error de conexión'}</p>
+        </div>
+      `);
     }
   });
 

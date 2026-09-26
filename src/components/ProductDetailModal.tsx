@@ -1572,7 +1572,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           onImagesAdded={(updatedItem, count) => {
             setCurrentItem(updatedItem);
             onItemUpdated?.(updatedItem);
-            setShowWebImagePicker(false);
             setActivePhotoIndex(0);
             setSaveSuccessMsg(`✨ ¡${count} foto${count === 1 ? '' : 's'} agregada${count === 1 ? '' : 's'} al producto!`);
           }}

@@ -45,7 +45,7 @@ import {
   Truck,
   X,
 } from 'lucide-react';
-import { CustomerOrder, InventoryItem, StoreConfig, TelegramMessage } from '../types.ts';
+import { CustomerOrder, InventoryItem, StoreConfig, TelegramMessage, Supplier } from '../types.ts';
 import { TelegramMessagesFeed } from './TelegramMessagesFeed.tsx';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
 import { ProductMarketingCopyModal } from './ProductMarketingCopyModal.tsx';
@@ -189,6 +189,7 @@ interface InventoryViewProps {
   messages?: TelegramMessage[];
   orders?: CustomerOrder[];
   purchases?: any[];
+  suppliersList?: Supplier[];
   storeConfig?: StoreConfig;
   onSelectItem: (item: InventoryItem) => void;
   onOpenDetailById?: (id: number) => void;
@@ -234,6 +235,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   messages = [],
   orders = [],
   purchases = [],
+  suppliersList = [],
   storeConfig,
   onSelectItem,
   onOpenDetailById,
@@ -284,6 +286,31 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 2500);
+  };
+
+  const handleSupplierClick = (supplierName?: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const targetName = (supplierName || '').trim();
+    if (!targetName) return;
+
+    // Search for matching supplier in suppliersList prop
+    const match = suppliersList?.find(
+      (s) =>
+        s.name?.toLowerCase().trim() === targetName.toLowerCase() ||
+        s.tradeName?.toLowerCase().trim() === targetName.toLowerCase()
+    );
+
+    let websiteUrl = match?.website?.trim();
+
+    if (websiteUrl) {
+      if (!websiteUrl.startsWith('http://') && !websiteUrl.startsWith('https://')) {
+        websiteUrl = `https://${websiteUrl}`;
+      }
+      window.open(websiteUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      // Fallback: search Google for supplier name in a new tab
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(targetName)}`, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleReparseWithAi = async (item: InventoryItem) => {
@@ -1450,12 +1477,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       </div>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedSupplier(item.supplierName || 'Proveedor Telegram');
-                        }}
+                        onClick={(e) => handleSupplierClick(item.supplierName, e)}
                         className="text-[11px] text-slate-600 hover:text-purple-800 hover:bg-purple-50 px-2 py-0.5 rounded-lg transition truncate max-w-[130px] font-bold cursor-pointer border border-transparent hover:border-purple-200"
-                        title={`Filtrar por proveedor: ${item.supplierName || 'Proveedor Telegram'}`}
+                        title={`Abrir página web de ${item.supplierName || 'Proveedor'}`}
                       >
                         👤 {item.supplierName || 'Proveedor Telegram'}
                       </button>
@@ -1803,9 +1827,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <td className="px-2 py-1.5">
                         <button
                           type="button"
-                          onClick={() => setSelectedSupplier(item.supplierName || 'Proveedor Telegram')}
-                          className="text-slate-700 hover:text-purple-700 font-medium block truncate max-w-[130px] text-left hover:underline cursor-pointer text-xs"
-                          title={`Filtrar por proveedor: ${item.supplierName || 'Proveedor Telegram'}`}
+                          onClick={(e) => handleSupplierClick(item.supplierName, e)}
+                          className="text-slate-700 hover:text-purple-700 font-bold block truncate max-w-[130px] text-left hover:underline cursor-pointer text-xs"
+                          title={`Abrir página web de ${item.supplierName || 'Proveedor'}`}
                         >
                           👤 {item.supplierName || 'Proveedor Telegram'}
                         </button>

@@ -23,6 +23,11 @@ import {
   Upload,
   ShoppingBag,
   Clipboard,
+  ArrowLeft,
+  ArrowRight,
+  RotateCw,
+  Compass,
+  Monitor,
 } from 'lucide-react';
 import { InventoryItem } from '../types.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -84,6 +89,83 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
   const [showManualUrlPanel, setShowManualUrlPanel] = useState<boolean>(false);
   const [manualUrlNotice, setManualUrlNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Embedded Web Browser Component State
+  const [activeMode, setActiveMode] = useState<'search' | 'browser'>('search');
+  const [browserInputUrl, setBrowserInputUrl] = useState<string>(
+    `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(item.name || '')}`
+  );
+  const [browserCurrentUrl, setBrowserCurrentUrl] = useState<string>(
+    `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(item.name || '')}`
+  );
+  const [browserLoading, setBrowserLoading] = useState<boolean>(false);
+  const [browserImages, setBrowserImages] = useState<WebImageResult[]>([]);
+  const [browserTitle, setBrowserTitle] = useState<string>('Navegador Web Integrado (Google Imágenes)');
+
+  // Listen for image selection messages from embedded browser iframe
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleIframeMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'COMERXIA_IMAGE_TOGGLE' && e.data.url) {
+        const cleanUrl = sanitizeUrl(e.data.url);
+        if (cleanUrl) {
+          toggleSelectUrl(cleanUrl);
+          setSuccessToast('✅ ¡Foto seleccionada directamente desde la página web del navegador!');
+        }
+      }
+    };
+
+    window.addEventListener('message', handleIframeMessage);
+    return () => window.removeEventListener('message', handleIframeMessage);
+  }, [isOpen]);
+
+  const handleBrowseWebPage = async (inputStr: string) => {
+    const raw = inputStr.trim();
+    if (!raw) return;
+    setBrowserLoading(true);
+    setErrorMsg(null);
+
+    let target = raw;
+    if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+      target = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(raw)}`;
+    }
+    setBrowserCurrentUrl(target);
+    setBrowserInputUrl(target);
+
+    try {
+      const res = await authFetch('/api/web-browser/extract-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: target,
+          query: !raw.startsWith('http://') && !raw.startsWith('https://') ? raw : undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Error al navegar en el sitio web');
+      }
+
+      const data = await res.json();
+      if (data.images && Array.isArray(data.images)) {
+        const cleaned = data.images.map((im: WebImageResult) => ({
+          ...im,
+          url: sanitizeUrl(im.url, im.thumbnailUrl),
+          thumbnailUrl: sanitizeUrl(im.thumbnailUrl || im.url),
+        }));
+        setBrowserImages(cleaned);
+        setBrowserTitle(data.title || data.hostname || 'Página Web');
+      } else {
+        setBrowserImages([]);
+      }
+    } catch (err: any) {
+      console.error('Error browsing web page:', err);
+      setErrorMsg(err.message || 'No se pudieron extraer las imágenes de la página web');
+    } finally {
+      setBrowserLoading(false);
+    }
+  };
 
   // Clipboard paste detection for quick manual image additions
   useEffect(() => {
@@ -209,7 +291,7 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
       setResults((prev) => [customRes, ...prev]);
     }
 
-    await handleAddSingleImage(clean, makeCover);
+    await handleAddSingleImage(clean, makeCover, false);
     setManualUrl('');
   };
 
@@ -255,10 +337,11 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
     const stepTimer2 = setTimeout(() => setSearchStep(3), 1600);
 
     try {
-      const res = await authFetch(`/api/inventory/${item.id}/search-web-images`, {
+      const endpoint = item?.id ? `/api/inventory/${item.id}/search-web-images` : '/api/ai/search-images';
+      const res = await authFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, limit: 28 }),
+        body: JSON.stringify({ query: q, limit: 32 }),
       });
 
       clearTimeout(stepTimer1);
@@ -312,7 +395,11 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
   };
 
   // Direct 1-click photo adder - includes all currently selected photos if any
-  const handleAddSingleImage = async (rawUrl: string, makeCover: boolean = true) => {
+  const handleAddSingleImage = async (
+    rawUrl: string,
+    makeCover: boolean = true,
+    closeModalOnFinish: boolean = false
+  ) => {
     const cleanUrl = sanitizeUrl(rawUrl);
     if (!cleanUrl || saving) return;
 
@@ -380,16 +467,22 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
         };
       }
 
+      // Update selected URLs list to include the newly added cleanUrl
+      setSelectedUrls((prev) => Array.from(new Set([...prev, cleanUrl])));
+
       setSuccessToast(
         makeCover
-          ? `⭐ Foto guardada y establecida como portada (${totalAdded} foto${totalAdded === 1 ? '' : 's'})`
-          : `✅ ¡${totalAdded} foto${totalAdded === 1 ? '' : 's'} agregada${totalAdded === 1 ? '' : 's'} al producto con éxito!`
+          ? `⭐ Foto guardada y establecida como portada (${totalAdded} foto${totalAdded === 1 ? '' : 's'}). ¡Puedes seguir pegando más URLs!`
+          : `✅ ¡Foto agregada con éxito! Puedes seguir pegando más URLs sin necesidad de cerrar la ventana.`
       );
 
-      setTimeout(() => {
-        onImagesAdded(updatedItemResult, totalAdded, finalUrls);
-        if (onClose) onClose();
-      }, 400);
+      onImagesAdded(updatedItemResult, totalAdded, finalUrls);
+
+      if (closeModalOnFinish && onClose) {
+        setTimeout(() => {
+          onClose();
+        }, 400);
+      }
     } catch (err: any) {
       console.error('Error adding images:', err);
       setErrorMsg(err.message || 'No se pudieron agregar las imágenes');
@@ -498,35 +591,53 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
         {/* Header */}
         <div className="flex items-start justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-sky-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 shrink-0">
-              <Sparkles className="w-5 h-5" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
+              <Globe className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-gradient-to-r from-sky-50 to-indigo-50 text-indigo-700 border border-indigo-200/80 flex items-center shadow-2xs">
-                  <Sparkles className="w-3 h-3 text-indigo-600 mr-1" />
-                  Búsqueda Exacta con IA (Gemini)
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200/80 flex items-center shadow-2xs">
+                  <span className="font-extrabold mr-1">
+                    <span className="text-blue-600">G</span>
+                    <span className="text-red-500">o</span>
+                    <span className="text-yellow-500">o</span>
+                    <span className="text-blue-600">g</span>
+                    <span className="text-green-600">l</span>
+                    <span className="text-red-500">e</span>
+                  </span>
+                  Imágenes
                 </span>
                 <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
                   SKU: {item.sku}
                 </span>
               </div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900 line-clamp-1 mt-0.5">
-                Fotos idénticas para "{item.name}"
+                Fotos de Internet para "{item.name}"
               </h3>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition cursor-pointer"
-            title="Cerrar"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition flex items-center space-x-1 cursor-pointer"
+              title="Finalizar y cerrar la ventana"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>Listo</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+              title="Cerrar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* AI Product Identity Card (Shows detected brand, model, traits) */}
-        {profile && (
+        {activeMode === 'search' && profile && (
           <div className="mt-2.5 px-3 py-2 bg-gradient-to-r from-indigo-50/70 via-sky-50/50 to-purple-50/40 border border-indigo-100/90 rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center space-x-2">
               <div className="w-5 h-5 rounded-md bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shadow-xs">
@@ -873,7 +984,7 @@ export const ProductWebImagePicker: React.FC<ProductWebImagePickerProps> = ({
           </div>
         )}
 
-        {/* Results Gallery Grid */}
+        {/* Results Gallery Grid (Google Images Search) */}
         <div className="flex-1 overflow-y-auto py-3 pr-1 min-h-[260px]">
           {loading ? (
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-3.5">
