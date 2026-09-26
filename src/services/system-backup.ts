@@ -2933,3 +2933,104 @@ export async function generateFinancialProductsExcelBuffer(userId?: number): Pro
   const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   return excelBuffer;
 }
+
+const BACKUPS_DIR = path.join(process.cwd(), 'backups');
+
+export function ensureBackupsDirExists(): string {
+  if (!fs.existsSync(BACKUPS_DIR)) {
+    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+  }
+  return BACKUPS_DIR;
+}
+
+export interface ServerBackupFileInfo {
+  filename: string;
+  sizeBytes: number;
+  sizeFormatted: string;
+  createdAt: string;
+}
+
+export async function saveMasterZipToServer(userId?: number): Promise<ServerBackupFileInfo> {
+  const dir = ensureBackupsDirExists();
+  const zipBuffer = await createFullSystemMasterZip(userId);
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+  const filename = `comerxia_respaldo_maestro_${dateStr}_${timeStr}.zip`;
+  const filePath = path.join(dir, filename);
+
+  fs.writeFileSync(filePath, zipBuffer);
+
+  const stat = fs.statSync(filePath);
+  const sizeMb = (stat.size / (1024 * 1024)).toFixed(2);
+
+  return {
+    filename,
+    sizeBytes: stat.size,
+    sizeFormatted: `${sizeMb} MB`,
+    createdAt: stat.mtime.toISOString(),
+  };
+}
+
+export function listServerMasterBackups(): ServerBackupFileInfo[] {
+  const dir = ensureBackupsDirExists();
+  const files = fs.readdirSync(dir);
+  const result: ServerBackupFileInfo[] = [];
+
+  for (const f of files) {
+    if (f.startsWith('.')) continue;
+    if (!f.toLowerCase().endsWith('.zip')) continue;
+
+    const fullPath = path.join(dir, f);
+    try {
+      const stat = fs.statSync(fullPath);
+      if (stat.isFile()) {
+        const sizeMb = (stat.size / (1024 * 1024)).toFixed(2);
+        result.push({
+          filename: f,
+          sizeBytes: stat.size,
+          sizeFormatted: `${sizeMb} MB`,
+          createdAt: stat.mtime.toISOString(),
+        });
+      }
+    } catch {}
+  }
+
+  result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return result;
+}
+
+export async function restoreServerMasterZipByName(
+  filename: string,
+  userId: number = 1
+): Promise<{
+  success: boolean;
+  restoredMediaCount: number;
+  restoredDbCounts: Record<string, number>;
+  errors: string[];
+}> {
+  const cleanName = path.basename(filename);
+  const dir = ensureBackupsDirExists();
+  const filePath = path.join(dir, cleanName);
+
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`El archivo de respaldo '${cleanName}' no existe en el servidor.`);
+  }
+
+  const fileBuffer = fs.readFileSync(filePath);
+  return await restoreMasterFullSystemZip(fileBuffer, userId);
+}
+
+export function deleteServerMasterZipByName(filename: string): boolean {
+  const cleanName = path.basename(filename);
+  const dir = ensureBackupsDirExists();
+  const filePath = path.join(dir, cleanName);
+
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+    return true;
+  }
+  return false;
+}
+

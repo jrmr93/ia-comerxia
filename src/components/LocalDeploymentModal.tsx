@@ -137,6 +137,22 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
   const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
   const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState<boolean>(false);
 
+  // Server-side backups state
+  interface ServerBackupItem {
+    filename: string;
+    sizeBytes: number;
+    sizeFormatted: string;
+    createdAt: string;
+  }
+  const [serverBackups, setServerBackups] = useState<ServerBackupItem[]>([]);
+  const [loadingServerBackups, setLoadingServerBackups] = useState<boolean>(false);
+  const [generatingServerBackup, setGeneratingServerBackup] = useState<boolean>(false);
+  const [selectedServerBackup, setSelectedServerBackup] = useState<string>('');
+  const [showServerRestoreConfirmModal, setShowServerRestoreConfirmModal] = useState<boolean>(false);
+  const [pendingServerRestoreFilename, setPendingServerRestoreFilename] = useState<string | null>(null);
+  const [restoringServerBackup, setRestoringServerBackup] = useState<boolean>(false);
+  const [deletingServerBackup, setDeletingServerBackup] = useState<string | null>(null);
+
   // Ref to track modal open state transitions
   const prevIsOpenRef = React.useRef(false);
 
@@ -152,8 +168,15 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
       fetchDatabaseInfo();
       fetchDomainConfig();
       fetchMediaStats();
+      fetchServerBackups();
     }
   }, [isOpen, initialTab]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'backup') {
+      fetchServerBackups();
+    }
+  }, [isOpen, activeTab]);
 
   const fetchMediaStats = async () => {
     try {
@@ -338,6 +361,151 @@ export const LocalDeploymentModal: React.FC<LocalDeploymentModalProps> = ({
 
   const handleDownloadProductsFinancialExcel = () => {
     triggerDownload('/api/export-products-financial-excel', 'comerxia_reporte_financiero_productos.xlsx', 'excel_financial');
+  };
+
+  const fetchServerBackups = async () => {
+    try {
+      setLoadingServerBackups(true);
+      const res = await authFetch('/api/backup/server-list');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.backups)) {
+          setServerBackups(data.backups);
+          if (data.backups.length > 0) {
+            setSelectedServerBackup((curr) => curr || data.backups[0].filename);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch server backups list:', e);
+    } finally {
+      setLoadingServerBackups(false);
+    }
+  };
+
+  const handleGenerateServerBackup = async () => {
+    try {
+      setGeneratingServerBackup(true);
+      setRestoreFeedback(null);
+      const res = await authFetch('/api/backup/server-generate', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRestoreFeedback({
+          type: 'success',
+          message: data.message || 'Respaldo maestro guardado exitosamente en el servidor.',
+        });
+        if (Array.isArray(data.backups)) {
+          setServerBackups(data.backups);
+          if (data.fileInfo?.filename) {
+            setSelectedServerBackup(data.fileInfo.filename);
+          }
+        } else {
+          fetchServerBackups();
+        }
+      } else {
+        setRestoreFeedback({
+          type: 'error',
+          message: data.error || 'Error al generar el respaldo en el servidor.',
+        });
+      }
+    } catch (err: any) {
+      setRestoreFeedback({
+        type: 'error',
+        message: err?.message || 'Error de conexión al generar el respaldo en el servidor.',
+      });
+    } finally {
+      setGeneratingServerBackup(false);
+    }
+  };
+
+  const handleDownloadServerBackup = (filename: string) => {
+    if (!filename) return;
+    triggerDownload(`/api/backup/server-download/${encodeURIComponent(filename)}`, filename, `server_${filename}`);
+  };
+
+  const handleRequestServerRestore = (filename: string) => {
+    if (!filename) return;
+    setPendingServerRestoreFilename(filename);
+    setShowServerRestoreConfirmModal(true);
+  };
+
+  const handleConfirmRestoreServerBackup = async () => {
+    if (!pendingServerRestoreFilename) return;
+    setRestoringServerBackup(true);
+    setRestoreFeedback(null);
+    try {
+      const res = await authFetch('/api/backup/server-restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: pendingServerRestoreFilename }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRestoreFeedback({
+          type: 'success',
+          message: data.message || `¡Restauración desde el respaldo '${pendingServerRestoreFilename}' completada con éxito!`,
+        });
+        fetchMediaStats();
+        handleRunDiagnostics();
+        if (onStoreConfigSaved) onStoreConfigSaved();
+        if (onConfigSaved) onConfigSaved();
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        setRestoreFeedback({
+          type: 'error',
+          message: data?.error || 'Error al restaurar el respaldo del servidor.',
+        });
+      }
+    } catch (err: any) {
+      setRestoreFeedback({
+        type: 'error',
+        message: err?.message || 'Error de conexión al restaurar desde el servidor.',
+      });
+    } finally {
+      setRestoringServerBackup(false);
+      setShowServerRestoreConfirmModal(false);
+      setPendingServerRestoreFilename(null);
+    }
+  };
+
+  const handleDeleteServerBackup = async (filename: string) => {
+    if (!filename) return;
+    if (!window.confirm(`¿Estás seguro de eliminar el respaldo '${filename}' del servidor?`)) return;
+    try {
+      setDeletingServerBackup(filename);
+      const res = await authFetch(`/api/backup/server-delete/${encodeURIComponent(filename)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRestoreFeedback({
+          type: 'success',
+          message: data.message || 'Respaldo eliminado del servidor.',
+        });
+        if (Array.isArray(data.backups)) {
+          setServerBackups(data.backups);
+          if (selectedServerBackup === filename) {
+            setSelectedServerBackup(data.backups[0]?.filename || '');
+          }
+        } else {
+          fetchServerBackups();
+        }
+      } else {
+        setRestoreFeedback({
+          type: 'error',
+          message: data.error || 'No se pudo eliminar el respaldo del servidor.',
+        });
+      }
+    } catch (err: any) {
+      setRestoreFeedback({
+        type: 'error',
+        message: err?.message || 'Error al eliminar respaldo.',
+      });
+    } finally {
+      setDeletingServerBackup(null);
+    }
   };
 
   const handleRunDiagnostics = async () => {
@@ -2588,6 +2756,174 @@ server {
                 </div>
               </div>
 
+              {/* Server-side Backups Section (Guardar en servidor y Restaurar desde archivo en servidor) */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-lg border border-indigo-500/30 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-indigo-800/50 pb-3.5">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Server className="w-5 h-5 text-indigo-400" />
+                      Respaldos en el Servidor de la App (<code className="font-mono text-indigo-300 text-xs px-1.5 py-0.5 rounded bg-indigo-900/60 border border-indigo-700/50">/backups</code>)
+                    </h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Genera respaldos maestros directamente dentro del almacenamiento del servidor y restaura el sistema en cualquier momento seleccionando cualquier respaldo de la lista.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={fetchServerBackups}
+                      disabled={loadingServerBackups}
+                      className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                      title="Actualizar lista de respaldos"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${loadingServerBackups ? 'animate-spin' : ''}`} />
+                    </button>
+
+                    <button
+                      onClick={handleGenerateServerBackup}
+                      disabled={generatingServerBackup}
+                      className="px-4 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-75 text-white font-bold text-xs flex items-center gap-2 transition shadow-md cursor-pointer"
+                    >
+                      {generatingServerBackup ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <span>Guardando en servidor...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 text-indigo-200" />
+                          <span>Generar y Guardar en Servidor</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Seleccionar y Restaurar desde Servidor */}
+                {serverBackups.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="p-3.5 rounded-xl bg-indigo-900/40 border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex-1 space-y-1">
+                        <label className="block text-xs font-bold text-indigo-200">
+                          Seleccionar respaldo guardado en el servidor:
+                        </label>
+                        <select
+                          value={selectedServerBackup}
+                          onChange={(e) => setSelectedServerBackup(e.target.value)}
+                          className="w-full bg-slate-900 border border-indigo-500/50 text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+                        >
+                          {serverBackups.map((b) => (
+                            <option key={b.filename} value={b.filename}>
+                              {b.filename} ({b.sizeFormatted} - {new Date(b.createdAt).toLocaleString('es-EC')})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-end gap-2 shrink-0 sm:self-end">
+                        <button
+                          onClick={() => handleDownloadServerBackup(selectedServerBackup)}
+                          disabled={!selectedServerBackup}
+                          className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer border border-slate-700"
+                          title="Descargar respaldo seleccionado a tu PC"
+                        >
+                          <Download className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Descargar</span>
+                        </button>
+                        <button
+                          onClick={() => handleRequestServerRestore(selectedServerBackup)}
+                          disabled={!selectedServerBackup || restoringServerBackup}
+                          className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                        >
+                          <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+                          <span>Restaurar Seleccionado</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Tabla / Lista detallada de archivos en servidor */}
+                    <div className="rounded-xl border border-indigo-900/60 overflow-hidden bg-slate-950/60">
+                      <div className="px-3.5 py-2 bg-indigo-950/80 border-b border-indigo-900/80 flex items-center justify-between text-[11px] font-bold text-indigo-300">
+                        <span>Respaldos Almacenados ({serverBackups.length})</span>
+                        <span>Ubicación: /backups/</span>
+                      </div>
+                      <div className="divide-y divide-indigo-950/60 max-h-48 overflow-y-auto">
+                        {serverBackups.map((item) => (
+                          <div
+                            key={item.filename}
+                            className={`p-3 flex items-center justify-between gap-3 text-xs transition ${
+                              selectedServerBackup === item.filename ? 'bg-indigo-900/30' : 'hover:bg-slate-900/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <FolderArchive className="w-4 h-4 text-indigo-400 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="font-mono text-xs font-semibold text-white truncate">
+                                  {item.filename}
+                                </p>
+                                <p className="text-[11px] text-slate-400 flex items-center gap-3">
+                                  <span>{item.sizeFormatted}</span>
+                                  <span>•</span>
+                                  <span>{new Date(item.createdAt).toLocaleString('es-EC')}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => handleDownloadServerBackup(item.filename)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+                                title="Descargar archivo a PC"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleRequestServerRestore(item.filename)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                title="Restaurar sistema con este respaldo"
+                              >
+                                <Zap className="w-3 h-3 text-emerald-400" />
+                                <span>Restaurar</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteServerBackup(item.filename)}
+                                disabled={deletingServerBackup === item.filename}
+                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 cursor-pointer"
+                                title="Eliminar respaldo del servidor"
+                              >
+                                {deletingServerBackup === item.filename ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-950/50 border border-indigo-900/50 text-center space-y-2">
+                    <p className="text-xs text-slate-400">
+                      No hay respaldos guardados en la carpeta del servidor (<code className="font-mono text-indigo-300">/backups</code>).
+                    </p>
+                    <button
+                      onClick={handleGenerateServerBackup}
+                      disabled={generatingServerBackup}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-2 cursor-pointer transition shadow-xs"
+                    >
+                      {generatingServerBackup ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
+                      )}
+                      <span>Generar el Primer Respaldo en Servidor</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Individual Download Action Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 {/* 1. Backup SQL Dump */}
@@ -3092,6 +3428,102 @@ server {
                   <>
                     <Upload className="w-4 h-4" />
                     <span>Sí, Continuar con la Restauración</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Restauración desde el Servidor */}
+      {showServerRestoreConfirmModal && pendingServerRestoreFilename && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 bg-indigo-950 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-800 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-700">
+                  <Server className="w-5 h-5 text-indigo-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">
+                    Restaurar desde Respaldo del Servidor
+                  </h3>
+                  <p className="text-[11px] text-indigo-200">
+                    Se restaurará la base de datos y multimedia desde un archivo del servidor
+                  </p>
+                </div>
+              </div>
+              {!restoringServerBackup && (
+                <button
+                  type="button"
+                  onClick={() => setShowServerRestoreConfirmModal(false)}
+                  className="p-1.5 rounded-lg text-indigo-300 hover:text-white hover:bg-indigo-900 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            <div className="p-6 space-y-4 text-xs text-slate-600">
+              <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <FolderArchive className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-900 truncate text-xs font-mono">
+                    {pendingServerRestoreFilename}
+                  </p>
+                  <p className="text-[11px] text-indigo-700 font-semibold">
+                    Archivo ubicado en: /backups/{pendingServerRestoreFilename}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-[11.5px] leading-relaxed">
+                    <strong>Confirmación de restauración:</strong> Al continuar, el servidor leerá el archivo seleccionado y actualizará la base de datos PostgreSQL y la carpeta física <code className="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-bold">/uploads</code> con los datos almacenados en dicho respaldo.
+                  </div>
+                </div>
+              </div>
+
+              {restoringServerBackup && (
+                <div className="p-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 flex items-center space-x-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-sky-600 shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-bold text-sky-950">Restaurando base de datos y archivos multimedia...</p>
+                    <p className="text-[11px] text-sky-700">Por favor, espera a que concluya el proceso.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowServerRestoreConfirmModal(false)}
+                disabled={restoringServerBackup}
+                className="px-4 py-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 font-bold text-slate-700 text-xs transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRestoreServerBackup}
+                disabled={restoringServerBackup}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-75 text-white font-bold text-xs flex items-center space-x-2 transition shadow-md cursor-pointer"
+              >
+                {restoringServerBackup ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Restaurando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 fill-white" />
+                    <span>Sí, Restaurar Ahora</span>
                   </>
                 )}
               </button>

@@ -190,6 +190,11 @@ import {
   restoreCompleteJsonDump,
   restoreMasterFullSystemZip,
   generateFinancialProductsExcelBuffer,
+  saveMasterZipToServer,
+  listServerMasterBackups,
+  restoreServerMasterZipByName,
+  deleteServerMasterZipByName,
+  ensureBackupsDirExists,
 } from './src/services/system-backup.ts';
 import { searchProductVideos } from './src/services/video-search.ts';
 import { quoteProductInEcuadorMarket } from './src/services/market-quote.ts';
@@ -5959,6 +5964,104 @@ async function startServer() {
       res.status(500).json({ success: false, error: error.message || 'Error al restaurar JSON' });
     }
   });
+
+  // 14e. Server-Side Master Backup Endpoints (Save on server, list, download from server, restore from server file)
+  app.post('/api/backup/server-generate', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const fileInfo = await saveMasterZipToServer(req.dbUserId || 1);
+      const list = listServerMasterBackups();
+      res.json({
+        success: true,
+        message: `¡Respaldo maestro '${fileInfo.filename}' guardado exitosamente en el servidor!`,
+        fileInfo,
+        backups: list,
+      });
+    } catch (error: any) {
+      console.error('Error generating master zip on server:', error);
+      res.status(500).json({ success: false, error: error.message || 'Error al generar respaldo maestro en el servidor' });
+    }
+  });
+
+  app.get('/api/backup/server-list', requireAuth, async (_req: AuthRequest, res: Response) => {
+    try {
+      const list = listServerMasterBackups();
+      res.json({ success: true, backups: list });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Error al obtener lista de respaldos del servidor' });
+    }
+  });
+
+  app.get('/api/backup/server-download/:filename', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const filename = path.basename(req.params.filename);
+      const dir = ensureBackupsDirExists();
+      const filePath = path.join(dir, filename);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ success: false, error: 'El archivo de respaldo no existe en el servidor' });
+      }
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.sendFile(filePath);
+    } catch (error: any) {
+      console.error('Error serving server backup file:', error);
+      res.status(500).json({ success: false, error: error.message || 'Error al descargar respaldo del servidor' });
+    }
+  });
+
+  app.post('/api/backup/server-restore', requireAuth, express.json(), async (req: AuthRequest, res: Response) => {
+    try {
+      const { filename } = req.body;
+      if (!filename) {
+        return res.status(400).json({ success: false, error: 'Debe especificar el nombre del archivo de respaldo a restaurar' });
+      }
+
+      const result = await restoreServerMasterZipByName(filename, req.dbUserId || 1);
+
+      // Auto-resume Telegram polling if token was restored
+      try {
+        const tgCfg = await getTelegramConfig(req.dbUserId || 1);
+        const restoredToken = tgCfg?.botToken?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+        if (restoredToken && tgCfg?.isActive !== false) {
+          process.env.TELEGRAM_BOT_TOKEN = restoredToken;
+          startTelegramPolling(restoredToken, req.dbUserId || 1);
+          console.log('[Server Backup Restore] Telegram bot polling successfully resumed.');
+        } else {
+          stopTelegramPolling();
+        }
+      } catch (tgErr) {
+        console.warn('[Server Backup Restore] Telegram bot polling resume notice:', tgErr);
+      }
+
+      res.json({
+        success: true,
+        restoredMediaCount: result.restoredMediaCount,
+        restoredDbCounts: result.restoredDbCounts,
+        errors: result.errors,
+        message: `¡Restauración desde el respaldo '${filename}' completada! Se restauraron ${result.restoredMediaCount} archivos multimedia y la base de datos.`,
+      });
+    } catch (error: any) {
+      console.error('Error restoring server master zip:', error);
+      res.status(500).json({ success: false, error: error.message || 'Error al restaurar respaldo desde el servidor' });
+    }
+  });
+
+  app.delete('/api/backup/server-delete/:filename', requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const filename = req.params.filename;
+      const deleted = deleteServerMasterZipByName(filename);
+      if (deleted) {
+        const list = listServerMasterBackups();
+        return res.json({ success: true, message: `Respaldo '${filename}' eliminado del servidor`, backups: list });
+      }
+      return res.status(404).json({ success: false, error: 'El archivo de respaldo no fue encontrado' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Error al eliminar respaldo del servidor' });
+    }
+  });
+
+
 
   // 15. Safe Image Download Endpoints (Supports direct attachment streaming for base64 & remote URLs)
   app.post('/api/download-image', async (req: Request, res: Response) => {
