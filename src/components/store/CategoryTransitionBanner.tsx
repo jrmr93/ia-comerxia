@@ -92,11 +92,11 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
 
   return (
     <div className={`col-span-full my-3 sm:my-4 ${className}`}>
-      {/* Compact Height Container with Mobile-First Continuous Effects */}
-      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-amber-400/50 shadow-xl group transition-all duration-500 hover:border-amber-400 hover:shadow-[0_12px_35px_rgba(245,158,11,0.3)] animate-mobile-gold-border glossy-sheen-effect min-h-[115px] sm:min-h-[130px]">
-        {/* Full Cover Background Image with Mobile Continuous Breathing Zoom & Hover Scale */}
+      {/* Compact Height Container with Continuous Panel Float Wave & Mobile Gold Border */}
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-amber-400/50 shadow-xl group transition-all duration-500 hover:border-amber-400 hover:shadow-[0_12px_35px_rgba(245,158,11,0.35)] animate-banner-panel-float animate-mobile-gold-border glossy-sheen-effect min-h-[115px] sm:min-h-[130px]">
+        {/* Full Cover Background Image with Continuous Camera Panning Motion */}
         <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110 animate-mobile-category-bg-zoom"
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-115 animate-category-bg-pan"
           style={{ backgroundImage: `url('${bgImage}')` }}
         />
 
@@ -109,7 +109,7 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
         {/* Dynamic Glass Sparkle Overlay Mesh */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-400/15 via-transparent to-purple-600/20 pointer-events-none" />
 
-        {/* Radiant Ambient Glow Orbs (Pulsing continuously on mobile screens) */}
+        {/* Radiant Ambient Glow Orbs */}
         <div className="absolute -right-8 -top-8 w-44 h-44 sm:w-52 sm:h-52 rounded-full bg-amber-400/25 blur-2xl pointer-events-none animate-pulse" />
         <div className="absolute -left-8 -bottom-8 w-44 h-44 sm:w-52 sm:h-52 rounded-full bg-indigo-500/25 blur-2xl pointer-events-none animate-pulse" />
         <div className="absolute left-1/3 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-amber-300/15 blur-xl pointer-events-none animate-float-particle" />
@@ -119,7 +119,7 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
           {/* Left Metadata & Title */}
           <div className="space-y-1 sm:space-y-1.5 max-w-xl min-w-0 flex-1">
             <div className="flex items-center space-x-1.5 sm:space-x-2 flex-wrap gap-y-1">
-              <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-slate-900/90 backdrop-blur-md border border-amber-400/60 text-amber-300 flex items-center gap-1 shadow-md">
+              <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-slate-900/90 backdrop-blur-md border border-amber-400/60 text-amber-300 flex items-center gap-1 shadow-md animate-parallax-counter">
                 <Layers className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 animate-float-particle" />
                 Categoría
               </span>
@@ -140,9 +140,9 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
 
           {/* Right Action & Thumbs (Optimized for Mobile Phone display) */}
           <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-            {/* Product Thumbnail Stack - Visible on Mobile too! */}
+            {/* Product Thumbnail Stack - Visible with counter float motion */}
             {thumbs.length > 0 && (
-              <div className="flex items-center -space-x-2.5 sm:-space-x-2 overflow-visible p-0.5">
+              <div className="flex items-center -space-x-2.5 sm:-space-x-2 overflow-visible p-0.5 animate-parallax-counter">
                 {thumbs.slice(0, 2).map((item, idx) => (
                   <div
                     key={item.id || idx}

@@ -511,4 +511,55 @@ video::-moz-media-controls-mute-button {
   animation: mobileCategoryBgZoom 10s ease-in-out infinite alternate;
 }
 
+/* Panel Continuous Floating Wave Motion */
+@keyframes categoryBannerFloatWave {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-5px) scale(1.003);
+  }
+}
+
+.animate-banner-panel-float {
+  animation: categoryBannerFloatWave 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Background Image Camera Panning Motion */
+@keyframes categoryBgCameraPan {
+  0% {
+    transform: scale(1.08) translate(0%, 0%) rotate(0deg);
+  }
+  33% {
+    transform: scale(1.12) translate(-1.5%, -1%) rotate(0.3deg);
+  }
+  66% {
+    transform: scale(1.10) translate(1.5%, 0.8%) rotate(-0.3deg);
+  }
+  100% {
+    transform: scale(1.08) translate(0%, 0%) rotate(0deg);
+  }
+}
+
+.animate-category-bg-pan {
+  animation: categoryBgCameraPan 14s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Parallax Counter Float for Badges & Accents */
+@keyframes parallaxCounterFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(3px) rotate(-1.5deg);
+  }
+}
+
+.animate-parallax-counter {
+  animation: parallaxCounterFloat 5s ease-in-out infinite;
+}
+
+
 
