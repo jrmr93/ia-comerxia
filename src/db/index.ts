@@ -549,6 +549,7 @@ export async function ensureTablesCreated() {
           show_stock BOOLEAN DEFAULT TRUE,
           show_out_of_stock BOOLEAN DEFAULT TRUE,
           prioritize_offers_first BOOLEAN DEFAULT TRUE,
+          show_category_header BOOLEAN DEFAULT TRUE,
           enable_pagination BOOLEAN DEFAULT FALSE,
           items_per_page INTEGER DEFAULT 12,
           default_product_sort TEXT DEFAULT 'date_desc',
@@ -561,6 +562,7 @@ export async function ensureTablesCreated() {
           courier_logos TEXT,
           payment_logos TEXT,
           theme TEXT DEFAULT 'classic',
+          category_images TEXT,
           promo_popup TEXT,
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
@@ -582,6 +584,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS show_stock BOOLEAN DEFAULT TRUE;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS show_out_of_stock BOOLEAN DEFAULT TRUE;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS prioritize_offers_first BOOLEAN DEFAULT TRUE;
+        ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS show_category_header BOOLEAN DEFAULT TRUE;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS enable_pagination BOOLEAN DEFAULT FALSE;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS items_per_page INTEGER DEFAULT 12;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS default_product_sort TEXT DEFAULT 'date_desc';

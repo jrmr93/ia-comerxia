@@ -3282,6 +3282,26 @@ function parseThemeAndColors(rawTheme: string | null | undefined): { theme: stri
   return { theme: rawTheme };
 }
 
+let _storeConfigsSchemaEnsured = false;
+export async function ensureStoreConfigsSchema() {
+  if (!isPostgresConfigured() || _storeConfigsSchemaEnsured) return;
+  try {
+    await pool.query(`
+      ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS show_category_header BOOLEAN DEFAULT TRUE;
+      ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS enable_pagination BOOLEAN DEFAULT FALSE;
+      ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS items_per_page INTEGER DEFAULT 12;
+      ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS default_product_sort TEXT DEFAULT 'date_desc';
+      ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS default_initial_category TEXT;
+      ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS logo_desktop_url TEXT;
+      ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS category_images TEXT;
+      ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS promo_popup TEXT;
+    `);
+    _storeConfigsSchemaEnsured = true;
+  } catch (err) {
+    console.warn('Notice ensuring store_configs schema:', err);
+  }
+}
+
 export async function getStoreConfig(userId: number = 1) {
   if (!isPostgresConfigured()) {
     const state = storage.getState();
@@ -3338,6 +3358,8 @@ export async function getStoreConfig(userId: number = 1) {
     storage.save();
     return defaultConfig;
   }
+
+  await ensureStoreConfigsSchema();
 
   try {
     let configs = await db
@@ -3489,6 +3511,8 @@ export async function updateStoreConfig(
   userId: number = 1,
   data: Partial<typeof storeConfigs.$inferInsert> & Record<string, any>
 ) {
+  await ensureStoreConfigsSchema();
+
   const updatePayload: Record<string, any> = {
     updatedAt: new Date(),
   };
