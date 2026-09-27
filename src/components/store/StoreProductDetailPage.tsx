@@ -83,6 +83,30 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
     return getProductPhotosWithFallback(product);
   }, [product.imageUrl, product.images, product.extractedAttributes]);
 
+  // Payment logos extraction for VIP price card (Render ONLY logos, very small)
+  const activePaymentLogos = React.useMemo(() => {
+    let list: PaymentMethodPartner[] = [];
+    if (Array.isArray(paymentPartners) && paymentPartners.length > 0) {
+      list = paymentPartners;
+    } else if (storeConfig.paymentLogos) {
+      try {
+        const parsed = typeof storeConfig.paymentLogos === 'string' ? JSON.parse(storeConfig.paymentLogos) : storeConfig.paymentLogos;
+        if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
+      } catch {}
+    }
+    const filtered = list.filter((p) => p.active !== false && p.logoUrl);
+    if (filtered.length > 0) return filtered;
+
+    // Fallback default payment partners with logos
+    return [
+      { id: 'pichincha', name: 'Banco Pichincha / Mi Vecino', logoUrl: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=160&auto=format&fit=crop&q=80', active: true },
+      { id: 'guayaquil', name: 'Banco Guayaquil / Banco del Barrio', logoUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=160&auto=format&fit=crop&q=80', active: true },
+      { id: 'deuna', name: 'Deuna / QR', logoUrl: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=160&auto=format&fit=crop&q=80', active: true },
+      { id: 'tarjetas', name: 'Tarjetas Débito / Crédito', logoUrl: 'https://images.unsplash.com/photo-1556742049-0a67c557689c?w=160&auto=format&fit=crop&q=80', active: true },
+      { id: 'efectivo', name: 'Efectivo / Contraentrega', logoUrl: 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=160&auto=format&fit=crop&q=80', active: true },
+    ];
+  }, [paymentPartners, storeConfig.paymentLogos]);
+
   // Reset indices and scroll to top ONLY when the product ID changes (navigating to another product)
   useEffect(() => {
     if (prevProductIdRef.current !== product.id) {
@@ -821,10 +845,28 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                     </div>
                   )}
 
-                  <p className="text-xs text-slate-300/90 flex items-center pt-2 border-t border-slate-800/90 relative z-10">
-                    <Truck className="w-4 h-4 mr-2 text-amber-400 shrink-0" />
-                    <span>Envío directo a domicilio o retiro coordinado con la tienda</span>
-                  </p>
+                  {/* Delivery Note & Very Small Payment Method Logos (Only Logos) */}
+                  <div className="pt-2.5 border-t border-slate-800/90 relative z-10 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] sm:text-xs text-slate-300/90 flex items-center">
+                      <Truck className="w-3.5 h-3.5 mr-1.5 text-amber-400 shrink-0" />
+                      <span>Envío directo o retiro coordinado</span>
+                    </p>
+
+                    {/* ONLY Payment Logos (Very Small) */}
+                    {activePaymentLogos.length > 0 && (
+                      <div className="flex items-center space-x-1 sm:space-x-1.5 overflow-x-auto py-0.5 no-scrollbar shrink-0">
+                        {activePaymentLogos.map((p, idx) => (
+                          <div
+                            key={p.id || idx}
+                            className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-white/95 border border-white/40 p-0.5 shadow-2xs flex items-center justify-center flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                            title={p.name}
+                          >
+                            <img src={p.logoUrl} alt={p.name} className="w-full h-full object-contain rounded-2xs" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Quantity Selector - Always available for customer orders */}
