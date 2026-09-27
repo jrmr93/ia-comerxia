@@ -45,6 +45,7 @@ import { CartItem, CustomerOrder, InventoryItem, StoreConfig, StoreTheme, Courie
 import { buildWhatsAppLink, toEcuadorInternationalPhone } from '../../utils/phone.ts';
 import { StoreSmartSearchBar } from './StoreSmartSearchBar.tsx';
 import { CategoryTransitionBanner } from './CategoryTransitionBanner.tsx';
+import { searchProductsFuzzy } from '../../utils/fuzzySearch.ts';
 import { getThemeColors, ThemeColorPalette } from '../../utils/themeColors.ts';
 import { ProductMediaDisplay } from '../ProductMediaDisplay.tsx';
 import { getProductPhotosWithFallback, normalizeMediaUrl } from '../../utils/media-helper.ts';
@@ -2794,6 +2795,33 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             Limpiar todo
           </button>
         </div>
+      )}
+
+      {/* Did You Mean Typo Suggestion Banner */}
+      {searchQuery && (
+        (() => {
+          const fuzzyInfo = searchProductsFuzzy(products, searchQuery);
+          if (fuzzyInfo.didYouMean && fuzzyInfo.didYouMean.toLowerCase() !== searchQuery.toLowerCase()) {
+            return (
+              <div className="bg-amber-500/10 border border-amber-300/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs text-amber-950 my-3 shadow-xs">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+                  <span className="truncate">
+                    Mostrando resultados interpretados para "<strong className="font-extrabold">{searchQuery}</strong>". ¿Quisiste decir <strong className="font-black text-amber-700 underline cursor-pointer" onClick={() => setSearchQuery(fuzzyInfo.didYouMean!)}>{fuzzyInfo.didYouMean}</strong>?
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery(fuzzyInfo.didYouMean!)}
+                  className="px-3 py-1 bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold rounded-lg text-xs transition cursor-pointer shrink-0 shadow-xs"
+                >
+                  Buscar "{fuzzyInfo.didYouMean}"
+                </button>
+              </div>
+            );
+          }
+          return null;
+        })()
       )}
 
       {/* ========================================================================= */}

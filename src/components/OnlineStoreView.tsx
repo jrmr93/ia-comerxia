@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
+import { searchProductsFuzzy } from '../utils/fuzzySearch.ts';
 import {
   AlertCircle,
   AlertTriangle,
@@ -2047,35 +2048,33 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
     const hideOutOfStock = storeConfig && storeConfig.showOutOfStock === false;
 
-    return products
-      .filter((p) => {
-        // Exclude archived products - buyer only sees products marked as Active
-        if (p.status === 'archived') return false;
+    const baseFiltered = products.filter((p) => {
+      // Exclude archived products - buyer only sees products marked as Active
+      if (p.status === 'archived') return false;
 
-        // In customer view, the buyer does not know about stock or backorder; all active products are visible.
-        // In admin view, respect the stock filter if configured.
-        if (!isCustomerView && (inStockOnly || hideOutOfStock) && (p.stock <= 0 || p.status === 'sold_out')) return false;
+      // In customer view, the buyer does not know about stock or backorder; all active products are visible.
+      // In admin view, respect the stock filter if configured.
+      if (!isCustomerView && (inStockOnly || hideOutOfStock) && (p.stock <= 0 || p.status === 'sold_out')) return false;
 
-        // Offers-only filter (active discount > 0)
-        if (showOffersOnly) {
-          const disc = Math.max(0, Math.min(100, Number(p.discountPercent) || 0));
-          if (disc <= 0) return false;
-        }
+      // Offers-only filter (active discount > 0)
+      if (showOffersOnly) {
+        const disc = Math.max(0, Math.min(100, Number(p.discountPercent) || 0));
+        if (disc <= 0) return false;
+      }
 
-        // Category filter
-        if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
+      // Category filter
+      if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
 
-        // Search query
-        if (!searchQuery.trim()) return true;
-        const q = searchQuery.toLowerCase();
-        const matchName = p.name.toLowerCase().includes(q);
-        const matchSku = p.sku.toLowerCase().includes(q);
-        const matchBarcode = p.barcode?.toLowerCase().includes(q) || false;
-        const matchDesc = p.description?.toLowerCase().includes(q) || false;
-        const matchTags = p.tags?.toLowerCase().includes(q) || false;
-        return matchName || matchSku || matchBarcode || matchDesc || matchTags;
-      })
-      .sort((a, b) => {
+      return true;
+    });
+
+    let matchedProducts = baseFiltered;
+    if (searchQuery.trim()) {
+      const fuzzyRes = searchProductsFuzzy(baseFiltered, searchQuery);
+      matchedProducts = fuzzyRes.matches;
+    }
+
+    return matchedProducts.sort((a, b) => {
         const discA = Math.max(0, Math.min(100, Number(a.discountPercent) || 0));
         const discB = Math.max(0, Math.min(100, Number(b.discountPercent) || 0));
         const hasDiscA = discA > 0;
