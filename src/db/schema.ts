@@ -223,6 +223,7 @@ export const storeConfigs = pgTable('store_configs', {
   showStock: boolean('show_stock').default(true),
   showOutOfStock: boolean('show_out_of_stock').default(true),
   prioritizeOffersFirst: boolean('prioritize_offers_first').default(true),
+  showCategoryHeader: boolean('show_category_header').default(true),
   enablePagination: boolean('enable_pagination').default(false),
   itemsPerPage: integer('items_per_page').default(12),
   defaultProductSort: text('default_product_sort').default('date_desc'),

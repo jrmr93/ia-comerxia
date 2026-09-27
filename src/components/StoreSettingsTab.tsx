@@ -225,6 +225,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   const [showStock, setShowStock] = useState(true);
   const [showOutOfStock, setShowOutOfStock] = useState(true);
   const [prioritizeOffersFirst, setPrioritizeOffersFirst] = useState(true);
+  const [showCategoryHeader, setShowCategoryHeader] = useState(true);
   const [enablePagination, setEnablePagination] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState<number>(12);
   const [defaultProductSort, setDefaultProductSort] = useState<string>('date_desc');
@@ -390,6 +391,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           if (data.showOutOfStock !== undefined) setShowOutOfStock(Boolean(data.showOutOfStock));
           if (data.prioritizeOffersFirst !== undefined) setPrioritizeOffersFirst(Boolean(data.prioritizeOffersFirst));
           else if (data.prioritize_offers_first !== undefined) setPrioritizeOffersFirst(Boolean(data.prioritize_offers_first));
+          if (data.showCategoryHeader !== undefined) setShowCategoryHeader(Boolean(data.showCategoryHeader));
+          else if (data.show_category_header !== undefined) setShowCategoryHeader(Boolean(data.show_category_header));
           if (data.enablePagination !== undefined) setEnablePagination(Boolean(data.enablePagination));
           if (data.itemsPerPage !== undefined) setItemsPerPage(Number(data.itemsPerPage) || 12);
           if (data.defaultProductSort) setDefaultProductSort(data.defaultProductSort);
@@ -693,6 +696,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
         showStock,
         showOutOfStock,
         prioritizeOffersFirst,
+        showCategoryHeader,
         enablePagination,
         itemsPerPage: Number(itemsPerPage) || 12,
         defaultProductSort,
@@ -1234,9 +1238,15 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                 Personaliza la portada o banner superior panorámico para cada categoría de producto en la tienda online vista cliente.
               </p>
             </div>
-            <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shrink-0 shadow-2xs">
-              Vista Cliente Active
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className={`text-xs font-black px-2.5 py-1 rounded-full border shadow-2xs ${
+                showCategoryHeader
+                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  : 'bg-slate-100 text-slate-600 border-slate-300'
+              }`}>
+                {showCategoryHeader ? 'Visibles en Tienda' : 'Ocultas en Tienda'}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pt-1">
@@ -1537,6 +1547,44 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600 shadow-xs"></div>
+              </label>
+            </div>
+          </div>
+
+          {/* Mostrar imágenes de cabecera por categoría */}
+          <div className="p-3 bg-amber-50/60 border border-amber-100/80 rounded-xl transition-all min-w-0">
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="text-xs font-bold text-slate-800 break-words">
+                    Mostrar imágenes de cabecera por categoría
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md shrink-0 ${
+                      showCategoryHeader
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {showCategoryHeader ? 'Visibles' : 'Ocultas'}
+                  </span>
+                </div>
+                <p className="text-[11px] font-normal text-slate-500 leading-tight">
+                  {showCategoryHeader
+                    ? 'Se mostrarán los banners panorámicos con imágenes de portada para cada categoría en la vista de cliente.'
+                    : 'Se ocultarán los banners de cabecera de las categorías para una navegación más compacta.'}
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5" htmlFor="switch-show-category-header">
+                <input
+                  type="checkbox"
+                  id="switch-show-category-header"
+                  checked={showCategoryHeader}
+                  onChange={(e) => setShowCategoryHeader(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 shadow-xs"></div>
               </label>
             </div>
           </div>

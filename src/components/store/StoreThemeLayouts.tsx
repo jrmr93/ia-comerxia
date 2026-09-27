@@ -2884,7 +2884,8 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             <div className="space-y-6">
               {(() => {
                 const catCfg = getCustomCategoryHeaderConfig(selectedCategory);
-                return (
+                const shouldShowBanner = storeConfig?.showCategoryHeader !== false;
+                return shouldShowBanner ? (
                   <CategoryTransitionBanner
                     categoryName={selectedCategory}
                     itemCount={filteredProducts.length}
@@ -2893,7 +2894,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                     overlayColor={catCfg?.overlayColor}
                     overlayOpacity={catCfg?.overlayOpacity}
                   />
-                );
+                ) : null;
               })()}
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
                 {paginatedProducts.map((item) => (
@@ -2901,7 +2902,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 ))}
               </div>
             </div>
-          ) : searchQuery ? (
+          ) : searchQuery || storeConfig?.showCategoryHeader === false ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
               {paginatedProducts.map((item) => (
                 <ProductCardItem key={item.id} item={item} props={props} />
@@ -2913,6 +2914,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 const presentCategories = Array.from(
                   new Set(paginatedProducts.map((p) => p.category || 'General'))
                 );
+                const shouldShowBanner = storeConfig?.showCategoryHeader !== false;
 
                 return presentCategories.map((catName) => {
                   const catProducts = paginatedProducts.filter(
@@ -2926,15 +2928,17 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   return (
                     <div key={catName} className="space-y-4">
                       {/* Category Header Panel with Full Background Image FIRST */}
-                      <CategoryTransitionBanner
-                        categoryName={catName}
-                        itemCount={totalInCat}
-                        sampleProducts={catProducts}
-                        customImageUrl={catCfg?.imageUrl}
-                        overlayColor={catCfg?.overlayColor}
-                        overlayOpacity={catCfg?.overlayOpacity}
-                        onSelectCategory={(cat) => setSelectedCategory(cat)}
-                      />
+                      {shouldShowBanner && (
+                        <CategoryTransitionBanner
+                          categoryName={catName}
+                          itemCount={totalInCat}
+                          sampleProducts={catProducts}
+                          customImageUrl={catCfg?.imageUrl}
+                          overlayColor={catCfg?.overlayColor}
+                          overlayOpacity={catCfg?.overlayOpacity}
+                          onSelectCategory={(cat) => setSelectedCategory(cat)}
+                        />
+                      )}
 
                       {/* Category Products Grid NEXT */}
                       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">

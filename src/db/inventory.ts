@@ -3360,6 +3360,7 @@ export async function getStoreConfig(userId: number = 1) {
       const { theme, themeColors } = parseThemeAndColors(cfg.theme);
       const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
       const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
+      const showCategoryHeader = cfg.showCategoryHeader !== undefined ? cfg.showCategoryHeader : (cfg.show_category_header !== undefined ? cfg.show_category_header : true);
       const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3374,6 +3375,7 @@ export async function getStoreConfig(userId: number = 1) {
         themeColors,
         showOutOfStock: Boolean(showOutOfStock),
         prioritizeOffersFirst: Boolean(prioritizeOffersFirst),
+        showCategoryHeader: Boolean(showCategoryHeader),
         isActive: Boolean(isActive),
         maintenanceTitle,
         maintenanceMessage,
@@ -3404,6 +3406,7 @@ export async function getStoreConfig(userId: number = 1) {
         showStock: true,
         showOutOfStock: true,
         prioritizeOffersFirst: true,
+        showCategoryHeader: true,
         websiteUrl: null,
         logoUrl: null,
         logoDesktopUrl: null,
@@ -3419,6 +3422,7 @@ export async function getStoreConfig(userId: number = 1) {
     const { theme, themeColors } = parseThemeAndColors(cfg.theme);
     const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
     const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
+    const showCategoryHeader = cfg.showCategoryHeader !== undefined ? cfg.showCategoryHeader : (cfg.show_category_header !== undefined ? cfg.show_category_header : true);
     const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
     const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
     const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3433,6 +3437,7 @@ export async function getStoreConfig(userId: number = 1) {
       themeColors,
       showOutOfStock: Boolean(showOutOfStock),
       prioritizeOffersFirst: Boolean(prioritizeOffersFirst),
+      showCategoryHeader: Boolean(showCategoryHeader),
       isActive: Boolean(isActive),
       maintenanceTitle,
       maintenanceMessage,
@@ -3450,6 +3455,7 @@ export async function getStoreConfig(userId: number = 1) {
       const { theme, themeColors } = parseThemeAndColors(cfg.theme);
       const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
       const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
+      const showCategoryHeader = cfg.showCategoryHeader !== undefined ? cfg.showCategoryHeader : (cfg.show_category_header !== undefined ? cfg.show_category_header : true);
       const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3464,6 +3470,7 @@ export async function getStoreConfig(userId: number = 1) {
         themeColors,
         showOutOfStock: Boolean(showOutOfStock),
         prioritizeOffersFirst: Boolean(prioritizeOffersFirst),
+        showCategoryHeader: Boolean(showCategoryHeader),
         isActive: Boolean(isActive),
         maintenanceTitle,
         maintenanceMessage,
@@ -3527,6 +3534,10 @@ export async function updateStoreConfig(
   if (data.prioritizeOffersFirst !== undefined || data.prioritize_offers_first !== undefined) {
     const rawVal = data.prioritizeOffersFirst !== undefined ? data.prioritizeOffersFirst : data.prioritize_offers_first;
     updatePayload.prioritizeOffersFirst = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === '1';
+  }
+  if (data.showCategoryHeader !== undefined || data.show_category_header !== undefined) {
+    const rawVal = data.showCategoryHeader !== undefined ? data.showCategoryHeader : data.show_category_header;
+    updatePayload.showCategoryHeader = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === '1';
   }
   if (data.enablePagination !== undefined || data.enable_pagination !== undefined) {
     const rawVal = data.enablePagination !== undefined ? data.enablePagination : data.enable_pagination;
