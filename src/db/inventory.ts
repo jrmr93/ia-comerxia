@@ -207,79 +207,147 @@ export function attachErpStockMetricsToItems(
 
 export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item: T): T {
   if (!item) return item;
-  let costWithoutTax = item.costWithoutTax;
-  let costWithTax = item.costWithTax;
-  const taxRate = item.taxRate !== undefined && item.taxRate !== null && !isNaN(Number(item.taxRate))
-    ? Number(item.taxRate)
-    : 15.0;
 
-  let hasPurchaseTax = item.hasPurchaseTax;
-  let purchaseTaxPercent = item.purchaseTaxPercent;
-  let applySaleTax = item.applySaleTax;
-  let saleTaxPercent = item.saleTaxPercent;
-
+  let parsedExtracted: Record<string, any> = {};
   if (item.extractedAttributes) {
     try {
-      const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
-      if (!costWithoutTax && (parsed.costWithoutTax || parsed.baseCostPrice)) {
-        costWithoutTax = String(parsed.costWithoutTax || parsed.baseCostPrice);
-      }
-      if (!costWithTax && (parsed.costWithTax || parsed.costPriceWithTax)) {
-        costWithTax = String(parsed.costWithTax || parsed.costPriceWithTax);
-      }
-      if (hasPurchaseTax === undefined && parsed.hasPurchaseTax !== undefined) {
-        hasPurchaseTax = Boolean(parsed.hasPurchaseTax);
-      }
-      if (purchaseTaxPercent === undefined && parsed.purchaseTaxPercent !== undefined) {
-        purchaseTaxPercent = Number(parsed.purchaseTaxPercent);
-      }
-      if (applySaleTax === undefined && parsed.applySaleTax !== undefined) {
-        applySaleTax = Boolean(parsed.applySaleTax);
-      }
-      if (saleTaxPercent === undefined && parsed.saleTaxPercent !== undefined) {
-        saleTaxPercent = Number(parsed.saleTaxPercent);
-      }
+      parsedExtracted = typeof item.extractedAttributes === 'string'
+        ? JSON.parse(item.extractedAttributes)
+        : (typeof item.extractedAttributes === 'object' && item.extractedAttributes !== null ? item.extractedAttributes : {});
     } catch { }
   }
 
-  const unifiedRate = saleTaxPercent !== undefined && !isNaN(Number(saleTaxPercent))
-    ? Number(saleTaxPercent)
-    : purchaseTaxPercent !== undefined && !isNaN(Number(purchaseTaxPercent))
-      ? Number(purchaseTaxPercent)
-      : item.taxPercent !== undefined && !isNaN(Number(item.taxPercent))
-        ? Number(item.taxPercent)
-        : taxRate;
+  const isGift = Boolean(
+    item.isSupplierGift ||
+    parsedExtracted.isSupplierGift ||
+    (item as any).isGift ||
+    (item.costPrice !== undefined && parseFloat(String(item.costPrice)) === 0 && (item as any).isSupplierGift !== false)
+  );
 
-  const unifiedHasTax = applySaleTax !== undefined
-    ? Boolean(applySaleTax)
-    : hasPurchaseTax !== undefined
-      ? Boolean(hasPurchaseTax)
-      : item.hasPurchaseTax !== undefined
-        ? Boolean(item.hasPurchaseTax)
-        : unifiedRate > 0;
+  let costWithoutTaxInput = item.costWithoutTax !== undefined && item.costWithoutTax !== null && String(item.costWithoutTax).trim() !== ''
+    ? String(item.costWithoutTax)
+    : (parsedExtracted.costWithoutTax !== undefined && parsedExtracted.costWithoutTax !== null && String(parsedExtracted.costWithoutTax).trim() !== ''
+      ? String(parsedExtracted.costWithoutTax)
+      : null);
 
-  const finalTaxRate = unifiedHasTax ? unifiedRate : 0;
+  let costWithTaxInput = item.costWithTax !== undefined && item.costWithTax !== null && String(item.costWithTax).trim() !== ''
+    ? String(item.costWithTax)
+    : (parsedExtracted.costWithTax !== undefined && parsedExtracted.costWithTax !== null && String(parsedExtracted.costWithTax).trim() !== ''
+      ? String(parsedExtracted.costWithTax)
+      : null);
 
-  if (costWithoutTax === undefined || costWithoutTax === null || costWithTax === undefined || costWithTax === null) {
-    const costNum = parseFloat(String(item.costPrice || '0')) || 0;
-    if (!costWithoutTax) {
-      costWithoutTax = costNum > 0 ? costNum.toFixed(2) : '0.00';
-    }
-    if (!costWithTax) {
-      const numWithout = parseFloat(String(costWithoutTax)) || costNum;
-      costWithTax = (numWithout * (1 + finalTaxRate / 100)).toFixed(2);
+  const explicitSaleTax = item.saleTaxPercent !== undefined && item.saleTaxPercent !== null && !isNaN(Number(item.saleTaxPercent))
+    ? Number(item.saleTaxPercent)
+    : (parsedExtracted.saleTaxPercent !== undefined && !isNaN(Number(parsedExtracted.saleTaxPercent))
+      ? Number(parsedExtracted.saleTaxPercent)
+      : undefined);
+
+  const explicitPurchaseTax = item.purchaseTaxPercent !== undefined && item.purchaseTaxPercent !== null && !isNaN(Number(item.purchaseTaxPercent))
+    ? Number(item.purchaseTaxPercent)
+    : (parsedExtracted.purchaseTaxPercent !== undefined && !isNaN(Number(parsedExtracted.purchaseTaxPercent))
+      ? Number(parsedExtracted.purchaseTaxPercent)
+      : undefined);
+
+  const rawTaxRate = item.taxRate !== undefined && item.taxRate !== null && !isNaN(Number(item.taxRate))
+    ? Number(item.taxRate)
+    : (parsedExtracted.taxRate !== undefined && !isNaN(Number(parsedExtracted.taxRate))
+      ? Number(parsedExtracted.taxRate)
+      : undefined);
+
+  const unifiedTaxPercent = explicitSaleTax !== undefined
+    ? explicitSaleTax
+    : (explicitPurchaseTax !== undefined
+      ? explicitPurchaseTax
+      : (rawTaxRate !== undefined ? rawTaxRate : 15.0));
+
+  const explicitApplySaleTax = item.applySaleTax !== undefined ? Boolean(item.applySaleTax) : (parsedExtracted.applySaleTax !== undefined ? Boolean(parsedExtracted.applySaleTax) : undefined);
+  const explicitHasPurchaseTax = item.hasPurchaseTax !== undefined ? Boolean(item.hasPurchaseTax) : (parsedExtracted.hasPurchaseTax !== undefined ? Boolean(parsedExtracted.hasPurchaseTax) : undefined);
+
+  const unifiedHasTax = explicitApplySaleTax !== undefined
+    ? explicitApplySaleTax
+    : (explicitHasPurchaseTax !== undefined
+      ? explicitHasPurchaseTax
+      : unifiedTaxPercent > 0);
+
+  const finalTaxRate = unifiedHasTax ? unifiedTaxPercent : 0.0;
+
+  let costWithoutNum = 0;
+  let costWithNum = 0;
+
+  if (isGift) {
+    costWithoutNum = 0;
+    costWithNum = 0;
+  } else {
+    const rawCostPrice = parseFloat(String(item.costPrice || parsedExtracted.selectedCostPrice || '0')) || 0;
+    const rawCostWithout = costWithoutTaxInput ? parseFloat(costWithoutTaxInput) : 0;
+    const rawCostWith = costWithTaxInput ? parseFloat(costWithTaxInput) : 0;
+
+    if (rawCostWithout > 0 && rawCostWith > 0) {
+      costWithoutNum = rawCostWithout;
+      costWithNum = rawCostWith;
+    } else if (rawCostWithout > 0) {
+      costWithoutNum = rawCostWithout;
+      costWithNum = finalTaxRate > 0 ? Math.round(costWithoutNum * (1 + finalTaxRate / 100) * 100) / 100 : costWithoutNum;
+    } else if (rawCostWith > 0) {
+      costWithNum = rawCostWith;
+      costWithoutNum = finalTaxRate > 0 ? Math.round((costWithNum / (1 + finalTaxRate / 100)) * 100) / 100 : costWithNum;
+    } else if (rawCostPrice > 0) {
+      if (parsedExtracted.pricingMode === 'EXCLUDING_TAX' || parsedExtracted.costTaxMode === 'WITHOUT_TAX' || parsedExtracted.taxStatus === 'PLUS_TAX') {
+        costWithoutNum = rawCostPrice;
+        costWithNum = finalTaxRate > 0 ? Math.round(costWithoutNum * (1 + finalTaxRate / 100) * 100) / 100 : costWithoutNum;
+      } else {
+        costWithNum = rawCostPrice;
+        costWithoutNum = finalTaxRate > 0 ? Math.round((costWithNum / (1 + finalTaxRate / 100)) * 100) / 100 : costWithNum;
+      }
     }
   }
 
+  const finalCostPriceStr = isGift ? '0.00' : costWithNum.toFixed(2);
+  const finalCostWithoutStr = isGift ? '0.00' : costWithoutNum.toFixed(2);
+  const finalCostWithStr = isGift ? '0.00' : costWithNum.toFixed(2);
+  const finalSalePriceStr = cleanNumericString(item.salePrice, '0.00');
+
+  const saleNum = parseFloat(finalSalePriceStr) || 0;
+  const discountPercent = Math.max(0, Math.min(100, Number(item.discountPercent || parsedExtracted.discountPercent) || 0));
+  const salePriceWithoutTax = finalTaxRate > 0 ? saleNum / (1 + finalTaxRate / 100) : saleNum;
+  const discountRate = discountPercent / 100;
+  const netBaseSinIVA = salePriceWithoutTax * (1 - discountRate);
+
+  const profitAmount = isGift
+    ? (finalTaxRate > 0 ? saleNum / (1 + finalTaxRate / 100) : saleNum)
+    : Math.round((netBaseSinIVA - costWithoutNum) * 100) / 100;
+  const marginPercent = costWithoutNum > 0
+    ? Math.round((profitAmount / costWithoutNum) * 100)
+    : (profitAmount > 0 ? 100 : 0);
+
+  const updatedExtracted = {
+    ...parsedExtracted,
+    costWithoutTax: isGift ? 0 : costWithoutNum,
+    costWithTax: isGift ? 0 : costWithNum,
+    selectedCostPrice: isGift ? 0 : costWithNum,
+    profitAmount,
+    profitMarginPercent: marginPercent,
+    subtotalSinIVA: Math.round(salePriceWithoutTax * 100) / 100,
+    hasPurchaseTax: Boolean(unifiedHasTax),
+    purchaseTaxPercent: Number(unifiedTaxPercent),
+    applySaleTax: Boolean(unifiedHasTax),
+    saleTaxPercent: Number(unifiedTaxPercent),
+    taxRate: Number(finalTaxRate),
+    isSupplierGift: isGift,
+  };
+
   return {
     ...item,
-    costWithoutTax: costWithoutTax ? String(Number(costWithoutTax).toFixed(2)) : '0.00',
-    costWithTax: costWithTax ? String(Number(costWithTax).toFixed(2)) : '0.00',
-    taxRate: String(finalTaxRate.toFixed(2)),
+    costPrice: finalCostPriceStr,
+    costWithoutTax: finalCostWithoutStr,
+    costWithTax: finalCostWithStr,
+    taxRate: finalTaxRate.toFixed(2),
     hasPurchaseTax: Boolean(unifiedHasTax),
-    purchaseTaxPercent: Number(finalTaxRate),
+    purchaseTaxPercent: Number(unifiedTaxPercent),
     applySaleTax: Boolean(unifiedHasTax),
-    saleTaxPercent: Number(finalTaxRate),
+    saleTaxPercent: Number(unifiedTaxPercent),
+    isSupplierGift: isGift,
+    extractedAttributes: JSON.stringify(updatedExtracted),
   };
 }
 

@@ -925,6 +925,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const effectiveHasTax = (hasPurchaseTax || applySaleTax) && (purchaseTaxPercent > 0 || saleTaxPercent > 0);
       const effectiveTaxRate = effectiveHasTax ? Math.max(purchaseTaxPercent, saleTaxPercent) : 0;
 
+      const saleNum = parseFloat(salePrice) || 0;
+      const subtotalSinIVA = effectiveTaxRate > 0 ? Math.round((saleNum / (1 + effectiveTaxRate / 100)) * 100) / 100 : saleNum;
+
       const mergedAttributes = {
         ...existingAttr,
         costOptions,
@@ -932,8 +935,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         costWithTax: isSupplierGift ? 0 : (parseFloat(costWithTax || costPrice) || 0),
         profitMarginPercent: marginPercent,
         profitAmount: parseFloat(profitAmount) || 0,
+        subtotalSinIVA,
         discountPercent: Number(discountPercent) || 0,
-        selectedCostPrice: isSupplierGift ? 0 : (parseFloat(costPrice) || 0),
+        selectedCostPrice: isSupplierGift ? 0 : (parseFloat(costWithTax || costPrice) || 0),
         hasPurchaseTax: effectiveHasTax,
         purchaseTaxPercent: effectiveTaxRate,
         applySaleTax: effectiveHasTax,
