@@ -192,6 +192,17 @@ const processLogoImageFile = (file: File, maxDim = 400): Promise<string> => {
   });
 };
 
+const hexToRgbaHelper = (hex: string, alpha: number = 1): string => {
+  if (!hex) return `rgba(15, 23, 42, ${alpha})`;
+  let c = hex.replace('#', '').trim();
+  if (c.length === 3) c = c.split('').map((char) => char + char).join('');
+  if (c.length !== 6) return `rgba(15, 23, 42, ${alpha})`;
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   initialConfig,
   onSaved,
@@ -218,7 +229,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   const [itemsPerPage, setItemsPerPage] = useState<number>(12);
   const [defaultProductSort, setDefaultProductSort] = useState<string>('date_desc');
   const [defaultInitialCategory, setDefaultInitialCategory] = useState<string>('all');
-  const [categoryImages, setCategoryImages] = useState<Record<string, string>>({});
+  const [categoryImages, setCategoryImages] = useState<Record<string, string | { imageUrl?: string; overlayColor?: string; overlayOpacity?: number }>>({});
   const [instagramUrl, setInstagramUrl] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [address, setAddress] = useState('');
@@ -1230,9 +1241,61 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pt-1">
             {(productCategories.length > 0 ? productCategories : ['General', 'Tecnología', 'Moda', 'Hogar', 'Ofertas']).map((cat) => {
-              const currentImg = categoryImages[cat] || '';
+              const rawVal = categoryImages[cat];
+              let catImg = '';
+              let catColor = '#0f172a';
+              let catOpacity = 85;
+
+              if (typeof rawVal === 'string') {
+                catImg = rawVal;
+              } else if (rawVal && typeof rawVal === 'object') {
+                catImg = rawVal.imageUrl || '';
+                catColor = rawVal.overlayColor || '#0f172a';
+                catOpacity = rawVal.overlayOpacity !== undefined ? Number(rawVal.overlayOpacity) : 85;
+              }
+
+              const updateCatConfig = (patch: Partial<{ imageUrl: string; overlayColor: string; overlayOpacity: number }>) => {
+                setCategoryImages((prev) => {
+                  const existing = prev[cat];
+                  let curImg = '';
+                  let curColor = '#0f172a';
+                  let curOpacity = 85;
+
+                  if (typeof existing === 'string') {
+                    curImg = existing;
+                  } else if (existing && typeof existing === 'object') {
+                    curImg = existing.imageUrl || '';
+                    curColor = existing.overlayColor || '#0f172a';
+                    curOpacity = existing.overlayOpacity !== undefined ? Number(existing.overlayOpacity) : 85;
+                  }
+
+                  return {
+                    ...prev,
+                    [cat]: {
+                      imageUrl: patch.imageUrl !== undefined ? patch.imageUrl : curImg,
+                      overlayColor: patch.overlayColor !== undefined ? patch.overlayColor : curColor,
+                      overlayOpacity: patch.overlayOpacity !== undefined ? patch.overlayOpacity : curOpacity,
+                    },
+                  };
+                });
+              };
+
               const fallbackBg = 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=900&q=80';
-              const displayBg = currentImg || fallbackBg;
+              const displayBg = catImg || fallbackBg;
+
+              const previewOverlayStyle = {
+                background: `linear-gradient(to right, ${hexToRgbaHelper(catColor, Math.min(1, (catOpacity / 100) * 1.15))}, ${hexToRgbaHelper(catColor, catOpacity / 100)}, ${hexToRgbaHelper(catColor, (catOpacity / 100) * 0.45)})`,
+              };
+
+              const COLOR_PRESETS = [
+                { hex: '#0f172a', name: 'Slate Oscuro' },
+                { hex: '#000000', name: 'Negro Puro' },
+                { hex: '#1e1b4b', name: 'Azul Noche' },
+                { hex: '#064e3b', name: 'Verde Esmeralda' },
+                { hex: '#831843', name: 'Vino Caramín' },
+                { hex: '#581c87', name: 'Púrpura Imperial' },
+                { hex: '#78350f', name: 'Ámbar Cálido' },
+              ];
 
               return (
                 <div key={cat} className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3.5 flex flex-col justify-between shadow-xs hover:border-amber-300 transition-all">
@@ -1242,7 +1305,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                       <Tag className="w-4 h-4 text-amber-500 shrink-0" />
                       <span className="truncate">{cat}</span>
                     </span>
-                    {currentImg ? (
+                    {catImg ? (
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
                         <span>Personalizada</span>
@@ -1254,7 +1317,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                     )}
                   </div>
 
-                  {/* Banner Live Preview Container */}
+                  {/* Banner Live Dynamic Preview Container */}
                   <div className="relative w-full h-24 rounded-xl border border-slate-200 overflow-hidden bg-slate-950 shadow-inner group">
                     <img
                       src={displayBg}
@@ -1264,7 +1327,10 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                         (e.target as HTMLElement).setAttribute('src', fallbackBg);
                       }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/40 to-transparent flex items-center px-3.5">
+                    {/* Live Custom Color & Transparency Overlay */}
+                    <div className="absolute inset-0 transition-all duration-300" style={previewOverlayStyle} />
+
+                    <div className="absolute inset-0 flex items-center px-3.5 z-10 pointer-events-none">
                       <div className="text-white space-y-0.5">
                         <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-400 block">Vista Previa Banner</span>
                         <span className="text-xs font-black drop-shadow-sm">{cat}</span>
@@ -1273,11 +1339,11 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                   </div>
 
                   {/* Buttons & File Input Row */}
-                  <div className="space-y-2 pt-1">
+                  <div className="space-y-3 pt-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <label className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs active:scale-95 text-center truncate">
                         <UploadCloud className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{currentImg ? 'Cambiar Imagen' : 'Subir Imagen HD'}</span>
+                        <span className="truncate">{catImg ? 'Cambiar Imagen' : 'Subir Imagen HD'}</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -1287,10 +1353,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                             if (file) {
                               try {
                                 const b64 = await processLogoImageFile(file, 1400);
-                                setCategoryImages((prev) => ({
-                                  ...prev,
-                                  [cat]: b64,
-                                }));
+                                updateCatConfig({ imageUrl: b64 });
                               } catch (err: any) {
                                 alert(err.message || 'Error al procesar imagen');
                               }
@@ -1299,13 +1362,11 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                         />
                       </label>
 
-                      {currentImg && (
+                      {catImg && (
                         <button
                           type="button"
                           onClick={() => {
-                            const copy = { ...categoryImages };
-                            delete copy[cat];
-                            setCategoryImages(copy);
+                            updateCatConfig({ imageUrl: '' });
                           }}
                           className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-xs transition flex items-center justify-center space-x-1 cursor-pointer shrink-0 active:scale-95"
                           title="Quitar imagen personalizada"
@@ -1323,15 +1384,66 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                       </label>
                       <input
                         type="text"
-                        value={currentImg}
-                        onChange={(e) => {
-                          setCategoryImages((prev) => ({
-                            ...prev,
-                            [cat]: e.target.value,
-                          }));
-                        }}
+                        value={catImg}
+                        onChange={(e) => updateCatConfig({ imageUrl: e.target.value })}
                         placeholder="https://ejemplo.com/banner-hd.jpg"
                         className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-400 font-medium truncate"
+                      />
+                    </div>
+
+                    {/* Color Picker & Presets Controls */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                        <span className="flex items-center gap-1.5">
+                          <Palette className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Color de Capa Overlay</span>
+                        </span>
+                        <span className="font-mono text-[10px] text-slate-500 uppercase">{catColor}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={catColor}
+                          onChange={(e) => updateCatConfig({ overlayColor: e.target.value })}
+                          className="w-7 h-7 rounded-lg cursor-pointer border border-slate-300 p-0.5 bg-white shrink-0 shadow-2xs"
+                          title="Seleccionar color personalizado"
+                        />
+                        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5 flex-1">
+                          {COLOR_PRESETS.map((preset) => (
+                            <button
+                              key={preset.hex}
+                              type="button"
+                              onClick={() => updateCatConfig({ overlayColor: preset.hex })}
+                              className={`w-5.5 h-5.5 rounded-md shrink-0 border transition-all cursor-pointer ${
+                                catColor.toLowerCase() === preset.hex.toLowerCase() ? 'ring-2 ring-amber-500 scale-110 border-white' : 'border-slate-300 hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: preset.hex }}
+                              title={`${preset.name} (${preset.hex})`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Opacity / Transparency Range Slider */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                        <span className="flex items-center gap-1.5">
+                          <Sliders className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Opacidad de Capa</span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 text-[10px] font-mono font-black">
+                          {catOpacity}% Opacidad ({100 - catOpacity}% Visibilidad Imagen)
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={catOpacity}
+                        onChange={(e) => updateCatConfig({ overlayOpacity: Number(e.target.value) })}
+                        className="w-full accent-amber-500 cursor-pointer h-1.5 bg-slate-200 rounded-lg appearance-none"
                       />
                     </div>
                   </div>

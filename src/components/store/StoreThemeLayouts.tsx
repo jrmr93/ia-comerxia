@@ -2038,15 +2038,31 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     }
   }, [storeConfig?.categoryImages]);
 
-  const getCustomCategoryImage = React.useCallback(
-    (catName: string): string | undefined => {
+  const getCustomCategoryHeaderConfig = React.useCallback(
+    (catName: string): { imageUrl?: string; overlayColor?: string; overlayOpacity?: number } | undefined => {
       if (!catName || !categoryImagesMap) return undefined;
-      if (categoryImagesMap[catName]) return categoryImagesMap[catName];
-      const trimmed = catName.trim();
-      if (categoryImagesMap[trimmed]) return categoryImagesMap[trimmed];
-      const lower = trimmed.toLowerCase();
-      const entry = Object.entries(categoryImagesMap).find(([k]) => k.trim().toLowerCase() === lower);
-      return entry ? entry[1] : undefined;
+      let raw: any = categoryImagesMap[catName];
+      if (!raw) {
+        const trimmed = catName.trim();
+        raw = categoryImagesMap[trimmed];
+        if (!raw) {
+          const lower = trimmed.toLowerCase();
+          const entry = Object.entries(categoryImagesMap).find(([k]) => k.trim().toLowerCase() === lower);
+          if (entry) raw = entry[1];
+        }
+      }
+      if (!raw) return undefined;
+      if (typeof raw === 'string') {
+        return { imageUrl: raw, overlayColor: '#0f172a', overlayOpacity: 85 };
+      }
+      if (typeof raw === 'object' && raw !== null) {
+        return {
+          imageUrl: raw.imageUrl || raw.url || '',
+          overlayColor: raw.overlayColor || '#0f172a',
+          overlayOpacity: raw.overlayOpacity !== undefined ? Number(raw.overlayOpacity) : 85,
+        };
+      }
+      return undefined;
     },
     [categoryImagesMap]
   );
@@ -2866,12 +2882,19 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
 
           {selectedCategory !== 'all' ? (
             <div className="space-y-6">
-              <CategoryTransitionBanner
-                categoryName={selectedCategory}
-                itemCount={filteredProducts.length}
-                sampleProducts={filteredProducts}
-                customImageUrl={getCustomCategoryImage(selectedCategory)}
-              />
+              {(() => {
+                const catCfg = getCustomCategoryHeaderConfig(selectedCategory);
+                return (
+                  <CategoryTransitionBanner
+                    categoryName={selectedCategory}
+                    itemCount={filteredProducts.length}
+                    sampleProducts={filteredProducts}
+                    customImageUrl={catCfg?.imageUrl}
+                    overlayColor={catCfg?.overlayColor}
+                    overlayOpacity={catCfg?.overlayOpacity}
+                  />
+                );
+              })()}
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
                 {paginatedProducts.map((item) => (
                   <ProductCardItem key={item.id} item={item} props={props} />
@@ -2898,6 +2921,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   const totalInCat = products.filter(
                     (p) => (p.category || 'General') === catName && p.status !== 'archived'
                   ).length;
+                  const catCfg = getCustomCategoryHeaderConfig(catName);
 
                   return (
                     <div key={catName} className="space-y-4">
@@ -2906,7 +2930,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                         categoryName={catName}
                         itemCount={totalInCat}
                         sampleProducts={catProducts}
-                        customImageUrl={getCustomCategoryImage(catName)}
+                        customImageUrl={catCfg?.imageUrl}
+                        overlayColor={catCfg?.overlayColor}
+                        overlayOpacity={catCfg?.overlayOpacity}
                         onSelectCategory={(cat) => setSelectedCategory(cat)}
                       />
 

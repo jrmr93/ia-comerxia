@@ -562,6 +562,12 @@ export interface StorePromoPopupConfig {
   featuredCategory?: string;
 }
 
+export interface CategoryHeaderConfig {
+  imageUrl?: string;
+  overlayColor?: string; // Hex color e.g. '#0f172a' or '#000000'
+  overlayOpacity?: number; // 0 to 100
+}
+
 export interface StoreConfig {
   id?: number;
   userId?: number;
@@ -592,7 +598,7 @@ export interface StoreConfig {
   itemsPerPage?: number;
   defaultProductSort?: 'price_desc' | 'price_asc' | 'category' | 'date_desc' | 'random' | 'featured' | string;
   defaultInitialCategory?: string | null;
-  categoryImages?: Record<string, string> | string | null;
+  categoryImages?: Record<string, string | CategoryHeaderConfig> | string | null;
   promoPopup?: StorePromoPopupConfig | string | null;
   domain?: string;
 }

@@ -7,9 +7,22 @@ interface CategoryTransitionBannerProps {
   itemCount: number;
   sampleProducts?: InventoryItem[];
   customImageUrl?: string | null;
+  overlayColor?: string | null;
+  overlayOpacity?: number | null;
   onSelectCategory?: (category: string) => void;
   className?: string;
 }
+
+const hexToRgba = (hex: string, alpha: number = 1): string => {
+  if (!hex) return `rgba(15, 23, 42, ${alpha})`;
+  let c = hex.replace('#', '').trim();
+  if (c.length === 3) c = c.split('').map((char) => char + char).join('');
+  if (c.length !== 6) return `rgba(15, 23, 42, ${alpha})`;
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const CATEGORY_BACKGROUND_IMAGES: Record<string, string> = {
   belleza: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1600&q=80',
@@ -42,6 +55,8 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
   itemCount,
   sampleProducts = [],
   customImageUrl,
+  overlayColor,
+  overlayOpacity,
   onSelectCategory,
   className = '',
 }) => {
@@ -67,6 +82,14 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
 
   const thumbs = sampleProducts.filter((p) => p.imageUrl).slice(0, 3);
 
+  // Compute dynamic overlay transparency and color gradient
+  const baseColor = overlayColor || '#0f172a';
+  const opVal = overlayOpacity !== undefined && overlayOpacity !== null ? Math.max(0, Math.min(100, Number(overlayOpacity))) / 100 : 0.85;
+
+  const overlayBgStyle = {
+    background: `linear-gradient(to right, ${hexToRgba(baseColor, Math.min(1, opVal * 1.15))}, ${hexToRgba(baseColor, opVal)}, ${hexToRgba(baseColor, opVal * 0.45)})`,
+  };
+
   return (
     <div className={`col-span-full my-3 sm:my-4 ${className}`}>
       {/* Compact Height Container (User Request: "no sean muy altos, sean un poco más cortos de altura") */}
@@ -77,8 +100,8 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
           style={{ backgroundImage: `url('${bgImage}')` }}
         />
 
-        {/* High-Contrast Multi-layered Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-900/85 to-slate-950/50 backdrop-blur-[1px]" />
+        {/* High-Contrast Dynamic Multi-layered Overlay with Custom Color & Transparency */}
+        <div className="absolute inset-0 backdrop-blur-[1px] transition-all duration-300" style={overlayBgStyle} />
 
         {/* Light Sweep Sheen Effect on Hover */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none" />
