@@ -15,6 +15,7 @@ import {
   Eye,
   Film,
   Filter,
+  FileArchive,
   Grid,
   Images,
   Layers,
@@ -55,6 +56,7 @@ import { parseVideoUrl } from '../utils/video-helper.ts';
 import { checkProductTransactionLink } from '../utils/productIntegrity.ts';
 import { DeactivateConfirmationModal } from './DeactivateConfirmationModal.tsx';
 import { ShareStoreModal } from './ShareStoreModal.tsx';
+import { BatchProductFlyersModal } from './BatchProductFlyersModal.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
 
 export function calculateItemFinancials(item: InventoryItem) {
@@ -448,6 +450,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [isProcessingStatus, setIsProcessingStatus] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [shareInitialCategory, setShareInitialCategory] = useState<string>('');
+  const [batchFlyerItems, setBatchFlyerItems] = useState<InventoryItem[] | null>(null);
 
   // Keep marketingCopyItem in sync with items without losing newly appended images
   useEffect(() => {
@@ -1206,6 +1209,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+            <button
+              onClick={() => {
+                const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
+                setBatchFlyerItems(selectedProducts);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+              title="Crear imágenes promocionales en lote por categoría y descargarlas en un archivo .ZIP"
+            >
+              <FileArchive className="w-3.5 h-3.5 text-indigo-200" />
+              <span>Crear Imágenes HD .ZIP ({selectedIds.length})</span>
+            </button>
             <button
               onClick={() => {
                 const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
@@ -2014,6 +2028,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           setTimeout(() => setReparseToast(null), 3500);
         }}
       />
+
+      {/* Batch Promotional Flyers (.ZIP) Modal */}
+      {batchFlyerItems && batchFlyerItems.length > 0 && (
+        <BatchProductFlyersModal
+          items={batchFlyerItems}
+          onClose={() => setBatchFlyerItems(null)}
+          storeConfig={storeConfig}
+          currency={currency}
+        />
+      )}
 
       {reparseToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl border border-amber-500/50 flex items-center gap-2 animate-bounce">
