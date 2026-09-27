@@ -293,7 +293,7 @@ video::-moz-media-controls-mute-button {
     transform: translateX(-150%) skewX(-20deg);
   }
 
-  50%,
+  30%,
   100% {
     transform: translateX(250%) skewX(-20deg);
   }
@@ -308,9 +308,91 @@ video::-moz-media-controls-mute-button {
   height: 100%;
   background: linear-gradient(90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.04) 50%,
       transparent 100%);
   transform: translateX(-150%) skewX(-20deg);
-  animation: vipLightSweep 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: vipLightSweep 12s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   pointer-events: none;
 }
+
+/* -------------------------------------------------------------------------- */
+/* SUBTLE MOBILE DESTELLOS, GLOSSY SHEEN & BADGE GLOW ANIMATIONS              */
+/* (Efectos de destellos sutiles y elegantes con intervalos más largos)       */
+/* -------------------------------------------------------------------------- */
+
+@keyframes continuousGlossySheen {
+  0% {
+    transform: translateX(-150%) skewX(-25deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.4;
+  }
+  28% {
+    transform: translateX(250%) skewX(-25deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(250%) skewX(-25deg);
+    opacity: 0;
+  }
+}
+
+.glossy-sheen-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.glossy-sheen-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.16) 50%,
+    transparent 100%
+  );
+  transform: translateX(-150%) skewX(-25deg);
+  animation: continuousGlossySheen 10.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 15;
+}
+
+@keyframes destelloPulseGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 1px rgba(245, 158, 11, 0.25)) brightness(1);
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.45)) brightness(1.03);
+    transform: scale(1.015);
+  }
+}
+
+.animate-destello-pulse {
+  animation: destelloPulseGlow 5.5s ease-in-out infinite;
+}
+
+@keyframes mobileBreathingZoom {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.018);
+  }
+}
+
+/* Dynamic touch-screen enhancements for mobile cell phones without hover capability */
+@media (hover: none) {
+  .mobile-auto-zoom {
+    animation: mobileBreathingZoom 8s ease-in-out infinite;
+  }
+
+  .mobile-destello-border {
+    box-shadow: 0 0 8px 1px rgba(245, 158, 11, 0.2);
+  }
+}

@@ -524,7 +524,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
 
               {/* Main Media Showcase Box with Mobile Touch Swipe & Zoom */}
               <div
-                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/80 flex items-center justify-center shadow-xs select-none touch-pan-y group cursor-zoom-in"
+                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/80 flex items-center justify-center shadow-xs select-none touch-pan-y group cursor-zoom-in glossy-sheen-effect"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}

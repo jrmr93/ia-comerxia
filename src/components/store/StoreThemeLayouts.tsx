@@ -1364,16 +1364,16 @@ export const ProductCardItem: React.FC<{
       {/* Top Image Preview */}
       <div
         onClick={() => onQuickViewProduct(item)}
-        className={`aspect-square relative overflow-hidden cursor-pointer transition ${themeStyles.productImageBg}`}
+        className={`aspect-square relative overflow-hidden cursor-pointer transition glossy-sheen-effect ${themeStyles.productImageBg}`}
       >
         <ProductMediaDisplay
           imageUrl={photos[0] || item.imageUrl}
           candidateImages={photos}
           videoUrl={item.videoUrl}
           name={item.name}
-          className="w-full h-full relative"
-          imageClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full relative glossy-sheen-effect"
+          imageClassName="w-full h-full object-cover group-hover:scale-105 mobile-auto-zoom transition-transform duration-300"
+          videoClassName="w-full h-full object-cover group-hover:scale-105 mobile-auto-zoom transition-transform duration-300"
           autoPlayVideo={true}
           showPlayBadge={false}
           placeholderText="Sin imagen"
@@ -1383,7 +1383,7 @@ export const ProductCardItem: React.FC<{
         {/* Offer & Category overlay pill */}
         <div className="absolute top-1.5 sm:top-2.5 left-1.5 sm:left-2.5 flex flex-col gap-1 z-10 max-w-[70%]">
           {hasDiscount && (
-            <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 text-white shadow-md shadow-rose-600/40 border border-white/40 flex items-center space-x-1 animate-pulse">
+            <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 text-white shadow-md shadow-rose-600/40 border border-white/40 flex items-center space-x-1 animate-destello-pulse">
               <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-yellow-200 fill-yellow-200" />
               <span>OFERTA -{discountPercent}%</span>
             </span>

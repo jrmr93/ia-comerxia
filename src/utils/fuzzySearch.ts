@@ -56,27 +56,21 @@ export function fuzzyWordMatchScore(queryWord: string, targetText: string): numb
   for (const word of targetWords) {
     if (word === normQuery) return 1.0;
     if (word.startsWith(normQuery)) return 0.95;
-    if (normQuery.startsWith(word) && word.length >= 3) return 0.90;
-    if (word.includes(normQuery)) return 0.85;
+    if (normQuery.startsWith(word) && word.length >= 4) return 0.90;
+    if (word.includes(normQuery) && normQuery.length >= 3) return 0.85;
 
     const lenDiff = Math.abs(word.length - normQuery.length);
 
-    // Allow Levenshtein typos based on word length
-    if (normQuery.length >= 3 && lenDiff <= 3) {
+    // Strict Levenshtein typos:
+    // Allow max 1 edit for 4-5 letter words, max 2 edits for 6+ letter words.
+    if (normQuery.length >= 4 && lenDiff <= 2) {
       const dist = levenshteinDistance(normQuery, word);
 
       if (dist === 1) {
-        maxScore = Math.max(maxScore, 0.85);
-      } else if (dist === 2 && normQuery.length >= 4) {
-        maxScore = Math.max(maxScore, 0.70);
-      } else if (dist === 3 && normQuery.length >= 6) {
-        maxScore = Math.max(maxScore, 0.55);
+        maxScore = Math.max(maxScore, 0.82);
+      } else if (dist === 2 && normQuery.length >= 6) {
+        maxScore = Math.max(maxScore, 0.68);
       }
-    }
-
-    // Prefix matching for typing speed (first 3 chars match)
-    if (normQuery.length >= 3 && word.length >= 3 && normQuery.slice(0, 3) === word.slice(0, 3)) {
-      maxScore = Math.max(maxScore, 0.60);
     }
   }
 
@@ -108,6 +102,10 @@ export function searchProductsFuzzy(
   const normQuery = normalizeFuzzyText(rawQ);
   const queryTokens = normQuery.split(/\s+/).filter(Boolean);
 
+  if (queryTokens.length === 0) {
+    return { matches: products, didYouMean: null, suggestedCategories: [] };
+  }
+
   const scoredList: FuzzySearchResult[] = [];
 
   (products || []).forEach((item) => {
@@ -138,53 +136,35 @@ export function searchProductsFuzzy(
       return;
     }
 
-    // 2. Token-by-token fuzzy scoring for typos
-    let tokenScoreSum = 0;
-    let highestSingleTokenScore = 0;
+    // 2. Strict Token-by-Token Match Requirement
+    // Every query token must match at least one attribute with score >= 0.65
+    let minTokenScore = 1.0;
+    let sumTokenScore = 0;
 
-    queryTokens.forEach((token) => {
+    for (const token of queryTokens) {
       const nameScore = fuzzyWordMatchScore(token, name);
+      const skuScore = normSku.includes(token) ? 1.0 : 0;
       const categoryScore = fuzzyWordMatchScore(token, category);
       const tagScore = fuzzyWordMatchScore(token, tags);
-      const descScore = fuzzyWordMatchScore(token, desc) * 0.8;
+      const descScore = fuzzyWordMatchScore(token, desc) * 0.7;
 
-      const bestTokenScore = Math.max(nameScore, categoryScore, tagScore, descScore);
-      tokenScoreSum += bestTokenScore;
-      highestSingleTokenScore = Math.max(highestSingleTokenScore, bestTokenScore);
-    });
+      const bestTokenScore = Math.max(nameScore, skuScore, categoryScore, tagScore, descScore);
+      if (bestTokenScore < minTokenScore) {
+        minTokenScore = bestTokenScore;
+      }
+      sumTokenScore += bestTokenScore;
+    }
 
-    const avgScore = queryTokens.length > 0 ? tokenScoreSum / queryTokens.length : 0;
-    const finalScore = Math.max(avgScore, highestSingleTokenScore * 0.85);
+    const avgTokenScore = queryTokens.length > 0 ? sumTokenScore / queryTokens.length : 0;
 
-    // Dynamic threshold: accepts item if score >= 0.40
-    if (finalScore >= 0.40) {
-      scoredList.push({ item, score: finalScore, exactMatch: false });
+    // High fidelity threshold: require minTokenScore >= 0.65 and average >= 0.68
+    if (minTokenScore >= 0.65 && avgTokenScore >= 0.68) {
+      scoredList.push({ item, score: avgTokenScore, exactMatch: false });
     }
   });
 
   // Sort descending by match score
   scoredList.sort((a, b) => b.score - a.score);
-
-  // Fallback: If no matches were found under standard threshold, pick candidates with any partial token overlap
-  if (scoredList.length === 0 && products.length > 0) {
-    products.forEach((item) => {
-      if (item.status === 'archived') return;
-      const normName = normalizeFuzzyText(item.name || '');
-      const normCat = normalizeFuzzyText(item.category || '');
-
-      let fallbackScore = 0;
-      queryTokens.forEach((token) => {
-        if (normName.includes(token.slice(0, 2)) || normCat.includes(token.slice(0, 2))) {
-          fallbackScore += 0.35;
-        }
-      });
-
-      if (fallbackScore > 0) {
-        scoredList.push({ item, score: fallbackScore, exactMatch: false });
-      }
-    });
-    scoredList.sort((a, b) => b.score - a.score);
-  }
 
   const matches = scoredList.map((s) => s.item);
 

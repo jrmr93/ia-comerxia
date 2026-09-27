@@ -70,7 +70,7 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
   return (
     <div className={`col-span-full my-3 sm:my-4 ${className}`}>
       {/* Compact Height Container (User Request: "no sean muy altos, sean un poco más cortos de altura") */}
-      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-700/60 shadow-xl group transition-all duration-300 hover:shadow-amber-500/10 min-h-[110px] sm:min-h-[125px]">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-700/60 shadow-xl group transition-all duration-300 hover:shadow-amber-500/10 min-h-[110px] sm:min-h-[125px] glossy-sheen-effect">
         {/* Full Cover Background Image with Zoom Effect */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
