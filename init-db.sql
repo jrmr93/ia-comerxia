@@ -233,6 +233,7 @@ CREATE TABLE IF NOT EXISTS store_configs (
   courier_logos TEXT,
   payment_logos TEXT,
   theme TEXT DEFAULT 'classic',
+  category_images TEXT,
   promo_popup TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()

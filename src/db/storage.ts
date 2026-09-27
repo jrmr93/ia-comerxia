@@ -36,6 +36,8 @@ export interface LocalInventoryItem {
   videoUrl?: string | null;
   images?: string[] | null;
   supplierName: string;
+  supplierCode?: string | null;
+  supplier_code?: string | null;
   tags?: string | null;
   extractedAttributes?: string | null;
   status: string;

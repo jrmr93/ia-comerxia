@@ -723,6 +723,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  courier_logos TEXT,\n`;
   sql += `  payment_logos TEXT,\n`;
   sql += `  theme TEXT DEFAULT 'classic',\n`;
+  sql += `  category_images TEXT,\n`;
   sql += `  promo_popup TEXT,\n`;
   sql += `  created_at TIMESTAMP DEFAULT NOW(),\n`;
   sql += `  updated_at TIMESTAMP DEFAULT NOW()\n`;

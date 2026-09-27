@@ -1210,6 +1210,136 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Panel 3: Imágenes de Cabecera Personalizadas por Categoría (Ubicado Horizontalmente bajo Logos de Tienda) */}
+        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/20 border border-amber-200/90 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xs min-w-0 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between border-b border-amber-200/60 pb-3 gap-2 min-w-0">
+            <div className="space-y-0.5 min-w-0">
+              <h4 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 min-w-0">
+                <ImageIcon className="w-4.5 h-4.5 text-amber-600 shrink-0" />
+                <span className="truncate">Imágenes de Cabecera Personalizadas por Categoría</span>
+              </h4>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                Personaliza la portada o banner superior panorámico para cada categoría de producto en la tienda online vista cliente.
+              </p>
+            </div>
+            <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shrink-0 shadow-2xs">
+              Vista Cliente Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pt-1">
+            {(productCategories.length > 0 ? productCategories : ['General', 'Tecnología', 'Moda', 'Hogar', 'Ofertas']).map((cat) => {
+              const currentImg = categoryImages[cat] || '';
+              const fallbackBg = 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=900&q=80';
+              const displayBg = currentImg || fallbackBg;
+
+              return (
+                <div key={cat} className="p-4 bg-white border border-slate-200 rounded-2xl space-y-3.5 flex flex-col justify-between shadow-xs hover:border-amber-300 transition-all">
+                  {/* Category Card Header */}
+                  <div className="flex items-center justify-between gap-2 min-w-0 border-b border-slate-100 pb-2.5">
+                    <span className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-2 truncate">
+                      <Tag className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span className="truncate">{cat}</span>
+                    </span>
+                    {currentImg ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>Personalizada</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                        Portada Auto
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Banner Live Preview Container */}
+                  <div className="relative w-full h-24 rounded-xl border border-slate-200 overflow-hidden bg-slate-950 shadow-inner group">
+                    <img
+                      src={displayBg}
+                      alt={cat}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      onError={(e) => {
+                        (e.target as HTMLElement).setAttribute('src', fallbackBg);
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/40 to-transparent flex items-center px-3.5">
+                      <div className="text-white space-y-0.5">
+                        <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-400 block">Vista Previa Banner</span>
+                        <span className="text-xs font-black drop-shadow-sm">{cat}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Buttons & File Input Row */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <label className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs active:scale-95 text-center truncate">
+                        <UploadCloud className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{currentImg ? 'Cambiar Imagen' : 'Subir Imagen HD'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const b64 = await processLogoImageFile(file, 1400);
+                                setCategoryImages((prev) => ({
+                                  ...prev,
+                                  [cat]: b64,
+                                }));
+                              } catch (err: any) {
+                                alert(err.message || 'Error al procesar imagen');
+                              }
+                            }
+                          }}
+                        />
+                      </label>
+
+                      {currentImg && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const copy = { ...categoryImages };
+                            delete copy[cat];
+                            setCategoryImages(copy);
+                          }}
+                          className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-xs transition flex items-center justify-center space-x-1 cursor-pointer shrink-0 active:scale-95"
+                          title="Quitar imagen personalizada"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>Quitar</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* URL Field */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 block">
+                        O pega la URL directa de imagen panorámica:
+                      </label>
+                      <input
+                        type="text"
+                        value={currentImg}
+                        onChange={(e) => {
+                          setCategoryImages((prev) => ({
+                            ...prev,
+                            [cat]: e.target.value,
+                          }));
+                        }}
+                        placeholder="https://ejemplo.com/banner-hd.jpg"
+                        className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-400 font-medium truncate"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Right 1 Col: Opciones de Visualización y Catálogo (Responsivo) */}
@@ -1395,77 +1525,8 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
             )}
           </div>
         </div>
-
-        {/* 🖼️ CATEGORY BANNER IMAGES CUSTOMIZATION */}
-        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/20 border border-amber-200/80 rounded-2xl p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-amber-200/60 pb-3">
-            <div className="space-y-0.5">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-amber-600" />
-                Imágenes de Cabecera Personalizadas por Categoría
-              </h4>
-              <p className="text-[11px] text-slate-600 font-medium">
-                Personaliza la imagen completa de fondo para el panel de cada categoría en la tienda online vista cliente.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {Array.from(new Set(storeProducts.map((p) => p.category).filter(Boolean))).map((cat) => {
-              const currentImg = categoryImages[cat] || '';
-              return (
-                <div key={cat} className="p-3 bg-white border border-slate-200 rounded-xl space-y-2 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 truncate">
-                      <Tag className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      {cat}
-                    </span>
-                    {currentImg && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const copy = { ...categoryImages };
-                          delete copy[cat];
-                          setCategoryImages(copy);
-                        }}
-                        className="text-[10px] text-red-600 hover:text-red-800 font-bold cursor-pointer shrink-0"
-                      >
-                        Quitar
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 relative">
-                      {currentImg ? (
-                        <img src={currentImg} alt={cat} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-[9px] font-bold">
-                          Auto
-                        </div>
-                      )}
-                    </div>
-
-                    <input
-                      type="text"
-                      value={currentImg}
-                      onChange={(e) => {
-                        setCategoryImages((prev) => ({
-                          ...prev,
-                          [cat]: e.target.value,
-                        }));
-                      }}
-                      placeholder="URL de imagen HD (https://...)"
-                      className="flex-1 text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 font-medium min-w-0"
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </div>
-      </div>
+    </div>
 
       {/* 2. MÉTODOS DE PAGO Y LOGÍSTICA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

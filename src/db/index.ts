@@ -594,6 +594,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS courier_logos TEXT;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS payment_logos TEXT;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'classic';
+        ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS category_images TEXT;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS promo_popup TEXT;
         ALTER TABLE store_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
       `);

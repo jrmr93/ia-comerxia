@@ -287,15 +287,23 @@ export function formatItemWithAllImages<T extends Record<string, any>>(item: T):
   if (!item) return item;
   const images = getProductPhotosWithFallback(item);
   let videoUrl = item.videoUrl || item.video_url || null;
-  if (!videoUrl && item.extractedAttributes) {
+  let supplierCode = item.supplierCode || item.supplier_code || null;
+  
+  if ((!videoUrl || !supplierCode) && item.extractedAttributes) {
     try {
       const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
-      videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
+      if (!videoUrl) {
+        videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
+      }
+      if (!supplierCode) {
+        supplierCode = parsed?.supplierCode || parsed?.supplier_code || parsed?.sku_proveedor || parsed?.providerSku || null;
+      }
     } catch { }
   }
   const effectiveImageUrl = normalizeMediaUrl(item.imageUrl || item.image_url) || images[0] || null;
   return normalizeItemTaxesAndPrices({
     ...item,
+    supplierCode: supplierCode ? String(supplierCode).trim() : null,
     imageUrl: effectiveImageUrl,
     images,
     videoUrl,
@@ -3494,6 +3502,12 @@ export async function updateStoreConfig(
   }
   if (data.promo_popup !== undefined) {
     updatePayload.promoPopup = typeof data.promo_popup === 'string' ? data.promo_popup : JSON.stringify(data.promo_popup);
+  }
+  if (data.categoryImages !== undefined) {
+    updatePayload.categoryImages = typeof data.categoryImages === 'string' ? data.categoryImages : JSON.stringify(data.categoryImages);
+  }
+  if (data.category_images !== undefined) {
+    updatePayload.categoryImages = typeof data.category_images === 'string' ? data.category_images : JSON.stringify(data.category_images);
   }
 
   const rawTheme = data.theme !== undefined ? String(data.theme).trim() : undefined;

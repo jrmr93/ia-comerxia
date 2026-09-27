@@ -2038,6 +2038,19 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     }
   }, [storeConfig?.categoryImages]);
 
+  const getCustomCategoryImage = React.useCallback(
+    (catName: string): string | undefined => {
+      if (!catName || !categoryImagesMap) return undefined;
+      if (categoryImagesMap[catName]) return categoryImagesMap[catName];
+      const trimmed = catName.trim();
+      if (categoryImagesMap[trimmed]) return categoryImagesMap[trimmed];
+      const lower = trimmed.toLowerCase();
+      const entry = Object.entries(categoryImagesMap).find(([k]) => k.trim().toLowerCase() === lower);
+      return entry ? entry[1] : undefined;
+    },
+    [categoryImagesMap]
+  );
+
   // Reset to page 1 whenever filters or search change
   React.useEffect(() => {
     setCurrentPage(1);
@@ -2857,7 +2870,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 categoryName={selectedCategory}
                 itemCount={filteredProducts.length}
                 sampleProducts={filteredProducts}
-                customImageUrl={categoryImagesMap[selectedCategory]}
+                customImageUrl={getCustomCategoryImage(selectedCategory)}
               />
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
                 {paginatedProducts.map((item) => (
@@ -2893,7 +2906,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                         categoryName={catName}
                         itemCount={totalInCat}
                         sampleProducts={catProducts}
-                        customImageUrl={categoryImagesMap[catName]}
+                        customImageUrl={getCustomCategoryImage(catName)}
                         onSelectCategory={(cat) => setSelectedCategory(cat)}
                       />
 

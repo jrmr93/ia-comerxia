@@ -235,6 +235,7 @@ export const storeConfigs = pgTable('store_configs', {
   courierLogos: text('courier_logos'),
   paymentLogos: text('payment_logos'),
   theme: text('theme').default('classic'),
+  categoryImages: text('category_images'),
   promoPopup: text('promo_popup'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

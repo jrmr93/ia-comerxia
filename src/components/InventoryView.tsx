@@ -538,11 +538,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     ? it.status === 'archived'
                     : it.status === statusFilter;
     const matchesOffer = !activeShowOffersOnly || disc > 0;
+    const effectiveSupplierCode = it.supplierCode || (it as any).supplier_code || (
+      it.extractedAttributes ? (() => {
+        try {
+          const p = typeof it.extractedAttributes === 'string' ? JSON.parse(it.extractedAttributes) : it.extractedAttributes;
+          return p?.supplierCode || p?.supplier_code || p?.sku_proveedor || null;
+        } catch { return null; }
+      })() : null
+    );
+
     const matchesSearch =
       !searchQuery.trim() ||
       it.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       it.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (it.supplierCode && it.supplierCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (effectiveSupplierCode && String(effectiveSupplierCode).toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.barcode && it.barcode.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.description && it.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.tags && it.tags.toLowerCase().includes(searchQuery.toLowerCase())) ||
