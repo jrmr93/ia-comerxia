@@ -244,3 +244,131 @@ video::-moz-media-controls-mute-button {
   display: none !important;
 }
 
+/* ==========================================================================
+   INNOVATIVE VISUAL & SCROLL ANIMATIONS FOR ONLINE STORE (CUSTOMER VIEW)
+   ========================================================================== */
+
+/* 1. Smooth Scroll Fade-In & Slide-Up Reveal */
+@keyframes scrollRevealFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.97);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.scroll-reveal-card {
+  animation: scrollRevealFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform, filter;
+}
+
+/* 2. Innovative 3D Elevation & Glossy Card Hover */
+.hover-card-innovative {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.35s ease,
+              border-color 0.3s ease;
+}
+
+.hover-card-innovative:hover {
+  transform: translateY(-6px) scale(1.015);
+}
+
+.hover-card-innovative:active {
+  transform: translateY(-2px) scale(0.99);
+}
+
+/* 3. Glossy Reflection Sheen on Hover */
+@keyframes cardGlossyShine {
+  0% {
+    transform: translateX(-100%) rotate(25deg);
+  }
+  100% {
+    transform: translateX(200%) rotate(25deg);
+  }
+}
+
+.glossy-sheen-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.glossy-sheen-effect::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    60deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%) rotate(25deg);
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.glossy-sheen-effect:hover::after {
+  opacity: 1;
+  animation: cardGlossyShine 1.2s ease-in-out forwards;
+}
+
+/* 4. Floating Badge Pulse Glow (OFERTA / ÚLTIMAS UNIDADES) */
+@keyframes floatBadgeGlowPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.5), 0 4px 12px rgba(225, 29, 72, 0.3);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 6px rgba(225, 29, 72, 0), 0 6px 18px rgba(245, 158, 11, 0.45);
+  }
+}
+
+.badge-pulse-glow {
+  animation: floatBadgeGlowPulse 2.4s ease-in-out infinite;
+}
+
+/* 5. Cart Item Added Bounce/Pop Animation */
+@keyframes cartPopBounce {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25) rotate(-4deg);
+  }
+  70% {
+    transform: scale(0.92) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.animate-cart-pop {
+  animation: cartPopBounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 6. Active Category Pill Ambient Glow */
+@keyframes categoryPillGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.65);
+  }
+}
+
+.category-pill-active {
+  animation: categoryPillGlow 3s ease-in-out infinite;
+}
+
+

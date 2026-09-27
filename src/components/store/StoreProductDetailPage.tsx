@@ -508,13 +508,13 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
               {/* Main Media Showcase Box with Mobile Touch Swipe */}
               <div
                 className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/80 flex items-center justify-center shadow-xs select-none touch-pan-y"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
+                onTouchStart={effectiveMediaMode === 'photo' ? handleTouchStart : undefined}
+                onTouchMove={effectiveMediaMode === 'photo' ? handleTouchMove : undefined}
+                onTouchEnd={effectiveMediaMode === 'photo' ? handleTouchEnd : undefined}
+                onMouseDown={effectiveMediaMode === 'photo' ? handleMouseDown : undefined}
+                onMouseMove={effectiveMediaMode === 'photo' ? handleMouseMove : undefined}
+                onMouseUp={effectiveMediaMode === 'photo' ? handleMouseUp : undefined}
+                onMouseLeave={effectiveMediaMode === 'photo' ? handleMouseLeave : undefined}
               >
                 <div
                   className="w-full h-full flex items-center justify-center transition-transform duration-200"
@@ -524,7 +524,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                   }}
                 >
                   {effectiveMediaMode === 'video' && parsedVideo ? (
-                    <div className="w-full h-full bg-black relative flex items-center justify-center">
+                    <div className="w-full h-full bg-black relative flex items-center justify-center z-0">
                       {parsedVideo.isDirect ? (
                         <video
                           ref={(el) => {
@@ -557,7 +557,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                           key={directVideoUrl || parsedVideo.embedUrl}
                           src={directVideoUrl || parsedVideo.embedUrl}
                           controls
-                          controlsList="nodownload novolume"
+                          controlsList="nodownload"
                           autoPlay
                           muted={false}
                           playsInline
@@ -571,7 +571,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                           title={product.name}
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                           allowFullScreen
-                          className="w-full h-full border-0"
+                          className="w-full h-full border-0 pointer-events-auto z-0"
                         />
                       ) : (
                         <div className="text-center p-4 text-slate-400 text-xs">
@@ -626,30 +626,28 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                   )}
                 </div>
 
-                {/* Media Counter Badge (Top Right) */}
-                <div className="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/70 text-white border border-white/20 backdrop-blur-xs flex items-center space-x-1 shadow pointer-events-none">
-                  {effectiveMediaMode === 'photo' ? (
-                    <>
-                      <ImageIcon className="w-3 h-3 text-amber-300" />
-                      <span>
-                        {photos.length > 0 ? `${activeImageIdx + 1}/${photos.length}` : '1/1'}
-                      </span>
-                      {hasVideo && <span className="text-sky-300 text-[10px] ml-1 font-semibold">+ Video ▶</span>}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3 h-3 text-sky-400 fill-current" />
-                      <span>Video</span>
-                    </>
-                  )}
-                </div>
-
-                {/* Video Platform & Return to Photos Badge (when video is playing) */}
-                {effectiveMediaMode === 'video' && parsedVideo && (
-                  <div className="absolute top-3 left-3 z-10 flex items-center space-x-2">
-                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-black/80 text-sky-300 border border-white/20 backdrop-blur-xs">
-                      {parsedVideo.platform.toUpperCase()}
+                {/* Media Counter Badge in Photo mode (Top Right) */}
+                {effectiveMediaMode === 'photo' && (
+                  <div className="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/70 text-white border border-white/20 backdrop-blur-xs flex items-center space-x-1 shadow pointer-events-none">
+                    <ImageIcon className="w-3 h-3 text-amber-300" />
+                    <span>
+                      {photos.length > 0 ? `${activeImageIdx + 1}/${photos.length}` : '1/1'}
                     </span>
+                    {hasVideo && <span className="text-sky-300 text-[10px] ml-1 font-semibold">+ Video ▶</span>}
+                  </div>
+                )}
+
+                {/* Video Badges & Return to Photos Button (when video is playing) */}
+                {effectiveMediaMode === 'video' && parsedVideo && (
+                  <>
+                    {/* Platform Badge (Top Left with pointer-events-none so touches pass to iframe) */}
+                    <div className="absolute top-3 left-3 z-20 pointer-events-none">
+                      <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-black/80 text-sky-300 border border-white/20 backdrop-blur-xs shadow-md">
+                        {parsedVideo.platform.toUpperCase()}
+                      </span>
+                    </div>
+
+                    {/* Volver a Fotos Button (Top Right where it never obstructs YouTube controls) */}
                     {photos.length > 0 && (
                       <button
                         type="button"
@@ -657,14 +655,14 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                           setActiveMediaMode('photo');
                           setActiveImageIdx(photos.length - 1);
                         }}
-                        className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-900/90 hover:bg-black text-amber-300 border border-amber-400/40 shadow flex items-center space-x-1 cursor-pointer transition active:scale-95 backdrop-blur-xs"
-                        title="Regresar a las fotos"
+                        className="absolute top-3 right-3 z-30 px-3 py-1.5 rounded-xl text-xs font-black bg-slate-900/90 hover:bg-black text-amber-300 border border-amber-400/50 shadow-lg flex items-center space-x-1.5 cursor-pointer transition active:scale-95 backdrop-blur-md"
+                        title="Regresar a las fotos del producto"
                       >
-                        <ChevronLeft className="w-3 h-3" />
+                        <ChevronLeft className="w-4 h-4 text-amber-400" />
                         <span>Volver a Fotos</span>
                       </button>
                     )}
-                  </div>
+                  </>
                 )}
 
                 {/* Discount Badge */}
