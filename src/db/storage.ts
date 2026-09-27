@@ -26,6 +26,8 @@ export interface LocalInventoryItem {
   userId: number;
   name: string;
   sku: string;
+  barcode?: string | null;
+  supplierCode?: string | null;
   description?: string;
   category: string;
   costPrice: string;

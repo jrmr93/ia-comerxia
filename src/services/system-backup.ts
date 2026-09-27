@@ -953,7 +953,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.inventoryItems.length > 0) {
     sql += `-- Datos: inventory_items (${data.inventoryItems.length} registros)\n`;
     for (const item of data.inventoryItems) {
-      sql += `INSERT INTO inventory_items (id, user_id, name, sku, barcode, description, category, cost_price, sale_price, discount_percent, stock, image_url, video_url, supplier_name, tags, extracted_attributes, status, raw_telegram_message, marketing_copy) VALUES (${item.id}, ${item.userId || 1}, ${escapeSqlString(item.name)}, ${escapeSqlString(item.sku)}, ${escapeSqlString(item.barcode)}, ${escapeSqlString(item.description)}, ${escapeSqlString(item.category || 'General')}, ${item.costPrice || 0}, ${item.salePrice || 0}, ${item.discountPercent || 0}, ${item.stock || 0}, ${escapeSqlString(item.imageUrl)}, ${escapeSqlString(item.videoUrl)}, ${escapeSqlString(item.supplierName)}, ${escapeSqlString(item.tags)}, ${escapeSqlString(item.extractedAttributes)}, ${escapeSqlString(item.status || 'available')}, ${escapeSqlString(item.rawTelegramMessage)}, ${escapeSqlString(item.marketingCopy)}) ON CONFLICT (id) DO NOTHING;\n`;
+      sql += `INSERT INTO inventory_items (id, user_id, name, sku, barcode, supplier_code, description, category, cost_price, sale_price, discount_percent, stock, image_url, video_url, supplier_name, tags, extracted_attributes, status, raw_telegram_message, marketing_copy) VALUES (${item.id}, ${item.userId || 1}, ${escapeSqlString(item.name)}, ${escapeSqlString(item.sku)}, ${escapeSqlString(item.barcode)}, ${escapeSqlString(item.supplierCode)}, ${escapeSqlString(item.description)}, ${escapeSqlString(item.category || 'General')}, ${item.costPrice || 0}, ${item.salePrice || 0}, ${item.discountPercent || 0}, ${item.stock || 0}, ${escapeSqlString(item.imageUrl)}, ${escapeSqlString(item.videoUrl)}, ${escapeSqlString(item.supplierName)}, ${escapeSqlString(item.tags)}, ${escapeSqlString(item.extractedAttributes)}, ${escapeSqlString(item.status || 'available')}, ${escapeSqlString(item.rawTelegramMessage)}, ${escapeSqlString(item.marketingCopy)}) ON CONFLICT (id) DO NOTHING;\n`;
     }
     sql += `\n`;
   }
@@ -1615,6 +1615,7 @@ export async function restoreCompleteJsonDump(
             name: clean.name,
             sku: clean.sku,
             barcode: clean.barcode || null,
+            supplierCode: clean.supplierCode || null,
             description: clean.description || null,
             category: clean.category || 'General',
             costPrice: String(clean.costPrice || '0.00'),

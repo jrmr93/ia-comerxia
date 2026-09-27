@@ -287,15 +287,24 @@ export function formatItemWithAllImages<T extends Record<string, any>>(item: T):
   if (!item) return item;
   const images = getProductPhotosWithFallback(item);
   let videoUrl = item.videoUrl || item.video_url || null;
-  if (!videoUrl && item.extractedAttributes) {
+  let supplierCode = item.supplierCode || item.supplier_code || null;
+
+  if (item.extractedAttributes) {
     try {
       const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
-      videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
+      if (!videoUrl) {
+        videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
+      }
+      if (!supplierCode) {
+        supplierCode = parsed?.supplierCode || parsed?.supplier_code || parsed?.supplierSku || parsed?.supplier_sku || null;
+      }
     } catch {}
   }
+
   const effectiveImageUrl = normalizeMediaUrl(item.imageUrl || item.image_url) || images[0] || null;
   return normalizeItemTaxesAndPrices({
     ...item,
+    supplierCode,
     imageUrl: effectiveImageUrl,
     images,
     videoUrl,
@@ -1068,6 +1077,7 @@ export async function createInventoryItem(data: {
   name: string;
   sku?: string;
   barcode?: string;
+  supplierCode?: string | null;
   description?: string;
   category: string;
   costPrice: string;
@@ -1090,6 +1100,9 @@ export async function createInventoryItem(data: {
   if (!finalSku || finalSku === 'AUTO' || finalSku.startsWith('PROD-') || finalSku.startsWith('CAL-') || finalSku.startsWith('GEN-')) {
     finalSku = await generateNextSku(data.supplierName || 'PF');
   }
+
+  let effectiveSupplierCode = data.supplierCode || (data as any).supplier_code || null;
+  if (effectiveSupplierCode) effectiveSupplierCode = String(effectiveSupplierCode).trim() || null;
 
   const safeDiscount = Math.max(0, Math.min(100, Number(data.discountPercent) || 0));
 
@@ -1148,6 +1161,12 @@ export async function createInventoryItem(data: {
   if (effectiveExtractedAttributes) {
     try {
       const parsed = JSON.parse(effectiveExtractedAttributes);
+      if (!effectiveSupplierCode && (parsed.supplierCode || parsed.supplier_code || parsed.supplierSku)) {
+        effectiveSupplierCode = String(parsed.supplierCode || parsed.supplier_code || parsed.supplierSku).trim() || null;
+      }
+      if (effectiveSupplierCode) {
+        parsed.supplierCode = effectiveSupplierCode;
+      }
       if (isGift) {
         parsed.isSupplierGift = true;
         parsed.costWithoutTax = 0;
@@ -1188,6 +1207,7 @@ export async function createInventoryItem(data: {
     const effectiveRate = hasTax ? rawRate : 0;
 
     effectiveExtractedAttributes = JSON.stringify({
+      supplierCode: effectiveSupplierCode,
       applySaleTax: hasTax,
       saleTaxPercent: effectiveRate,
       hasPurchaseTax: hasTax,
@@ -1209,6 +1229,7 @@ export async function createInventoryItem(data: {
       name: data.name,
       sku: finalSku,
       barcode: data.barcode?.trim() || null,
+      supplierCode: effectiveSupplierCode,
       description: data.description || '',
       category: data.category || 'General',
       costPrice: effectiveCostPrice,
@@ -1245,6 +1266,7 @@ export async function createInventoryItem(data: {
         name: data.name,
         sku: finalSku,
         barcode: data.barcode?.trim() || null,
+        supplierCode: effectiveSupplierCode,
         description: data.description || '',
         category: data.category || 'General',
         costPrice: effectiveCostPrice,
@@ -1326,6 +1348,11 @@ export async function updateInventoryItem(
 ) {
   const sanitizedPayload: Record<string, any> = { ...data };
 
+  if (data.supplierCode !== undefined || (data as any).supplier_code !== undefined) {
+    const rawSupp = data.supplierCode !== undefined ? data.supplierCode : (data as any).supplier_code;
+    sanitizedPayload.supplierCode = rawSupp && String(rawSupp).trim() ? String(rawSupp).trim() : null;
+  }
+
   const isGift = Boolean(
     data.isSupplierGift ||
     (data as any).isSupplierGift ||
@@ -1375,6 +1402,11 @@ export async function updateInventoryItem(
   if (data.extractedAttributes !== undefined && data.extractedAttributes !== null && data.extractedAttributes !== '') {
     try {
       const parsed = JSON.parse(data.extractedAttributes);
+      if (sanitizedPayload.supplierCode !== undefined) {
+        parsed.supplierCode = sanitizedPayload.supplierCode;
+      } else if (!parsed.supplierCode && (parsed.supplier_code || parsed.supplierSku)) {
+        parsed.supplierCode = parsed.supplier_code || parsed.supplierSku;
+      }
       if (isGift) {
         parsed.isSupplierGift = true;
         parsed.costWithoutTax = 0;

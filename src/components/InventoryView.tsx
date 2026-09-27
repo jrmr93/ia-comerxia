@@ -290,6 +290,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setTimeout(() => setCopiedCode(null), 2500);
   };
 
+  const getEffectiveSupplierCode = (item: any): string | null => {
+    if (!item) return null;
+    if (item.supplierCode && typeof item.supplierCode === 'string' && item.supplierCode.trim()) return item.supplierCode.trim();
+    if (item.supplier_code && typeof item.supplier_code === 'string' && item.supplier_code.trim()) return item.supplier_code.trim();
+    if (item.extractedAttributes) {
+      try {
+        const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
+        const code = parsed?.supplierCode || parsed?.supplier_code || parsed?.supplierSku || parsed?.supplier_sku;
+        if (code && typeof code === 'string' && code.trim()) return code.trim();
+      } catch {}
+    }
+    return null;
+  };
+
   const handleSupplierClick = (supplierName?: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const targetName = (supplierName || '').trim();
@@ -541,11 +555,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         ? it.status === 'archived'
         : it.status === statusFilter;
     const matchesOffer = !activeShowOffersOnly || disc > 0;
+    const itemSuppCode = getEffectiveSupplierCode(it);
     const matchesSearch =
       !searchQuery.trim() ||
       it.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       it.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (it.supplierCode && it.supplierCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (itemSuppCode && itemSuppCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.barcode && it.barcode.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.description && it.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.tags && it.tags.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -1466,22 +1481,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         <span className="font-mono text-[11px] font-black text-sky-800 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-300" title="Código SKU Interno">
                           {item.sku}
                         </span>
-                        {item.supplierCode && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleCopySupplierCode(item.supplierCode!, e)}
-                            className="font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
-                            title="Haz clic para copiar el SKU / Código de Proveedor al portapapeles"
-                          >
-                            <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
-                            <span className="max-w-[95px] truncate">{item.supplierCode}</span>
-                            {copiedCode === item.supplierCode ? (
-                              <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
-                            ) : (
-                              <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
-                            )}
-                          </button>
-                        )}
+                        {(() => {
+                          const suppCode = getEffectiveSupplierCode(item);
+                          if (!suppCode) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => handleCopySupplierCode(suppCode, e)}
+                              className="font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
+                              title="Haz clic para copiar el SKU / Código de Proveedor al portapapeles"
+                            >
+                              <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
+                              <span className="max-w-[95px] truncate">{suppCode}</span>
+                              {copiedCode === suppCode ? (
+                                <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                              ) : (
+                                <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                              )}
+                            </button>
+                          );
+                        })()}
                         {item.barcode && (
                           <span className="font-mono text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-300 flex items-center space-x-1" title={`Código de barras del producto: ${item.barcode}`}>
                             <Barcode className="w-2.5 h-2.5 text-slate-500" />
@@ -1850,21 +1869,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       </td>
                       <td className="px-2 py-1.5 font-mono text-xs">
                         <span className="text-sky-700 font-bold block" title="SKU Interno">{item.sku}</span>
-                        {item.supplierCode && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleCopySupplierCode(item.supplierCode!, e)}
-                            className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 hover:border-amber-400 transition cursor-pointer mt-0.5 active:scale-95 group/copy shadow-2xs"
-                            title="Haz clic para copiar el SKU Proveedor al portapapeles"
-                          >
-                            <span>Prov: {item.supplierCode}</span>
-                            {copiedCode === item.supplierCode ? (
-                              <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
-                            ) : (
-                              <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
-                            )}
-                          </button>
-                        )}
+                        {(() => {
+                          const suppCode = getEffectiveSupplierCode(item);
+                          if (!suppCode) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => handleCopySupplierCode(suppCode, e)}
+                              className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 hover:border-amber-400 transition cursor-pointer mt-0.5 active:scale-95 group/copy shadow-2xs"
+                              title="Haz clic para copiar el SKU Proveedor al portapapeles"
+                            >
+                              <span>Prov: {suppCode}</span>
+                              {copiedCode === suppCode ? (
+                                <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                              ) : (
+                                <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                              )}
+                            </button>
+                          );
+                        })()}
                         {item.barcode && (
                           <span className="text-[9px] text-slate-500 block truncate max-w-[100px]" title={`Código de barras: ${item.barcode}`}>
                             {item.barcode}

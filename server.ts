@@ -2087,6 +2087,7 @@ async function startServer() {
         name,
         sku,
         barcode,
+        supplierCode,
         description,
         category,
         costPrice,
@@ -2120,6 +2121,9 @@ async function startServer() {
       } else if (typeof extractedAttributes === 'string' && extractedAttributes.trim()) {
         try { parsedExtracted = JSON.parse(extractedAttributes); } catch {}
       }
+      if (supplierCode) {
+        parsedExtracted.supplierCode = supplierCode.trim();
+      }
       if (isGift) {
         parsedExtracted.isSupplierGift = true;
         parsedExtracted.costWithoutTax = 0;
@@ -2132,6 +2136,7 @@ async function startServer() {
         name,
         sku: finalSku,
         barcode: barcode?.trim() || null,
+        supplierCode: supplierCode?.trim() || null,
         description,
         category: category || 'General',
         costPrice: isGift ? '0.00' : String(costPrice || '0.00'),
