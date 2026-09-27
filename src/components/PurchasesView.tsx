@@ -140,7 +140,7 @@ export const getPurchaseStatusStyles = (status?: string) => {
 
 export function getInventoryCostWithoutTax(inv: InventoryItem | any): number {
   if (!inv) return 0;
-  
+
   if (
     inv.costWithoutTax !== undefined &&
     inv.costWithoutTax !== null &&
@@ -165,10 +165,10 @@ export function getInventoryCostWithoutTax(inv: InventoryItem | any): number {
     inv.purchaseTaxPercent !== undefined
       ? Number(inv.purchaseTaxPercent)
       : inv.hasPurchaseTax === false
-      ? 0
-      : (inv as any).taxRate !== undefined
-      ? Number((inv as any).taxRate)
-      : 15;
+        ? 0
+        : (inv as any).taxRate !== undefined
+          ? Number((inv as any).taxRate)
+          : 15;
 
   const costWithTax = Number(inv.costPrice || inv.salePrice || 0);
   return costWithTax;
@@ -454,11 +454,11 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   currency = 'USD',
   authFetch = window.fetch.bind(window),
   onReceivePurchase,
-  onRefreshPurchases = async () => {},
+  onRefreshPurchases = async () => { },
   onCreatePurchase,
   onUpdatePurchase,
   onDeletePurchase,
-  showToast = (_msg: string) => {},
+  showToast = (_msg: string) => { },
   onGoToStoreOrders,
   onGoToInventory,
   onOpenPayableForPurchase,
@@ -479,7 +479,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       try {
         const saved = window.localStorage.getItem('comerxia_purchases_collapsed_keys');
         if (saved) return new Set(JSON.parse(saved));
-      } catch {}
+      } catch { }
     }
     return new Set();
   });
@@ -489,7 +489,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.setItem('comerxia_purchases_collapsed_keys', JSON.stringify(Array.from(newSet)));
-      } catch {}
+      } catch { }
     }
   };
 
@@ -519,7 +519,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       try {
         const saved = window.localStorage.getItem('comerxia_purchases_view_mode');
         if (saved === 'grid' || saved === 'table') return saved;
-      } catch {}
+      } catch { }
     }
     return 'grid';
   });
@@ -528,7 +528,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.setItem('comerxia_purchases_view_mode', viewMode);
-      } catch {}
+      } catch { }
     }
   }, [viewMode]);
 
@@ -697,17 +697,17 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
     return (purchases || []).map((p) => {
       let parsedItems = Array.isArray(p.items) ? p.items : [];
       if (typeof p.items === 'string') {
-        try { parsedItems = JSON.parse(p.items); } catch {}
+        try { parsedItems = JSON.parse(p.items); } catch { }
       }
 
       let parsedReceptions = Array.isArray(p.receptions) ? p.receptions : [];
       if (typeof p.receptions === 'string') {
-        try { parsedReceptions = JSON.parse(p.receptions); } catch {}
+        try { parsedReceptions = JSON.parse(p.receptions); } catch { }
       }
 
       let parsedReturns = Array.isArray(p.returns) ? p.returns : [];
       if (typeof p.returns === 'string') {
-        try { parsedReturns = JSON.parse(p.returns); } catch {}
+        try { parsedReturns = JSON.parse(p.returns); } catch { }
       }
 
       const itemsList = Array.isArray(parsedItems) ? parsedItems : [];
@@ -731,10 +731,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
           matchedInv.purchaseTaxPercent !== undefined
             ? Number(matchedInv.purchaseTaxPercent)
             : matchedInv.hasPurchaseTax === false
-            ? 0
-            : (matchedInv as any).taxRate !== undefined
-            ? Number((matchedInv as any).taxRate)
-            : 15;
+              ? 0
+              : (matchedInv as any).taxRate !== undefined
+                ? Number((matchedInv as any).taxRate)
+                : 15;
 
         const costPriceStr = currentCostWithoutTax > 0
           ? currentCostWithoutTax.toFixed(2)
@@ -767,10 +767,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
           it.taxPercent !== undefined
             ? Number(it.taxPercent)
             : (it as any).purchaseTaxPercent !== undefined
-            ? Number((it as any).purchaseTaxPercent)
-            : (it as any).hasPurchaseTax === false
-            ? 0
-            : 15;
+              ? Number((it as any).purchaseTaxPercent)
+              : (it as any).hasPurchaseTax === false
+                ? 0
+                : 15;
 
         if (taxPercent === 0) sub0 += lineBase;
         else if (taxPercent === 5) sub5 += lineBase;
@@ -955,18 +955,18 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
 
     const blocks: Array<
       | {
-          type: 'group';
-          key: string;
-          orderNumber: string;
-          customerOrderId?: number;
-          customerName?: string;
-          purchases: typeof filteredPurchases;
-        }
+        type: 'group';
+        key: string;
+        orderNumber: string;
+        customerOrderId?: number;
+        customerName?: string;
+        purchases: typeof filteredPurchases;
+      }
       | {
-          type: 'single';
-          key: string;
-          purchase: (typeof filteredPurchases)[0];
-        }
+        type: 'single';
+        key: string;
+        purchase: (typeof filteredPurchases)[0];
+      }
     > = [];
 
     // Add sales order groups first
@@ -1284,11 +1284,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
               <button
                 type="button"
                 onClick={() => setDateFilterPreset('all')}
-                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
-                  dateFilterPreset === 'all'
+                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${dateFilterPreset === 'all'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
-                }`}
+                  }`}
               >
                 Todo el Historial
               </button>
@@ -1296,11 +1295,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
               <button
                 type="button"
                 onClick={() => setDateFilterPreset('today')}
-                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
-                  dateFilterPreset === 'today'
+                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${dateFilterPreset === 'today'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
-                }`}
+                  }`}
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>Hoy</span>
@@ -1309,11 +1307,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
               <button
                 type="button"
                 onClick={() => setDateFilterPreset('this_month')}
-                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
-                  dateFilterPreset === 'this_month'
+                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${dateFilterPreset === 'this_month'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
-                }`}
+                  }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
                 <span>Este Mes</span>
@@ -1322,11 +1319,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
               <button
                 type="button"
                 onClick={() => setDateFilterPreset('custom')}
-                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
-                  dateFilterPreset === 'custom'
+                className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${dateFilterPreset === 'custom'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
-                }`}
+                  }`}
               >
                 <CalendarRange className="w-3.5 h-3.5" />
                 <span>Personalizada</span>
@@ -1474,13 +1470,12 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       {/* Toolbar & Filters (Dos Barras Horizontales Estáticas) */}
       <div
         id="purchases-search-container"
-        className={`sticky ${
-          scrollDirection === 'down'
+        className={`sticky ${scrollDirection === 'down'
             ? '-translate-y-full opacity-0 pointer-events-none'
             : scrollDirection === 'up'
-            ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
-            : 'top-16 z-20 translate-y-0 opacity-100'
-        } bg-white/95 backdrop-blur-md rounded-2xl border border-slate-300 p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
+              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
+              : 'top-16 z-20 translate-y-0 opacity-100'
+          } bg-white/95 backdrop-blur-md rounded-2xl border border-slate-300 p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
       >
         {/* Barra 1: Búsqueda y Selector de Modo de Vista */}
         <div className="flex items-center gap-1.5 sm:gap-2 w-full">
@@ -1511,11 +1506,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             <button
               type="button"
               onClick={() => setGroupByOrder(true)}
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                groupByOrder
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${groupByOrder
                   ? 'bg-white text-indigo-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
               title="Agrupar visualmente las órdenes generadas por pedido de venta"
             >
               <Layers className="w-3.5 h-3.5 text-indigo-600" />
@@ -1524,11 +1518,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             <button
               type="button"
               onClick={() => setGroupByOrder(false)}
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                !groupByOrder
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${!groupByOrder
                   ? 'bg-white text-indigo-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
               title="Ver lista plana individual de compras"
             >
               <List className="w-3.5 h-3.5 text-slate-600" />
@@ -1541,11 +1534,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                viewMode === 'grid'
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${viewMode === 'grid'
                   ? 'bg-white text-amber-950 shadow-2xs font-black'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
               title="Vista en Paneles / Tarjetas uniformes"
             >
               <Receipt className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -1554,11 +1546,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('table')}
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                viewMode === 'table'
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${viewMode === 'table'
                   ? 'bg-white text-amber-950 shadow-2xs font-black'
                   : 'text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
               title="Vista Tipo Factura / Tabla Horizontal con detalle de productos"
             >
               <FileText className="w-3.5 h-3.5 text-orange-600 shrink-0" />
@@ -1583,11 +1574,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             <button
               key={tab.id}
               onClick={() => setStatusFilter(tab.id)}
-              className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center gap-1 text-[11px] shrink-0 whitespace-nowrap ${
-                statusFilter === tab.id
+              className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center gap-1 text-[11px] shrink-0 whitespace-nowrap ${statusFilter === tab.id
                   ? 'bg-slate-900 text-white shadow-2xs'
                   : 'text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200'
-              }`}
+                }`}
             >
               <span>{tab.label}</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${statusFilter === tab.id ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-600'}`}>
@@ -2284,14 +2274,14 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
 
   const isLinkedOrderConfirmed = Boolean(
     linkedCustomerOrder &&
-      (linkedCustomerOrder.status === 'confirmed' ||
-        linkedCustomerOrder.status === 'shipped' ||
-        linkedCustomerOrder.status === 'delivered')
+    (linkedCustomerOrder.status === 'confirmed' ||
+      linkedCustomerOrder.status === 'shipped' ||
+      linkedCustomerOrder.status === 'delivered')
   );
 
   const isLinkedOrderUnconfirmed = Boolean(
     (isAutoGeneratedFromSale || Boolean(purchase?.linkedCustomerOrderId || purchase?.linkedCustomerOrderNumber || linkedOrderId)) &&
-      !isLinkedOrderConfirmed
+    !isLinkedOrderConfirmed
   );
 
   // Manejador de cambio de estado sincronizado con regla ERP de pago y confirmación de venta
@@ -2335,8 +2325,8 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
     if (!productSearch.trim()) return [];
     const q = productSearch.toLowerCase();
     return inventoryItems
-      .filter((it) => 
-        it.name?.toLowerCase().includes(q) || 
+      .filter((it) =>
+        it.name?.toLowerCase().includes(q) ||
         it.sku?.toLowerCase().includes(q) ||
         (it.barcode && it.barcode.toLowerCase().includes(q))
       )
@@ -2347,7 +2337,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const handleAddCatalogItem = (it: InventoryItem) => {
     const costWithoutTax = getInventoryCostWithoutTax(it);
     const itemSupplier = it.supplierName || (it as any).supplier || (it as any).channelTitle || supplierName;
-    
+
     // Auto-update order supplier if it's currently the default generic placeholder and the item has a specific supplier
     if (
       (!supplierName || supplierName === 'Proveedor Telegram Principal' || supplierName === 'Proveedor Telegram') &&
@@ -2369,10 +2359,10 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
       it.purchaseTaxPercent !== undefined
         ? Number(it.purchaseTaxPercent)
         : it.hasPurchaseTax === false
-        ? 0
-        : (it as any).taxRate !== undefined
-        ? Number((it as any).taxRate)
-        : 15;
+          ? 0
+          : (it as any).taxRate !== undefined
+            ? Number((it as any).taxRate)
+            : 15;
 
     if (existingIndex !== -1) {
       // El producto ya estaba agregado -> se incrementa la cantidad y SE COLOCA COMO PRIMERO (index 0)
@@ -2495,10 +2485,10 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         it.taxPercent !== undefined
           ? Number(it.taxPercent)
           : (it as any).purchaseTaxPercent !== undefined
-          ? Number((it as any).purchaseTaxPercent)
-          : (it as any).hasPurchaseTax === false
-          ? 0
-          : 15;
+            ? Number((it as any).purchaseTaxPercent)
+            : (it as any).hasPurchaseTax === false
+              ? 0
+              : 15;
 
       let baseUnitCost = 0;
       const rawCostPrice = it.costPrice !== undefined && it.costPrice !== null ? Number(it.costPrice) : 0;
@@ -2588,10 +2578,10 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           it.taxPercent !== undefined
             ? Number(it.taxPercent)
             : (it as any).purchaseTaxPercent !== undefined
-            ? Number((it as any).purchaseTaxPercent)
-            : (it as any).hasPurchaseTax === false
-            ? 0
-            : 15;
+              ? Number((it as any).purchaseTaxPercent)
+              : (it as any).hasPurchaseTax === false
+                ? 0
+                : 15;
         return {
           ...it,
           costPrice: unitCost,
@@ -2643,8 +2633,8 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
           openPaymentAfterSave
             ? '✓ Compra guardada. Abriendo Cuenta por Pagar para ingresar el pago y confirmar...'
             : isEditing
-            ? '✓ Compra actualizada exitosamente'
-            : '✓ Compra registrada exitosamente'
+              ? '✓ Compra actualizada exitosamente'
+              : '✓ Compra registrada exitosamente'
         );
 
         await onSaved();
@@ -2673,17 +2663,17 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white border border-slate-200 rounded-3xl max-w-7xl lg:max-w-[94vw] w-full shadow-2xl space-y-0 my-auto animate-in fade-in zoom-in-95 duration-200 max-h-[93vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between shadow-xs shrink-0">
+        <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
           <div>
-            <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
               {isAutoGeneratedFromSale ? (
                 <>
                   <span>Detalle de Compra #{purchase?.purchaseNumber}</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-400/40 uppercase tracking-wider flex items-center gap-1">
-                    <Lock className="w-3 h-3 text-amber-300" />
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-amber-700" />
                     Auto por Venta (Sólo Lectura)
                   </span>
                 </>
@@ -2695,14 +2685,14 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                 'Nueva Compra / Pedido a Proveedor'
               )}
             </h2>
-            <p className="text-xs text-slate-200/90 mt-0.5">
+            <p className="text-xs text-slate-500">
               {isAutoGeneratedFromSale
                 ? `Generada automáticamente para el Pedido de Venta #${purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId} (No editable)`
                 : isImmutable
-                ? 'Consulta los datos de la orden cerrada y recepción de mercadería'
-                : isEditing
-                ? 'Modifica los datos de la orden en borrador o consulta su detalle'
-                : 'Registra los productos que compraste o solicitaste a tus proveedores de Telegram'}
+                  ? 'Consulta los datos de la orden cerrada y recepción de mercadería'
+                  : isEditing
+                    ? 'Modifica los datos de la orden en borrador o consulta su detalle'
+                    : 'Registra los productos que compraste o solicitaste a tus proveedores de Telegram'}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -2714,7 +2704,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                     onOpenPrintA4(purchase);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition cursor-pointer border border-white/20 shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition cursor-pointer border border-sky-400/40 shadow-xs"
                 title="Imprimir vista previa de la Orden de Compra"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -2723,7 +2713,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
             )}
             <button
               onClick={onClose}
-              className="text-slate-300 hover:text-white p-2 rounded-xl hover:bg-white/15 transition cursor-pointer ml-1"
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition"
               title="Cerrar modal"
             >
               <X className="w-5 h-5" />
@@ -2734,56 +2724,51 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
         {/* Modal Form Body */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
-          {/* ERP Immutability Banner */}
-          {isAutoGeneratedFromSale ? (
-            <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 text-xs text-amber-950 flex items-start gap-2.5 shadow-2xs">
-              <Lock className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
-              <div>
-                <strong className="block font-bold mb-0.5 text-amber-900 flex items-center gap-1.5">
-                  <span>🔒 Compra Generada Automáticamente por Pedido de Venta #{purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId}</span>
-                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 uppercase">Sólo Lectura</span>
-                </strong>
-                <p className="leading-relaxed">
-                  Esta orden de compra fue generada de forma automática para abastecer los productos faltantes del <strong>Pedido de Venta #{purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId}</strong>. Por normas de integridad comercial y trazabilidad de inventario, no puede ser editada directamente desde el menú de compras.
-                </p>
-              </div>
-            </div>
-          ) : isImmutable ? (
-            <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 text-xs text-amber-950 flex items-start gap-2.5 shadow-2xs">
-              <Lock className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
-              <div>
-                <strong className="block font-bold mb-0.5 text-amber-900">
-                  🔒 Orden Confirmada y Pagada / Protegida por Integridad ERP
-                </strong>
-                Esta orden ya fue confirmada con el proveedor y se encuentra pagada. Por normas estrictas de trazabilidad e integridad de inventario ERP, no se puede modificar ni eliminar. Únicamente puedes proceder a registrar la <strong>recepción parcial o total</strong> en bodega cuando llegue la mercadería.
-              </div>
-            </div>
-          ) : null}
-
-          {/* CARD 1: DATOS DEL PROVEEDOR, ESTADO & VINCULACIÓN */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* LEFT CARD: DATOS DEL PROVEEDOR Y CONTACTO */}
-            <div className="lg:col-span-7 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-6 h-6 rounded-lg bg-slate-800 text-white flex items-center justify-center">
-                    <Building2 className="w-3.5 h-3.5" />
-                  </div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                    Información del Proveedor
-                  </h3>
+            {/* ERP Immutability Banner */}
+            {isAutoGeneratedFromSale ? (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 text-xs text-amber-950 flex items-start gap-2.5 shadow-2xs">
+                <Lock className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong className="block font-bold mb-0.5 text-amber-900 flex items-center gap-1.5">
+                    <span>🔒 Compra Generada Automáticamente por Pedido de Venta #{purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId}</span>
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 uppercase">Sólo Lectura</span>
+                  </strong>
+                  <p className="leading-relaxed">
+                    Esta orden de compra fue generada de forma automática para abastecer los productos faltantes del <strong>Pedido de Venta #{purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId}</strong>. Por normas de integridad comercial y trazabilidad de inventario, no puede ser editada directamente desde el menú de compras.
+                  </p>
                 </div>
-                {!isImmutable && knownSuppliers.length > 0 && (
-                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                    {knownSuppliers.length} registrados
-                  </span>
-                )}
               </div>
+            ) : isImmutable ? (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 text-xs text-amber-950 flex items-start gap-2.5 shadow-2xs">
+                <Lock className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong className="block font-bold mb-0.5 text-amber-900">
+                    🔒 Orden Confirmada y Pagada / Protegida por Integridad ERP
+                  </strong>
+                  Esta orden ya fue confirmada con el proveedor y se encuentra pagada. Por normas estrictas de trazabilidad e integridad de inventario ERP, no se puede modificar ni eliminar. Únicamente puedes proceder a registrar la <strong>recepción parcial o total</strong> en bodega cuando llegue la mercadería.
+                </div>
+              </div>
+            ) : null}
 
+            {/* Supplier & Contact Info Section */}
+            <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">
-                  Nombre del Proveedor *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                    <span>Nombre del Proveedor *</span>
+                    {!isImmutable && knownSuppliers.length > 0 && (
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        {knownSuppliers.length} registrados
+                      </span>
+                    )}
+                  </label>
+                  {!isImmutable && knownSuppliers.length > 0 && (
+                    <span className="text-[10px] text-slate-500">
+                      Elige de la lista o escribe uno nuevo
+                    </span>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                   {/* Input text with datalist */}
                   <div className={`${!isImmutable && knownSuppliers.length > 0 ? 'sm:col-span-7' : 'sm:col-span-12'} relative`}>
@@ -2795,11 +2780,10 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                       value={supplierName}
                       onChange={(e) => handleSelectSupplier(e.target.value)}
                       placeholder="Ej. Proveedor Calzados Telegram"
-                      className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
-                        isImmutable
+                      className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${isImmutable
                           ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
                           : 'bg-white border-slate-300 text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
-                      }`}
+                        }`}
                     />
                     {!isImmutable && (
                       <datalist id="purchase-registered-suppliers-list">
@@ -2837,7 +2821,7 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                     <div className="text-[10px] font-bold text-slate-500 mb-1 flex items-center space-x-1">
                       <span>⚡ Proveedores de ingresos y catálogo:</span>
                     </div>
-                    <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
+                    <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
                       {knownSuppliers.map((sup) => {
                         const isSelected = supplierName.trim().toLowerCase() === sup.trim().toLowerCase();
                         return (
@@ -2845,11 +2829,10 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                             type="button"
                             key={sup}
                             onClick={() => handleSelectSupplier(sup)}
-                            className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                              isSelected
+                            className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ${isSelected
                                 ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 hover:text-slate-900'
-                            }`}
+                              }`}
                           >
                             <span>🏷️</span>
                             <span className="truncate max-w-[150px]">{sup}</span>
@@ -2865,567 +2848,623 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200/60">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Teléfono / WhatsApp / Telegram
+                    Teléfono / WhatsApp / Telegram (Opcional)
                   </label>
                   <input
                     type="text"
                     disabled={isImmutable}
                     value={supplierContact}
                     onChange={(e) => setSupplierContact(e.target.value)}
-                    placeholder="Ej. +51 987 654 321 o @proveedor"
-                    className={`w-full px-3 py-2 border rounded-xl text-xs ${
-                      isImmutable
+                    placeholder="Ej. +51 987 654 321 o @proveedor_canal"
+                    className={`w-full px-3 py-2 border rounded-xl text-xs ${isImmutable
                         ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
                         : 'bg-white border-slate-300 text-slate-900 focus:outline-none focus:border-indigo-500'
-                    }`}
+                      }`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Fecha de Compra</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Fecha de la Compra</label>
                   <input
                     type="date"
                     disabled={isImmutable}
                     value={purchaseDate}
                     onChange={(e) => setPurchaseDate(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-xl text-xs ${
-                      isImmutable
+                    className={`w-full px-3 py-2 border rounded-xl text-xs ${isImmutable
                         ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
                         : 'bg-white border-slate-300 text-slate-900 focus:outline-none focus:border-indigo-500'
-                    }`}
+                      }`}
                   />
                 </div>
               </div>
             </div>
 
-            {/* RIGHT CARD: ESTADO COMERCIAL & VINCULACIÓN */}
-            <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs flex flex-col justify-between">
+            {/* Status & Payment */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <div className="flex items-center space-x-2 mb-3">
-                  <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
-                    <Clock className="w-3.5 h-3.5" />
-                  </div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                    Estado & Vinculación Comercial
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Estado de la Compra
-                      {status === 'received' && (
-                        <span className="ml-1 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
-                          + Suma stock
-                        </span>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Estado de la Compra
+                  {status === 'received' && (
+                    <span className="ml-1.5 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      + Suma stock
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  disabled={isImmutable}
+                  className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer ${isImmutable ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-slate-800'
+                    }`}
+                >
+                  {!isEditing ? (
+                    <>
+                      <option value="pending">⏳ Pendiente (Averiguar disponibilidad y precio con proveedor - Recomendado)</option>
+                      <option value="ordered">🔵 Confirmada con Proveedor (Orden en firme)</option>
+                      <option value="received">✅ Recibida en Bodega (Ingreso físico inmediato a stock)</option>
+                    </>
+                  ) : (
+                    <>
+                      {purchase?.status === 'pending' && (
+                        <option value="pending">⏳ Pendiente (Averiguando disponibilidad)</option>
                       )}
-                    </label>
-                    <select
-                      value={status}
-                      onChange={(e) => handleStatusChange(e.target.value)}
-                      disabled={isImmutable}
-                      className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer ${
-                        isImmutable ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      {!isEditing ? (
+                      {(purchase?.status === 'pending' || purchase?.status === 'ordered' || purchase?.status === 'in_transit') && (
                         <>
-                          <option value="pending">⏳ Pendiente (Averiguar disponibilidad y precio)</option>
-                          <option value="ordered">🔵 Confirmada con Proveedor</option>
-                          <option value="received">✅ Recibida en Bodega (Ingreso físico a stock)</option>
-                        </>
-                      ) : (
-                        <>
-                          {purchase?.status === 'pending' && (
-                            <option value="pending">⏳ Pendiente (Averiguando disponibilidad)</option>
-                          )}
-                          {(purchase?.status === 'pending' || purchase?.status === 'ordered' || purchase?.status === 'in_transit') && (
-                            <>
-                              <option value="ordered">🔵 Confirmada / Pedida al Proveedor</option>
-                              <option value="in_transit">🚚 En Tránsito / Despachada por Proveedor</option>
-                            </>
-                          )}
-                          {(purchase?.status === 'pending' || purchase?.status === 'ordered' || purchase?.status === 'in_transit' || purchase?.status === 'partially_received') && (
-                            <option value="partially_received">📦 Parcialmente Recibida</option>
-                          )}
-                          <option value="received">✅ Recibida en Bodega (Ingreso total a stock)</option>
-                          <option value="cancelled">❌ Cancelada (Anular orden)</option>
+                          <option value="ordered">🔵 Confirmada / Pedida al Proveedor</option>
+                          <option value="in_transit">🚚 En Tránsito / Despachada por Proveedor</option>
                         </>
                       )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Estado del Pago
-                      {status === 'pending' && (
-                        <span className="ml-1 text-[10px] text-amber-700 font-bold bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
-                          Fijo por pagar
-                        </span>
+                      {(purchase?.status === 'pending' || purchase?.status === 'ordered' || purchase?.status === 'in_transit' || purchase?.status === 'partially_received') && (
+                        <option value="partially_received">📦 Parcialmente Recibida</option>
                       )}
-                    </label>
-                    <select
-                      value={status === 'pending' ? 'unpaid' : paymentStatus}
-                      onChange={(e) => setPaymentStatus(e.target.value)}
-                      disabled={status === 'pending' || isImmutable}
-                      className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer ${
-                        status === 'pending' || isImmutable
-                          ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
-                          : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <option value="unpaid">⚠️ Por pagar (Pendiente de pago)</option>
-                      <option value="paid">💳 Pagado al proveedor</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Link to Customer Order */}
-                <div className="pt-2 border-t border-slate-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-700">
-                      ¿Vincular a Pedido de Cliente?
-                    </label>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-slate-500" />
-                      Automático
-                    </span>
-                  </div>
-                  <select
-                    value={linkedOrderId}
-                    disabled={true}
-                    className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-600 cursor-not-allowed font-medium"
-                    title="La vinculación se realiza exclusivamente de forma automática por el sistema cuando un pedido de venta genera su compra"
-                  >
-                    <option value="">Ninguno (Compra directa para inventario propio)</option>
-                    {(customerOrders || []).map((ord) => (
-                      <option key={ord.id} value={ord.id}>
-                        Pedido #{ord.orderNumber} - {ord.customerName} (${Number(ord.totalAmount).toFixed(2)})
-                      </option>
-                    ))}
-                    {linkedOrderId && !(customerOrders || []).some(o => String(o.id) === String(linkedOrderId)) && (
-                      <option value={linkedOrderId}>
-                        Pedido #{purchase?.linkedCustomerOrderNumber || linkedOrderId} (Vinculado automáticamente)
-                      </option>
-                    )}
-                  </select>
-                  <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                    <span>ℹ️</span>
-                    <span>
-                      {linkedCustomerOrder || linkedOrderId
-                        ? `Esta compra está vinculada automáticamente al Pedido de Venta #${linkedCustomerOrder?.orderNumber || purchase?.linkedCustomerOrderNumber || linkedOrderId}.`
-                        : 'Las compras a proveedores sólo se vinculan automáticamente por el sistema al crearse desde una venta.'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CARD 2 (FULL WIDTH): ARTÍCULOS DE LA COMPRA Y BUSCADOR DE CATÁLOGO */}
-          <div className="bg-gradient-to-b from-indigo-50/70 via-slate-50 to-slate-50/90 border border-indigo-100 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-xs">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                  <Package className="w-4 h-4" />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-slate-900 uppercase tracking-wider">
-                    Artículos de la Compra
-                  </label>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {items.length} {items.length === 1 ? 'producto cargado' : 'productos cargados'}
-                  </span>
-                </div>
+                      <option value="received">✅ Recibida en Bodega (Ingreso total a stock)</option>
+                      <option value="cancelled">❌ Cancelada (Anular orden)</option>
+                    </>
+                  )}
+                </select>
               </div>
 
-              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 font-bold text-[11px] border border-emerald-200 shadow-2xs">
-                <Barcode className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Compatible con Lector de Barras</span>
-              </span>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Estado del Pago
+                  {status === 'pending' && (
+                    <span className="ml-1 text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                      Fijo por pagar
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={status === 'pending' ? 'unpaid' : paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value)}
+                  disabled={status === 'pending' || isImmutable}
+                  className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer ${status === 'pending' || isImmutable
+                      ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
+                      : 'bg-slate-50 border-slate-200 text-slate-800'
+                    }`}
+                >
+                  <option value="unpaid">⚠️ Por pagar (Pendiente de pago)</option>
+                  <option value="paid">💳 Pagado al proveedor</option>
+                </select>
+              </div>
             </div>
 
-            {/* Smart Search catalog picker with barcode & SKU scanner support */}
-            {!isImmutable && (
-              <div className="relative">
-                <Search className="w-4 h-4 text-indigo-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  onKeyDown={handleProductSearchKeyDown}
-                  placeholder="🔍 Escanea con lector de código de barras (envía Enter) o busca por SKU/Nombre..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-indigo-200/90 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition shadow-xs"
-                />
-                {filteredCatalog.length > 0 && (
-                  <div className="absolute z-20 left-0 right-0 top-full mt-1.5 bg-white border border-indigo-100 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
-                    <div className="p-2 bg-indigo-50/50 text-[10px] font-bold text-indigo-800 uppercase tracking-wider flex items-center justify-between">
-                      <span>Resultados del catálogo</span>
-                      <span>{filteredCatalog.length} coincidencias</span>
-                    </div>
-                    {filteredCatalog.map((it) => (
-                      <div
-                        key={it.id}
-                        onClick={() => handleAddCatalogItem(it)}
-                        className="p-3 hover:bg-indigo-50/80 cursor-pointer flex items-center justify-between text-xs transition group"
-                      >
-                        <div className="flex items-center space-x-3 truncate">
-                          {it.imageUrl ? (
-                            <img src={it.imageUrl} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0 border border-slate-200 shadow-xs" />
-                          ) : (
-                            <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center flex-shrink-0 border border-slate-200">
-                              <Package className="w-4 h-4" />
-                            </div>
-                          )}
-                          <div className="truncate">
-                            <div className="font-bold text-slate-900 truncate group-hover:text-indigo-700 transition">
-                              {it.name}
-                            </div>
-                            <div className="flex items-center space-x-2 text-[10px] mt-0.5 text-slate-500">
-                              {it.sku && (
-                                <span className="font-mono font-bold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-200">
-                                  SKU: {it.sku}
-                                </span>
-                              )}
-                              {it.barcode && (
-                                <span className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200 flex items-center space-x-1">
-                                  <Barcode className="w-2.5 h-2.5" />
-                                  <span>{it.barcode}</span>
-                                </span>
-                              )}
-                              {it.category && <span>• {it.category}</span>}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right ml-2 flex-shrink-0">
-                          <span className="text-[10px] text-slate-500 block">Costo (sin IVA)</span>
-                          <span className="font-mono font-black text-amber-700 text-xs sm:text-sm">
-                            ${getInventoryCostWithoutTax(it).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {/* Link to Customer Order - Non-editable as requested */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">
+                  ¿Vincular a un Pedido de Cliente Bajo Pedido? (Opcional)
+                </label>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-slate-500" />
+                  Automático (No editable)
+                </span>
+              </div>
+              <select
+                value={linkedOrderId}
+                disabled={true}
+                className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-600 cursor-not-allowed font-medium"
+                title="La vinculación se realiza exclusivamente de forma automática por el sistema cuando un pedido de venta genera su compra"
+              >
+                <option value="">Ninguno (Compra directa para inventario propio)</option>
+                {(customerOrders || []).map((ord) => (
+                  <option key={ord.id} value={ord.id}>
+                    Pedido #{ord.orderNumber} - {ord.customerName} (${Number(ord.totalAmount).toFixed(2)})
+                  </option>
+                ))}
+                {linkedOrderId && !(customerOrders || []).some(o => String(o.id) === String(linkedOrderId)) && (
+                  <option value={linkedOrderId}>
+                    Pedido #{purchase?.linkedCustomerOrderNumber || linkedOrderId} (Vinculado automáticamente)
+                  </option>
                 )}
-              </div>
-            )}
+              </select>
+              <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                <span>ℹ️</span>
+                <span>
+                  {linkedCustomerOrder || linkedOrderId
+                    ? `Esta compra está vinculada automáticamente al Pedido de Venta #${linkedCustomerOrder?.orderNumber || purchase?.linkedCustomerOrderNumber || linkedOrderId}.`
+                    : 'Las compras a proveedores sólo se vinculan automáticamente por el sistema al crearse desde una venta.'}
+                </span>
+              </p>
+            </div>
 
-            {/* Items List - Vista Tipo Factura Desglosada en Tabla Horizontal */}
-            {items.length === 0 ? (
-              <div className="text-center py-6 px-4 bg-white/80 border border-dashed border-indigo-200 rounded-xl space-y-2">
-                <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto">
-                  <Package className="w-5 h-5" />
+            {/* Items Section - Enhanced Visual Layout */}
+            <div className="bg-gradient-to-b from-indigo-50/70 via-slate-50 to-slate-50/90 border border-indigo-100 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-xs">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center space-x-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                    <Package className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Artículos de la Compra
+                    </label>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {items.length} {items.length === 1 ? 'producto cargado' : 'productos cargados'}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs font-bold text-slate-700">No hay productos agregados a esta orden</p>
-                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                  Escanea el código de barras con el lector (envía Enter automáticamente) o busca por SKU/Nombre para agregar productos registrados en el catálogo.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-white border border-indigo-200 rounded-xl overflow-hidden shadow-xs">
-                <div className="overflow-x-auto max-h-72 custom-scrollbar">
-                  <table className="w-full text-left text-xs text-slate-800 font-sans border-collapse min-w-[850px]">
-                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300 text-[11px] uppercase tracking-wider sticky top-0 z-10">
-                      <tr>
-                        <th className="p-2.5 w-8 text-center">#</th>
-                        <th className="p-2.5 min-w-[200px]">Producto / Descripción</th>
-                        <th className="p-2.5 min-w-[100px]">SKU / Código</th>
-                        <th className="p-2.5 text-center min-w-[100px]">Cantidad</th>
-                        <th className="p-2.5 text-right min-w-[100px]">Costo Unit. ($)</th>
-                        <th className="p-2.5 text-right min-w-[90px]">Desc. ($)</th>
-                        <th className="p-2.5 text-center min-w-[90px]">IVA (%)</th>
-                        <th className="p-2.5 text-right min-w-[100px]">Subtotal ($)</th>
-                        <th className="p-2.5 text-center w-10">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white">
-                      {items.map((it, idx) => {
-                        const unitCost = Number(it.costPrice || 0);
-                        const qty = Number(it.quantity || 1);
-                        const discount = Number(it.discount || 0);
-                        const lineSubtotal = Math.max(0, Math.round((unitCost * qty - discount) * 100) / 100);
-                        const itemTaxPercent =
-                          it.taxPercent !== undefined
-                            ? Number(it.taxPercent)
-                            : (it as any).purchaseTaxPercent !== undefined
-                            ? Number((it as any).purchaseTaxPercent)
-                            : (it as any).hasPurchaseTax === false
-                            ? 0
-                            : 15;
 
-                        return (
-                          <tr key={idx} className="hover:bg-indigo-50/40 transition">
-                            <td className="p-2.5 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
-                            <td className="p-2.5">
-                              <div className="flex items-center space-x-2.5">
-                                {it.imageUrl ? (
-                                  <img
-                                    src={it.imageUrl}
-                                    alt=""
-                                    className="w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-slate-200 shadow-xs"
-                                  />
-                                ) : (
-                                  <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
-                                    <Package className="w-4 h-4" />
-                                  </div>
-                                )}
-                                <input
-                                  type="text"
-                                  value={it.name}
-                                  disabled={isImmutable}
-                                  onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
-                                  placeholder="Nombre del producto"
-                                  className={`w-full font-extrabold text-slate-900 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none text-xs placeholder:text-slate-400 ${
-                                    isImmutable ? 'cursor-not-allowed text-slate-600' : ''
-                                  }`}
-                                />
-                                {(Number(it.costPrice) === 0 || it.isSupplierGift) && (
-                                  <span className="bg-purple-100 text-purple-900 border border-purple-300 font-bold px-1.5 py-0.5 rounded text-[10px] shrink-0 whitespace-nowrap">
-                                    🎁 Regalo ($0.00)
+                <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 font-bold text-[11px] border border-emerald-200 shadow-2xs">
+                  <Barcode className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Compatible con Lector de Barras</span>
+                </span>
+              </div>
+
+              {/* Smart Search catalog picker with barcode & SKU scanner support */}
+              {!isImmutable && (
+                <div className="relative">
+                  <Search className="w-4 h-4 text-indigo-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    onKeyDown={handleProductSearchKeyDown}
+                    placeholder="🔍 Escanea con lector de código de barras (envía Enter) o busca por SKU/Nombre..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-indigo-200/90 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition shadow-xs"
+                  />
+                  {filteredCatalog.length > 0 && (
+                    <div className="absolute z-20 left-0 right-0 top-full mt-1.5 bg-white border border-indigo-100 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
+                      <div className="p-2 bg-indigo-50/50 text-[10px] font-bold text-indigo-800 uppercase tracking-wider flex items-center justify-between">
+                        <span>Resultados del catálogo</span>
+                        <span>{filteredCatalog.length} coincidencias</span>
+                      </div>
+                      {filteredCatalog.map((it) => (
+                        <div
+                          key={it.id}
+                          onClick={() => handleAddCatalogItem(it)}
+                          className="p-3 hover:bg-indigo-50/80 cursor-pointer flex items-center justify-between text-xs transition group"
+                        >
+                          <div className="flex items-center space-x-3 truncate">
+                            {it.imageUrl ? (
+                              <img src={it.imageUrl} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0 border border-slate-200 shadow-xs" />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center flex-shrink-0 border border-slate-200">
+                                <Package className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="truncate">
+                              <div className="font-bold text-slate-900 truncate group-hover:text-indigo-700 transition">
+                                {it.name}
+                              </div>
+                              <div className="flex items-center space-x-2 text-[10px] mt-0.5 text-slate-500">
+                                {it.sku && (
+                                  <span className="font-mono font-bold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-200">
+                                    SKU: {it.sku}
                                   </span>
                                 )}
-                              </div>
-                            </td>
-                            <td className="p-2.5 font-mono text-[11px]">
-                              <input
-                                type="text"
-                                value={it.sku || ''}
-                                disabled={isImmutable}
-                                onChange={(e) => handleUpdateItem(idx, 'sku', e.target.value)}
-                                placeholder="Auto"
-                                className="w-20 bg-sky-50 border border-sky-200 rounded px-1.5 py-0.5 font-mono text-sky-900 font-bold text-[11px] focus:outline-none focus:border-sky-500 disabled:text-slate-600 disabled:bg-slate-100"
-                              />
-                              {(() => {
-                                const supplierCode = it.supplierCode || (inventoryItems?.find((inv) => inv.id === it.inventoryItemId || (it.sku && inv.sku && inv.sku.toLowerCase() === it.sku.toLowerCase())) as any)?.supplierCode;
-                                if (!supplierCode) return null;
-                                return (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigator.clipboard.writeText(supplierCode);
-                                      if (showToast) showToast(`📋 SKU Proveedor ${supplierCode} copiado al portapapeles`);
-                                    }}
-                                    className="mt-1 font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
-                                    title="Haz clic para copiar el SKU Proveedor al portapapeles"
-                                  >
-                                    <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
-                                    <span className="max-w-[70px] truncate">{supplierCode}</span>
-                                    <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
-                                  </button>
-                                );
-                              })()}
-                            </td>
-                            <td className="p-2.5 text-center">
-                              <div className="flex items-center justify-center space-x-1">
-                                {!isImmutable && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateItem(idx, 'quantity', Math.max(1, qty - 1))}
-                                    className="w-6 h-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs cursor-pointer"
-                                  >
-                                    -
-                                  </button>
+                                {it.barcode && (
+                                  <span className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200 flex items-center space-x-1">
+                                    <Barcode className="w-2.5 h-2.5" />
+                                    <span>{it.barcode}</span>
+                                  </span>
                                 )}
+                                {it.category && <span>• {it.category}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right ml-2 flex-shrink-0">
+                            <span className="text-[10px] text-slate-500 block">Costo (sin IVA)</span>
+                            <span className="font-mono font-black text-amber-700 text-xs sm:text-sm">
+                              ${getInventoryCostWithoutTax(it).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Items List - Vista Tipo Factura Desglosada en Tabla Horizontal */}
+              {items.length === 0 ? (
+                <div className="text-center py-6 px-4 bg-white/80 border border-dashed border-indigo-200 rounded-xl space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto">
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-700">No hay productos agregados a esta orden</p>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                    Escanea el código de barras con el lector (envía Enter automáticamente) o busca por SKU/Nombre para agregar productos registrados en el catálogo.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white border border-indigo-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto max-h-72 custom-scrollbar">
+                    <table className="w-full text-left text-xs text-slate-800 font-sans border-collapse min-w-[850px]">
+                      <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300 text-[11px] uppercase tracking-wider sticky top-0 z-10">
+                        <tr>
+                          <th className="p-2.5 w-8 text-center">#</th>
+                          <th className="p-2.5 min-w-[200px]">Producto / Descripción</th>
+                          <th className="p-2.5 min-w-[100px]">SKU / Código</th>
+                          <th className="p-2.5 text-center min-w-[100px]">Cantidad</th>
+                          <th className="p-2.5 text-right min-w-[100px]">Costo Unit. ($)</th>
+                          <th className="p-2.5 text-right min-w-[90px]">Desc. ($)</th>
+                          <th className="p-2.5 text-center min-w-[90px]">IVA (%)</th>
+                          <th className="p-2.5 text-right min-w-[100px]">Subtotal ($)</th>
+                          <th className="p-2.5 text-center w-10">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 bg-white">
+                        {items.map((it, idx) => {
+                          const unitCost = Number(it.costPrice || 0);
+                          const qty = Number(it.quantity || 1);
+                          const discount = Number(it.discount || 0);
+                          const lineSubtotal = Math.max(0, Math.round((unitCost * qty - discount) * 100) / 100);
+                          const itemTaxPercent =
+                            it.taxPercent !== undefined
+                              ? Number(it.taxPercent)
+                              : (it as any).purchaseTaxPercent !== undefined
+                                ? Number((it as any).purchaseTaxPercent)
+                                : (it as any).hasPurchaseTax === false
+                                  ? 0
+                                  : 15;
+
+                          return (
+                            <tr key={idx} className="hover:bg-indigo-50/40 transition">
+                              <td className="p-2.5 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
+                              <td className="p-2.5">
+                                <div className="flex items-center space-x-2.5">
+                                  {it.imageUrl ? (
+                                    <img
+                                      src={it.imageUrl}
+                                      alt=""
+                                      className="w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-slate-200 shadow-xs"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                                      <Package className="w-4 h-4" />
+                                    </div>
+                                  )}
+                                  <input
+                                    type="text"
+                                    value={it.name}
+                                    disabled={isImmutable}
+                                    onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
+                                    placeholder="Nombre del producto"
+                                    className={`w-full font-extrabold text-slate-900 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none text-xs placeholder:text-slate-400 ${isImmutable ? 'cursor-not-allowed text-slate-600' : ''
+                                      }`}
+                                  />
+                                  {(Number(it.costPrice) === 0 || it.isSupplierGift) && (
+                                    <span className="bg-purple-100 text-purple-900 border border-purple-300 font-bold px-1.5 py-0.5 rounded text-[10px] shrink-0 whitespace-nowrap">
+                                      🎁 Regalo ($0.00)
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-2.5 font-mono text-[11px]">
+                                <input
+                                  type="text"
+                                  value={it.sku || ''}
+                                  disabled={isImmutable}
+                                  onChange={(e) => handleUpdateItem(idx, 'sku', e.target.value)}
+                                  placeholder="Auto"
+                                  className="w-20 bg-sky-50 border border-sky-200 rounded px-1.5 py-0.5 font-mono text-sky-900 font-bold text-[11px] focus:outline-none focus:border-sky-500 disabled:text-slate-600 disabled:bg-slate-100"
+                                />
+                                {(() => {
+                                  const supplierCode = it.supplierCode || (inventoryItems?.find((inv) => inv.id === it.inventoryItemId || (it.sku && inv.sku && inv.sku.toLowerCase() === it.sku.toLowerCase())) as any)?.supplierCode;
+                                  if (!supplierCode) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(supplierCode);
+                                        if (showToast) showToast(`📋 SKU Proveedor ${supplierCode} copiado al portapapeles`);
+                                      }}
+                                      className="mt-1 font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
+                                      title="Haz clic para copiar el SKU Proveedor al portapapeles"
+                                    >
+                                      <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
+                                      <span className="max-w-[70px] truncate">{supplierCode}</span>
+                                      <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                                    </button>
+                                  );
+                                })()}
+                              </td>
+                              <td className="p-2.5 text-center">
+                                <div className="flex items-center justify-center space-x-1">
+                                  {!isImmutable && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateItem(idx, 'quantity', Math.max(1, qty - 1))}
+                                      className="w-6 h-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs cursor-pointer"
+                                    >
+                                      -
+                                    </button>
+                                  )}
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={it.quantity}
+                                    disabled={isImmutable}
+                                    onChange={(e) => handleUpdateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
+                                    className={`w-11 h-6 px-1 bg-slate-50 border border-slate-300 rounded font-bold text-center text-xs text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white ${isImmutable ? 'cursor-not-allowed bg-slate-100 text-slate-600' : ''
+                                      }`}
+                                  />
+                                  {!isImmutable && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateItem(idx, 'quantity', qty + 1)}
+                                      className="w-6 h-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs cursor-pointer"
+                                    >
+                                      +
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-2.5 text-right">
                                 <input
                                   type="number"
-                                  min="1"
-                                  value={it.quantity}
+                                  step="any"
+                                  min="0"
+                                  value={it.costPrice}
                                   disabled={isImmutable}
-                                  onChange={(e) => handleUpdateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
-                                  className={`w-11 h-6 px-1 bg-slate-50 border border-slate-300 rounded font-bold text-center text-xs text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white ${
-                                    isImmutable ? 'cursor-not-allowed bg-slate-100 text-slate-600' : ''
-                                  }`}
+                                  onChange={(e) => handleUpdateItem(idx, 'costPrice', e.target.value)}
+                                  className={`w-20 h-6 px-1.5 border rounded font-mono font-bold text-xs text-right focus:outline-none ${isImmutable
+                                      ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
+                                      : 'bg-amber-50/80 border-amber-300 text-amber-950 focus:border-amber-500 focus:bg-white'
+                                    }`}
                                 />
-                                {!isImmutable && (
+                              </td>
+                              <td className="p-2.5 text-right">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={it.discount || ''}
+                                  disabled={isImmutable}
+                                  onChange={(e) => handleUpdateItem(idx, 'discount', Math.max(0, parseFloat(e.target.value) || 0))}
+                                  placeholder="0.00"
+                                  className="w-16 h-6 px-1 border border-slate-200 rounded font-mono text-xs text-right focus:outline-none focus:border-indigo-500 disabled:bg-slate-100"
+                                />
+                              </td>
+                              <td className="p-2.5 text-center">
+                                <select
+                                  value={itemTaxPercent}
+                                  disabled={isImmutable}
+                                  onChange={(e) => handleUpdateItem(idx, 'taxPercent', Number(e.target.value))}
+                                  className={`px-1.5 py-0.5 border rounded text-[11px] font-mono font-bold focus:outline-none cursor-pointer ${itemTaxPercent > 0
+                                      ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                                    } ${isImmutable ? 'cursor-not-allowed opacity-80' : ''}`}
+                                >
+                                  <option value={15}>15% IVA</option>
+                                  <option value={5}>5% IVA</option>
+                                  <option value={0}>0% Exento</option>
+                                </select>
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-black text-indigo-700">
+                                ${lineSubtotal.toFixed(2)}
+                              </td>
+                              <td className="p-2.5 text-center">
+                                {!isImmutable ? (
                                   <button
                                     type="button"
-                                    onClick={() => handleUpdateItem(idx, 'quantity', qty + 1)}
-                                    className="w-6 h-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs cursor-pointer"
+                                    onClick={() => handleRemoveItem(idx)}
+                                    title="Eliminar producto de la lista"
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer transition"
                                   >
-                                    +
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
+                                ) : (
+                                  <Lock className="w-3.5 h-3.5 text-slate-400 mx-auto" />
                                 )}
-                              </div>
-                            </td>
-                            <td className="p-2.5 text-right">
-                              <input
-                                type="number"
-                                step="any"
-                                min="0"
-                                value={it.costPrice}
-                                disabled={isImmutable}
-                                onChange={(e) => handleUpdateItem(idx, 'costPrice', e.target.value)}
-                                className={`w-20 h-6 px-1.5 border rounded font-mono font-bold text-xs text-right focus:outline-none ${
-                                  isImmutable
-                                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
-                                    : 'bg-amber-50/80 border-amber-300 text-amber-950 focus:border-amber-500 focus:bg-white'
-                                }`}
-                              />
-                            </td>
-                            <td className="p-2.5 text-right">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={it.discount || ''}
-                                disabled={isImmutable}
-                                onChange={(e) => handleUpdateItem(idx, 'discount', Math.max(0, parseFloat(e.target.value) || 0))}
-                                placeholder="0.00"
-                                className="w-16 h-6 px-1 border border-slate-200 rounded font-mono text-xs text-right focus:outline-none focus:border-indigo-500 disabled:bg-slate-100"
-                              />
-                            </td>
-                            <td className="p-2.5 text-center">
-                              <select
-                                value={itemTaxPercent}
-                                disabled={isImmutable}
-                                onChange={(e) => handleUpdateItem(idx, 'taxPercent', Number(e.target.value))}
-                                className={`px-1.5 py-0.5 border rounded text-[11px] font-mono font-bold focus:outline-none cursor-pointer ${
-                                  itemTaxPercent > 0
-                                    ? 'bg-amber-50 text-amber-900 border-amber-300'
-                                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                                } ${isImmutable ? 'cursor-not-allowed opacity-80' : ''}`}
-                              >
-                                <option value={15}>15% IVA</option>
-                                <option value={5}>5% IVA</option>
-                                <option value={0}>0% Exento</option>
-                              </select>
-                            </td>
-                            <td className="p-2.5 text-right font-mono font-black text-indigo-700">
-                              ${lineSubtotal.toFixed(2)}
-                            </td>
-                            <td className="p-2.5 text-center">
-                              {!isImmutable ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveItem(idx)}
-                                  title="Eliminar producto de la lista"
-                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer transition"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              ) : (
-                                <Lock className="w-3.5 h-3.5 text-slate-400 mx-auto" />
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* CARD 3: NOTAS Y RESUMEN FISCAL SRI EN 2 COLUMNAS */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* LEFT CARD: NOTAS */}
-            <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-4 space-y-2 shadow-2xs">
-              <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-slate-600" />
-                <span>Notas / Guía de Proveedor</span>
-              </label>
+            {/* Notes */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Notas / Guía de Proveedor</label>
               <textarea
-                rows={3}
+                rows={2}
                 disabled={isImmutable}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Instrucciones especiales, números de guía del proveedor o acuerdos de pago..."
-                className={`w-full px-3 py-2 border rounded-xl text-xs ${
-                  isImmutable
+                className={`w-full px-3 py-2 border rounded-xl text-xs ${isImmutable
                     ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed'
                     : 'bg-slate-50 border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500'
-                }`}
+                  }`}
               />
             </div>
+          </div>
 
-            {/* RIGHT CARD: RESUMEN DE ENTRADA Y FACTURACIÓN SRI */}
-            <div className="lg:col-span-7 bg-slate-900 text-white rounded-2xl p-4 shadow-sm border border-slate-800 flex flex-col justify-between">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center space-x-2">
-                  <div className="w-6 h-6 rounded-lg bg-indigo-500/30 text-indigo-300 flex items-center justify-center">
-                    <Boxes className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-xs font-bold text-slate-200">Resumen de Entrada & Facturación SRI</span>
+          {/* FIXED BOTTOM PANEL: Resumen de Entrada Fijo + Botones de Acción Organizados */}
+          <div className="flex-shrink-0 border-t border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-lg z-10">
+            {/* Panel de Resumen de Entrada Fijo con Desglose SRI */}
+            <div className="bg-slate-900 text-white rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/30 flex items-center justify-center text-indigo-300 flex-shrink-0">
+                  <Boxes className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] font-semibold text-slate-400">
-                  {items.reduce((s, it) => s + (Number(it.quantity) || 1), 0)} un. totales ({items.length} ítems)
-                </span>
+                <div>
+                  <span className="text-[11px] text-slate-400 font-medium block">Resumen de Entrada & Facturación SRI</span>
+                  <span className="text-xs font-bold text-slate-200">
+                    {items.reduce((s, it) => s + (Number(it.quantity) || 1), 0)} unidades totales ({items.length} {items.length === 1 ? 'producto' : 'productos'})
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-xs font-mono">
-                <div className="bg-slate-800/80 p-2 rounded-xl border border-slate-700/60">
-                  <span className="text-[10px] text-slate-400 block">Subtotal 0%:</span>
+              {/* SRI Totals Breakdown */}
+              <div className="w-full sm:w-auto bg-slate-800/90 rounded-lg p-2.5 border border-slate-700 text-xs font-mono space-y-1 min-w-[260px]">
+                <div className="flex justify-between text-slate-400 text-[11px]">
+                  <span>Subtotal 0%:</span>
                   <span className="font-bold text-slate-200">${sriBreakdown.subtotal0.toFixed(2)}</span>
                 </div>
-                <div className="bg-slate-800/80 p-2 rounded-xl border border-slate-700/60">
-                  <span className="text-[10px] text-slate-400 block">Subtotal 15%:</span>
+                <div className="flex justify-between text-slate-400 text-[11px]">
+                  <span>Subtotal 15%:</span>
                   <span className="font-bold text-slate-200">${sriBreakdown.subtotal15.toFixed(2)}</span>
                 </div>
-                <div className="bg-slate-800/80 p-2 rounded-xl border border-slate-700/60">
-                  <span className="text-[10px] text-slate-400 block">IVA 15%:</span>
+                {sriBreakdown.subtotal5 > 0 && (
+                  <div className="flex justify-between text-slate-400 text-[11px]">
+                    <span>Subtotal 5%:</span>
+                    <span className="font-bold text-slate-200">${sriBreakdown.subtotal5.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-slate-300 font-bold text-[11px] pt-1 border-t border-slate-700">
+                  <span>Subtotal Sin Impuesto:</span>
+                  <span className="text-white">${sriBreakdown.subtotalSinImpuesto.toFixed(2)}</span>
+                </div>
+                {sriBreakdown.totalDiscount > 0 && (
+                  <div className="flex justify-between text-amber-400 text-[11px]">
+                    <span>Total Descuento:</span>
+                    <span>-${sriBreakdown.totalDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-slate-400 text-[11px]">
+                  <span>IVA 15%:</span>
                   <span className="font-bold text-slate-200">${sriBreakdown.iva15.toFixed(2)}</span>
                 </div>
-                <div className="bg-indigo-950/90 p-2 rounded-xl border border-indigo-700/80 text-right">
-                  <span className="text-[10px] text-indigo-300 block uppercase font-sans font-bold">TOTAL FACTURA</span>
-                  <span className="text-sm font-black text-emerald-400">${totalCost.toFixed(2)} {currency}</span>
+                {sriBreakdown.iva5 > 0 && (
+                  <div className="flex justify-between text-slate-400 text-[11px]">
+                    <span>IVA 5%:</span>
+                    <span className="font-bold text-slate-200">${sriBreakdown.iva5.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-emerald-400 font-black text-sm pt-1 border-t border-slate-700">
+                  <span>TOTAL FACTURA SRI:</span>
+                  <span>${totalCost.toFixed(2)} {currency}</span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* FIXED BOTTOM PANEL: Botones de Acción Organizados */}
-        <div className="flex-shrink-0 border-t border-slate-200 bg-white p-3.5 sm:p-4 shadow-lg z-10">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
-            {/* Lado izquierdo */}
-            <div className="w-full sm:w-auto flex items-center gap-2">
-              {isEditing && purchase && isAutoGeneratedFromSale ? (
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 text-xs font-bold border border-amber-300">
-                  <Lock className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
-                  <span>Vinculada al Pedido #{purchase.linkedCustomerOrderNumber || purchase.linkedCustomerOrderId} (Ineliminable)</span>
-                </span>
-              ) : isEditing && purchase && (purchase.linkedCustomerOrderId || purchase.linkedCustomerOrderNumber) ? (
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 text-xs font-semibold border border-amber-200">
-                  <Lock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                  <span>Vinculada al Pedido #{purchase.linkedCustomerOrderNumber || purchase.linkedCustomerOrderId}</span>
-                </span>
-              ) : isEditing && purchase && purchase.status === 'pending' && onDeleteClick ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onDeleteClick(purchase);
-                  }}
-                  className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs cursor-pointer transition border border-rose-200/80 shadow-2xs"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Eliminar Orden (Borrador)</span>
-                </button>
-              ) : isImmutable ? (
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold border border-slate-200">
-                  <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                  <span>Orden Cerrada (Ineliminable)</span>
-                </span>
-              ) : null}
-            </div>
+            {/* Botones de acción situados, alineados y organizados en la parte inferior */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-0.5">
+              {/* Lado izquierdo */}
+              <div className="w-full sm:w-auto flex items-center gap-2">
+                {isEditing && purchase && isAutoGeneratedFromSale ? (
+                  <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 text-xs font-bold border border-amber-300">
+                    <Lock className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+                    <span>Vinculada al Pedido #{purchase.linkedCustomerOrderNumber || purchase.linkedCustomerOrderId} (Ineliminable)</span>
+                  </span>
+                ) : isEditing && purchase && (purchase.linkedCustomerOrderId || purchase.linkedCustomerOrderNumber) ? (
+                  <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 text-xs font-semibold border border-amber-200">
+                    <Lock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                    <span>Vinculada al Pedido #{purchase.linkedCustomerOrderNumber || purchase.linkedCustomerOrderId}</span>
+                  </span>
+                ) : isEditing && purchase && purchase.status === 'pending' && onDeleteClick ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onDeleteClick(purchase);
+                    }}
+                    className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs cursor-pointer transition border border-rose-200/80 shadow-2xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar Orden (Borrador)</span>
+                  </button>
+                ) : isImmutable ? (
+                  <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold border border-slate-200">
+                    <Lock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    <span>Orden Cerrada (Ineliminable)</span>
+                  </span>
+                ) : null}
+              </div>
 
-            {/* Lado derecho */}
-            <div className="w-full sm:w-auto flex items-center justify-end space-x-2">
-              {isImmutable ? (
-                <>
-                  {purchase?.status === 'pending' && onConfirmPayment && (
-                    isLinkedOrderUnconfirmed ? (
+              {/* Lado derecho */}
+              <div className="w-full sm:w-auto flex items-center justify-end space-x-2">
+                {isImmutable ? (
+                  <>
+                    {purchase?.status === 'pending' && onConfirmPayment && (
+                      isLinkedOrderUnconfirmed ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            showToast(
+                              `⚠️ No se puede confirmar la compra: El Pedido de Venta #${linkedCustomerOrder?.orderNumber || purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId} aún no ha sido confirmado. Confirma primero el pedido de venta.`
+                            );
+                          }}
+                          className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs cursor-pointer transition shadow-2xs"
+                          title="Venta sin confirmar"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Venta Sin Confirmar</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onConfirmPayment(purchase);
+                          }}
+                          className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs cursor-pointer transition shadow-xs active:scale-95"
+                          title="Confirmar pago a proveedor"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Confirmar Pago</span>
+                        </button>
+                      )
+                    )}
+                    {purchase && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onOpenPrintA4) {
+                            onOpenPrintA4(purchase);
+                          }
+                        }}
+                        className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs cursor-pointer transition shadow-xs"
+                        title="Imprimir Orden de Compra"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Imprimir Compra</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs cursor-pointer transition shadow-xs"
+                    >
+                      Cerrar Detalle
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition"
+                    >
+                      Cancelar
+                    </button>
+                    {isLinkedOrderUnconfirmed ? (
                       <button
                         type="button"
                         onClick={() => {
                           showToast(
-                            `⚠️ No se puede confirmar la compra: El Pedido de Venta #${linkedCustomerOrder?.orderNumber || purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId} aún no ha sido confirmado. Confirma primero el pedido de venta.`
+                            `⚠️ No se puede confirmar con pago: El Pedido de Venta #${linkedCustomerOrder?.orderNumber || purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId} aún no ha sido confirmado por el vendedor.`
                           );
                         }}
-                        className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs cursor-pointer transition shadow-2xs"
+                        className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs cursor-pointer transition shadow-2xs"
                         title="Venta sin confirmar"
                       >
                         <Lock className="w-3.5 h-3.5 text-amber-700" />
@@ -3434,88 +3473,27 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
                     ) : (
                       <button
                         type="button"
-                        onClick={() => {
-                          onClose();
-                          onConfirmPayment(purchase);
-                        }}
-                        className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs cursor-pointer transition shadow-xs active:scale-95"
-                        title="Confirmar pago a proveedor"
+                        onClick={() => handleSavePurchase(true)}
+                        disabled={isSubmitting}
+                        className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs cursor-pointer transition shadow-xs disabled:opacity-50 active:scale-95"
+                        title="Guarda la orden y abre el formulario para registrar los datos de pago al proveedor"
                       >
                         <CreditCard className="w-3.5 h-3.5" />
-                        <span>Confirmar Pago</span>
+                        <span>Confirmar con Pago</span>
                       </button>
-                    )
-                  )}
-                  {purchase && (
+                    )}
                     <button
-                      type="button"
-                      onClick={() => {
-                        if (onOpenPrintA4) {
-                          onOpenPrintA4(purchase);
-                        }
-                      }}
-                      className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs cursor-pointer transition shadow-xs"
-                      title="Imprimir Orden de Compra"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Imprimir Compra</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs cursor-pointer transition shadow-xs"
-                  >
-                    Cerrar Detalle
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition"
-                  >
-                    Cancelar
-                  </button>
-                  {isLinkedOrderUnconfirmed ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        showToast(
-                          `⚠️ No se puede confirmar con pago: El Pedido de Venta #${linkedCustomerOrder?.orderNumber || purchase?.linkedCustomerOrderNumber || purchase?.linkedCustomerOrderId} aún no ha sido confirmado por el vendedor.`
-                        );
-                      }}
-                      className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs cursor-pointer transition shadow-2xs"
-                      title="Venta sin confirmar"
-                    >
-                      <Lock className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Venta Sin Confirmar</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleSavePurchase(true)}
+                      type="submit"
                       disabled={isSubmitting}
-                      className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs cursor-pointer transition shadow-xs disabled:opacity-50 active:scale-95"
-                      title="Guarda la orden y abre el formulario para registrar los datos de pago al proveedor"
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer transition shadow-xs disabled:opacity-50"
                     >
-                      <CreditCard className="w-3.5 h-3.5" />
-                      <span>Confirmar con Pago</span>
+                      {isSubmitting ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Guardar Pendiente'}
                     </button>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer transition shadow-xs disabled:opacity-50"
-                  >
-                    {isSubmitting ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Guardar Pendiente'}
-                  </button>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
         </form>
       </div>
     </div>
@@ -3576,11 +3554,10 @@ const FinancialSummaryModal: React.FC<FinancialSummaryModalProps> = ({
               <button
                 key={tab.id}
                 onClick={() => onPeriodChange(tab.id)}
-                className={`flex-1 py-1.5 rounded-lg font-bold text-center transition cursor-pointer text-xs ${
-                  period === tab.id
+                className={`flex-1 py-1.5 rounded-lg font-bold text-center transition cursor-pointer text-xs ${period === tab.id
                     ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -3685,11 +3662,10 @@ const FinancialSummaryModal: React.FC<FinancialSummaryModalProps> = ({
                       <div key={idx} className="p-2.5 flex items-center justify-between hover:bg-slate-50">
                         <div className="flex items-center space-x-2.5">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              tx.type === 'sale'
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${tx.type === 'sale'
                                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                 : 'bg-rose-50 text-rose-800 border border-rose-200'
-                            }`}
+                              }`}
                           >
                             {tx.type === 'sale' ? 'Venta' : 'Compra'}
                           </span>
@@ -3701,9 +3677,8 @@ const FinancialSummaryModal: React.FC<FinancialSummaryModalProps> = ({
 
                         <div className="text-right">
                           <div
-                            className={`font-mono font-bold ${
-                              tx.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                            }`}
+                            className={`font-mono font-bold ${tx.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                              }`}
                           >
                             {tx.amount >= 0 ? `+$${tx.amount.toFixed(2)}` : `-$${Math.abs(tx.amount).toFixed(2)}`}
                           </div>
@@ -3775,14 +3750,14 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
 
   const isLinkedOrderConfirmed = Boolean(
     linkedCustomerOrder &&
-      (linkedCustomerOrder.status === 'confirmed' ||
-        linkedCustomerOrder.status === 'shipped' ||
-        linkedCustomerOrder.status === 'delivered')
+    (linkedCustomerOrder.status === 'confirmed' ||
+      linkedCustomerOrder.status === 'shipped' ||
+      linkedCustomerOrder.status === 'delivered')
   );
 
   const isLinkedOrderUnconfirmed = Boolean(
     (Boolean(purchase.linkedCustomerOrderId || purchase.linkedCustomerOrderNumber)) &&
-      !isLinkedOrderConfirmed
+    !isLinkedOrderConfirmed
   );
 
   const computedGrandTotal = useMemo(() => {
@@ -3799,10 +3774,10 @@ const PurchaseConfirmPaymentModal: React.FC<PurchaseConfirmPaymentModalProps> = 
         item.taxPercent !== undefined
           ? Number(item.taxPercent)
           : (item as any).purchaseTaxPercent !== undefined
-          ? Number((item as any).purchaseTaxPercent)
-          : (item as any).hasPurchaseTax === false
-          ? 0
-          : 15;
+            ? Number((item as any).purchaseTaxPercent)
+            : (item as any).hasPurchaseTax === false
+              ? 0
+              : 15;
 
       let baseUnitCost = 0;
       const rawCostPrice = item.costPrice !== undefined && item.costPrice !== null ? Number(item.costPrice) : 0;

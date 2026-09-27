@@ -208,20 +208,18 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
         {candidates.map((_, i) => (
           <span
             key={i}
-            className={`transition-all ${
-              effectiveMode === 'photo' && candidateIdx === i
+            className={`transition-all ${effectiveMode === 'photo' && candidateIdx === i
                 ? 'w-3 h-1 bg-amber-400 rounded-full shadow-xs'
                 : 'w-1 h-1 bg-white/70 rounded-full'
-            }`}
+              }`}
           />
         ))}
         {hasValidVideo && (
           <span
-            className={`transition-all flex items-center justify-center ${
-              effectiveMode === 'video'
+            className={`transition-all flex items-center justify-center ${effectiveMode === 'video'
                 ? 'w-3 h-1 bg-sky-400 rounded-full shadow-xs'
                 : 'w-1 h-1 bg-sky-200/70 rounded-full'
-            }`}
+              }`}
           />
         )}
       </div>
@@ -333,18 +331,18 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Quick button to toggle back to cover (moved to top-right to avoid blocking controls) */}
+            {/* Quick button to toggle back to cover if desired */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setActiveMode('photo');
               }}
-              className="absolute top-2 right-2 z-20 px-2.5 py-1 rounded-lg bg-black/80 hover:bg-black text-amber-300 text-[10px] font-bold border border-amber-400/40 flex items-center gap-1 cursor-pointer transition shadow-md backdrop-blur-xs active:scale-95"
-              title="Volver a la portada / fotos"
+              className="absolute top-2 left-2 z-20 px-2 py-0.5 rounded-lg bg-black/70 hover:bg-black text-white text-[9px] font-bold border border-white/20 flex items-center gap-1 cursor-pointer transition shadow-xs backdrop-blur-xs"
+              title="Volver a la portada"
             >
-              <ImageOff className="w-3 h-3 text-amber-400" />
-              <span>Fotos</span>
+              <ImageOff className="w-2.5 h-2.5" />
+              <span>Portada</span>
             </button>
 
             <video
@@ -359,14 +357,14 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
                         const unmute = () => {
                           el.muted = false;
                           el.volume = 1.0;
-                          el.play().catch(() => {});
+                          el.play().catch(() => { });
                           window.removeEventListener('click', unmute);
                           window.removeEventListener('touchstart', unmute);
                         };
                         window.addEventListener('click', unmute, { once: true });
                         window.addEventListener('touchstart', unmute, { once: true });
                         el.muted = true;
-                        el.play().catch(() => {});
+                        el.play().catch(() => { });
                       });
                     }
                   }
@@ -381,7 +379,7 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
               muted={false}
               autoPlay={autoPlayVideo}
               controls
-              controlsList="nodownload"
+              controlsList="nodownload novolume"
               loop
               playsInline
               className={videoClassName}
@@ -402,32 +400,32 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
       if (videoInfo.embedUrl) {
         return (
           <div
-            className={`${className} select-none bg-black relative flex items-center justify-center`}
+            className={`${className} touch-pan-y select-none bg-black relative flex items-center justify-center`}
+            onClick={handleClick}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
-            <iframe
-              src={videoInfo.embedUrl}
-              title={name}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              className="w-full h-full border-0 pointer-events-auto z-0"
-            />
-
-            {/* Quick button to toggle back to cover (moved to top-right to avoid blocking YouTube controls) */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setActiveMode('photo');
               }}
-              className="absolute top-2 right-2 z-30 px-2.5 py-1 rounded-lg bg-black/85 hover:bg-black text-amber-300 text-[10px] font-bold border border-amber-400/50 flex items-center gap-1 cursor-pointer transition shadow-lg backdrop-blur-md active:scale-95"
-              title="Volver a fotos / portada"
+              className="absolute top-2 left-2 z-20 px-2 py-0.5 rounded-lg bg-black/70 hover:bg-black text-white text-[9px] font-bold border border-white/20 flex items-center gap-1 cursor-pointer transition shadow-xs backdrop-blur-xs"
+              title="Volver a la portada"
             >
-              <ImageOff className="w-3 h-3 text-amber-400" />
-              <span>Fotos</span>
+              <ImageOff className="w-2.5 h-2.5" />
+              <span>Portada</span>
             </button>
-
+            <iframe
+              src={videoInfo.embedUrl}
+              title={name}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-full border-0 pointer-events-auto"
+            />
             {showPlayBadge && (
-              <div className="absolute top-2 left-2 z-20 px-2 py-0.5 rounded-lg text-[9px] font-black flex items-center space-x-1 shadow-md bg-slate-950/80 text-sky-300 border border-sky-400/30 backdrop-blur-xs pointer-events-none">
+              <div className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg text-[9px] font-black flex items-center space-x-1 shadow-md bg-slate-950/90 text-sky-300 border border-sky-400/40 backdrop-blur-xs pointer-events-none">
                 <Play className="w-2.5 h-2.5 text-sky-400 fill-current" />
                 <span>{videoInfo.platform.toUpperCase()}</span>
               </div>

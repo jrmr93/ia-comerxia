@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @layer base {
+
   html,
   body {
     background-color: #f8fafc;
@@ -15,13 +16,16 @@
     width: 6px;
     height: 6px;
   }
+
   ::-webkit-scrollbar-track {
     background: #f1f5f9;
   }
+
   ::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 9999px;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
@@ -32,26 +36,32 @@
     transform: scale(1) rotate(0deg);
     filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0));
   }
+
   15% {
     transform: scale(1.32) rotate(-3deg);
     filter: drop-shadow(0 12px 20px rgba(14, 165, 233, 0.35));
   }
+
   30% {
     transform: scale(1.24) rotate(3deg);
     filter: drop-shadow(0 14px 24px rgba(14, 165, 233, 0.4));
   }
+
   50% {
     transform: scale(1.28) rotate(-2deg);
     filter: drop-shadow(0 12px 20px rgba(14, 165, 233, 0.35));
   }
+
   70% {
     transform: scale(1.18) rotate(1.5deg);
     filter: drop-shadow(0 8px 14px rgba(14, 165, 233, 0.25));
   }
+
   88% {
     transform: scale(1.06) rotate(-0.5deg);
     filter: drop-shadow(0 4px 8px rgba(14, 165, 233, 0.15));
   }
+
   100% {
     transform: scale(1) rotate(0deg);
     filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0));
@@ -65,16 +75,19 @@
 
 /* Refined Halo Glow Animation for Pending Orders (Efecto Halo Elegante y Llamativo sin destello excesivo) */
 @keyframes pendingHaloCardRefined {
-  0%, 100% {
-    box-shadow: 
+
+  0%,
+  100% {
+    box-shadow:
       0 0 0 1.5px rgba(245, 158, 11, 0.6),
       0 0 12px 1px rgba(245, 158, 11, 0.25),
       0 4px 14px rgba(0, 0, 0, 0.04);
     border-color: rgba(245, 158, 11, 0.6);
     background-color: #fffdf7;
   }
+
   50% {
-    box-shadow: 
+    box-shadow:
       0 0 0 2.5px rgba(217, 119, 6, 0.85),
       0 0 24px 4px rgba(245, 158, 11, 0.45),
       0 0 38px 8px rgba(251, 191, 36, 0.2),
@@ -91,14 +104,17 @@
 }
 
 @keyframes pendingHaloRowRefined {
-  0%, 100% {
-    box-shadow: 
+
+  0%,
+  100% {
+    box-shadow:
       inset 4px 0 0 0 #f59e0b,
       0 0 8px rgba(245, 158, 11, 0.15);
     background-color: rgba(254, 243, 199, 0.35);
   }
+
   50% {
-    box-shadow: 
+    box-shadow:
       inset 5px 0 0 0 #d97706,
       0 0 16px 2px rgba(245, 158, 11, 0.35);
     background-color: rgba(254, 243, 199, 0.7);
@@ -111,10 +127,13 @@
 }
 
 @keyframes haloDotPulseRefined {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(0.95);
     box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7), 0 0 4px #f59e0b;
   }
+
   50% {
     transform: scale(1.15);
     box-shadow: 0 0 0 6px rgba(245, 158, 11, 0), 0 0 8px #ea580c;
@@ -126,9 +145,12 @@
 }
 
 @keyframes haloBadgeBeaconRefined {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5), 0 2px 6px rgba(0, 0, 0, 0.12);
   }
+
   50% {
     box-shadow: 0 0 0 4px rgba(245, 158, 11, 0), 0 0 12px rgba(234, 88, 12, 0.5);
   }
@@ -145,10 +167,12 @@
     transform: translateY(14px) scale(0.96);
     filter: blur(3px);
   }
+
   50% {
     opacity: 0.8;
     filter: blur(0.5px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -166,6 +190,7 @@
     opacity: 0;
     transform: scale(0.97);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);
@@ -181,6 +206,7 @@
   0% {
     transform: translateX(0);
   }
+
   100% {
     transform: translateX(-50%);
   }
@@ -190,6 +216,7 @@
   0% {
     transform: translateX(-50%);
   }
+
   100% {
     transform: translateX(0);
   }
@@ -227,6 +254,7 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none !important;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
@@ -244,138 +272,13 @@ video::-moz-media-controls-mute-button {
   display: none !important;
 }
 
-/* ==========================================================================
-   INNOVATIVE VISUAL & SCROLL ANIMATIONS FOR ONLINE STORE (CUSTOMER VIEW)
-   ========================================================================== */
-
-/* 1. Smooth Scroll Fade-In & Slide-Up Reveal */
-@keyframes scrollRevealFadeUp {
-  0% {
-    opacity: 0;
-    transform: translateY(22px) scale(0.97);
-    filter: blur(2px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0px);
-  }
-}
-
-.scroll-reveal-card {
-  animation: scrollRevealFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: opacity, transform, filter;
-}
-
-/* 2. Innovative 3D Elevation & Glossy Card Hover */
-.hover-card-innovative {
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 0.35s ease,
-              border-color 0.3s ease;
-}
-
-.hover-card-innovative:hover {
-  transform: translateY(-6px) scale(1.015);
-}
-
-.hover-card-innovative:active {
-  transform: translateY(-2px) scale(0.99);
-}
-
-/* 3. Glossy Reflection Sheen on Hover */
-@keyframes cardGlossyShine {
-  0% {
-    transform: translateX(-100%) rotate(25deg);
-  }
-  100% {
-    transform: translateX(200%) rotate(25deg);
-  }
-}
-
-.glossy-sheen-effect {
-  position: relative;
-  overflow: hidden;
-}
-
-.glossy-sheen-effect::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    60deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.25) 50%,
-    transparent 70%
-  );
-  transform: translateX(-100%) rotate(25deg);
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-  opacity: 0;
-}
-
-.glossy-sheen-effect:hover::after {
-  opacity: 1;
-  animation: cardGlossyShine 1.2s ease-in-out forwards;
-}
-
-/* 4. Floating Badge Pulse Glow (OFERTA / ÚLTIMAS UNIDADES) */
-@keyframes floatBadgeGlowPulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.5), 0 4px 12px rgba(225, 29, 72, 0.3);
-  }
-  50% {
-    transform: scale(1.04);
-    box-shadow: 0 0 0 6px rgba(225, 29, 72, 0), 0 6px 18px rgba(245, 158, 11, 0.45);
-  }
-}
-
-.badge-pulse-glow {
-  animation: floatBadgeGlowPulse 2.4s ease-in-out infinite;
-}
-
-/* 5. Cart Item Added Bounce/Pop Animation */
-@keyframes cartPopBounce {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.25) rotate(-4deg);
-  }
-  70% {
-    transform: scale(0.92) rotate(2deg);
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-  }
-}
-
-.animate-cart-pop {
-  animation: cartPopBounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* 6. Active Category Pill Ambient Glow */
-@keyframes categoryPillGlow {
-  0%, 100% {
-    box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(245, 158, 11, 0.65);
-  }
-}
-
-.category-pill-active {
-  animation: categoryPillGlow 3s ease-in-out infinite;
-}
-
-/* 7. Subtle Ambient & Border Glow Pulse for VIP Price Card */
 @keyframes vipCardPulseGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 10px 30px -5px rgba(245, 158, 11, 0.25), 0 0 0 1px rgba(245, 158, 11, 0.35);
   }
+
   50% {
     box-shadow: 0 14px 45px -5px rgba(245, 158, 11, 0.45), 0 0 0 2px rgba(251, 191, 36, 0.6);
   }
@@ -389,7 +292,9 @@ video::-moz-media-controls-mute-button {
   0% {
     transform: translateX(-150%) skewX(-20deg);
   }
-  50%, 100% {
+
+  50%,
+  100% {
     transform: translateX(250%) skewX(-20deg);
   }
 }
@@ -401,16 +306,11 @@ video::-moz-media-controls-mute-button {
   left: 0;
   width: 50%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.08) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      transparent 100%);
   transform: translateX(-150%) skewX(-20deg);
   animation: vipLightSweep 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   pointer-events: none;
 }
-
-
-

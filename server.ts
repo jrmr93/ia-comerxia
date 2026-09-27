@@ -996,7 +996,7 @@ async function startServer() {
       const amtWithoutTax = Math.round(Math.max(0, Number(subtotal0 || 0)) * 100);
       const amtWithTax = Math.round(Math.max(0, Number(subtotal15 || 0)) * 100);
       const taxAmt = Math.round(Math.max(0, Number(tax15 || 0)) * 100);
-      
+
       let totalAmt = amtWithoutTax + amtWithTax + taxAmt;
       if (totalAmt <= 0) {
         totalAmt = Math.round(Math.max(0, Number(totalAmount || 0)) * 100);
@@ -1220,8 +1220,8 @@ async function startServer() {
       let apiResOk = false;
 
       // Paso 1: Si rawId o rawClientTxId es un ID numérico entero de recibo Payphone (ej. 1045920)
-      const numericId = !isNaN(Number(rawId)) && Number(rawId) > 0 
-        ? Number(rawId) 
+      const numericId = !isNaN(Number(rawId)) && Number(rawId) > 0
+        ? Number(rawId)
         : (!isNaN(Number(rawClientTxId)) && Number(rawClientTxId) > 0 ? Number(rawClientTxId) : 0);
 
       if (numericId > 0) {
@@ -1255,7 +1255,7 @@ async function startServer() {
           });
           const text1b = await res1b.text();
           let data1b: any = null;
-          try { data1b = JSON.parse(text1b); } catch {}
+          try { data1b = JSON.parse(text1b); } catch { }
           if (res1b.ok && data1b && typeof data1b === 'object') {
             resultData = data1b;
             apiResOk = true;
@@ -1280,7 +1280,7 @@ async function startServer() {
           });
           const text2 = await res2.text();
           let data2: any = null;
-          try { data2 = JSON.parse(text2); } catch {}
+          try { data2 = JSON.parse(text2); } catch { }
 
           if (!res2.ok || !data2) {
             try {
@@ -1289,8 +1289,8 @@ async function startServer() {
                 headers,
               });
               const text2Get = await res2Get.text();
-              try { data2 = JSON.parse(text2Get); } catch {}
-            } catch {}
+              try { data2 = JSON.parse(text2Get); } catch { }
+            } catch { }
           }
 
           if (data2) {
@@ -1336,7 +1336,7 @@ async function startServer() {
           if (resStoreSales.ok) {
             const salesList = await resStoreSales.json();
             if (Array.isArray(salesList)) {
-              const matchedSale = salesList.find((s: any) => 
+              const matchedSale = salesList.find((s: any) =>
                 String(s.clientTransactionId || s.clientTxId || '') === targetClientTxId ||
                 String(s.id || s.transactionId || '') === targetClientTxId
               );
@@ -1379,9 +1379,9 @@ async function startServer() {
             body: JSON.stringify({ id: 0, clientTxId: targetClientTxId }),
           });
           const text4 = await res4.text();
-          try { resultData = JSON.parse(text4); } catch {}
+          try { resultData = JSON.parse(text4); } catch { }
           apiResOk = res4.ok;
-        } catch {}
+        } catch { }
       }
 
       if (!resultData) {
@@ -1871,8 +1871,8 @@ async function startServer() {
       const statusLabel = isAutorizado
         ? 'AUTORIZADO'
         : isDevuelto
-        ? 'DEVUELTO'
-        : estadoAutorizacion || estadoRecepcion || 'DESCONOCIDO';
+          ? 'DEVUELTO'
+          : estadoAutorizacion || estadoRecepcion || 'DESCONOCIDO';
 
       const allMessages = [...mensajesRecepcion, ...mensajesAutorizacion];
       let motivoDetalle = '';
@@ -2087,7 +2087,6 @@ async function startServer() {
         name,
         sku,
         barcode,
-        supplierCode,
         description,
         category,
         costPrice,
@@ -2119,10 +2118,7 @@ async function startServer() {
       if (typeof extractedAttributes === 'object' && extractedAttributes !== null) {
         parsedExtracted = { ...extractedAttributes };
       } else if (typeof extractedAttributes === 'string' && extractedAttributes.trim()) {
-        try { parsedExtracted = JSON.parse(extractedAttributes); } catch {}
-      }
-      if (supplierCode) {
-        parsedExtracted.supplierCode = supplierCode.trim();
+        try { parsedExtracted = JSON.parse(extractedAttributes); } catch { }
       }
       if (isGift) {
         parsedExtracted.isSupplierGift = true;
@@ -2136,7 +2132,6 @@ async function startServer() {
         name,
         sku: finalSku,
         barcode: barcode?.trim() || null,
-        supplierCode: supplierCode?.trim() || null,
         description,
         category: category || 'General',
         costPrice: isGift ? '0.00' : String(costPrice || '0.00'),
@@ -2913,7 +2908,7 @@ async function startServer() {
       if (item.extractedAttributes) {
         try {
           parsedAttr = JSON.parse(item.extractedAttributes);
-        } catch {}
+        } catch { }
       }
 
       if (costPrice !== undefined) {
@@ -3003,7 +2998,7 @@ async function startServer() {
               .filter((p: any) => p.active !== false && p.name)
               .map((p: any) => String(p.name).trim());
           }
-        } catch {}
+        } catch { }
       }
 
       if (extractedPaymentTitles.length === 0) {
@@ -3031,7 +3026,7 @@ async function startServer() {
               .filter((c: any) => c.active !== false && c.name)
               .map((c: any) => String(c.name).trim());
           }
-        } catch {}
+        } catch { }
       }
 
       if (extractedShippingCompanies.length === 0) {
@@ -3052,7 +3047,7 @@ async function startServer() {
           if (candidateStoreDomain && !candidateStoreDomain.includes('localhost') && !candidateStoreDomain.includes('127.0.0.1')) {
             effectiveWebsiteUrl = `https://${candidateStoreDomain}/?producto=${item.id}`;
           }
-        } catch {}
+        } catch { }
       }
 
       if (!effectiveWebsiteUrl) {
@@ -3201,7 +3196,7 @@ async function startServer() {
           if (candidateStoreDomain && !candidateStoreDomain.includes('localhost') && !candidateStoreDomain.includes('127.0.0.1')) {
             effectiveWebsiteUrl = product.id ? `https://${candidateStoreDomain}/?producto=${product.id}` : `https://${candidateStoreDomain}`;
           }
-        } catch {}
+        } catch { }
       }
 
       if (!effectiveWebsiteUrl) {
@@ -3467,7 +3462,7 @@ async function startServer() {
           try {
             const parsed = new URL(targetUrl);
             searchQueryToUse = parsed.searchParams.get('q') || parsed.searchParams.get('query') || '';
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (searchQueryToUse && searchQueryToUse.trim()) {
@@ -3514,7 +3509,7 @@ async function startServer() {
             try {
               const parsed = new URL(targetUrl);
               src = `${parsed.origin}${src}`;
-            } catch (e) {}
+            } catch (e) { }
           }
           if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:image/')) {
             imagesSet.add(src);
@@ -3532,7 +3527,7 @@ async function startServer() {
             try {
               const parsed = new URL(targetUrl);
               src = `${parsed.origin}${src}`;
-            } catch (e) {}
+            } catch (e) { }
           }
           if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:image/')) {
             imagesSet.add(src);
@@ -3812,7 +3807,7 @@ async function startServer() {
         if (aiCfg?.apiKey && isValidGeminiApiKey(aiCfg.apiKey)) {
           customApiKey = aiCfg.apiKey.trim();
         }
-      } catch {}
+      } catch { }
 
       const quote = await quoteProductInEcuadorMarket({
         productName: productName.trim(),
@@ -3905,7 +3900,7 @@ async function startServer() {
       try {
         const u = new URL(targetUrl);
         originHeader = `${u.protocol}//${u.hostname}`;
-      } catch {}
+      } catch { }
 
       const imgRes = await fetch(targetUrl, {
         signal: controller.signal,
@@ -3939,7 +3934,7 @@ async function startServer() {
           if (!fs.existsSync(cachedFile)) {
             fs.writeFileSync(cachedFile, buffer);
           }
-        } catch {}
+        } catch { }
       }
 
       res.setHeader('Content-Type', contentType);
@@ -4023,7 +4018,7 @@ async function startServer() {
           try {
             const stat = fs.statSync(path.join(uploadsDir, file));
             totalBytes += stat.size;
-          } catch {}
+          } catch { }
         }
       }
 
@@ -5784,7 +5779,7 @@ async function startServer() {
             if (Array.isArray(parsed.images)) {
               parsed.images.forEach((img: string) => checkMedia(img));
             }
-          } catch {}
+          } catch { }
         }
       }
 
@@ -5879,7 +5874,7 @@ async function startServer() {
       res.status(500).json({ success: false, error: error.message || 'Error al procesar y restaurar el archivo ZIP' });
     } finally {
       if (tempPath && fs.existsSync(tempPath)) {
-        try { fs.unlinkSync(tempPath); } catch (_) {}
+        try { fs.unlinkSync(tempPath); } catch (_) { }
       }
     }
   });
@@ -5928,7 +5923,7 @@ async function startServer() {
       res.status(500).json({ success: false, error: error.message || 'Error al procesar respaldo maestro' });
     } finally {
       if (tempPath && fs.existsSync(tempPath)) {
-        try { fs.unlinkSync(tempPath); } catch (_) {}
+        try { fs.unlinkSync(tempPath); } catch (_) { }
       }
     }
   });
@@ -6487,8 +6482,8 @@ async function startServer() {
     const indexHtmlPath = fs.existsSync(path.join(distPath, 'index.html'))
       ? path.join(distPath, 'index.html')
       : fs.existsSync(path.join(distPath, 'client', 'index.html'))
-      ? path.join(distPath, 'client', 'index.html')
-      : null;
+        ? path.join(distPath, 'client', 'index.html')
+        : null;
 
     app.use(express.static(distPath));
     if (fs.existsSync(path.join(distPath, 'client'))) {

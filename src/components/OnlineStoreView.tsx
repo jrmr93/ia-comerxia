@@ -209,79 +209,79 @@ export const THEME_PRESETS: Array<{
   previewCard: string;
   previewAccent: string;
 }> = [
-  {
-    id: 'classic',
-    name: 'Clásico Moderno',
-    subtitle: 'Azul & Esmeralda Profesional',
-    tag: 'Recomendado General',
-    description: 'Estilo limpio, profesional y altamente confiable con esquinas suaves y sombras equilibradas. Ideal para comercio general.',
-    layoutDescription: 'Distribución vertical fluida: Barra de filtros y búsqueda horizontal superior, galería de 4 columnas y paneles de logística apilados.',
-    colors: ['#0284c7', '#2563eb', '#10b981', '#f8fafc'],
-    previewBg: 'bg-slate-100',
-    previewCard: 'bg-white border-slate-300 text-slate-900',
-    previewAccent: 'from-sky-500 to-blue-600',
-  },
-  {
-    id: 'boutique',
-    name: 'Boutique Elegante',
-    subtitle: 'Negro Obsidiana & Oro Luxury',
-    tag: 'Alta Gama & Lujo',
-    description: 'Atmósfera sofisticada con contrastes oscuros profundos, líneas nítidas y detalles dorados para marcas exclusivas.',
-    layoutDescription: 'Estructura editorial de 2 columnas: Barra lateral izquierda con navegación Atelier, concierge VIP y certificados; galería espaciosa a la derecha.',
-    colors: ['#f59e0b', '#eab308', '#27272a', '#09090b'],
-    previewBg: 'bg-zinc-950',
-    previewCard: 'bg-zinc-900 border-amber-500/30 text-zinc-100',
-    previewAccent: 'from-amber-500 via-amber-600 to-yellow-600',
-  },
-  {
-    id: 'fresh',
-    name: 'Fresco & Dinámico',
-    subtitle: 'Menta, Teal & Verde Esmeralda',
-    tag: 'Vitalidad & Tendencia',
-    description: 'Estilo revitalizante, moderno y enérgico con tonos menta y teal para belleza, salud y vida activa.',
-    layoutDescription: 'Diseño Bento interactivo: Cinta superior de avisos, cinturón de categorías vivas, banner Bento con búsqueda rápida y paneles dobles de logística.',
-    colors: ['#059669', '#0d9488', '#06b6d4', '#ecfdf5'],
-    previewBg: 'bg-teal-50/50',
-    previewCard: 'bg-white border-teal-300 text-slate-900',
-    previewAccent: 'from-emerald-500 via-teal-500 to-cyan-600',
-  },
-  {
-    id: 'brutalist',
-    name: 'Neo-Brutalismo Pop',
-    subtitle: 'Bordes Negros & Sombras Duras',
-    tag: 'Impacto Visual & Retro',
-    description: 'Estilo gráfico de alto impacto con bordes negros gruesos, sombras de bloque duras y botones con pulsación táctil.',
-    layoutDescription: 'Estructura Zine en bloques divididos: Columna izquierda de control con stickers de búsqueda, categorías y garantías; galería de impacto a la derecha.',
-    colors: ['#fde047', '#fb7185', '#34d399', '#000000'],
-    previewBg: 'bg-amber-100',
-    previewCard: 'bg-white border-3 border-black text-black shadow-[3px_3px_0px_#000]',
-    previewAccent: 'from-yellow-400 to-amber-500 text-black',
-  },
-  {
-    id: 'cyber',
-    name: 'Cyberpunk HUD',
-    subtitle: 'Neón Cyan & Terminal Sci-Fi',
-    tag: 'Tecnología & Gamer',
-    description: 'Cabina futurista de control con fondos espaciales oscuros, resplandor neón cyan y magenta y tipografía monospace HUD.',
-    layoutDescription: 'Centro de comando Sci-Fi: Barra de telemetría superior, terminal lateral de protocolos y seguridad, y matriz holográfica de productos.',
-    colors: ['#06b6d4', '#d946ef', '#0b1528', '#070d18'],
-    previewBg: 'bg-[#070d18]',
-    previewCard: 'bg-[#0b1528] border border-cyan-500/70 text-cyan-200 shadow-[0_0_10px_rgba(6,182,212,0.3)]',
-    previewAccent: 'from-cyan-500 to-fuchsia-600',
-  },
-  {
-    id: 'minimal',
-    name: 'Minimalista Nórdico',
-    subtitle: 'Zen & Arena Cálida',
-    tag: 'Elegancia Silenciosa',
-    description: 'Estética escandinava pura con lienzo arena cálida, tarjetas flotantes sin bordes rígidos y formas de píldora redondeadas.',
-    layoutDescription: 'Distribución Zen centrada: Navegación de categorías en píldoras centradas, galería limpia de 4 columnas y paneles de logística en tarjetas suaves.',
-    colors: ['#1c1917', '#78716c', '#e7e5e4', '#faf8f5'],
-    previewBg: 'bg-[#FAF8F5]',
-    previewCard: 'bg-white border-0 shadow-sm text-stone-900',
-    previewAccent: 'from-stone-800 to-stone-950',
-  },
-];
+    {
+      id: 'classic',
+      name: 'Clásico Moderno',
+      subtitle: 'Azul & Esmeralda Profesional',
+      tag: 'Recomendado General',
+      description: 'Estilo limpio, profesional y altamente confiable con esquinas suaves y sombras equilibradas. Ideal para comercio general.',
+      layoutDescription: 'Distribución vertical fluida: Barra de filtros y búsqueda horizontal superior, galería de 4 columnas y paneles de logística apilados.',
+      colors: ['#0284c7', '#2563eb', '#10b981', '#f8fafc'],
+      previewBg: 'bg-slate-100',
+      previewCard: 'bg-white border-slate-300 text-slate-900',
+      previewAccent: 'from-sky-500 to-blue-600',
+    },
+    {
+      id: 'boutique',
+      name: 'Boutique Elegante',
+      subtitle: 'Negro Obsidiana & Oro Luxury',
+      tag: 'Alta Gama & Lujo',
+      description: 'Atmósfera sofisticada con contrastes oscuros profundos, líneas nítidas y detalles dorados para marcas exclusivas.',
+      layoutDescription: 'Estructura editorial de 2 columnas: Barra lateral izquierda con navegación Atelier, concierge VIP y certificados; galería espaciosa a la derecha.',
+      colors: ['#f59e0b', '#eab308', '#27272a', '#09090b'],
+      previewBg: 'bg-zinc-950',
+      previewCard: 'bg-zinc-900 border-amber-500/30 text-zinc-100',
+      previewAccent: 'from-amber-500 via-amber-600 to-yellow-600',
+    },
+    {
+      id: 'fresh',
+      name: 'Fresco & Dinámico',
+      subtitle: 'Menta, Teal & Verde Esmeralda',
+      tag: 'Vitalidad & Tendencia',
+      description: 'Estilo revitalizante, moderno y enérgico con tonos menta y teal para belleza, salud y vida activa.',
+      layoutDescription: 'Diseño Bento interactivo: Cinta superior de avisos, cinturón de categorías vivas, banner Bento con búsqueda rápida y paneles dobles de logística.',
+      colors: ['#059669', '#0d9488', '#06b6d4', '#ecfdf5'],
+      previewBg: 'bg-teal-50/50',
+      previewCard: 'bg-white border-teal-300 text-slate-900',
+      previewAccent: 'from-emerald-500 via-teal-500 to-cyan-600',
+    },
+    {
+      id: 'brutalist',
+      name: 'Neo-Brutalismo Pop',
+      subtitle: 'Bordes Negros & Sombras Duras',
+      tag: 'Impacto Visual & Retro',
+      description: 'Estilo gráfico de alto impacto con bordes negros gruesos, sombras de bloque duras y botones con pulsación táctil.',
+      layoutDescription: 'Estructura Zine en bloques divididos: Columna izquierda de control con stickers de búsqueda, categorías y garantías; galería de impacto a la derecha.',
+      colors: ['#fde047', '#fb7185', '#34d399', '#000000'],
+      previewBg: 'bg-amber-100',
+      previewCard: 'bg-white border-3 border-black text-black shadow-[3px_3px_0px_#000]',
+      previewAccent: 'from-yellow-400 to-amber-500 text-black',
+    },
+    {
+      id: 'cyber',
+      name: 'Cyberpunk HUD',
+      subtitle: 'Neón Cyan & Terminal Sci-Fi',
+      tag: 'Tecnología & Gamer',
+      description: 'Cabina futurista de control con fondos espaciales oscuros, resplandor neón cyan y magenta y tipografía monospace HUD.',
+      layoutDescription: 'Centro de comando Sci-Fi: Barra de telemetría superior, terminal lateral de protocolos y seguridad, y matriz holográfica de productos.',
+      colors: ['#06b6d4', '#d946ef', '#0b1528', '#070d18'],
+      previewBg: 'bg-[#070d18]',
+      previewCard: 'bg-[#0b1528] border border-cyan-500/70 text-cyan-200 shadow-[0_0_10px_rgba(6,182,212,0.3)]',
+      previewAccent: 'from-cyan-500 to-fuchsia-600',
+    },
+    {
+      id: 'minimal',
+      name: 'Minimalista Nórdico',
+      subtitle: 'Zen & Arena Cálida',
+      tag: 'Elegancia Silenciosa',
+      description: 'Estética escandinava pura con lienzo arena cálida, tarjetas flotantes sin bordes rígidos y formas de píldora redondeadas.',
+      layoutDescription: 'Distribución Zen centrada: Navegación de categorías en píldoras centradas, galería limpia de 4 columnas y paneles de logística en tarjetas suaves.',
+      colors: ['#1c1917', '#78716c', '#e7e5e4', '#faf8f5'],
+      previewBg: 'bg-[#FAF8F5]',
+      previewCard: 'bg-white border-0 shadow-sm text-stone-900',
+      previewAccent: 'from-stone-800 to-stone-950',
+    },
+  ];
 
 export const getThemeStyles = (theme: StoreTheme = 'classic', customPalette?: string[], isCustomerView: boolean = true) => {
   const colors = getThemeColors(customPalette, theme);
@@ -679,7 +679,7 @@ const parseCouriers = (raw: any): CourierPartner[] => {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch {}
+    } catch { }
   }
   return DEFAULT_COURIERS;
 };
@@ -691,7 +691,7 @@ const parsePayments = (raw: any): PaymentMethodPartner[] => {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch {}
+    } catch { }
   }
   return DEFAULT_PAYMENTS;
 };
@@ -813,7 +813,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         if (saved === 'catalog' || saved === 'orders' || (saved === 'settings' && isAdmin)) {
           return saved;
         }
-      } catch {}
+      } catch { }
     }
     return 'catalog';
   });
@@ -849,7 +849,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     if (typeof window !== 'undefined' && !isCustomerOnly) {
       try {
         safeLocalStorage.setItem('comerxia_store_subtab', tab);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -865,7 +865,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     if (typeof window !== 'undefined' && !isCustomerOnly) {
       try {
         safeLocalStorage.setItem('comerxia_store_subtab', storeTab);
-      } catch {}
+      } catch { }
     }
   }, [storeTab, isCustomerOnly]);
   const [isCustomerMode, setIsCustomerMode] = useState<boolean>(isCustomerOnly);
@@ -935,7 +935,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         if (saved === 'cards' || saved === 'table') {
           return saved;
         }
-      } catch {}
+      } catch { }
     }
     return 'table';
   });
@@ -945,7 +945,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     if (typeof window !== 'undefined') {
       try {
         safeLocalStorage.setItem('comerxia_orders_view_mode', orderViewMode);
-      } catch {}
+      } catch { }
     }
   }, [orderViewMode]);
 
@@ -1560,7 +1560,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   const [bannerTextInput, setBannerTextInput] = useState(storeConfig.bannerText || '');
   const [deliveryFeeInput, setDeliveryFeeInput] = useState(String(storeConfig.deliveryFee ?? '0'));
   const [showStockInput, setShowStockInput] = useState<boolean>(storeConfig.showStock !== false);
-  
+
   // Store Logo, Delivery Partners, and Payment Logos State
   const [storeLogoInput, setStoreLogoInput] = useState<string | null>(storeConfig.logoUrl || null);
   const [storeLogoDesktopInput, setStoreLogoDesktopInput] = useState<string | null>(storeConfig.logoDesktopUrl || null);
@@ -1634,44 +1634,6 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   // Customer View: Static bottom bar modals state
   const [isStorePaymentsModalOpen, setIsStorePaymentsModalOpen] = useState(false);
   const [isStoreShippingModalOpen, setIsStoreShippingModalOpen] = useState(false);
-
-  // Native Mobile Back Button Interception to prevent leaving the page when a modal, drawer or sheet is open
-  const modalHistoryPushedRef = useRef<boolean>(false);
-
-  const isOverlayModalActive = Boolean(
-    isCartOpen ||
-    isFilterSheetOpen ||
-    isShareModalOpen ||
-    isManualOrderModalOpen ||
-    orderToEdit ||
-    orderToConfirm ||
-    orderToShip ||
-    orderToDeliver ||
-    orderToDelete ||
-    orderToCancel ||
-    orderForPartialDelivery ||
-    orderToPrintA4 ||
-    orderToSetShipping ||
-    orderForPendingShipping ||
-    orderToPrintShipping ||
-    orderToRequestShippingData ||
-    isStorePaymentsModalOpen ||
-    isStoreShippingModalOpen
-  );
-
-  // Sync window.history state when overlay modals/drawers open (excluding product detail page which manages its own history)
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    if (isOverlayModalActive) {
-      if (!modalHistoryPushedRef.current && !window.history.state?.__online_store_modal__) {
-        window.history.pushState({ __online_store_modal__: true }, '');
-        modalHistoryPushedRef.current = true;
-      }
-    } else {
-      modalHistoryPushedRef.current = false;
-    }
-  }, [isOverlayModalActive]);
 
   // Sync inputs when storeConfig updates from backend ONLY IF the user hasn't edited the form locally
   React.useEffect(() => {
@@ -1968,7 +1930,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   // Auto-detect and open product from URL param (?producto=... or ?product=... or ?sku=...)
   React.useEffect(() => {
     if (typeof window === 'undefined' || !products || products.length === 0) return;
-    
+
     // In admin mode, if the admin previously closed the preview modal, never reopen it automatically
     if (!isCustomerView && adminDismissedProductModalRef.current) {
       return;
@@ -2571,8 +2533,8 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     const cleanShipping = isPickup
       ? ''
       : rawDeliveryAddress === 'Envío a Domicilio' || rawDeliveryAddress.toLowerCase().includes('retiro')
-      ? ''
-      : stripCiFromAddress(rawDeliveryAddress);
+        ? ''
+        : stripCiFromAddress(rawDeliveryAddress);
     setEditShippingAddress(cleanShipping);
     setConfirmShippingAddress(cleanShipping);
 
@@ -2590,17 +2552,17 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     // 3. Items parsing
     const parsed = Array.isArray(ord.items)
       ? ord.items.map((it: any) => ({
-          id: it.id || it.item?.id || it.inventoryItemId,
-          inventoryItemId: it.inventoryItemId || it.id || it.item?.id,
-          name: it.name || it.item?.name || 'Producto',
-          sku: it.sku || it.item?.sku || '',
-          barcode: it.barcode || it.item?.barcode || undefined,
-          costPrice: it.costPrice || it.item?.costPrice || undefined,
-          supplierName: it.supplierName || it.item?.supplierName || (it as any).supplier || (it.item as any)?.supplier || undefined,
-          salePrice: Number(it.salePrice || it.item?.salePrice || 0),
-          quantity: Number(it.quantity || 1),
-          imageUrl: it.imageUrl || it.item?.imageUrl || null,
-        }))
+        id: it.id || it.item?.id || it.inventoryItemId,
+        inventoryItemId: it.inventoryItemId || it.id || it.item?.id,
+        name: it.name || it.item?.name || 'Producto',
+        sku: it.sku || it.item?.sku || '',
+        barcode: it.barcode || it.item?.barcode || undefined,
+        costPrice: it.costPrice || it.item?.costPrice || undefined,
+        supplierName: it.supplierName || it.item?.supplierName || (it as any).supplier || (it.item as any)?.supplier || undefined,
+        salePrice: Number(it.salePrice || it.item?.salePrice || 0),
+        quantity: Number(it.quantity || 1),
+        imageUrl: it.imageUrl || it.item?.imageUrl || null,
+      }))
       : [];
     setEditItems(parsed);
 
@@ -3452,7 +3414,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
       if (result.success) {
         const orderNum = result.orderNumber || result.order?.orderNumber || 'PED-REC';
-        
+
         // If status or voucher were not handled in createOrder, update it as fallback
         if (result.order?.id && (manualStatus !== 'pending' || manualPaymentVoucher.trim()) && result.order?.status !== manualStatus) {
           await onUpdateOrderStatus(
@@ -3604,7 +3566,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     return calculated.lineTotal;
   };
 
-    // Cart operations
+  // Cart operations
   const cartTotalItems = useMemo(() => {
     return cart.reduce((acc, it) => acc + it.quantity, 0);
   }, [cart]);
@@ -3658,7 +3620,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   const generateWhatsAppOrderText = (orderNum?: string) => {
     const store = storeConfig.storeName || 'Comerxia Store';
     const num = orderNum || `PED-${Date.now().toString().slice(-6)}`;
-    
+
     let displayPhone = 'Coordinar por este chat';
     if (customerPhone && customerPhone.trim()) {
       const phoneNorm = normalizeEcuadorPhone(customerPhone.trim());
@@ -4149,22 +4111,20 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 text-xs">
                   <button
                     onClick={() => setOrderDateRangeFilter('all')}
-                    className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
-                      orderDateRangeFilter === 'all'
+                    className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${orderDateRangeFilter === 'all'
                         ? 'bg-sky-600 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
-                    }`}
+                      }`}
                   >
                     Todo el Historial
                   </button>
 
                   <button
                     onClick={() => setOrderDateRangeFilter('today')}
-                    className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
-                      orderDateRangeFilter === 'today'
+                    className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${orderDateRangeFilter === 'today'
                         ? 'bg-sky-600 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
-                    }`}
+                      }`}
                   >
                     <Clock className="w-3.5 h-3.5" />
                     <span>Hoy (Día)</span>
@@ -4172,11 +4132,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
                   <button
                     onClick={() => setOrderDateRangeFilter('month')}
-                    className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
-                      orderDateRangeFilter === 'month'
+                    className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${orderDateRangeFilter === 'month'
                         ? 'bg-sky-600 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
-                    }`}
+                      }`}
                   >
                     <Calendar className="w-3.5 h-3.5" />
                     <span>Este Mes</span>
@@ -4184,11 +4143,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
                   <button
                     onClick={() => setOrderDateRangeFilter('custom')}
-                    className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${
-                      orderDateRangeFilter === 'custom'
+                    className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer flex items-center space-x-1 ${orderDateRangeFilter === 'custom'
                         ? 'bg-sky-600 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-800 hover:text-slate-950 hover:bg-slate-200 border border-slate-300'
-                    }`}
+                      }`}
                   >
                     <CalendarRange className="w-3.5 h-3.5" />
                     <span>Personalizada</span>
@@ -4365,11 +4323,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
             {/* Total Orders Card */}
             <div
               onClick={() => setOrderStatusFilter('all')}
-              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${
-                orderStatusFilter === 'all'
+              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${orderStatusFilter === 'all'
                   ? 'bg-sky-50 border-sky-500 ring-1 ring-sky-400'
                   : 'bg-white border-slate-200 hover:border-sky-300 shadow-xs'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Total Período</span>
@@ -4388,11 +4345,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
             {/* Pending Orders Card */}
             <div
               onClick={() => setOrderStatusFilter('pending')}
-              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${
-                orderStatusFilter === 'pending'
+              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${orderStatusFilter === 'pending'
                   ? 'bg-amber-50 border-amber-500 ring-1 ring-amber-400'
                   : 'bg-white border-slate-200 hover:border-amber-300 shadow-xs'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -4416,11 +4372,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
             {/* Confirmed Orders Card */}
             <div
               onClick={() => setOrderStatusFilter('confirmed')}
-              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${
-                orderStatusFilter === 'confirmed'
+              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${orderStatusFilter === 'confirmed'
                   ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-400'
                   : 'bg-white border-slate-200 hover:border-purple-300 shadow-xs'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-purple-800 uppercase tracking-wider">Confirmados</span>
@@ -4439,11 +4394,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
             {/* Shipped Orders Card */}
             <div
               onClick={() => setOrderStatusFilter('shipped')}
-              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${
-                orderStatusFilter === 'shipped'
+              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${orderStatusFilter === 'shipped'
                   ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-400'
                   : 'bg-white border-slate-200 hover:border-blue-300 shadow-xs'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wider">Enviados</span>
@@ -4462,11 +4416,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
             {/* Delivered Orders Card */}
             <div
               onClick={() => setOrderStatusFilter('delivered')}
-              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${
-                orderStatusFilter === 'delivered'
+              className={`p-3.5 rounded-2xl border space-y-1 cursor-pointer transition relative overflow-hidden ${orderStatusFilter === 'delivered'
                   ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-400'
                   : 'bg-white border-slate-200 hover:border-emerald-300 shadow-xs'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider">Entregados</span>
@@ -4543,13 +4496,12 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
           {/* Orders Filter, Search Bar & View Mode Switcher (Dos Barras Horizontales Estáticas) */}
           <div
             id="orders-search-container"
-            className={`sticky ${
-              orderScrollDirection === 'down'
+            className={`sticky ${orderScrollDirection === 'down'
                 ? '-translate-y-full opacity-0 pointer-events-none'
                 : orderScrollDirection === 'up'
-                ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
-                : `${isCustomerOnly ? 'top-0' : 'top-16'} z-20 translate-y-0 opacity-100`
-            } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
+                  ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
+                  : `${isCustomerOnly ? 'top-0' : 'top-16'} z-20 translate-y-0 opacity-100`
+              } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
           >
             {/* Barra 1: Búsqueda y Selector de Vista */}
             <div className="flex items-center gap-1.5 sm:gap-2 w-full">
@@ -4582,11 +4534,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               <div className="flex items-center space-x-1 bg-slate-100 border border-slate-300 p-0.5 sm:p-1 rounded-xl flex-shrink-0">
                 <button
                   onClick={() => setOrderViewMode('cards')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
-                    orderViewMode === 'cards'
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${orderViewMode === 'cards'
                       ? 'bg-white text-sky-900 shadow-xs border border-slate-200/60 font-black'
                       : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                    }`}
                   title="Vista en Paneles / Tarjetas uniformes"
                 >
                   <LayoutGrid className="w-3.5 h-3.5 text-sky-600 shrink-0" />
@@ -4595,11 +4546,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
                 <button
                   onClick={() => setOrderViewMode('table')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
-                    orderViewMode === 'table'
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${orderViewMode === 'table'
                       ? 'bg-white text-indigo-900 shadow-xs border border-slate-200/60 font-black'
                       : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                    }`}
                   title="Vista Tipo Factura / Lista Detallada con desglose fiscal"
                 >
                   <Receipt className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
@@ -4614,11 +4564,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
               <button
                 onClick={() => setOrderStatusFilter('all')}
-                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${
-                  orderStatusFilter === 'all'
+                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${orderStatusFilter === 'all'
                     ? 'bg-sky-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200 border border-slate-200'
-                }`}
+                  }`}
               >
                 <span>Todos</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${orderStatusFilter === 'all' ? 'bg-sky-900 text-white' : 'bg-slate-200 text-slate-700'}`}>
@@ -4628,13 +4577,12 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
               <button
                 onClick={() => setOrderStatusFilter('pending')}
-                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${
-                  orderStatusFilter === 'pending'
+                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${orderStatusFilter === 'pending'
                     ? 'bg-amber-500 text-white shadow-xs'
                     : orderCounts.pending > 0
-                    ? 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300 ring-2 ring-amber-400/40 shadow-2xs'
-                    : 'bg-slate-100 text-amber-700 hover:text-amber-900 hover:bg-amber-50 border border-slate-200'
-                }`}
+                      ? 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300 ring-2 ring-amber-400/40 shadow-2xs'
+                      : 'bg-slate-100 text-amber-700 hover:text-amber-900 hover:bg-amber-50 border border-slate-200'
+                  }`}
               >
                 <Clock className={`w-3 h-3 ${orderCounts.pending > 0 ? 'text-amber-600 animate-pulse' : ''}`} />
                 <span>Pre-Facturas (Pendientes)</span>
@@ -4645,11 +4593,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
               <button
                 onClick={() => setOrderStatusFilter('confirmed')}
-                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${
-                  orderStatusFilter === 'confirmed'
+                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${orderStatusFilter === 'confirmed'
                     ? 'bg-purple-600 text-white shadow-xs'
                     : 'bg-slate-100 text-purple-700 hover:text-purple-900 hover:bg-purple-50 border border-slate-200'
-                }`}
+                  }`}
               >
                 <Receipt className="w-3 h-3" />
                 <span>Facturas (Confirmadas)</span>
@@ -4660,11 +4607,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
               <button
                 onClick={() => setOrderStatusFilter('shipped')}
-                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${
-                  orderStatusFilter === 'shipped'
+                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${orderStatusFilter === 'shipped'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-100 text-blue-700 hover:text-blue-900 hover:bg-blue-50 border border-slate-200'
-                }`}
+                  }`}
               >
                 <Truck className="w-3 h-3" />
                 <span>Facturas (En Tránsito)</span>
@@ -4675,11 +4621,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
               <button
                 onClick={() => setOrderStatusFilter('delivered')}
-                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${
-                  orderStatusFilter === 'delivered'
+                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${orderStatusFilter === 'delivered'
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-slate-100 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 border border-slate-200'
-                }`}
+                  }`}
               >
                 <BadgeCheck className="w-3 h-3" />
                 <span>Facturas (Entregadas)</span>
@@ -4690,11 +4635,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
               <button
                 onClick={() => setOrderStatusFilter('cancelled')}
-                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${
-                  orderStatusFilter === 'cancelled'
+                className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 flex-shrink-0 text-xs whitespace-nowrap ${orderStatusFilter === 'cancelled'
                     ? 'bg-rose-600 text-white shadow-xs'
                     : 'bg-slate-100 text-rose-700 hover:text-rose-900 hover:bg-rose-50 border border-slate-200'
-                }`}
+                  }`}
               >
                 <X className="w-3 h-3" />
                 <span>Anuladas / Canceladas</span>
@@ -4930,11 +4874,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                           <button
                             type="button"
                             onClick={() => setActiveMediaMode('photo')}
-                            className={`flex-1 py-1.5 rounded-lg text-center transition flex items-center justify-center space-x-1.5 cursor-pointer ${
-                              effectiveMediaMode === 'photo'
+                            className={`flex-1 py-1.5 rounded-lg text-center transition flex items-center justify-center space-x-1.5 cursor-pointer ${effectiveMediaMode === 'photo'
                                 ? 'bg-white text-slate-900 shadow-xs'
                                 : 'text-slate-600 hover:text-slate-900'
-                            }`}
+                              }`}
                           >
                             <ImageIcon className="w-3.5 h-3.5" />
                             <span>Fotos ({photos.length})</span>
@@ -4942,11 +4885,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                           <button
                             type="button"
                             onClick={() => setActiveMediaMode('video')}
-                            className={`flex-1 py-1.5 rounded-lg text-center transition flex items-center justify-center space-x-1.5 cursor-pointer ${
-                              effectiveMediaMode === 'video'
+                            className={`flex-1 py-1.5 rounded-lg text-center transition flex items-center justify-center space-x-1.5 cursor-pointer ${effectiveMediaMode === 'video'
                                 ? 'bg-sky-600 text-white shadow-xs'
                                 : 'text-slate-600 hover:text-slate-900'
-                            }`}
+                              }`}
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
                             <span>Ver Video</span>
@@ -4969,14 +4911,14 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                                       const unmute = () => {
                                         el.muted = false;
                                         el.volume = 1.0;
-                                        el.play().catch(() => {});
+                                        el.play().catch(() => { });
                                         window.removeEventListener('click', unmute);
                                         window.removeEventListener('touchstart', unmute);
                                       };
                                       window.addEventListener('click', unmute, { once: true });
                                       window.addEventListener('touchstart', unmute, { once: true });
                                       el.muted = true;
-                                      el.play().catch(() => {});
+                                      el.play().catch(() => { });
                                     });
                                   }
                                 }
@@ -5088,11 +5030,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                             <button
                               key={idx}
                               onClick={() => setActiveImageIdx(idx)}
-                              className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition cursor-pointer ${
-                                activeImageIdx === idx
+                              className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition cursor-pointer ${activeImageIdx === idx
                                   ? 'border-sky-500 scale-105 shadow-xs'
                                   : 'border-transparent opacity-60 hover:opacity-100'
-                              }`}
+                                }`}
                             >
                               <img src={ph} alt="" className="w-full h-full object-cover" />
                             </button>
@@ -5262,8 +5203,8 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                     {cartStep === 'cart'
                       ? 'Carrito de Compras'
                       : cartStep === 'checkout'
-                      ? 'Completar y Enviar Pedido'
-                      : '¡Pedido Confirmado!'}
+                        ? 'Completar y Enviar Pedido'
+                        : '¡Pedido Confirmado!'}
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     {cartTotalItems} {cartTotalItems === 1 ? 'artículo' : 'artículos'} seleccionados
@@ -5285,21 +5226,18 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 {cart.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-8">
                     <ShoppingBag
-                      className={`w-16 h-16 mb-3 opacity-30 ${
-                        isCustomerView ? 'text-slate-400' : 'text-sky-400'
-                      }`}
+                      className={`w-16 h-16 mb-3 opacity-30 ${isCustomerView ? 'text-slate-400' : 'text-sky-400'
+                        }`}
                     />
                     <h4
-                      className={`text-sm font-bold ${
-                        isCustomerView ? 'text-slate-800' : 'text-slate-300'
-                      }`}
+                      className={`text-sm font-bold ${isCustomerView ? 'text-slate-800' : 'text-slate-300'
+                        }`}
                     >
                       Tu carrito está vacío
                     </h4>
                     <p
-                      className={`text-xs mt-1 max-w-xs ${
-                        isCustomerView ? 'text-slate-500' : 'text-slate-500'
-                      }`}
+                      className={`text-xs mt-1 max-w-xs ${isCustomerView ? 'text-slate-500' : 'text-slate-500'
+                        }`}
                     >
                       Explora el catálogo y agrega los productos que deseas adquirir.
                     </p>
@@ -5408,9 +5346,8 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 <button
                   onClick={() => setCartStep('cart')}
-                  className={`text-xs hover:underline flex items-center space-x-1 cursor-pointer mb-2 font-bold ${
-                    isCustomerView ? 'text-sky-600' : 'text-sky-400'
-                  }`}
+                  className={`text-xs hover:underline flex items-center space-x-1 cursor-pointer mb-2 font-bold ${isCustomerView ? 'text-sky-600' : 'text-sky-400'
+                    }`}
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>Volver al carrito</span>
@@ -5512,11 +5449,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setDeliveryType('shipping')}
-                      className={`p-2.5 rounded-xl border text-xs font-medium transition cursor-pointer flex flex-col items-center justify-center ${
-                        deliveryType === 'shipping'
+                      className={`p-2.5 rounded-xl border text-xs font-medium transition cursor-pointer flex flex-col items-center justify-center ${deliveryType === 'shipping'
                           ? 'bg-sky-50 border-sky-400 text-sky-900 font-bold shadow-xs'
                           : 'bg-white border-slate-200 text-slate-600'
-                      }`}
+                        }`}
                     >
                       <Truck className="w-4 h-4 mb-1" />
                       <span>Envío a Domicilio</span>
@@ -5530,11 +5466,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setDeliveryType('pickup')}
-                      className={`p-2.5 rounded-xl border text-xs font-medium transition cursor-pointer flex flex-col items-center justify-center ${
-                        deliveryType === 'pickup'
+                      className={`p-2.5 rounded-xl border text-xs font-medium transition cursor-pointer flex flex-col items-center justify-center ${deliveryType === 'pickup'
                           ? 'bg-sky-50 border-sky-400 text-sky-900 font-bold shadow-xs'
                           : 'bg-white border-slate-200 text-slate-600'
-                      }`}
+                        }`}
                     >
                       <Store className="w-4 h-4 mb-1" />
                       <span>Retiro en Local</span>
@@ -6150,18 +6085,18 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         let rawItems = Array.isArray(orderToDeliver.items)
           ? orderToDeliver.items
           : typeof orderToDeliver.items === 'string'
-          ? (() => {
+            ? (() => {
               try {
                 let p = JSON.parse(orderToDeliver.items);
                 if (typeof p === 'string') {
-                  try { p = JSON.parse(p); } catch {}
+                  try { p = JSON.parse(p); } catch { }
                 }
                 return Array.isArray(p) ? p : [];
               } catch {
                 return [];
               }
             })()
-          : [];
+            : [];
 
         // Fallback to linked purchase items if order items were empty
         if (rawItems.length === 0 && purchases) {
@@ -6175,10 +6110,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
               try {
                 let p = JSON.parse(lp.items);
                 if (typeof p === 'string') {
-                  try { p = JSON.parse(p); } catch {}
+                  try { p = JSON.parse(p); } catch { }
                 }
                 if (Array.isArray(p)) rawItems = p;
-              } catch {}
+              } catch { }
             }
           }
         }
@@ -6216,7 +6151,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
           try {
             const combinedNotes = (orderToDeliver.notes ? `${orderToDeliver.notes}\n` : '') +
               (deliveryNoteInput.trim() ? `[Entrega Verificada] ${deliveryNoteInput.trim()}` : '[Entrega Verificada en Sistema]');
-            
+
             await onUpdateOrderStatus(
               orderToDeliver.id,
               'delivered',
@@ -6401,11 +6336,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                   type="button"
                   disabled={isConfirmingDelivery || isWaitingSupplierReception || isShippingDeliveryBlocked}
                   onClick={handleConfirmDelivery}
-                  className={`px-5 py-2.5 rounded-xl text-white text-xs font-black transition flex items-center space-x-1.5 shadow-sm active:scale-95 ${
-                    isWaitingSupplierReception || isShippingDeliveryBlocked
+                  className={`px-5 py-2.5 rounded-xl text-white text-xs font-black transition flex items-center space-x-1.5 shadow-sm active:scale-95 ${isWaitingSupplierReception || isShippingDeliveryBlocked
                       ? 'bg-slate-400 opacity-60 cursor-not-allowed'
                       : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 cursor-pointer'
-                  }`}
+                    }`}
                 >
                   {isWaitingSupplierReception ? (
                     <>
@@ -6565,11 +6499,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                           key={c.id || c.name}
                           type="button"
                           onClick={() => setQuickShippingCarrierInput(c.name)}
-                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition cursor-pointer flex items-center gap-1.5 ${
-                            quickShippingCarrierInput.toLowerCase() === c.name.toLowerCase()
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition cursor-pointer flex items-center gap-1.5 ${quickShippingCarrierInput.toLowerCase() === c.name.toLowerCase()
                               ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                               : 'bg-white text-slate-700 border-slate-200 hover:text-slate-900'
-                          }`}
+                            }`}
                         >
                           {c.logoUrl ? (
                             <img src={c.logoUrl} alt={c.name} className="w-3.5 h-3.5 object-contain rounded-xs bg-white p-0.5" />
@@ -6646,11 +6579,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                           key={val}
                           type="button"
                           onClick={() => setQuickShippingCostInput(val)}
-                          className={`px-2.5 py-2 rounded-xl text-[11px] font-mono font-bold border transition cursor-pointer ${
-                            Number(quickShippingCostInput) === Number(val)
+                          className={`px-2.5 py-2 rounded-xl text-[11px] font-mono font-bold border transition cursor-pointer ${Number(quickShippingCostInput) === Number(val)
                               ? 'bg-sky-600 text-white border-sky-600'
                               : 'bg-white text-slate-700 border-slate-200 hover:border-sky-400'
-                          }`}
+                            }`}
                         >
                           {val === '0.00' ? 'Gratis' : `$${val}`}
                         </button>
@@ -6677,11 +6609,10 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                           key={partner.id}
                           type="button"
                           onClick={() => setSelectedQuickPaymentPartnerId(partner.id)}
-                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition cursor-pointer flex items-center gap-1.5 ${
-                            (selectedQuickPaymentPartnerId === partner.id || (!selectedQuickPaymentPartnerId && activePartners[0]?.id === partner.id))
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition cursor-pointer flex items-center gap-1.5 ${(selectedQuickPaymentPartnerId === partner.id || (!selectedQuickPaymentPartnerId && activePartners[0]?.id === partner.id))
                               ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
                               : 'bg-white text-slate-700 border-slate-200 hover:text-slate-900'
-                          }`}
+                            }`}
                         >
                           {partner.logoUrl ? (
                             <img src={partner.logoUrl} alt={partner.name} className="w-3.5 h-3.5 object-contain rounded-xs bg-white p-0.5" />
@@ -6837,8 +6768,8 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
             isStorePaymentsModalOpen
               ? 'payments'
               : isStoreShippingModalOpen
-              ? 'shipping'
-              : 'none'
+                ? 'shipping'
+                : 'none'
           }
         />
       )}

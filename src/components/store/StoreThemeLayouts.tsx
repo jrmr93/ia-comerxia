@@ -43,6 +43,8 @@ import {
 } from 'lucide-react';
 import { CartItem, CustomerOrder, InventoryItem, StoreConfig, StoreTheme, CourierPartner, PaymentMethodPartner } from '../../types.ts';
 import { buildWhatsAppLink, toEcuadorInternationalPhone } from '../../utils/phone.ts';
+import { StoreSmartSearchBar } from './StoreSmartSearchBar.tsx';
+import { CategoryTransitionBanner } from './CategoryTransitionBanner.tsx';
 import { getThemeColors, ThemeColorPalette } from '../../utils/themeColors.ts';
 import { ProductMediaDisplay } from '../ProductMediaDisplay.tsx';
 import { getProductPhotosWithFallback, normalizeMediaUrl } from '../../utils/media-helper.ts';
@@ -1355,7 +1357,7 @@ export const ProductCardItem: React.FC<{
   return (
     <div
       id={`product-card-${item.id}`}
-      className={`rounded-2xl overflow-hidden flex flex-col group relative border bg-white border-slate-200/90 hover:border-amber-400 hover:shadow-2xl hover-card-innovative glossy-sheen-effect scroll-reveal-card ${hasDiscount ? 'ring-1 ring-rose-500/30 shadow-md shadow-rose-500/5' : 'shadow-xs'
+      className={`rounded-2xl overflow-hidden flex flex-col transition-all duration-300 group relative border bg-white border-slate-200/90 hover:border-amber-400 hover:shadow-xl hover:-translate-y-1 ${hasDiscount ? 'ring-1 ring-rose-500/30 shadow-md shadow-rose-500/5' : 'shadow-xs'
         }`}
     >
       {/* Top Image Preview */}
@@ -1369,8 +1371,8 @@ export const ProductCardItem: React.FC<{
           videoUrl={item.videoUrl}
           name={item.name}
           className="w-full h-full relative"
-          imageClassName="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
-          videoClassName="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
+          imageClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           autoPlayVideo={true}
           showPlayBadge={false}
           placeholderText="Sin imagen"
@@ -1380,7 +1382,7 @@ export const ProductCardItem: React.FC<{
         {/* Offer & Category overlay pill */}
         <div className="absolute top-1.5 sm:top-2.5 left-1.5 sm:left-2.5 flex flex-col gap-1 z-10 max-w-[70%]">
           {hasDiscount && (
-            <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 text-white shadow-md shadow-rose-600/40 border border-white/40 flex items-center space-x-1 badge-pulse-glow">
+            <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 text-white shadow-md shadow-rose-600/40 border border-white/40 flex items-center space-x-1 animate-pulse">
               <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-yellow-200 fill-yellow-200" />
               <span>OFERTA -{discountPercent}%</span>
             </span>
@@ -2111,15 +2113,13 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       {/* ========================================================================= */}
       <div
         id="marketplace-sticky-header"
-        className={`sticky ${
-          scrollDirection === 'down'
+        className={`sticky ${scrollDirection === 'down'
             ? '-translate-y-full opacity-0 pointer-events-none'
             : scrollDirection === 'up'
-            ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-amber-400/30'
-            : `${isCustomerOnly ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
-        } text-slate-900 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b ${
-          isScrolled ? 'border-amber-400/80 shadow-md' : 'border-slate-200/90'
-        } transition-all duration-300 transform`}
+              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-amber-400/30'
+              : `${isCustomerOnly ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
+          } text-slate-900 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b ${isScrolled ? 'border-amber-400/80 shadow-md' : 'border-slate-200/90'
+          } transition-all duration-300 transform`}
         style={{
           background: 'linear-gradient(180deg, #f59f0be3 0%, #fae5afff 35%, #fdfbeaff 70%, #ffffffff 100%)',
         }}
@@ -2211,26 +2211,16 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 <ChevronDown className="w-3 h-3 text-slate-600 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
-              {/* Main Search Input */}
-              <div className="relative flex-1 flex items-center bg-white">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar productos en la tienda... (ej. audífonos, ropa, SKU)"
-                  className="w-full pl-9 pr-7 py-2 text-xs text-slate-900 placeholder:text-slate-400 bg-white focus:outline-none font-medium"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-                    title="Limpiar búsqueda"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+              {/* Main Smart Search Input with Live Fuzzy Dropdown */}
+              <StoreSmartSearchBar
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                products={products}
+                categories={categories}
+                onSelectCategory={(cat) => setSelectedCategory(cat)}
+                onSelectProduct={(item) => setSelectedProductDetail(item)}
+                storeConfig={storeConfig}
+              />
 
               {/* Signature Amber Search Button */}
               <button
@@ -2822,11 +2812,63 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       ) : (
         <>
           <div id="store-products-anchor" className="scroll-mt-32" />
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
-            {paginatedProducts.map((item) => (
-              <ProductCardItem key={item.id} item={item} props={props} />
-            ))}
-          </div>
+
+          {selectedCategory !== 'all' ? (
+            <div className="space-y-6">
+              <CategoryTransitionBanner
+                categoryName={selectedCategory}
+                itemCount={filteredProducts.length}
+                sampleProducts={filteredProducts}
+              />
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
+                {paginatedProducts.map((item) => (
+                  <ProductCardItem key={item.id} item={item} props={props} />
+                ))}
+              </div>
+            </div>
+          ) : searchQuery ? (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
+              {paginatedProducts.map((item) => (
+                <ProductCardItem key={item.id} item={item} props={props} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-10">
+              {(() => {
+                const presentCategories = Array.from(
+                  new Set(paginatedProducts.map((p) => p.category || 'General'))
+                );
+
+                return presentCategories.map((catName) => {
+                  const catProducts = paginatedProducts.filter(
+                    (p) => (p.category || 'General') === catName
+                  );
+                  const totalInCat = products.filter(
+                    (p) => (p.category || 'General') === catName && p.status !== 'archived'
+                  ).length;
+
+                  return (
+                    <div key={catName} className="space-y-4">
+                      {/* Category Header Panel with Full Background Image FIRST */}
+                      <CategoryTransitionBanner
+                        categoryName={catName}
+                        itemCount={totalInCat}
+                        sampleProducts={catProducts}
+                        onSelectCategory={(cat) => setSelectedCategory(cat)}
+                      />
+
+                      {/* Category Products Grid NEXT */}
+                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
+                        {catProducts.map((item) => (
+                          <ProductCardItem key={item.id} item={item} props={props} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
 
           {/* Pagination Controls */}
           {isPaginationEnabled && totalPages > 1 && (

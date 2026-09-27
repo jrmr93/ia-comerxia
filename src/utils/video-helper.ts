@@ -48,7 +48,7 @@ export function parseVideoUrl(
       originalUrl: url,
       platform: 'youtube_shorts',
       id,
-      embedUrl: `https://www.youtube-nocookie.com/embed/${id}?autoplay=${autoPlayParam}&mute=0&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${id}?autoplay=${autoPlayParam}&rel=0&modestbranding=1&enablejsapi=1`,
       isDirect: false,
       thumbnailUrl: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
     };
@@ -62,7 +62,7 @@ export function parseVideoUrl(
       originalUrl: url,
       platform: 'youtube',
       id,
-      embedUrl: `https://www.youtube-nocookie.com/embed/${id}?autoplay=${autoPlayParam}&mute=0&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${id}?autoplay=${autoPlayParam}&rel=0&modestbranding=1&enablejsapi=1`,
       isDirect: false,
       thumbnailUrl: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
     };

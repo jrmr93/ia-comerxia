@@ -239,7 +239,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             setSriInvoiceRecord(match || null);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     } else {
       setSriInvoiceRecord(null);
     }
@@ -259,7 +259,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           });
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isOpen]);
 
   const handleEmitSriInvoice = async () => {
@@ -705,15 +705,15 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         const matchingProduct = isShippingLine ? null : products.find((p) => p.id === targetId || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
         const cPrice = isShippingLine ? 0 : Number(it.costPrice ?? matchingProduct?.costWithoutTax ?? matchingProduct?.costPrice ?? 0);
         const hasItemSalePrice = (it.salePrice !== undefined && it.salePrice !== null && !isNaN(Number(it.salePrice))) ||
-                                 (it.item?.salePrice !== undefined && it.item?.salePrice !== null && !isNaN(Number(it.item.salePrice)));
+          (it.item?.salePrice !== undefined && it.item?.salePrice !== null && !isNaN(Number(it.item.salePrice)));
         const rawSale = Number(it.salePrice || it.item?.salePrice || matchingProduct?.salePrice || 0);
         const itemTaxPct = isShippingLine ? 0 : extractItemTaxPercent(it, orderTaxPct, matchingProduct);
         const itemApplyTax = itemTaxPct > 0;
         const pricingMode = isShippingLine
           ? 'EXCLUDING_TAX'
           : (hasItemSalePrice
-              ? (it.pricingMode ? it.pricingMode : (itemApplyTax && matchingProduct?.salePrice && Math.abs(rawSale - Number(matchingProduct.salePrice)) < 0.01 ? 'INCLUDING_TAX' : 'EXCLUDING_TAX'))
-              : (itemApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX'));
+            ? (it.pricingMode ? it.pricingMode : (itemApplyTax && matchingProduct?.salePrice && Math.abs(rawSale - Number(matchingProduct.salePrice)) < 0.01 ? 'INCLUDING_TAX' : 'EXCLUDING_TAX'))
+            : (itemApplyTax ? 'INCLUDING_TAX' : 'EXCLUDING_TAX'));
         const basePriceInfo = extractBaseUnitPriceWithoutTax({
           rawSalePrice: rawSale,
           costWithoutTax: cPrice,
@@ -890,7 +890,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   const handleAddProduct = (prod: InventoryItem) => {
     setItems((prev) => {
       const existingIdx = prev.findIndex((it) => it.id === prod.id || (prod.sku && it.sku && it.sku.toLowerCase() === prod.sku.toLowerCase()));
-      
+
       const cPrice = Number(prod.costWithoutTax ?? prod.costPrice ?? 0);
       const rawSale = Number(prod.salePrice || 0);
       const prodTaxPercent = extractItemTaxPercent(prod, 15);
@@ -1902,8 +1902,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white border border-slate-200 rounded-3xl max-w-7xl lg:max-w-[94vw] w-full shadow-2xl space-y-0 my-auto animate-in fade-in zoom-in-95 duration-200 max-h-[93vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full shadow-2xl space-y-0 my-auto animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col overflow-hidden">
         {/* ================= MODAL HEADER ================= */}
         <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between shadow-xs shrink-0">
           <div className="flex items-center space-x-3.5">
@@ -1929,17 +1929,16 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 )}
                 {!isCreateMode && (
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                      isConfirmed
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${isConfirmed
                         ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/40'
                         : isShipped
-                        ? 'bg-blue-500/30 text-blue-200 border-blue-400/40'
-                        : isDelivered
-                        ? 'bg-purple-500/30 text-purple-200 border-purple-400/40'
-                        : isCancelled
-                        ? 'bg-rose-500/30 text-rose-200 border-rose-400/40'
-                        : 'bg-amber-500/30 text-amber-200 border-amber-400/40'
-                    }`}
+                          ? 'bg-blue-500/30 text-blue-200 border-blue-400/40'
+                          : isDelivered
+                            ? 'bg-purple-500/30 text-purple-200 border-purple-400/40'
+                            : isCancelled
+                              ? 'bg-rose-500/30 text-rose-200 border-rose-400/40'
+                              : 'bg-amber-500/30 text-amber-200 border-amber-400/40'
+                      }`}
                   >
                     {isConfirmed ? 'Factura Emitida' : isShipped ? 'Factura (En Tránsito)' : isDelivered ? 'Factura (Entregada)' : isCancelled ? 'Anulada' : 'Pre-Factura (Pendiente)'}
                   </span>
@@ -2002,11 +2001,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 text-xs bg-slate-50/60">
           {/* Banner de Resultado de Emisión SRI */}
           {sriEmissionResult && (
-            <div className={`p-4 rounded-2xl border text-xs space-y-2 shadow-xl ${
-              sriEmissionResult.autorizado
+            <div className={`p-4 rounded-2xl border text-xs space-y-2 shadow-xl ${sriEmissionResult.autorizado
                 ? 'bg-emerald-950/90 border-emerald-500/60 text-emerald-100'
                 : 'bg-rose-950/90 border-rose-500/60 text-rose-100'
-            }`}>
+              }`}>
               <div className="flex items-center justify-between font-black text-sm flex-wrap gap-2">
                 <span className="flex items-center gap-2">
                   {sriEmissionResult.autorizado ? (
@@ -2119,17 +2117,16 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                   <button
                     type="button"
                     onClick={() => handleSelectDocType('07')}
-                    className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition flex items-center gap-1 border cursor-pointer ${
-                      docType === '07' || customerCi.trim() === '9999999999999'
+                    className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition flex items-center gap-1 border cursor-pointer ${docType === '07' || customerCi.trim() === '9999999999999'
                         ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
                         : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200'
-                    }`}
+                      }`}
                     title="Asignar Consumidor Final (9999999999999)"
                   >
                     <span>⚡ Consumidor Final</span>
                   </button>
                 </div>
-                
+
                 <div className="flex gap-1.5">
                   {/* Selector de Tipo de Documento */}
                   <select
@@ -2176,20 +2173,19 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                         docType === '07'
                           ? '9999999999999'
                           : docType === '04'
-                          ? '13 dígitos (RUC)'
-                          : docType === '06'
-                          ? 'Pasaporte (Alfanumérico)'
-                          : '10 dígitos (Cédula)'
+                            ? '13 dígitos (RUC)'
+                            : docType === '06'
+                              ? 'Pasaporte (Alfanumérico)'
+                              : '10 dígitos (Cédula)'
                       }
-                      className={`w-full h-10 pl-8 pr-7 rounded-xl font-mono text-xs sm:text-sm focus:outline-none font-semibold transition ${
-                        docType === '07'
+                      className={`w-full h-10 pl-8 pr-7 rounded-xl font-mono text-xs sm:text-sm focus:outline-none font-semibold transition ${docType === '07'
                           ? 'bg-purple-50/80 border border-purple-300 text-purple-900 font-bold'
                           : customerCi.trim()
-                          ? idValidation?.isValid
-                            ? 'bg-emerald-50/50 border border-emerald-400 text-slate-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100'
-                            : 'bg-rose-50/50 border border-rose-400 text-slate-900 focus:border-rose-600 focus:ring-2 focus:ring-rose-100'
-                          : 'bg-slate-50 border border-slate-200 text-slate-900 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100'
-                      }`}
+                            ? idValidation?.isValid
+                              ? 'bg-emerald-50/50 border border-emerald-400 text-slate-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100'
+                              : 'bg-rose-50/50 border border-rose-400 text-slate-900 focus:border-rose-600 focus:ring-2 focus:ring-rose-100'
+                            : 'bg-slate-50 border border-slate-200 text-slate-900 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100'
+                        }`}
                     />
                     {customerCi && docType !== '07' && (
                       <button
@@ -2393,7 +2389,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           </div>
 
           {/* ================= SECTION 2: MODALIDAD DE ENTREGA Y LOGÍSTICA ================= */}
-          <div className="w-full p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3.5">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-xl bg-sky-50 text-sky-700 border border-sky-200/60 flex items-center justify-center font-black text-xs shadow-2xs">
@@ -2409,11 +2405,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               </div>
               <span
-                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                  deliveryType === 'pickup'
+                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${deliveryType === 'pickup'
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                     : 'bg-sky-50 text-sky-800 border-sky-200'
-                }`}
+                  }`}
               >
                 {deliveryType === 'pickup' ? 'Retiro en Local' : 'Despacho a Domicilio'}
               </span>
@@ -2429,11 +2424,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     <button
                       type="button"
                       onClick={() => setDeliveryType('pickup')}
-                      className={`h-10 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition text-xs cursor-pointer border ${
-                        deliveryType === 'pickup'
+                      className={`h-10 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition text-xs cursor-pointer border ${deliveryType === 'pickup'
                           ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-200'
                           : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       <Store className={`w-4 h-4 shrink-0 ${deliveryType === 'pickup' ? 'text-white' : 'text-emerald-600'}`} />
                       <span>Retiro en Local</span>
@@ -2446,11 +2440,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           setShippingCost(String(storeConfig.deliveryFee));
                         }
                       }}
-                      className={`h-10 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition text-xs cursor-pointer border ${
-                        deliveryType === 'shipping'
+                      className={`h-10 px-3 rounded-xl font-bold flex items-center justify-center gap-2 transition text-xs cursor-pointer border ${deliveryType === 'shipping'
                           ? 'bg-sky-600 text-white border-sky-600 shadow-xs ring-2 ring-sky-200'
                           : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       <Truck className={`w-4 h-4 shrink-0 ${deliveryType === 'shipping' ? 'text-white' : 'text-sky-600'}`} />
                       <span>A Domicilio</span>
@@ -2496,11 +2489,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           <button
                             type="button"
                             onClick={() => setShippingCost('0')}
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold cursor-pointer transition ${
-                              Number(shippingCost) === 0
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold cursor-pointer transition ${Number(shippingCost) === 0
                                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                            }`}
+                              }`}
                           >
                             Gratis $0
                           </button>
@@ -2545,10 +2537,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     {(activeCouriers.length > 0
                       ? activeCouriers
                       : [
-                          { id: 'servientrega', name: 'Servientrega' },
-                          { id: 'laarcourier', name: 'LaarCourier' },
-                          { id: 'tramaco', name: 'Tramaco Express' },
-                        ]
+                        { id: 'servientrega', name: 'Servientrega' },
+                        { id: 'laarcourier', name: 'LaarCourier' },
+                        { id: 'tramaco', name: 'Tramaco Express' },
+                      ]
                     ).map((c) => {
                       const isSelected = trackingCarrier.toLowerCase() === c.name.toLowerCase();
                       const logo = getPartnerLogo(c, 'courier');
@@ -2557,11 +2549,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           key={c.id || c.name}
                           type="button"
                           onClick={() => setTrackingCarrier(c.name)}
-                          className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
-                            isSelected
+                          className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${isSelected
                               ? 'bg-sky-50/90 border-sky-500 ring-2 ring-sky-200 shadow-xs'
                               : 'bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
+                            }`}
                         >
                           <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
                             <img src={logo} alt={c.name} className="max-w-full max-h-full object-contain" />
@@ -2677,366 +2668,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               )}
             </div>
-
-          {/* ================= SECTION 3: PAGO, TESORERÍA Y CONFIRMACIÓN ================= */}
-          <div className="w-full p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3.5">
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center justify-center font-black text-xs shadow-2xs">
-                      3
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight block">
-                        Pago, Tesorería y Confirmación
-                      </span>
-                      <span className="text-[11px] text-slate-400 font-normal">
-                        Registra el método, cuenta receptora y número de comprobante o transacción
-                      </span>
-                    </div>
-                  </div>
-                  <span
-                    className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                      isCash ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    }`}
-                  >
-                    {isCash ? 'Pago en Efectivo / Contraentrega' : 'Transferencia / Electrónico'}
-                  </span>
-                </div>
-
-                {/* Payment Method Badges with Logos */}
-                <div className="space-y-1.5">
-                  <label className="block text-slate-700 font-bold text-xs">Métodos de Pago Registrados:</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {activePaymentPartners.map((partner) => {
-                      const isSelected = paymentMethod === partner.name || paymentMethod === partner.id;
-                      const logo = getPartnerLogo(partner, 'payment');
-                      return (
-                        <button
-                          key={partner.id || partner.name}
-                          type="button"
-                          onClick={() => {
-                            setPaymentMethod(partner.name);
-                            setBankOrAccount(partner.name);
-                          }}
-                          className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
-                            isSelected
-                              ? 'bg-emerald-50/90 border-emerald-500 shadow-xs ring-2 ring-emerald-200'
-                              : 'bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
-                            <img src={logo} alt={partner.name} className="max-w-full max-h-full object-contain" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="font-bold text-xs text-slate-900 truncate">{partner.name}</span>
-                              {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
-                            </div>
-                            <span className="text-[10px] text-slate-500 line-clamp-1 block">
-                              {(partner as any).accountNumber || partner.details || 'Cuenta configurada'}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-
-                    {/* Cash Option */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod('Efectivo / Contraentrega');
-                        setBankOrAccount('Caja Chica / Efectivo');
-                      }}
-                      className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
-                        paymentMethod === 'Efectivo / Contraentrega'
-                          ? 'bg-emerald-50/90 border-emerald-500 shadow-xs ring-2 ring-emerald-200'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
-                        <img src={DEFAULT_PAYMENT_LOGOS['cash']} alt="Efectivo" className="max-w-full max-h-full object-contain" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-bold text-xs text-slate-900 truncate">Efectivo</span>
-                          {paymentMethod === 'Efectivo / Contraentrega' && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
-                        </div>
-                        <span className="text-[10px] text-slate-500 line-clamp-1 block">Cobro en entrega</span>
-                      </div>
-                    </button>
-
-                    {/* Dedicated Payphone API Option */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod('Payphone');
-                        setBankOrAccount('Payphone API / Pasarela Online');
-                      }}
-                      className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
-                        isPayphonePaymentMethod
-                          ? 'bg-orange-50/90 border-orange-500 shadow-xs ring-2 ring-orange-200'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-orange-100 border border-orange-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
-                        <CreditCard className="w-4 h-4 text-orange-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-bold text-xs text-slate-900 truncate">Payphone</span>
-                          {isPayphonePaymentMethod && <Check className="w-3.5 h-3.5 text-orange-600 shrink-0" />}
-                        </div>
-                        <span className="text-[10px] text-slate-500 line-clamp-1 block">Pasarela Enlace API</span>
-                      </div>
-                    </button>
-                  </div>
-
-                  {/* Commission percentage input box (appears ONLY when Tarjeta or PayPhone is selected) */}
-                  {isCardPaymentMethod && (
-                    <div className="p-3.5 bg-sky-50/90 border border-sky-200 rounded-2xl space-y-2 animate-in fade-in duration-200 shadow-2xs">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <label className="text-xs font-bold text-sky-950 flex items-center gap-1.5">
-                          <CreditCard className="w-4 h-4 text-sky-600" />
-                          <span>Porcentaje de Comisión por Tarjeta / PayPhone (%)</span>
-                        </label>
-                        <span className="text-[10px] text-sky-700 font-mono bg-white px-2 py-0.5 rounded border border-sky-200 font-bold">
-                          Fórmula: Subtotal / (1 - %Comisión)
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="99"
-                            value={cardCommissionPercent}
-                            onChange={(e) => setCardCommissionPercent(Math.max(0, parseFloat(e.target.value) || 0))}
-                            placeholder="5.75"
-                            className="w-full h-9 pl-3 pr-7 rounded-xl bg-white border border-sky-300 text-sky-950 font-mono font-bold text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none shadow-2xs"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-sky-600">%</span>
-                        </div>
-                        <div className="flex gap-1">
-                          {[5.75, 7.5, 10, 12].map((comm) => (
-                            <button
-                              key={comm}
-                              type="button"
-                              onClick={() => setCardCommissionPercent(comm)}
-                              className={`px-2 py-1 text-[10px] font-mono font-bold rounded-lg border transition cursor-pointer ${
-                                cardCommissionPercent === comm
-                                  ? 'bg-sky-600 text-white border-sky-600'
-                                  : 'bg-white text-sky-800 border-sky-200 hover:bg-sky-100'
-                              }`}
-                            >
-                              {comm}%
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-[10.5px] text-sky-800 leading-tight">
-                        💡 Al seleccionar este método de pago, los subtotales de cada producto y el desglose fiscal SRI se calcularán con la comisión ({cardCommissionPercent}%).
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Bloque Integración Payphone API (Solo cuando se selecciona el método de pago Payphone) */}
-                  {isPayphonePaymentMethod && payphoneConfig?.isActive && (
-                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-950 via-slate-900 to-indigo-950 text-white space-y-3 shadow-md border border-orange-500/30">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-orange-400" />
-                          <span className="font-bold text-xs text-white">Pasarela Payphone (Visa / Mastercard)</span>
-                        </div>
-                        <span className="text-[10px] bg-orange-500/30 text-orange-200 border border-orange-400/30 px-2 py-0.5 rounded-full font-bold">
-                          Cobro por Link API
-                        </span>
-                      </div>
-
-                      {!payphoneConfig?.hasToken ? (
-                        <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                          <span>Para generar enlaces de cobro con tarjeta, ingresa tu Token de Payphone en <strong>Ajustes &gt; Payphone API</strong>.</span>
-                        </div>
-                      ) : (
-                        <div className="space-y-2.5">
-                          {!payphoneUrl ? (
-                            <button
-                              type="button"
-                              onClick={handleGeneratePayphoneLink}
-                              disabled={payphoneGenerating || items.length === 0}
-                              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {payphoneGenerating ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                                  <span>Generando Enlace Payphone...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <CreditCard className="w-4 h-4 text-white" />
-                                  <span>Generar Link de Pago Payphone (${invoiceTotals.totalInvoiceAmount.toFixed(2)} USD)</span>
-                                </>
-                              )}
-                            </button>
-                          ) : (
-                            <div className="space-y-2">
-                              <div className="p-2.5 rounded-xl bg-slate-900 border border-orange-500/50 flex items-center justify-between gap-2">
-                                <div className="min-w-0 flex-1">
-                                  <span className="text-[10px] text-orange-300 font-bold uppercase tracking-wider block">Enlace de Pago Generado:</span>
-                                  <p className="font-mono text-xs text-white truncate">{payphoneUrl}</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(payphoneUrl);
-                                    showToast('✓ Link de pago Payphone copiado');
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shrink-0 cursor-pointer shadow-2xs"
-                                >
-                                  Copiar Link
-                                </button>
-                              </div>
-
-                              {/* Botones de Notificación: WhatsApp y Correo Gmail */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const norm = normalizeEcuadorPhone(customerPhone);
-                                    const msg = `Hola ${customerName || 'Cliente'}, se ha generado su enlace de pago en línea con tarjeta Visa/Mastercard para el pedido #${order?.orderNumber || 'Venta'} por un total de $${invoiceTotals.totalInvoiceAmount.toFixed(2)} USD:\n\n${payphoneUrl}\n\nHaga clic en el enlace para realizar su pago seguro.`;
-                                    const url = buildWhatsAppLink(norm.whatsappDigits || customerPhone, msg);
-                                    window.open(url, '_blank');
-                                  }}
-                                  className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
-                                >
-                                  <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                                  <span>Enviar por WhatsApp</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={handleSendPayphoneEmail}
-                                  disabled={payphoneSendingEmail}
-                                  className="py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
-                                >
-                                  {payphoneSendingEmail ? (
-                                    <>
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                      <span>Enviando...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Mail className="w-3.5 h-3.5" />
-                                      <span>Enviar por Correo (Gmail)</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-
-                              {/* Botón de Verificación de Estado de Pago Payphone */}
-                              <button
-                                type="button"
-                                onClick={() => handleVerifyPayphoneTransaction()}
-                                disabled={payphoneVerifying}
-                                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md disabled:opacity-60"
-                              >
-                                {payphoneVerifying ? (
-                                  <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                                    <span>Verificando Pago en Payphone...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-                                    <span>Verificar Estado de Pago PayPhone (Confirmar Comprobante)</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Account in Treasury & Voucher Input */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <div className="h-5 flex items-center justify-between mb-1">
-                        <label className="text-slate-700 font-bold text-xs">Cuenta Receptora en Tesorería:</label>
-                      </div>
-                      <div className="relative">
-                        <Wallet className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                          type="text"
-                          value={bankOrAccount}
-                          title={bankOrAccount || 'Cuenta Receptora en Tesorería'}
-                          onChange={(e) => setBankOrAccount(e.target.value)}
-                          placeholder="Ej. Banco Pichincha Ahorros / Caja"
-                          className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm font-semibold focus:outline-none focus:border-emerald-500 focus:bg-white transition"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="h-5 flex items-center justify-between mb-1">
-                        <label className="text-slate-700 font-bold text-xs">
-                          N° de Comprobante / Transacción: {!isCash && <span className="text-rose-500 font-bold">*</span>}
-                        </label>
-                        <span className="text-[10px] text-slate-400">{isCash ? 'Opcional para efectivo' : 'Requerido para confirmar'}</span>
-                      </div>
-                      <div className="relative">
-                        <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                          type="text"
-                          value={voucherInput}
-                          title={voucherInput || 'Número de Comprobante / Transacción'}
-                          onChange={(e) => {
-                            setVoucherInput(e.target.value);
-                            if (voucherError) setVoucherError(null);
-                          }}
-                          placeholder={isCash ? 'EFECTIVO - CONTRAENTREGA' : 'Ej. 004829148'}
-                          className={`w-full h-10 pl-9 pr-3 rounded-xl font-mono text-xs sm:text-sm font-bold focus:outline-none transition ${
-                            voucherInput.trim()
-                              ? 'bg-emerald-50/50 border border-emerald-400 text-slate-900 focus:border-emerald-600'
-                              : isCash
-                              ? 'bg-slate-50 border border-slate-200 text-slate-900'
-                              : 'bg-slate-50 border border-slate-200 text-slate-900 focus:border-emerald-500 focus:bg-white'
-                          }`}
-                        />
-                      </div>
-                      {!isCash && (
-                        <div className="mt-1.5">
-                          {!voucherInput.trim() ? (
-                            <p className="text-[11px] text-amber-800 flex items-start gap-1.5 font-medium bg-amber-50/80 p-2 rounded-lg border border-amber-200/80">
-                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                              <span>
-                                El pedido permanecerá <strong>Pendiente</strong> hasta que se ingrese el comprobante de pago. Si el cliente aún no te envía el comprobante, usa el botón <strong>&quot;Guardar&quot;</strong>.
-                              </span>
-                            </p>
-                          ) : (
-                            <p className="text-[11px] text-emerald-800 flex items-center gap-1.5 font-bold bg-emerald-50/90 p-2 rounded-lg border border-emerald-200">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>
-                                ✓ Comprobante listo: Al confirmar, el pedido continuará su flujo a <strong>Confirmado</strong> y se registrará en tesorería.
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
           </div>
 
-          {/* ================= SECTION 4: DETALLE DE PRODUCTOS ================= */}
+          {/* ================= SECTION 3: DETALLE DE PRODUCTOS ================= */}
           <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center justify-center font-black text-xs shadow-2xs">
-                  4
+                  3
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -3441,100 +3080,441 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               </div>
             )}
+
           </div>
 
-          {/* ================= SECTION 5: OBSERVACIONES Y RESUMEN TRIBUTARIO SRI ================= */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* Observaciones del Pedido (lg:col-span-6) */}
-            <div className="lg:col-span-6 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3">
-              <label className="block text-slate-700 font-bold text-xs font-bold flex items-center gap-1.5">
-                <span>Notas u Observaciones del Pedido:</span>
-              </label>
+          {/* ================= SECTION 4: PAGO, TESORERÍA Y RESUMEN FINANCIERO ================= */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center justify-center font-black text-xs shadow-2xs">
+                  4
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight block">
+                    Pago, Tesorería y Confirmación
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    Registra el método, cuenta receptora y número de comprobante o transacción
+                  </span>
+                </div>
+              </div>
+              <span
+                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${isCash ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  }`}
+              >
+                {isCash ? 'Pago en Efectivo / Contraentrega' : 'Transferencia / Electrónico'}
+              </span>
+            </div>
+
+            {/* Payment Method Badges with Logos */}
+            <div className="space-y-1.5">
+              <label className="block text-slate-700 font-bold text-xs">Métodos de Pago Registrados:</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {activePaymentPartners.map((partner) => {
+                  const isSelected = paymentMethod === partner.name || paymentMethod === partner.id;
+                  const logo = getPartnerLogo(partner, 'payment');
+                  return (
+                    <button
+                      key={partner.id || partner.name}
+                      type="button"
+                      onClick={() => {
+                        setPaymentMethod(partner.name);
+                        setBankOrAccount(partner.name);
+                      }}
+                      className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${isSelected
+                          ? 'bg-emerald-50/90 border-emerald-500 shadow-xs ring-2 ring-emerald-200'
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                        }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
+                        <img src={logo} alt={partner.name} className="max-w-full max-h-full object-contain" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-bold text-xs text-slate-900 truncate">{partner.name}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                        </div>
+                        <span className="text-[10px] text-slate-500 line-clamp-1 block">
+                          {(partner as any).accountNumber || partner.details || 'Cuenta configurada'}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Cash Option */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod('Efectivo / Contraentrega');
+                    setBankOrAccount('Caja Chica / Efectivo');
+                  }}
+                  className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${paymentMethod === 'Efectivo / Contraentrega'
+                      ? 'bg-emerald-50/90 border-emerald-500 shadow-xs ring-2 ring-emerald-200'
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
+                    <img src={DEFAULT_PAYMENT_LOGOS['cash']} alt="Efectivo" className="max-w-full max-h-full object-contain" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-xs text-slate-900 truncate">Efectivo</span>
+                      {paymentMethod === 'Efectivo / Contraentrega' && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                    </div>
+                    <span className="text-[10px] text-slate-500 line-clamp-1 block">Cobro en entrega</span>
+                  </div>
+                </button>
+
+                {/* Dedicated Payphone API Option */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod('Payphone');
+                    setBankOrAccount('Payphone API / Pasarela Online');
+                  }}
+                  className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${isPayphonePaymentMethod
+                      ? 'bg-orange-50/90 border-orange-500 shadow-xs ring-2 ring-orange-200'
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-orange-100 border border-orange-200 p-1 flex items-center justify-center shrink-0 shadow-2xs">
+                    <CreditCard className="w-4 h-4 text-orange-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-xs text-slate-900 truncate">Payphone</span>
+                      {isPayphonePaymentMethod && <Check className="w-3.5 h-3.5 text-orange-600 shrink-0" />}
+                    </div>
+                    <span className="text-[10px] text-slate-500 line-clamp-1 block">Pasarela Enlace API</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Commission percentage input box (appears ONLY when Tarjeta or PayPhone is selected) */}
+              {isCardPaymentMethod && (
+                <div className="p-3.5 bg-sky-50/90 border border-sky-200 rounded-2xl space-y-2 animate-in fade-in duration-200 shadow-2xs">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="text-xs font-bold text-sky-950 flex items-center gap-1.5">
+                      <CreditCard className="w-4 h-4 text-sky-600" />
+                      <span>Porcentaje de Comisión por Tarjeta / PayPhone (%)</span>
+                    </label>
+                    <span className="text-[10px] text-sky-700 font-mono bg-white px-2 py-0.5 rounded border border-sky-200 font-bold">
+                      Fórmula: Subtotal / (1 - %Comisión)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="99"
+                        value={cardCommissionPercent}
+                        onChange={(e) => setCardCommissionPercent(Math.max(0, parseFloat(e.target.value) || 0))}
+                        placeholder="5.75"
+                        className="w-full h-9 pl-3 pr-7 rounded-xl bg-white border border-sky-300 text-sky-950 font-mono font-bold text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none shadow-2xs"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-sky-600">%</span>
+                    </div>
+                    <div className="flex gap-1">
+                      {[5.75, 7.5, 10, 12].map((comm) => (
+                        <button
+                          key={comm}
+                          type="button"
+                          onClick={() => setCardCommissionPercent(comm)}
+                          className={`px-2 py-1 text-[10px] font-mono font-bold rounded-lg border transition cursor-pointer ${cardCommissionPercent === comm
+                              ? 'bg-sky-600 text-white border-sky-600'
+                              : 'bg-white text-sky-800 border-sky-200 hover:bg-sky-100'
+                            }`}
+                        >
+                          {comm}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[10.5px] text-sky-800 leading-tight">
+                    💡 Al seleccionar este método de pago, los subtotales de cada producto y el desglose fiscal SRI se calcularán con la comisión ({cardCommissionPercent}%).
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Bloque Integración Payphone API (Solo cuando se selecciona el método de pago Payphone) */}
+            {isPayphonePaymentMethod && payphoneConfig?.isActive && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-950 via-slate-900 to-indigo-950 text-white space-y-3 shadow-md border border-orange-500/30">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-orange-400" />
+                    <span className="font-bold text-xs text-white">Pasarela Payphone (Visa / Mastercard)</span>
+                  </div>
+                  <span className="text-[10px] bg-orange-500/30 text-orange-200 border border-orange-400/30 px-2 py-0.5 rounded-full font-bold">
+                    Cobro por Link API
+                  </span>
+                </div>
+
+                {!payphoneConfig?.hasToken ? (
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Para generar enlaces de cobro con tarjeta, ingresa tu Token de Payphone en <strong>Ajustes &gt; Payphone API</strong>.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {!payphoneUrl ? (
+                      <button
+                        type="button"
+                        onClick={handleGeneratePayphoneLink}
+                        disabled={payphoneGenerating || items.length === 0}
+                        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {payphoneGenerating ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                            <span>Generando Enlace Payphone...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="w-4 h-4 text-white" />
+                            <span>Generar Link de Pago Payphone (${invoiceTotals.totalInvoiceAmount.toFixed(2)} USD)</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="p-2.5 rounded-xl bg-slate-900 border border-orange-500/50 flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] text-orange-300 font-bold uppercase tracking-wider block">Enlace de Pago Generado:</span>
+                            <p className="font-mono text-xs text-white truncate">{payphoneUrl}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(payphoneUrl);
+                              showToast('✓ Link de pago Payphone copiado');
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shrink-0 cursor-pointer shadow-2xs"
+                          >
+                            Copiar Link
+                          </button>
+                        </div>
+
+                        {/* Botones de Notificación: WhatsApp y Correo Gmail */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const norm = normalizeEcuadorPhone(customerPhone);
+                              const msg = `Hola ${customerName || 'Cliente'}, se ha generado su enlace de pago en línea con tarjeta Visa/Mastercard para el pedido #${order?.orderNumber || 'Venta'} por un total de $${invoiceTotals.totalInvoiceAmount.toFixed(2)} USD:\n\n${payphoneUrl}\n\nHaga clic en el enlace para realizar su pago seguro.`;
+                              const url = buildWhatsAppLink(norm.whatsappDigits || customerPhone, msg);
+                              window.open(url, '_blank');
+                            }}
+                            className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                            <span>Enviar por WhatsApp</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleSendPayphoneEmail}
+                            disabled={payphoneSendingEmail}
+                            className="py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
+                          >
+                            {payphoneSendingEmail ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Enviando...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Mail className="w-3.5 h-3.5" />
+                                <span>Enviar por Correo (Gmail)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Botón de Verificación de Estado de Pago Payphone */}
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyPayphoneTransaction()}
+                          disabled={payphoneVerifying}
+                          className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md disabled:opacity-60"
+                        >
+                          {payphoneVerifying ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                              <span>Verificando Pago en Payphone...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                              <span>Verificar Estado de Pago PayPhone (Confirmar Comprobante)</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Account in Treasury & Voucher Input */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <div className="h-5 flex items-center justify-between mb-1">
+                  <label className="text-slate-700 font-bold text-xs">Cuenta Receptora en Tesorería:</label>
+                </div>
+                <div className="relative">
+                  <Wallet className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={bankOrAccount}
+                    title={bankOrAccount || 'Cuenta Receptora en Tesorería'}
+                    onChange={(e) => setBankOrAccount(e.target.value)}
+                    placeholder="Ej. Banco Pichincha Ahorros / Caja"
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm font-semibold focus:outline-none focus:border-emerald-500 focus:bg-white transition"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="h-5 flex items-center justify-between mb-1">
+                  <label className="text-slate-700 font-bold text-xs">
+                    N° de Comprobante / Transacción: {!isCash && <span className="text-rose-500 font-bold">*</span>}
+                  </label>
+                  <span className="text-[10px] text-slate-400">{isCash ? 'Opcional para efectivo' : 'Requerido para confirmar'}</span>
+                </div>
+                <div className="relative">
+                  <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={voucherInput}
+                    title={voucherInput || 'Número de Comprobante / Transacción'}
+                    onChange={(e) => {
+                      setVoucherInput(e.target.value);
+                      if (voucherError) setVoucherError(null);
+                    }}
+                    placeholder={isCash ? 'EFECTIVO - CONTRAENTREGA' : 'Ej. 004829148'}
+                    className={`w-full h-10 pl-9 pr-3 rounded-xl font-mono text-xs sm:text-sm font-bold focus:outline-none transition ${voucherInput.trim()
+                        ? 'bg-emerald-50/50 border border-emerald-400 text-slate-900 focus:border-emerald-600'
+                        : isCash
+                          ? 'bg-slate-50 border border-slate-200 text-slate-900'
+                          : 'bg-slate-50 border border-slate-200 text-slate-900 focus:border-emerald-500 focus:bg-white'
+                      }`}
+                  />
+                </div>
+                {!isCash && (
+                  <div className="mt-1.5">
+                    {!voucherInput.trim() ? (
+                      <p className="text-[11px] text-amber-800 flex items-start gap-1.5 font-medium bg-amber-50/80 p-2 rounded-lg border border-amber-200/80">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <span>
+                          El pedido permanecerá <strong>Pendiente</strong> hasta que se ingrese el comprobante de pago. Si el cliente aún no te envía el comprobante, usa el botón <strong>&quot;Guardar&quot;</strong>.
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-emerald-800 flex items-center gap-1.5 font-bold bg-emerald-50/90 p-2 rounded-lg border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>
+                          ✓ Comprobante listo: Al confirmar, el pedido continuará su flujo a <strong>Confirmado</strong> y se registrará en tesorería.
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Notes Input */}
+            <div>
+              <label className="block text-slate-700 font-bold mb-1 text-xs">Notas u Observaciones del Pedido:</label>
               <textarea
-                rows={4}
+                rows={2}
                 value={notesInput}
                 onChange={(e) => setNotesInput(e.target.value)}
                 placeholder="Observaciones de entrega, indicaciones de empaque o referencias de pago..."
-                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white transition font-medium"
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white"
               />
             </div>
+          </div>
+        </div>
 
-            {/* SRI Totals Breakdown Card (lg:col-span-6) */}
-            <div className="lg:col-span-6 bg-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-xl border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 shrink-0">
-                    <Receipt className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 font-medium block">Resumen de Venta & Facturación SRI</span>
-                    <span className="text-xs font-bold text-slate-200">
-                      {items.reduce((s, i) => s + i.quantity, 0)} unidades totales ({items.length} {items.length === 1 ? 'producto' : 'productos'})
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-400/30 px-2 py-0.5 rounded font-mono font-bold">
-                  SRI ECUADOR
+        {/* FIXED BOTTOM PANEL: Resumen de Venta Fijo con Desglose SRI (Mismo estilo y ubicación que compras) */}
+        <div className="flex-shrink-0 border-t border-slate-200 bg-slate-900 p-3 sm:p-3.5 space-y-3 shadow-lg z-10">
+          <div className="text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8.5 h-8.5 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 flex-shrink-0">
+                <Receipt className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-400 font-medium block">Resumen de Venta & Facturación SRI</span>
+                <span className="text-xs font-bold text-slate-200">
+                  {items.reduce((s, i) => s + i.quantity, 0)} unidades totales ({items.length} {items.length === 1 ? 'producto' : 'productos'})
+                </span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  Modalidad: <strong className="text-slate-200">{deliveryType === 'pickup' ? 'Retiro en Local' : 'Envío a Domicilio'}</strong>
                 </span>
               </div>
+            </div>
 
-              {/* SRI Totals Breakdown (Desglose Tributario Oficial) */}
-              <div className="space-y-1.5 font-mono text-xs">
-                {/* 1. Subtotal 0% */}
-                <div className="flex justify-between text-slate-400 text-[11px]">
-                  <span>Subtotal 0%:</span>
-                  <span className="font-bold text-slate-200">${invoiceTotals.subtotalZero0.toFixed(2)}</span>
+            {/* SRI Totals Breakdown (Desglose Tributario Oficial) */}
+            <div className="w-full sm:w-auto bg-slate-800/90 rounded-xl p-3 border border-slate-700 text-xs font-mono space-y-1 min-w-[300px]">
+              {/* 1. Subtotal 0% */}
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>Subtotal 0%:</span>
+                <span className="font-bold text-slate-200">${invoiceTotals.subtotalZero0.toFixed(2)}</span>
+              </div>
+              {/* 2. Subtotal 15% */}
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>Subtotal 15%:</span>
+                <span className="font-bold text-slate-200">${invoiceTotals.subtotalTaxable15.toFixed(2)}</span>
+              </div>
+              {/* 3. Subtotal 5% */}
+              <div className="flex justify-between text-slate-400 text-[11px]">
+                <span>Subtotal 5%:</span>
+                <span className="font-bold text-slate-200">${invoiceTotals.subtotalTaxable5.toFixed(2)}</span>
+              </div>
+              {/* 4. Subtotal Sin Impuestos */}
+              <div className="flex justify-between text-slate-300 font-bold text-[11px] pt-1 border-t border-slate-700/80">
+                <span>Subtotal Sin Impuestos:</span>
+                <span className="text-white">${invoiceTotals.subtotalNoTax.toFixed(2)}</span>
+              </div>
+              {/* 5. Total Descuento */}
+              <div className="flex justify-between text-purple-300 text-[11px]">
+                <span>Total Descuento:</span>
+                <span className="font-bold">-${totalDiscountAmount.toFixed(2)}</span>
+              </div>
+              {/* 6. IVA 15% */}
+              <div className="flex justify-between text-amber-300 text-[11px]">
+                <span>IVA 15%:</span>
+                <span className="font-bold">+${(invoiceTotals.taxAmount15 || (salesTaxAmount > 0 ? salesTaxAmount : 0)).toFixed(2)}</span>
+              </div>
+              {/* 7. IVA 5% */}
+              <div className="flex justify-between text-amber-300 text-[11px]">
+                <span>IVA 5%:</span>
+                <span className="font-bold">+${(invoiceTotals.taxAmount5 || 0).toFixed(2)}</span>
+              </div>
+              {/* 8. Valor Envío (Opcional) */}
+              {deliveryType === 'shipping' && shippingFee > 0 && (
+                <div className="flex justify-between text-sky-300 text-[11px]">
+                  <span>Valor Envío ({trackingCarrier}):</span>
+                  <span className="font-bold">+${shippingFee.toFixed(2)}</span>
                 </div>
-                {/* 2. Subtotal 15% */}
-                <div className="flex justify-between text-slate-400 text-[11px]">
-                  <span>Subtotal 15%:</span>
-                  <span className="font-bold text-slate-200">${invoiceTotals.subtotalTaxable15.toFixed(2)}</span>
-                </div>
-                {/* 3. Subtotal 5% */}
-                <div className="flex justify-between text-slate-400 text-[11px]">
-                  <span>Subtotal 5%:</span>
-                  <span className="font-bold text-slate-200">${invoiceTotals.subtotalTaxable5.toFixed(2)}</span>
-                </div>
-                {/* 4. Subtotal Sin Impuestos */}
-                <div className="flex justify-between text-slate-300 font-bold text-[11px] pt-1 border-t border-slate-800">
-                  <span>Subtotal Sin Impuestos:</span>
-                  <span className="text-white">${invoiceTotals.subtotalNoTax.toFixed(2)}</span>
-                </div>
-                {/* 5. Total Descuento */}
-                <div className="flex justify-between text-purple-300 text-[11px]">
-                  <span>Total Descuento:</span>
-                  <span className="font-bold">-${totalDiscountAmount.toFixed(2)}</span>
-                </div>
-                {/* 6. IVA 15% */}
-                <div className="flex justify-between text-amber-300 text-[11px]">
-                  <span>IVA 15%:</span>
-                  <span className="font-bold">+${(invoiceTotals.taxAmount15 || (salesTaxAmount > 0 ? salesTaxAmount : 0)).toFixed(2)}</span>
-                </div>
-                {/* 7. IVA 5% */}
-                <div className="flex justify-between text-amber-300 text-[11px]">
-                  <span>IVA 5%:</span>
-                  <span className="font-bold">+${(invoiceTotals.taxAmount5 || 0).toFixed(2)}</span>
-                </div>
-                {/* 8. Valor Envío (Opcional) */}
-                {deliveryType === 'shipping' && shippingFee > 0 && (
-                  <div className="flex justify-between text-sky-300 text-[11px]">
-                    <span>Valor Envío ({trackingCarrier}):</span>
-                    <span className="font-bold">+${shippingFee.toFixed(2)}</span>
-                  </div>
-                )}
-                {/* 9. Total Final */}
-                <div className="flex justify-between text-emerald-400 font-black text-sm sm:text-base pt-2 border-t border-slate-800">
-                  <span>TOTAL PREFACTURA:</span>
-                  <span>${totalOrderAmount.toFixed(2)} {currency}</span>
-                </div>
+              )}
+              {/* 9. Total Final */}
+              <div className="flex justify-between text-emerald-400 font-black text-sm pt-1.5 border-t border-slate-700">
+                <span>TOTAL PREFACTURA:</span>
+                <span>${totalOrderAmount.toFixed(2)} {currency}</span>
               </div>
             </div>
           </div>
         </div>
-        {/* END SCROLLABLE MODAL BODY */}
 
-        {/* ================= MODAL FOOTER & ACTIONS (BARRA HORIZONTAL FIJA INFERIOR) ================= */}
-        <div className="px-5 sm:px-6 py-4 bg-white border-t border-slate-200/90 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-lg sticky bottom-0 z-30 w-full">
+        {/* ================= MODAL FOOTER & ACTIONS (CANCELAR, GUARDAR PRE-FACTURA, EMITIR FACTURA, NOTIFICAR POR WHATSAPP) ================= */}
+        <div className="px-5 sm:px-6 py-3.5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 shadow-xs">
           {/* Botón: Cancelar */}
           <button
             type="button"
@@ -3590,6 +3570,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               <MessageCircle className="w-4 h-4" />
               <span>Notificar Pre-Factura por WhatsApp</span>
             </button>
+          </div>
         </div>
       </div>
 
@@ -3697,7 +3678,6 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
           </div>
         </div>
       )}
-    </div>
     </div>
   );
 };

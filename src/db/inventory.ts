@@ -117,7 +117,7 @@ export function safeParseOrderItems(items: any): any[] {
       if (typeof parsed === 'string') {
         try {
           parsed = JSON.parse(parsed);
-        } catch {}
+        } catch { }
       }
       return Array.isArray(parsed) ? parsed : [];
     } catch {
@@ -239,24 +239,24 @@ export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item:
       if (saleTaxPercent === undefined && parsed.saleTaxPercent !== undefined) {
         saleTaxPercent = Number(parsed.saleTaxPercent);
       }
-    } catch {}
+    } catch { }
   }
 
   const unifiedRate = saleTaxPercent !== undefined && !isNaN(Number(saleTaxPercent))
     ? Number(saleTaxPercent)
     : purchaseTaxPercent !== undefined && !isNaN(Number(purchaseTaxPercent))
-    ? Number(purchaseTaxPercent)
-    : item.taxPercent !== undefined && !isNaN(Number(item.taxPercent))
-    ? Number(item.taxPercent)
-    : taxRate;
+      ? Number(purchaseTaxPercent)
+      : item.taxPercent !== undefined && !isNaN(Number(item.taxPercent))
+        ? Number(item.taxPercent)
+        : taxRate;
 
   const unifiedHasTax = applySaleTax !== undefined
     ? Boolean(applySaleTax)
     : hasPurchaseTax !== undefined
-    ? Boolean(hasPurchaseTax)
-    : item.hasPurchaseTax !== undefined
-    ? Boolean(item.hasPurchaseTax)
-    : unifiedRate > 0;
+      ? Boolean(hasPurchaseTax)
+      : item.hasPurchaseTax !== undefined
+        ? Boolean(item.hasPurchaseTax)
+        : unifiedRate > 0;
 
   const finalTaxRate = unifiedHasTax ? unifiedRate : 0;
 
@@ -287,24 +287,15 @@ export function formatItemWithAllImages<T extends Record<string, any>>(item: T):
   if (!item) return item;
   const images = getProductPhotosWithFallback(item);
   let videoUrl = item.videoUrl || item.video_url || null;
-  let supplierCode = item.supplierCode || item.supplier_code || null;
-
-  if (item.extractedAttributes) {
+  if (!videoUrl && item.extractedAttributes) {
     try {
       const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
-      if (!videoUrl) {
-        videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
-      }
-      if (!supplierCode) {
-        supplierCode = parsed?.supplierCode || parsed?.supplier_code || parsed?.supplierSku || parsed?.supplier_sku || null;
-      }
-    } catch {}
+      videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
+    } catch { }
   }
-
   const effectiveImageUrl = normalizeMediaUrl(item.imageUrl || item.image_url) || images[0] || null;
   return normalizeItemTaxesAndPrices({
     ...item,
-    supplierCode,
     imageUrl: effectiveImageUrl,
     images,
     videoUrl,
@@ -443,7 +434,7 @@ export async function appendImagesToInventoryItem(
     if (item.extractedAttributes) {
       try {
         parsedAttr = JSON.parse(item.extractedAttributes);
-      } catch {}
+      } catch { }
     }
 
     const currentImages: string[] = [];
@@ -547,7 +538,7 @@ export async function clearAllImagesFromInventoryItem(id: number) {
     if (item.extractedAttributes) {
       try {
         parsedAttr = JSON.parse(item.extractedAttributes);
-      } catch {}
+      } catch { }
     }
 
     parsedAttr.images = [];
@@ -615,14 +606,14 @@ export async function removeImageFromInventoryItem(id: number, imageUrlToRemove?
     if (item.extractedAttributes) {
       try {
         parsedAttr = JSON.parse(item.extractedAttributes);
-      } catch {}
+      } catch { }
     }
 
     let currentImages: string[] = Array.isArray(parsedAttr.images) && parsedAttr.images.length > 0
       ? [...parsedAttr.images]
       : item.imageUrl
-      ? [item.imageUrl]
-      : [];
+        ? [item.imageUrl]
+        : [];
 
     const norm = (u: string) => {
       try {
@@ -747,14 +738,14 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
     if (item.extractedAttributes) {
       try {
         parsedAttr = JSON.parse(item.extractedAttributes);
-      } catch {}
+      } catch { }
     }
 
     let currentImages: string[] = Array.isArray(parsedAttr.images)
       ? [...parsedAttr.images]
       : item.imageUrl
-      ? [item.imageUrl]
-      : [];
+        ? [item.imageUrl]
+        : [];
 
     if (!currentImages.includes(effectiveCoverUrl)) {
       currentImages.unshift(effectiveCoverUrl);
@@ -829,7 +820,7 @@ export async function setInventoryItemVideo(id: number, rawVideoUrl: string | nu
     if (item.extractedAttributes) {
       try {
         parsedAttr = JSON.parse(item.extractedAttributes);
-      } catch {}
+      } catch { }
     }
 
     const oldVideoUrl = item.videoUrl || parsedAttr.videoUrl || parsedAttr.video;
@@ -1077,7 +1068,6 @@ export async function createInventoryItem(data: {
   name: string;
   sku?: string;
   barcode?: string;
-  supplierCode?: string | null;
   description?: string;
   category: string;
   costPrice: string;
@@ -1100,9 +1090,6 @@ export async function createInventoryItem(data: {
   if (!finalSku || finalSku === 'AUTO' || finalSku.startsWith('PROD-') || finalSku.startsWith('CAL-') || finalSku.startsWith('GEN-')) {
     finalSku = await generateNextSku(data.supplierName || 'PF');
   }
-
-  let effectiveSupplierCode = data.supplierCode || (data as any).supplier_code || null;
-  if (effectiveSupplierCode) effectiveSupplierCode = String(effectiveSupplierCode).trim() || null;
 
   const safeDiscount = Math.max(0, Math.min(100, Number(data.discountPercent) || 0));
 
@@ -1161,12 +1148,6 @@ export async function createInventoryItem(data: {
   if (effectiveExtractedAttributes) {
     try {
       const parsed = JSON.parse(effectiveExtractedAttributes);
-      if (!effectiveSupplierCode && (parsed.supplierCode || parsed.supplier_code || parsed.supplierSku)) {
-        effectiveSupplierCode = String(parsed.supplierCode || parsed.supplier_code || parsed.supplierSku).trim() || null;
-      }
-      if (effectiveSupplierCode) {
-        parsed.supplierCode = effectiveSupplierCode;
-      }
       if (isGift) {
         parsed.isSupplierGift = true;
         parsed.costWithoutTax = 0;
@@ -1194,7 +1175,7 @@ export async function createInventoryItem(data: {
         parsed.purchaseTaxPercent = Number((data as any).purchaseTaxPercent);
       }
       effectiveExtractedAttributes = JSON.stringify(parsed);
-    } catch {}
+    } catch { }
   } else {
     const rawRate = (data as any).saleTaxPercent !== undefined
       ? Number((data as any).saleTaxPercent)
@@ -1207,7 +1188,6 @@ export async function createInventoryItem(data: {
     const effectiveRate = hasTax ? rawRate : 0;
 
     effectiveExtractedAttributes = JSON.stringify({
-      supplierCode: effectiveSupplierCode,
       applySaleTax: hasTax,
       saleTaxPercent: effectiveRate,
       hasPurchaseTax: hasTax,
@@ -1229,7 +1209,6 @@ export async function createInventoryItem(data: {
       name: data.name,
       sku: finalSku,
       barcode: data.barcode?.trim() || null,
-      supplierCode: effectiveSupplierCode,
       description: data.description || '',
       category: data.category || 'General',
       costPrice: effectiveCostPrice,
@@ -1266,7 +1245,6 @@ export async function createInventoryItem(data: {
         name: data.name,
         sku: finalSku,
         barcode: data.barcode?.trim() || null,
-        supplierCode: effectiveSupplierCode,
         description: data.description || '',
         category: data.category || 'General',
         costPrice: effectiveCostPrice,
@@ -1348,11 +1326,6 @@ export async function updateInventoryItem(
 ) {
   const sanitizedPayload: Record<string, any> = { ...data };
 
-  if (data.supplierCode !== undefined || (data as any).supplier_code !== undefined) {
-    const rawSupp = data.supplierCode !== undefined ? data.supplierCode : (data as any).supplier_code;
-    sanitizedPayload.supplierCode = rawSupp && String(rawSupp).trim() ? String(rawSupp).trim() : null;
-  }
-
   const isGift = Boolean(
     data.isSupplierGift ||
     (data as any).isSupplierGift ||
@@ -1402,11 +1375,6 @@ export async function updateInventoryItem(
   if (data.extractedAttributes !== undefined && data.extractedAttributes !== null && data.extractedAttributes !== '') {
     try {
       const parsed = JSON.parse(data.extractedAttributes);
-      if (sanitizedPayload.supplierCode !== undefined) {
-        parsed.supplierCode = sanitizedPayload.supplierCode;
-      } else if (!parsed.supplierCode && (parsed.supplier_code || parsed.supplierSku)) {
-        parsed.supplierCode = parsed.supplier_code || parsed.supplierSku;
-      }
       if (isGift) {
         parsed.isSupplierGift = true;
         parsed.costWithoutTax = 0;
@@ -1441,21 +1409,21 @@ export async function updateInventoryItem(
         parsed.saleTaxPercent = Number((data as any).saleTaxPercent);
       }
       sanitizedPayload.extractedAttributes = JSON.stringify(parsed);
-    } catch {}
+    } catch { }
   } else if (Array.isArray(incomingImages) && incomingImages.length > 0) {
     const persistedImages = await persistImageListLocally(incomingImages);
     sanitizedPayload.extractedAttributes = JSON.stringify({
       images: persistedImages,
       totalPhotos: persistedImages.length,
-      ...( (data as any).applySaleTax !== undefined ? { applySaleTax: Boolean((data as any).applySaleTax) } : {} ),
-      ...( (data as any).saleTaxPercent !== undefined ? { saleTaxPercent: Number((data as any).saleTaxPercent) } : {} ),
-      ...( isGift ? { isSupplierGift: true, costWithoutTax: 0, costWithTax: 0 } : {} ),
+      ...((data as any).applySaleTax !== undefined ? { applySaleTax: Boolean((data as any).applySaleTax) } : {}),
+      ...((data as any).saleTaxPercent !== undefined ? { saleTaxPercent: Number((data as any).saleTaxPercent) } : {}),
+      ...(isGift ? { isSupplierGift: true, costWithoutTax: 0, costWithTax: 0 } : {}),
     });
   } else if ((data as any).applySaleTax !== undefined || (data as any).saleTaxPercent !== undefined || isGift) {
     sanitizedPayload.extractedAttributes = JSON.stringify({
       applySaleTax: Boolean((data as any).applySaleTax),
       saleTaxPercent: Number((data as any).saleTaxPercent),
-      ...( isGift ? { isSupplierGift: true, costWithoutTax: 0, costWithTax: 0 } : {} ),
+      ...(isGift ? { isSupplierGift: true, costWithoutTax: 0, costWithTax: 0 } : {}),
     });
   }
 
@@ -1588,7 +1556,7 @@ export async function reparseInventoryItemWithAi(id: number, userId: number = 1)
   if (typeof item.extractedAttributes === 'string' && item.extractedAttributes.trim()) {
     try {
       existingAttributes = JSON.parse(item.extractedAttributes);
-    } catch {}
+    } catch { }
   }
 
   const mergedAttributes = {
@@ -1754,8 +1722,7 @@ export async function deleteInventoryItem(id: number) {
     }
 
     const err: any = new Error(
-      `No se puede eliminar el producto ${
-        linkCheck.productName ? `"${linkCheck.productName}" ` : ''
+      `No se puede eliminar el producto ${linkCheck.productName ? `"${linkCheck.productName}" ` : ''
       }porque se encuentra vinculado a ${reasons.join(' y a ')}. Solo se pueden eliminar productos sin compras ni ventas asociadas.`
     );
     err.code = 'PRODUCT_LINKED_TO_TRANSACTIONS';
@@ -1911,7 +1878,7 @@ export async function deleteBulkInventoryItems(ids: number[]) {
       if (itemsToDeleteMedia.length === 0) {
         itemsToDeleteMedia = await db.select().from(inventoryItems).where(inArray(inventoryItems.id, deletableIds));
       }
-    } catch {}
+    } catch { }
 
     await db
       .update(telegramMessages)
@@ -2612,8 +2579,8 @@ export async function updateAiConfig(
     data.isActive !== undefined
       ? Boolean(data.isActive)
       : data.is_active !== undefined
-      ? Boolean(data.is_active)
-      : undefined;
+        ? Boolean(data.is_active)
+        : undefined;
 
   let localConfig = state.aiConfigs.find((c) => c.userId === userId);
   if (!localConfig) {
@@ -2663,8 +2630,8 @@ export async function updateAiConfig(
             effectiveIsActive !== undefined
               ? effectiveIsActive
               : existing.isActive !== undefined
-              ? Boolean(existing.isActive)
-              : true,
+                ? Boolean(existing.isActive)
+                : true,
           updatedAt: new Date(),
         })
         .where(eq(aiConfigs.id, existing.id))
@@ -3225,7 +3192,7 @@ function parseThemeAndColors(rawTheme: string | null | undefined): { theme: stri
         theme: parsed.theme || parsed.active || 'classic',
         themeColors: parsed.colors || parsed.themeColors || undefined,
       };
-    } catch {}
+    } catch { }
   }
   if (rawTheme.includes(':::')) {
     try {
@@ -3234,7 +3201,7 @@ function parseThemeAndColors(rawTheme: string | null | undefined): { theme: stri
         theme: themeName || 'classic',
         themeColors: JSON.parse(colorsJson),
       };
-    } catch {}
+    } catch { }
   }
   return { theme: rawTheme };
 }
@@ -3528,7 +3495,7 @@ export async function updateStoreConfig(
   if (data.promo_popup !== undefined) {
     updatePayload.promoPopup = typeof data.promo_popup === 'string' ? data.promo_popup : JSON.stringify(data.promo_popup);
   }
-  
+
   const rawTheme = data.theme !== undefined ? String(data.theme).trim() : undefined;
   const rawThemeColors = data.themeColors !== undefined ? data.themeColors : data.theme_colors;
 
@@ -3977,8 +3944,8 @@ export async function adjustInventoryStockForItems(items: any[] | string, multip
     // Always keep in-memory / fallback storage in sync
     const state = storage.getState();
     if (!state.inventoryItems) state.inventoryItems = [];
-    
-    let localInv = state.inventoryItems.find((it) => 
+
+    let localInv = state.inventoryItems.find((it) =>
       (foundDbItem && it.id === foundDbItem.id) ||
       (!isNaN(itemId) && itemId > 0 && it.id === itemId) ||
       (rawSku && it.sku && it.sku.trim().toLowerCase() === rawSku.toLowerCase()) ||
@@ -4122,12 +4089,12 @@ export async function createCustomerOrder(data: {
     const invItem = isCustom
       ? null
       : currentInventory.find(
-          (inv) =>
-            inv.id === it.id ||
-            inv.id === it.inventoryItemId ||
-            (inv.sku && it.sku && inv.sku.toLowerCase() === it.sku.toLowerCase()) ||
-            (inv.name && it.name && inv.name.trim().toLowerCase() === it.name.trim().toLowerCase())
-        );
+        (inv) =>
+          inv.id === it.id ||
+          inv.id === it.inventoryItemId ||
+          (inv.sku && it.sku && inv.sku.toLowerCase() === it.sku.toLowerCase()) ||
+          (inv.name && it.name && inv.name.trim().toLowerCase() === it.name.trim().toLowerCase())
+      );
 
     const availableStock = invItem ? Math.max(0, Number(invItem.stock || 0)) : 0;
     const requestedQty = Math.max(1, Number(it.quantity || 1));
@@ -4259,7 +4226,7 @@ export async function createCustomerOrder(data: {
     storage.save();
     try {
       await upsertCustomerFromOrder(newOrder, userId);
-    } catch {}
+    } catch { }
 
     // Auto-generate supplier purchase order for the exact missing deficit units
     if (hasOutOfStockItems) {
@@ -4349,7 +4316,7 @@ export async function createCustomerOrder(data: {
         clientAddress: data.clientAddress,
         shippingAddress: data.shippingAddress || data.customerAddress,
       }, targetUserId);
-    } catch {}
+    } catch { }
 
     // Auto-generate supplier purchase order for the exact missing deficit units
     if (hasOutOfStockItems) {
@@ -4432,7 +4399,7 @@ export async function createCustomerOrder(data: {
 
     try {
       await upsertCustomerFromOrder(newOrder, userId);
-    } catch {}
+    } catch { }
 
     if (hasOutOfStockItems) {
       try {
@@ -4555,7 +4522,7 @@ export async function updateCustomerOrderStatus(
         .where(eq(customerOrders.id, id))
         .limit(1);
       existingOrder = ord || null;
-    } catch {}
+    } catch { }
   }
   if (!existingOrder) {
     const state = storage.getState();
@@ -4748,7 +4715,7 @@ export async function updateCustomerOrderStatus(
         if (linkedP && linkedP.items) {
           rawItems = safeParseOrderItems(linkedP.items);
         }
-      } catch {}
+      } catch { }
     }
 
     const isAllItemsPhysicallyDelivered =
@@ -4767,8 +4734,7 @@ export async function updateCustomerOrderStatus(
 
         if (linkedP && linkedP.status !== 'received') {
           throw new Error(
-            `Bloqueo ERP: Este pedido fue registrado sin stock (bajo encargo) y tiene la orden de compra a proveedor #${
-              linkedP.purchaseNumber || linkedP.id
+            `Bloqueo ERP: Este pedido fue registrado sin stock (bajo encargo) y tiene la orden de compra a proveedor #${linkedP.purchaseNumber || linkedP.id
             } en estado '${linkedP.status}'. No puede pasar a estado ENTREGADO hasta que se confirme la compra y recepción de la mercadería del proveedor en el módulo de Compras.`
           );
         }
@@ -4879,7 +4845,7 @@ export async function updateCustomerOrderStatus(
 
     try {
       await upsertCustomerFromOrder(ord);
-    } catch {}
+    } catch { }
 
     // Auto-create payment inflow when client payment is confirmed
     if (status === 'confirmed' || status === 'delivered' || status === 'shipped' || paymentVoucher) {
@@ -4937,7 +4903,7 @@ export async function updateCustomerOrderStatus(
 
       try {
         await upsertCustomerFromOrder(result[0]);
-      } catch {}
+      } catch { }
 
       // Auto-create payment inflow when client payment is confirmed
       if (status === 'confirmed' || status === 'delivered' || status === 'shipped' || paymentVoucher) {
@@ -4985,7 +4951,7 @@ export async function updateCustomerOrderStatus(
       storage.save();
       try {
         await upsertCustomerFromOrder(ord);
-      } catch {}
+      } catch { }
 
       if (status === 'confirmed' || status === 'delivered' || status === 'shipped' || paymentVoucher) {
         try {
@@ -5014,7 +4980,7 @@ export async function updateCustomerOrderStatus(
               });
             }
           }
-        } catch (pErr) {}
+        } catch (pErr) { }
       }
 
       return {
@@ -5029,32 +4995,32 @@ export async function updateCustomerOrderStatus(
 export async function updateCustomerOrder(
   id: number,
   data: {
-  customerName?: string;
-  customerPhone?: string;
-  customerEmail?: string | null;
-  customerAddress?: string;
-  clientAddress?: string | null;
-  shippingAddress?: string | null;
-  deliveryType?: string | null;
-  customerCi?: string | null;
-  ci?: string | null;
-  items?: any[];
-  returns?: any[];
-  totalAmount?: number | string;
-  paymentMethod?: string;
-  cardCommissionPercent?: number | string | null;
-  status?: string;
-  paymentVoucher?: string;
-  notes?: string;
-  trackingNumber?: string;
-  trackingCarrier?: string;
-  trackingNotes?: string;
-  fulfillmentStatus?: string;
-  linkedPurchaseId?: number | null;
-  linkedPurchaseNumber?: string | null;
-  purchaseAction?: 'cancel' | 'keep';
-  bypassSupplierBlock?: boolean;
-}) {
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string | null;
+    customerAddress?: string;
+    clientAddress?: string | null;
+    shippingAddress?: string | null;
+    deliveryType?: string | null;
+    customerCi?: string | null;
+    ci?: string | null;
+    items?: any[];
+    returns?: any[];
+    totalAmount?: number | string;
+    paymentMethod?: string;
+    cardCommissionPercent?: number | string | null;
+    status?: string;
+    paymentVoucher?: string;
+    notes?: string;
+    trackingNumber?: string;
+    trackingCarrier?: string;
+    trackingNotes?: string;
+    fulfillmentStatus?: string;
+    linkedPurchaseId?: number | null;
+    linkedPurchaseNumber?: string | null;
+    purchaseAction?: 'cancel' | 'keep';
+    bypassSupplierBlock?: boolean;
+  }) {
   const updatePayload: Record<string, any> = {};
 
   if (data.customerName !== undefined) updatePayload.customerName = data.customerName;
@@ -5088,8 +5054,8 @@ export async function updateCustomerOrder(
     updatePayload.returns = Array.isArray(data.returns)
       ? data.returns
       : typeof data.returns === 'string'
-      ? JSON.parse(data.returns)
-      : [];
+        ? JSON.parse(data.returns)
+        : [];
   }
   if (data.totalAmount !== undefined) {
     updatePayload.totalAmount = cleanNumericString(data.totalAmount, '0.00');
@@ -5118,7 +5084,7 @@ export async function updateCustomerOrder(
         .where(eq(customerOrders.id, id))
         .limit(1);
       existingOrder = ord || null;
-    } catch {}
+    } catch { }
   }
   if (!existingOrder) {
     const state = storage.getState();
@@ -5253,7 +5219,7 @@ export async function updateCustomerOrder(
       const allPurchases = await getPurchases(existingOrder.userId);
       const linkedP = existingOrder.linkedPurchaseId ? allPurchases.find((p) => p.id === existingOrder.linkedPurchaseId) : null;
       wasSuppliedByReservedPurchase = Boolean(linkedP && linkedP.status === 'received');
-    } catch {}
+    } catch { }
 
     if (!wasFinalized && isNowFinalized) {
       // Transitioning to finalized sale
@@ -5291,7 +5257,7 @@ export async function updateCustomerOrder(
           if (linkedP && linkedP.items) {
             rawCurrentItems = safeParseOrderItems(linkedP.items);
           }
-        } catch {}
+        } catch { }
       }
 
       const isAllItemsPhysicallyDelivered =
@@ -5314,8 +5280,7 @@ export async function updateCustomerOrder(
 
           if (linkedP && linkedP.status !== 'received') {
             throw new Error(
-              `Bloqueo ERP: Este pedido fue registrado sin stock (bajo encargo) y tiene la orden de compra a proveedor #${
-                linkedP.purchaseNumber || linkedP.id
+              `Bloqueo ERP: Este pedido fue registrado sin stock (bajo encargo) y tiene la orden de compra a proveedor #${linkedP.purchaseNumber || linkedP.id
               } en estado '${linkedP.status}'. No puede pasar a estado ENTREGADO hasta que se confirme la compra y recepción de la mercadería del proveedor en el módulo de Compras.`
             );
           }
@@ -5369,8 +5334,8 @@ export async function updateCustomerOrder(
         const updatedOrderItems: any[] = Array.isArray(data.items)
           ? data.items
           : typeof data.items === 'string'
-          ? JSON.parse(data.items)
-          : [];
+            ? JSON.parse(data.items)
+            : [];
 
         const isOrderDeliveredOrClosed =
           newStatus === 'delivered' ||
@@ -5469,12 +5434,12 @@ export async function updateCustomerOrder(
           const invItem = isCustom
             ? null
             : currentInventory.find(
-                (inv) =>
-                  inv.id === oItem.id ||
-                  inv.id === oItem.inventoryItemId ||
-                  (inv.sku && oItem.sku && inv.sku.toLowerCase() === oItem.sku.toLowerCase()) ||
-                  (inv.name && oItem.name && inv.name.trim().toLowerCase() === oItem.name.trim().toLowerCase())
-              );
+              (inv) =>
+                inv.id === oItem.id ||
+                inv.id === oItem.inventoryItemId ||
+                (inv.sku && oItem.sku && inv.sku.toLowerCase() === oItem.sku.toLowerCase()) ||
+                (inv.name && oItem.name && inv.name.trim().toLowerCase() === oItem.name.trim().toLowerCase())
+            );
 
           const currentStock = invItem ? Math.max(0, Number(invItem.stock || 0)) : 0;
           const requestedQty = Math.max(0, Number(oItem.quantity || 0));
@@ -5517,10 +5482,10 @@ export async function updateCustomerOrder(
                 invItem.purchaseTaxPercent !== undefined
                   ? Number(invItem.purchaseTaxPercent)
                   : (invItem as any).taxRate !== undefined
-                  ? Number((invItem as any).taxRate)
-                  : invItem.hasPurchaseTax !== false
-                  ? 15
-                  : 0;
+                    ? Number((invItem as any).taxRate)
+                    : invItem.hasPurchaseTax !== false
+                      ? 15
+                      : 0;
               const costWithTax = Number(invItem.costPrice || (Number(invItem.salePrice || 0) * 0.7) || 0);
               itemCostPrice = taxRate > 0 && costWithTax > 0 ? costWithTax / (1 + taxRate / 100) : costWithTax;
             }
@@ -5607,14 +5572,14 @@ export async function updateCustomerOrder(
               oItem.taxPercent !== undefined && !isNaN(Number(oItem.taxPercent))
                 ? Number(oItem.taxPercent)
                 : oItem.purchaseTaxPercent !== undefined && !isNaN(Number(oItem.purchaseTaxPercent))
-                ? Number(oItem.purchaseTaxPercent)
-                : invItem?.purchaseTaxPercent !== undefined && !isNaN(Number(invItem.purchaseTaxPercent))
-                ? Number(invItem.purchaseTaxPercent)
-                : (invItem as any)?.taxRate !== undefined && !isNaN(Number((invItem as any).taxRate))
-                ? Number((invItem as any).taxRate)
-                : invItem?.hasPurchaseTax === false || oItem.hasPurchaseTax === false
-                ? 0
-                : 15;
+                  ? Number(oItem.purchaseTaxPercent)
+                  : invItem?.purchaseTaxPercent !== undefined && !isNaN(Number(invItem.purchaseTaxPercent))
+                    ? Number(invItem.purchaseTaxPercent)
+                    : (invItem as any)?.taxRate !== undefined && !isNaN(Number((invItem as any).taxRate))
+                      ? Number((invItem as any).taxRate)
+                      : invItem?.hasPurchaseTax === false || oItem.hasPurchaseTax === false
+                        ? 0
+                        : 15;
 
             deficitItemsBySupplier.get(groupKey)!.items.push({
               inventoryItemId: invItem ? invItem.id : (isCustom ? undefined : (oItem.inventoryItemId || oItem.id)),
@@ -5773,9 +5738,8 @@ export async function updateCustomerOrder(
               .join('\n')
               .trim();
 
-            const syncNote = `[Abastecimiento por Proveedor] 🔍 ${resultingActivePurchases.length} ${
-              resultingActivePurchases.length === 1 ? 'orden actualizada' : 'órdenes actualizadas por proveedor'
-            }: ${summaryBreakdown} (${totalAllDeficitUnits} un. faltantes en total)`;
+            const syncNote = `[Abastecimiento por Proveedor] 🔍 ${resultingActivePurchases.length} ${resultingActivePurchases.length === 1 ? 'orden actualizada' : 'órdenes actualizadas por proveedor'
+              }: ${summaryBreakdown} (${totalAllDeficitUnits} un. faltantes en total)`;
 
             updatePayload.notes = cleanBaseNotes ? `${cleanBaseNotes}\n${syncNote}` : syncNote;
           }
@@ -5884,7 +5848,7 @@ export async function updateCustomerOrder(
     storage.save();
     try {
       await upsertCustomerFromOrder(ord);
-    } catch {}
+    } catch { }
     return {
       ...ord,
       items: safeParseOrderItems(ord.items) as any,
@@ -5915,7 +5879,7 @@ export async function updateCustomerOrder(
         clientAddress: data.clientAddress !== undefined ? data.clientAddress : (localOrd as any)?.clientAddress,
         shippingAddress: data.shippingAddress !== undefined ? data.shippingAddress : ((localOrd as any)?.shippingAddress || result[0].customerAddress),
       });
-    } catch {}
+    } catch { }
 
     return {
       ...result[0],
@@ -5930,7 +5894,7 @@ export async function updateCustomerOrder(
       storage.save();
       try {
         await upsertCustomerFromOrder(ord);
-      } catch {}
+      } catch { }
       return {
         ...ord,
         items: safeParseOrderItems(ord.items) as any,
@@ -5951,7 +5915,7 @@ export async function deleteCustomerOrder(id: number, purchaseAction?: 'cancel' 
         .where(eq(customerOrders.id, id))
         .limit(1);
       existingOrder = ord || null;
-    } catch {}
+    } catch { }
   }
   if (!existingOrder) {
     const state = storage.getState();
@@ -5983,7 +5947,7 @@ export async function deleteCustomerOrder(id: number, purchaseAction?: 'cancel' 
       const allPurchases = await getPurchases(existingOrder.userId);
       const linkedP = existingOrder.linkedPurchaseId ? allPurchases.find((p) => p.id === existingOrder.linkedPurchaseId) : null;
       wasSuppliedByReservedPurchase = Boolean(linkedP && linkedP.status === 'received');
-    } catch {}
+    } catch { }
 
     if (!wasSuppliedByReservedPurchase) {
       await adjustInventoryStockForItems(existingOrder.items, 1);
@@ -6024,7 +5988,7 @@ export async function deleteCustomerOrder(id: number, purchaseAction?: 'cancel' 
             .from(purchases)
             .where(eq(purchases.linkedCustomerOrderId, id));
           sqlPurchases.forEach((sp: any) => linkedPurchasesMap.set(sp.id, sp));
-        } catch {}
+        } catch { }
       }
 
       // 3. Also check local storage state directly
@@ -6667,7 +6631,7 @@ export async function getCustomerById(id: number) {
   let ordersList: any[] = [];
   try {
     ordersList = await getCustomerOrders();
-  } catch {}
+  } catch { }
 
   if (!isPostgresConfigured()) {
     const state = storage.getState();
@@ -7457,7 +7421,7 @@ export async function getSupplierById(id: number) {
     purchasesList = await getPurchases();
     inventoryList = await getInventoryItems();
     paymentsList = await getPayments();
-  } catch {}
+  } catch { }
 
   let supplierRaw: any = null;
 
@@ -8031,7 +7995,7 @@ export async function syncSuppliersFromPurchasesAndInventory(userId?: number) {
   let deletedCount = 0;
   for (const sup of existingSuppliers) {
     if (!isSupplierInInventory(sup) && sup.id) {
-      await deleteSupplier(sup.id).catch(() => {});
+      await deleteSupplier(sup.id).catch(() => { });
       deletedCount++;
     }
   }
@@ -8147,17 +8111,17 @@ export function normalizePurchaseRecord(p: any) {
   let parsedItems: any[] = [];
   try {
     parsedItems = typeof p.items === 'string' ? JSON.parse(p.items) : (Array.isArray(p.items) ? p.items : []);
-  } catch {}
+  } catch { }
 
   let parsedReceptions: any[] = [];
   try {
     parsedReceptions = typeof p.receptions === 'string' ? JSON.parse(p.receptions) : (Array.isArray(p.receptions) ? p.receptions : []);
-  } catch {}
+  } catch { }
 
   let parsedReturns: any[] = [];
   try {
     parsedReturns = typeof p.returns === 'string' ? JSON.parse(p.returns) : (Array.isArray(p.returns) ? p.returns : []);
-  } catch {}
+  } catch { }
 
   const record = {
     ...p,
@@ -8299,7 +8263,7 @@ export async function createPurchase(data: {
           .where(eq(customerOrders.id, data.linkedCustomerOrderId))
           .limit(1);
         checkOrder = ord || null;
-      } catch {}
+      } catch { }
     }
     if (!checkOrder) {
       const state = storage.getState();
@@ -8364,7 +8328,7 @@ export async function createPurchase(data: {
     let parsedItems = [];
     try {
       parsedItems = JSON.parse(newPurchase.items);
-    } catch {}
+    } catch { }
 
     return {
       success: true,
@@ -8567,12 +8531,12 @@ export async function updatePurchase(
         prevStatus === 'received'
           ? 'Recibida en Bodega'
           : prevStatus === 'partially_received'
-          ? 'Parcialmente Recibida'
-          : prevStatus === 'in_transit'
-          ? 'En Tránsito'
-          : prevStatus === 'cancelled'
-          ? 'Cancelada'
-          : 'Confirmada con Proveedor';
+            ? 'Parcialmente Recibida'
+            : prevStatus === 'in_transit'
+              ? 'En Tránsito'
+              : prevStatus === 'cancelled'
+                ? 'Cancelada'
+                : 'Confirmada con Proveedor';
 
       throw new Error(
         `Integridad de Datos ERP: La orden #${existingPurchase.purchaseNumber} está en estado '${statusLabel}' y se encuentra pagada. No se puede modificar ni eliminar el pedido; únicamente se puede proceder a recibir la mercadería.`
@@ -8635,7 +8599,7 @@ export async function updatePurchase(
           try {
             const parsed = typeof ord.items === 'string' ? JSON.parse(ord.items) : ord.items || [];
             hasPartialDelivered = parsed.some((it: any) => (Number(it.deliveredQuantity) || 0) > 0);
-          } catch {}
+          } catch { }
           ord.fulfillmentStatus = hasPartialDelivered ? 'partial_ready' : 'supplier_received';
         } else if (newStatus === 'ordered' || newStatus === 'in_transit' || (newStatus === 'received' && !allReceived)) {
           ord.fulfillmentStatus = 'supplier_ordered';
@@ -8706,7 +8670,7 @@ export async function updatePurchase(
           .where(eq(customerOrders.id, targetOrderId))
           .limit(1);
         foundOrd = ord || null;
-      } catch {}
+      } catch { }
 
       if (foundOrd && foundOrd.status !== 'delivered' && foundOrd.fulfillmentStatus !== 'delivered') {
         let targetFulfillment: string | null = null;
@@ -8716,7 +8680,7 @@ export async function updatePurchase(
             .select()
             .from(purchases)
             .where(eq(purchases.linkedCustomerOrderId, targetOrderId));
-        } catch {}
+        } catch { }
 
         const activeOther = allOtherPurchases.filter((op: any) => op.id !== id && op.status !== 'cancelled');
         const allReceived = newStatus === 'received' && activeOther.every((op: any) => op.status === 'received');
@@ -8726,7 +8690,7 @@ export async function updatePurchase(
           try {
             const parsed = typeof foundOrd.items === 'string' ? JSON.parse(foundOrd.items) : foundOrd.items || [];
             hasPartialDelivered = parsed.some((it: any) => (Number(it.deliveredQuantity) || 0) > 0);
-          } catch {}
+          } catch { }
           targetFulfillment = hasPartialDelivered ? 'partial_ready' : 'supplier_received';
         } else if (newStatus === 'ordered' || newStatus === 'in_transit' || (newStatus === 'received' && !allReceived)) {
           targetFulfillment = 'supplier_ordered';
@@ -8891,12 +8855,12 @@ export async function deletePurchase(id: number, forceFromCustomerOrder: boolean
       purchase.status === 'received'
         ? 'Recibida en Bodega (Cerrada)'
         : purchase.status === 'partially_received'
-        ? 'Recepción Parcial'
-        : purchase.status === 'in_transit'
-        ? 'En Tránsito'
-        : purchase.status === 'ordered' || purchase.status === 'confirmed'
-        ? 'Confirmada con Proveedor'
-        : purchase.status;
+          ? 'Recepción Parcial'
+          : purchase.status === 'in_transit'
+            ? 'En Tránsito'
+            : purchase.status === 'ordered' || purchase.status === 'confirmed'
+              ? 'Confirmada con Proveedor'
+              : purchase.status;
 
     throw new Error(
       `Integridad de Datos ERP: No se puede eliminar la orden de compra #${purchase.purchaseNumber} porque se encuentra en estado '${statusLabel}'. Solo las órdenes en estado 'Pendiente' (Averiguación / Borrador) pueden eliminarse.`
@@ -9336,7 +9300,7 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
   let suppliersList: any[] = [];
   try {
     suppliersList = await getSuppliers(userId);
-  } catch {}
+  } catch { }
 
   const deficitItemsBySupplier = new Map<
     string,
@@ -9359,12 +9323,12 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
     const invItem = isCustom
       ? null
       : inventory.find(
-          (inv) =>
-            inv.id === it.id ||
-            inv.id === it.inventoryItemId ||
-            (inv.sku && it.sku && inv.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()) ||
-            (inv.name && it.name && inv.name.trim().toLowerCase() === it.name.trim().toLowerCase())
-        );
+        (inv) =>
+          inv.id === it.id ||
+          inv.id === it.inventoryItemId ||
+          (inv.sku && it.sku && inv.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()) ||
+          (inv.name && it.name && inv.name.trim().toLowerCase() === it.name.trim().toLowerCase())
+      );
 
     const currentStock = invItem ? Math.max(0, Number(invItem.stock || 0)) : 0;
     const requestedQty = Number(it.quantity || 1);
@@ -9430,22 +9394,22 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
       it.taxPercent !== undefined && !isNaN(Number(it.taxPercent))
         ? Number(it.taxPercent)
         : it.purchaseTaxPercent !== undefined && !isNaN(Number(it.purchaseTaxPercent))
-        ? Number(it.purchaseTaxPercent)
-        : invItem?.purchaseTaxPercent !== undefined && !isNaN(Number(invItem.purchaseTaxPercent))
-        ? Number(invItem.purchaseTaxPercent)
-        : (invItem as any)?.taxRate !== undefined && !isNaN(Number((invItem as any).taxRate))
-        ? Number((invItem as any).taxRate)
-        : invItem?.hasPurchaseTax === false || it.hasPurchaseTax === false
-        ? 0
-        : 15;
+          ? Number(it.purchaseTaxPercent)
+          : invItem?.purchaseTaxPercent !== undefined && !isNaN(Number(invItem.purchaseTaxPercent))
+            ? Number(invItem.purchaseTaxPercent)
+            : (invItem as any)?.taxRate !== undefined && !isNaN(Number((invItem as any).taxRate))
+              ? Number((invItem as any).taxRate)
+              : invItem?.hasPurchaseTax === false || it.hasPurchaseTax === false
+                ? 0
+                : 15;
 
     const baseCostVal = invItem?.costWithoutTax !== undefined && invItem?.costWithoutTax !== null && Number(invItem.costWithoutTax) > 0
       ? Number(invItem.costWithoutTax)
       : it?.costWithoutTax !== undefined && it?.costWithoutTax !== null && Number(it.costWithoutTax) > 0
-      ? Number(it.costWithoutTax)
-      : invItem
-      ? Number(invItem.costPrice || (Number(invItem.salePrice || 0) * 0.7) || 0)
-      : Number(it.costPrice || (Number(it.salePrice || 0) * 0.7) || 0);
+        ? Number(it.costWithoutTax)
+        : invItem
+          ? Number(invItem.costPrice || (Number(invItem.salePrice || 0) * 0.7) || 0)
+          : Number(it.costPrice || (Number(it.salePrice || 0) * 0.7) || 0);
 
     const itemCostPrice = baseCostVal;
     const itemCostWithTax = baseCostVal * (1 + itemTaxRate / 100);
@@ -9606,8 +9570,7 @@ export async function autoGeneratePurchaseForOrder(orderId: number, userId?: num
     linkedPurchaseNumber: purchaseNumbers,
     notes:
       (order.notes ? order.notes + '\n' : '') +
-      `[Abastecimiento por Proveedor] 🔍 ${resultingPurchases.length} ${
-        resultingPurchases.length === 1 ? 'orden generada' : 'órdenes generadas por proveedor'
+      `[Abastecimiento por Proveedor] 🔍 ${resultingPurchases.length} ${resultingPurchases.length === 1 ? 'orden generada' : 'órdenes generadas por proveedor'
       }: ${summaryBreakdown} (${totalAllMissingUnits} un. faltantes en total)`,
   });
 
@@ -9745,7 +9708,7 @@ export async function recordPartialDelivery(
   // Determine new statuses
   const isFullyDelivered = totalPendingUnits === 0;
   const newStatus = isFullyDelivered ? 'delivered' : (order.status === 'delivered' ? 'confirmed' : (order.status || 'confirmed'));
-  
+
   let newFulfillmentStatus: any = order.fulfillmentStatus || 'in_stock';
   if (isFullyDelivered) {
     newFulfillmentStatus = 'delivered';
@@ -11569,7 +11532,7 @@ export async function createPayment(
           const newPaymentStatus = totalDisbursed >= (purchaseTotal - 0.001) ? 'paid' : totalDisbursed > 0 ? 'partial' : 'unpaid';
           const paymentNote = `[${timestamp} Egreso Proveedor] 💳 ${paymentNumber}: $${numericAmount.toFixed(2)} vía ${methodLabel} (${data.bankOrAccount || 'Banco'}). Total pagado: $${totalDisbursed.toFixed(2)} / $${purchaseTotal.toFixed(2)}`;
           const updatedNotes = (purchase.notes ? purchase.notes + '\n' : '') + paymentNote;
-          
+
           const updates: any = {
             paymentStatus: newPaymentStatus,
             notes: updatedNotes,
@@ -11882,7 +11845,7 @@ export async function autoReconcileLedger(userId?: number) {
           let items: any[] = [];
           try {
             items = typeof ord.items === 'string' ? JSON.parse(ord.items) : ord.items || [];
-          } catch {}
+          } catch { }
           const totalDelivered = items.reduce((acc, it) => acc + (Number(it.deliveredQuantity) || 0), 0);
           const totalPending = items.reduce((acc, it) => acc + (Number(it.pendingQuantity) || 0), 0);
           const totalReq = items.reduce((acc, it) => acc + (Number(it.quantity) || 1), 0);
@@ -11991,14 +11954,14 @@ export function calculatePurchaseSriBreakdown(po: any) {
   const items = Array.isArray(po.items)
     ? po.items
     : typeof po.items === 'string'
-    ? (() => {
+      ? (() => {
         try {
           return JSON.parse(po.items);
         } catch {
           return [];
         }
       })()
-    : [];
+      : [];
 
   let subtotal0 = 0;
   let subtotal15 = 0;
@@ -12014,10 +11977,10 @@ export function calculatePurchaseSriBreakdown(po: any) {
         normalized.purchaseTaxPercent !== undefined && !isNaN(Number(normalized.purchaseTaxPercent))
           ? Number(normalized.purchaseTaxPercent)
           : normalized.taxPercent !== undefined && !isNaN(Number(normalized.taxPercent))
-          ? Number(normalized.taxPercent)
-          : normalized.hasPurchaseTax === false
-          ? 0
-          : 15;
+            ? Number(normalized.taxPercent)
+            : normalized.hasPurchaseTax === false
+              ? 0
+              : 15;
 
       let costWithoutTax = 0;
       const rawCostPrice = item.costPrice !== undefined && item.costPrice !== null ? Number(item.costPrice) : 0;
@@ -12159,14 +12122,14 @@ export async function getAccountsPayable(userId?: number) {
     const parsedItems = Array.isArray(po.items)
       ? po.items
       : typeof po.items === 'string'
-      ? (() => {
+        ? (() => {
           try {
             return JSON.parse(po.items);
           } catch {
             return [];
           }
         })()
-      : [];
+        : [];
 
     if (po.status === 'cancelled') {
       return {
@@ -12496,14 +12459,14 @@ export async function syncPaymentsFromOrdersAndPurchases(userId?: number) {
     const returnsList = Array.isArray(rawReturns)
       ? rawReturns
       : typeof rawReturns === 'string'
-      ? (() => {
+        ? (() => {
           try {
             return JSON.parse(rawReturns);
           } catch {
             return [];
           }
         })()
-      : [];
+        : [];
 
     for (const ret of returnsList) {
       const refAmt = Number(ret.refundAmount || 0);

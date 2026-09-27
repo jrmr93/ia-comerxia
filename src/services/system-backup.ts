@@ -133,7 +133,7 @@ function sanitizeInventoryItemForExport(item: any): any {
         parsed.images = parsed.images.map((img: string) => normalizeMediaUrl(img));
       }
       clean.extractedAttributes = JSON.stringify(parsed);
-    } catch {}
+    } catch { }
   }
   return clean;
 }
@@ -275,7 +275,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
     try {
       const dbStores = await db.select().from(storeConfigs);
       if (dbStores && dbStores.length > 0) allStoreConfigs = dbStores;
-    } catch {}
+    } catch { }
 
     try {
       const dbTgs = await db.select().from(telegramConfigs);
@@ -285,7 +285,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
           botToken: t.botToken || effectiveTgConfig?.botToken || process.env.TELEGRAM_BOT_TOKEN?.trim() || null,
         }));
       }
-    } catch {}
+    } catch { }
 
     try {
       const dbAis = await db.select().from(aiConfigs);
@@ -298,57 +298,57 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
           localModelName: a.localModelName || effectiveAiConfig?.localModelName || 'qwen2.5-coder-7b-instruct',
         }));
       }
-    } catch {}
+    } catch { }
 
     try {
       const dbEmails = await db.select().from(emailConfigs);
       if (dbEmails && dbEmails.length > 0) allEmailConfigs = dbEmails;
-    } catch {}
+    } catch { }
 
     try {
       const dbDomains = await db.select().from(serverDomainConfigs);
       if (dbDomains && dbDomains.length > 0) allDomainConfigs = dbDomains;
-    } catch {}
+    } catch { }
 
     try {
       const dbEcuador = await db.select().from(ecuadorApiConfigs);
       if (dbEcuador && dbEcuador.length > 0) allEcuadorApiConfigs = dbEcuador;
-    } catch {}
+    } catch { }
 
     try {
       const dbPayphone = await db.select().from(payphoneConfigs);
       if (dbPayphone && dbPayphone.length > 0) allPayphoneConfigs = dbPayphone;
-    } catch {}
+    } catch { }
 
     try {
       const dbSri = await db.select().from(sriConfigs);
       if (dbSri && dbSri.length > 0) allSriConfigs = dbSri;
-    } catch {}
+    } catch { }
 
     try {
       const dbSriInvs = await db.select().from(sriInvoices);
       if (dbSriInvs && dbSriInvs.length > 0) allSriInvoices = dbSriInvs;
-    } catch {}
+    } catch { }
 
     try {
       const dbAdvVids = await db.select().from(advertisingVideos);
       if (dbAdvVids && dbAdvVids.length > 0) allAdvVideos = dbAdvVids;
-    } catch {}
+    } catch { }
 
     try {
       const dbAdvPls = await db.select().from(advertisingPlaylists);
       if (dbAdvPls && dbAdvPls.length > 0) allAdvPlaylists = dbAdvPls;
-    } catch {}
+    } catch { }
 
     try {
       const dbAdvItems = await db.select().from(advertisingPlaylistItems);
       if (dbAdvItems && dbAdvItems.length > 0) allAdvPlaylistItems = dbAdvItems;
-    } catch {}
+    } catch { }
 
     try {
       const dbAdvDisps = await db.select().from(advertisingDisplays);
       if (dbAdvDisps && dbAdvDisps.length > 0) allAdvDisplays = dbAdvDisps;
-    } catch {}
+    } catch { }
   } else {
     // Fallback to local storage state if available
     const localState = storage.getState();
@@ -953,7 +953,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.inventoryItems.length > 0) {
     sql += `-- Datos: inventory_items (${data.inventoryItems.length} registros)\n`;
     for (const item of data.inventoryItems) {
-      sql += `INSERT INTO inventory_items (id, user_id, name, sku, barcode, supplier_code, description, category, cost_price, sale_price, discount_percent, stock, image_url, video_url, supplier_name, tags, extracted_attributes, status, raw_telegram_message, marketing_copy) VALUES (${item.id}, ${item.userId || 1}, ${escapeSqlString(item.name)}, ${escapeSqlString(item.sku)}, ${escapeSqlString(item.barcode)}, ${escapeSqlString(item.supplierCode)}, ${escapeSqlString(item.description)}, ${escapeSqlString(item.category || 'General')}, ${item.costPrice || 0}, ${item.salePrice || 0}, ${item.discountPercent || 0}, ${item.stock || 0}, ${escapeSqlString(item.imageUrl)}, ${escapeSqlString(item.videoUrl)}, ${escapeSqlString(item.supplierName)}, ${escapeSqlString(item.tags)}, ${escapeSqlString(item.extractedAttributes)}, ${escapeSqlString(item.status || 'available')}, ${escapeSqlString(item.rawTelegramMessage)}, ${escapeSqlString(item.marketingCopy)}) ON CONFLICT (id) DO NOTHING;\n`;
+      sql += `INSERT INTO inventory_items (id, user_id, name, sku, barcode, description, category, cost_price, sale_price, discount_percent, stock, image_url, video_url, supplier_name, tags, extracted_attributes, status, raw_telegram_message, marketing_copy) VALUES (${item.id}, ${item.userId || 1}, ${escapeSqlString(item.name)}, ${escapeSqlString(item.sku)}, ${escapeSqlString(item.barcode)}, ${escapeSqlString(item.description)}, ${escapeSqlString(item.category || 'General')}, ${item.costPrice || 0}, ${item.salePrice || 0}, ${item.discountPercent || 0}, ${item.stock || 0}, ${escapeSqlString(item.imageUrl)}, ${escapeSqlString(item.videoUrl)}, ${escapeSqlString(item.supplierName)}, ${escapeSqlString(item.tags)}, ${escapeSqlString(item.extractedAttributes)}, ${escapeSqlString(item.status || 'available')}, ${escapeSqlString(item.rawTelegramMessage)}, ${escapeSqlString(item.marketingCopy)}) ON CONFLICT (id) DO NOTHING;\n`;
     }
     sql += `\n`;
   }
@@ -1463,7 +1463,7 @@ export async function restoreCompleteJsonDump(
   }
 
   // Ensure SQL tables exist before restoration
-  await ensureTablesCreated().catch(() => {});
+  await ensureTablesCreated().catch(() => { });
 
   const localState = storage.getState();
 
@@ -1499,12 +1499,12 @@ export async function restoreCompleteJsonDump(
     const rawStoresList = Array.isArray(backupData.storeConfigs)
       ? backupData.storeConfigs
       : Array.isArray(backupData.store_configs)
-      ? backupData.store_configs
-      : backupData.storeConfig
-      ? [backupData.storeConfig]
-      : backupData.store_config
-      ? [backupData.store_config]
-      : [];
+        ? backupData.store_configs
+        : backupData.storeConfig
+          ? [backupData.storeConfig]
+          : backupData.store_config
+            ? [backupData.store_config]
+            : [];
 
     if (rawStoresList.length > 0) {
       if (!localState.storeConfigs) localState.storeConfigs = [];
@@ -1615,7 +1615,6 @@ export async function restoreCompleteJsonDump(
             name: clean.name,
             sku: clean.sku,
             barcode: clean.barcode || null,
-            supplierCode: clean.supplierCode || null,
             description: clean.description || null,
             category: clean.category || 'General',
             costPrice: String(clean.costPrice || '0.00'),
@@ -2831,19 +2830,19 @@ export async function generateFinancialProductsExcelBuffer(userId?: number): Pro
         parsedAttr = typeof item.extractedAttributes === 'string'
           ? JSON.parse(item.extractedAttributes)
           : item.extractedAttributes;
-      } catch {}
+      } catch { }
     }
 
     const itemTaxRate =
       item.taxRate !== undefined && item.taxRate !== null && !isNaN(Number(item.taxRate))
         ? Number(item.taxRate)
         : item.purchaseTaxPercent !== undefined && !isNaN(Number(item.purchaseTaxPercent))
-        ? Number(item.purchaseTaxPercent)
-        : parsedAttr.purchaseTaxPercent !== undefined && !isNaN(Number(parsedAttr.purchaseTaxPercent))
-        ? Number(parsedAttr.purchaseTaxPercent)
-        : parsedAttr.taxPercent !== undefined && !isNaN(Number(parsedAttr.taxPercent))
-        ? Number(parsedAttr.taxPercent)
-        : 15;
+          ? Number(item.purchaseTaxPercent)
+          : parsedAttr.purchaseTaxPercent !== undefined && !isNaN(Number(parsedAttr.purchaseTaxPercent))
+            ? Number(parsedAttr.purchaseTaxPercent)
+            : parsedAttr.taxPercent !== undefined && !isNaN(Number(parsedAttr.taxPercent))
+              ? Number(parsedAttr.taxPercent)
+              : 15;
 
     const costWith = Math.round((
       item.costWithTax !== undefined && item.costWithTax !== null
@@ -2862,20 +2861,20 @@ export async function generateFinancialProductsExcelBuffer(userId?: number): Pro
     const margin = parsedAttr.profitMarginPercent !== undefined
       ? Number(parsedAttr.profitMarginPercent)
       : costWithout > 0
-      ? Math.round(((sale - costWithout) / costWithout) * 100)
-      : 30;
+        ? Math.round(((sale - costWithout) / costWithout) * 100)
+        : 30;
 
     const applySaleTax = item.applySaleTax !== undefined
       ? Boolean(item.applySaleTax)
       : parsedAttr.applySaleTax !== undefined
-      ? Boolean(parsedAttr.applySaleTax)
-      : false;
+        ? Boolean(parsedAttr.applySaleTax)
+        : false;
 
     const saleTaxPercent = item.saleTaxPercent !== undefined && !isNaN(Number(item.saleTaxPercent))
       ? Number(item.saleTaxPercent)
       : parsedAttr.saleTaxPercent !== undefined && !isNaN(Number(parsedAttr.saleTaxPercent))
-      ? Number(parsedAttr.saleTaxPercent)
-      : itemTaxRate;
+        ? Number(parsedAttr.saleTaxPercent)
+        : itemTaxRate;
 
     const discountPercent = Math.max(0, Math.min(100, Number(item.discountPercent) || 0));
     const discountVal = Math.round((sale * (discountPercent / 100)) * 100) / 100;
@@ -2995,7 +2994,7 @@ export function listServerMasterBackups(): ServerBackupFileInfo[] {
           createdAt: stat.mtime.toISOString(),
         });
       }
-    } catch {}
+    } catch { }
   }
 
   result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

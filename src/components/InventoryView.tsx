@@ -15,7 +15,6 @@ import {
   Eye,
   Film,
   Filter,
-  FileArchive,
   Grid,
   Images,
   Layers,
@@ -56,7 +55,6 @@ import { parseVideoUrl } from '../utils/video-helper.ts';
 import { checkProductTransactionLink } from '../utils/productIntegrity.ts';
 import { DeactivateConfirmationModal } from './DeactivateConfirmationModal.tsx';
 import { ShareStoreModal } from './ShareStoreModal.tsx';
-import { BatchProductFlyersModal } from './BatchProductFlyersModal.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
 
 export function calculateItemFinancials(item: InventoryItem) {
@@ -69,7 +67,7 @@ export function calculateItemFinancials(item: InventoryItem) {
     try {
       const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
       if (parsed && typeof parsed === 'object') parsedAttr = parsed;
-    } catch {}
+    } catch { }
   }
 
   const explicitApplySaleTax = item.applySaleTax !== undefined ? Boolean(item.applySaleTax) : parsedAttr.applySaleTax !== undefined ? Boolean(parsedAttr.applySaleTax) : undefined;
@@ -290,20 +288,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setTimeout(() => setCopiedCode(null), 2500);
   };
 
-  const getEffectiveSupplierCode = (item: any): string | null => {
-    if (!item) return null;
-    if (item.supplierCode && typeof item.supplierCode === 'string' && item.supplierCode.trim()) return item.supplierCode.trim();
-    if (item.supplier_code && typeof item.supplier_code === 'string' && item.supplier_code.trim()) return item.supplier_code.trim();
-    if (item.extractedAttributes) {
-      try {
-        const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
-        const code = parsed?.supplierCode || parsed?.supplier_code || parsed?.supplierSku || parsed?.supplier_sku;
-        if (code && typeof code === 'string' && code.trim()) return code.trim();
-      } catch {}
-    }
-    return null;
-  };
-
   const handleSupplierClick = (supplierName?: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const targetName = (supplierName || '').trim();
@@ -373,7 +357,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         if (saved === 'products' || saved === 'messages') {
           return saved;
         }
-      } catch {}
+      } catch { }
     }
     return initialSubTab;
   });
@@ -382,7 +366,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     if (typeof window !== 'undefined') {
       try {
         safeLocalStorage.setItem('comerxia_inventory_subtab', subTab);
-      } catch {}
+      } catch { }
     }
     setSearchQuery('');
     setSelectedCategory('all');
@@ -397,7 +381,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         if (saved === 'grid' || saved === 'table') {
           return saved;
         }
-      } catch {}
+      } catch { }
     }
     return 'grid';
   });
@@ -406,7 +390,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     if (typeof window !== 'undefined') {
       try {
         safeLocalStorage.setItem('comerxia_inventory_view_mode', viewMode);
-      } catch {}
+      } catch { }
     }
   }, [viewMode]);
 
@@ -464,7 +448,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [isProcessingStatus, setIsProcessingStatus] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [shareInitialCategory, setShareInitialCategory] = useState<string>('');
-  const [batchFlyerItems, setBatchFlyerItems] = useState<InventoryItem[] | null>(null);
 
   // Keep marketingCopyItem in sync with items without losing newly appended images
   useEffect(() => {
@@ -542,25 +525,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       statusFilter === 'all'
         ? true
         : statusFilter === 'offers'
-        ? disc > 0
-        : statusFilter === 'available'
-        ? it.status !== 'archived'
-        : statusFilter === 'in_stock'
-        ? (it.availableStock !== undefined ? it.availableStock : (it.stock || 0)) > 0
-        : statusFilter === 'in_transit'
-        ? (it.incomingStock || 0) > 0
-        : statusFilter === 'reserved'
-        ? (it.reservedStock || 0) > 0
-        : statusFilter === 'archived'
-        ? it.status === 'archived'
-        : it.status === statusFilter;
+          ? disc > 0
+          : statusFilter === 'available'
+            ? it.status !== 'archived'
+            : statusFilter === 'in_stock'
+              ? (it.availableStock !== undefined ? it.availableStock : (it.stock || 0)) > 0
+              : statusFilter === 'in_transit'
+                ? (it.incomingStock || 0) > 0
+                : statusFilter === 'reserved'
+                  ? (it.reservedStock || 0) > 0
+                  : statusFilter === 'archived'
+                    ? it.status === 'archived'
+                    : it.status === statusFilter;
     const matchesOffer = !activeShowOffersOnly || disc > 0;
-    const itemSuppCode = getEffectiveSupplierCode(it);
     const matchesSearch =
       !searchQuery.trim() ||
       it.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       it.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (itemSuppCode && itemSuppCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (it.supplierCode && it.supplierCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.barcode && it.barcode.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.description && it.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (it.tags && it.tags.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -677,18 +659,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         <div className="grid grid-cols-2 sm:flex items-center gap-1.5 sm:space-x-2 w-full sm:w-auto">
           <button
             onClick={() => setSubTab('products')}
-            className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 sm:space-x-2 transition cursor-pointer ${
-              subTab === 'products'
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 sm:space-x-2 transition cursor-pointer ${subTab === 'products'
                 ? 'bg-sky-600 text-white shadow-xs'
                 : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100'
-            }`}
+              }`}
           >
             <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             <span className="truncate">Catálogo</span>
             <span
-              className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-mono font-black ${
-                subTab === 'products' ? 'bg-sky-900/80 text-sky-100' : 'bg-slate-200 text-slate-800 border border-slate-300'
-              }`}
+              className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-mono font-black ${subTab === 'products' ? 'bg-sky-900/80 text-sky-100' : 'bg-slate-200 text-slate-800 border border-slate-300'
+                }`}
             >
               {items.length}
             </span>
@@ -704,18 +684,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
           <button
             onClick={() => setSubTab('messages')}
-            className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 sm:space-x-2 transition cursor-pointer ${
-              subTab === 'messages'
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 sm:space-x-2 transition cursor-pointer ${subTab === 'messages'
                 ? 'bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow-xs'
                 : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100'
-            }`}
+              }`}
           >
             <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             <span className="truncate">Mensajes</span>
             <span
-              className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-mono font-black ${
-                subTab === 'messages' ? 'bg-indigo-900/80 text-indigo-100' : 'bg-slate-200 text-slate-800 border border-slate-300'
-              }`}
+              className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-mono font-black ${subTab === 'messages' ? 'bg-indigo-900/80 text-indigo-100' : 'bg-slate-200 text-slate-800 border border-slate-300'
+                }`}
             >
               {messages.length}
             </span>
@@ -842,9 +820,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               type="button"
               onClick={() => setStatusFilter(statusFilter === 'in_stock' ? 'all' : 'in_stock')}
-              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-blue-700 text-white shadow-md shadow-sky-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${
-                statusFilter === 'in_stock' ? 'ring-4 ring-sky-300 border-white shadow-lg font-black' : 'border-sky-400/40 hover:brightness-105'
-              }`}
+              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-blue-700 text-white shadow-md shadow-sky-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${statusFilter === 'in_stock' ? 'ring-4 ring-sky-300 border-white shadow-lg font-black' : 'border-sky-400/40 hover:brightness-105'
+                }`}
               title="Filtrar por productos con stock en almacén"
             >
               <div className="absolute right-0 top-0 translate-x-3 -translate-y-2 opacity-15 pointer-events-none group-hover:scale-110 transition duration-300">
@@ -870,9 +847,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               type="button"
               onClick={() => setStatusFilter(statusFilter === 'in_stock' ? 'all' : 'in_stock')}
-              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${
-                statusFilter === 'in_stock' ? 'ring-4 ring-emerald-300 border-white shadow-lg font-black' : 'border-emerald-400/40 hover:brightness-105'
-              }`}
+              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${statusFilter === 'in_stock' ? 'ring-4 ring-emerald-300 border-white shadow-lg font-black' : 'border-emerald-400/40 hover:brightness-105'
+                }`}
               title="Filtrar por productos con stock en almacén listo para venta"
             >
               <div className="absolute right-0 top-0 translate-x-3 -translate-y-2 opacity-15 pointer-events-none group-hover:scale-110 transition duration-300">
@@ -900,9 +876,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               type="button"
               onClick={() => setStatusFilter(statusFilter === 'reserved' ? 'all' : 'reserved')}
-              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 text-white shadow-md shadow-amber-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${
-                statusFilter === 'reserved' ? 'ring-4 ring-amber-300 border-white shadow-lg font-black' : 'border-amber-400/40 hover:brightness-105'
-              }`}
+              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 text-white shadow-md shadow-amber-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${statusFilter === 'reserved' ? 'ring-4 ring-amber-300 border-white shadow-lg font-black' : 'border-amber-400/40 hover:brightness-105'
+                }`}
               title="Filtrar por productos con stock reservado en pedidos confirmados"
             >
               <div className="absolute right-0 top-0 translate-x-3 -translate-y-2 opacity-15 pointer-events-none group-hover:scale-110 transition duration-300">
@@ -930,9 +905,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               type="button"
               onClick={() => setStatusFilter(statusFilter === 'in_transit' ? 'all' : 'in_transit')}
-              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 text-white shadow-md shadow-indigo-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${
-                statusFilter === 'in_transit' ? 'ring-4 ring-indigo-300 border-white shadow-lg font-black' : 'border-indigo-400/40 hover:brightness-105'
-              }`}
+              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 text-white shadow-md shadow-indigo-500/15 border text-left transition cursor-pointer active:scale-98 group relative overflow-hidden ${statusFilter === 'in_transit' ? 'ring-4 ring-indigo-300 border-white shadow-lg font-black' : 'border-indigo-400/40 hover:brightness-105'
+                }`}
               title="Filtrar por productos en tránsito / por recibir de compras a proveedor"
             >
               <div className="absolute right-0 top-0 translate-x-3 -translate-y-2 opacity-15 pointer-events-none group-hover:scale-110 transition duration-300">
@@ -960,13 +934,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           {/* Controls Bar: Search (Barra 1) & Filtros (Barra 2) */}
           <div
             id="inventory-controls-container"
-            className={`sticky ${
-              scrollDirection === 'down'
+            className={`sticky ${scrollDirection === 'down'
                 ? '-translate-y-full opacity-0 pointer-events-none'
                 : scrollDirection === 'up'
-                ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
-                : 'top-16 z-20 translate-y-0 opacity-100'
-            } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
+                  ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
+                  : 'top-16 z-20 translate-y-0 opacity-100'
+              } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
           >
             {/* Barra 1: Búsqueda y Selector de Vista / Selección */}
             <div className="flex items-center gap-1.5 sm:gap-2 w-full">
@@ -997,22 +970,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 {/* Quick Offer Filter Toggle */}
                 <button
                   onClick={() => setActiveShowOffersOnly(!activeShowOffersOnly)}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition border flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 ${
-                    activeShowOffersOnly || statusFilter === 'offers'
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition border flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 ${activeShowOffersOnly || statusFilter === 'offers'
                       ? 'bg-rose-600 border-rose-700 text-white shadow-xs font-black'
                       : 'bg-slate-50 text-slate-700 border-slate-300 hover:text-slate-950 hover:bg-slate-100'
-                  }`}
+                    }`}
                   title="Filtrar productos con porcentaje de descuento u oferta activa"
                 >
                   <Sparkles className={`w-3.5 h-3.5 shrink-0 ${activeShowOffersOnly || statusFilter === 'offers' ? 'text-amber-200 fill-amber-200' : 'text-rose-500'}`} />
                   <span className="hidden xs:inline">Ofertas</span>
                   {offersCount > 0 && (
                     <span
-                      className={`px-1.5 py-0.2 rounded-full font-black text-[10px] ${
-                        activeShowOffersOnly || statusFilter === 'offers'
+                      className={`px-1.5 py-0.2 rounded-full font-black text-[10px] ${activeShowOffersOnly || statusFilter === 'offers'
                           ? 'bg-rose-950 text-rose-100'
                           : 'bg-rose-100 text-rose-700'
-                      }`}
+                        }`}
                     >
                       {offersCount}
                     </span>
@@ -1023,11 +994,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 {filteredItems.length > 0 && (
                   <button
                     onClick={handleSelectAll}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition border flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 ${
-                      selectedIds.length > 0
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition border flex items-center space-x-1 cursor-pointer shadow-2xs shrink-0 ${selectedIds.length > 0
                         ? 'bg-sky-50 text-sky-900 border-sky-400'
                         : 'bg-slate-50 text-slate-700 border-slate-300 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
+                      }`}
                     title={
                       selectedIds.length === filteredItems.length
                         ? 'Deseleccionar todos'
@@ -1057,22 +1027,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <button
                     onClick={() => setViewMode('grid')}
                     title="Vista en tarjetas (Paneles)"
-                    className={`p-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1 ${
-                      viewMode === 'grid'
+                    className={`p-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1 ${viewMode === 'grid'
                         ? 'bg-white text-sky-700 shadow-xs font-bold'
                         : 'text-slate-500 hover:text-slate-900'
-                    }`}
+                      }`}
                   >
                     <Grid className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setViewMode('table')}
                     title="Vista en lista compacta"
-                    className={`p-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1 ${
-                      viewMode === 'table'
+                    className={`p-1.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1 ${viewMode === 'table'
                         ? 'bg-white text-sky-700 shadow-xs font-bold'
                         : 'text-slate-500 hover:text-slate-900'
-                    }`}
+                      }`}
                   >
                     <List className="w-3.5 h-3.5" />
                   </button>
@@ -1204,798 +1172,773 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </div>
           </div>
 
-      {/* Floating Bulk Action Bar (Activate/Deactivate or Print Barcodes) */}
-      {selectedIds.length > 0 && (
-        <div className="p-3 bg-sky-50 border border-sky-200 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
-          <div className="flex items-center space-x-3">
-            <span className="w-7 h-7 rounded-lg bg-sky-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-              {selectedIds.length}
-            </span>
-            <div>
-              <h4 className="text-xs font-bold text-sky-950">
-                {selectedIds.length === 1
-                  ? '1 producto seleccionado'
-                  : `${selectedIds.length} productos seleccionados`}
-              </h4>
-              <p className="text-[11px] text-sky-700">
-                Puedes cambiar su estado de disponibilidad o imprimir sus códigos de barras en lote.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-            <button
-              onClick={() => {
-                const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
-                setBatchFlyerItems(selectedProducts);
-              }}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
-              title="Crear imágenes promocionales en lote por categoría y descargarlas en un archivo .ZIP"
-            >
-              <FileArchive className="w-3.5 h-3.5 text-indigo-200" />
-              <span>Crear Imágenes HD .ZIP ({selectedIds.length})</span>
-            </button>
-            <button
-              onClick={() => {
-                const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
-                setBarcodeItems(selectedProducts);
-              }}
-              className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
-              title="Imprimir etiquetas de código de barras para todos los productos seleccionados"
-            >
-              <Barcode className="w-3.5 h-3.5" />
-              <span>Imprimir Códigos ({selectedIds.length})</span>
-            </button>
-            <button
-              onClick={handleTriggerBulkActivate}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
-              title="Activar productos seleccionados para la venta"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>Activar ({selectedIds.length})</span>
-            </button>
-            <button
-              onClick={handleTriggerBulkDeactivate}
-              className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
-              title="Desactivar productos seleccionados (ocultar de la venta)"
-            >
-              <Power className="w-3.5 h-3.5" />
-              <span>Desactivar ({selectedIds.length})</span>
-            </button>
-            {onBulkDelete && (
-              <button
-                onClick={() => {
-                  const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
-                  onBulkDelete(selectedProducts);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
-                title="Eliminar productos seleccionados (solo se eliminarán los que no tengan compras ni ventas vinculadas)"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Eliminar ({selectedIds.length})</span>
-              </button>
-            )}
-            <button
-              onClick={() => setSelectedIds([])}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium transition cursor-pointer"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Telegram Newly Arrived Products Highlight Announcement Banner */}
-      {unseenProductIds && unseenProductIds.size > 0 && (
-        <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-400/20 to-amber-500/10 border-2 border-amber-400 text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md shadow-amber-500/10 animate-fadeIn">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center font-black shadow-sm flex-shrink-0 animate-bounce ring-2 ring-amber-300">
-              <Sparkles className="w-5 h-5 fill-slate-950" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h4 className="text-xs font-black text-slate-950 uppercase tracking-wider">
-                  ¡{unseenProductIds.size} Producto{unseenProductIds.size > 1 ? 's' : ''} Nuevo{unseenProductIds.size > 1 ? 's' : ''} de Telegram Resaltado{unseenProductIds.size > 1 ? 's' : ''}!
-                </h4>
-                <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow-2xs border border-amber-500/30">
-                  ✨ RECIÉN INGRESADO
+          {/* Floating Bulk Action Bar (Activate/Deactivate or Print Barcodes) */}
+          {selectedIds.length > 0 && (
+            <div className="p-3 bg-sky-50 border border-sky-200 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+              <div className="flex items-center space-x-3">
+                <span className="w-7 h-7 rounded-lg bg-sky-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  {selectedIds.length}
                 </span>
+                <div>
+                  <h4 className="text-xs font-bold text-sky-950">
+                    {selectedIds.length === 1
+                      ? '1 producto seleccionado'
+                      : `${selectedIds.length} productos seleccionados`}
+                  </h4>
+                  <p className="text-[11px] text-sky-700">
+                    Puedes cambiar su estado de disponibilidad o imprimir sus códigos de barras en lote.
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-slate-700 font-medium mt-0.5">
-                Los productos con halo dorado y etiqueta brillante acaban de ingresar por Telegram. La etiqueta se quitará automáticamente al salir o volver a abrir el inventario.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2 self-end sm:self-auto flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                if (onMarkAllProductsAsSeen) onMarkAllProductsAsSeen();
-                else if (onMarkAllAsSeen) onMarkAllAsSeen();
-              }}
-              className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition shadow-xs cursor-pointer active:scale-95 flex items-center space-x-1.5 border border-amber-500/40"
-            >
-              <Check className="w-3.5 h-3.5 stroke-[3]" />
-              <span>Entendido / Quitar Resaltado</span>
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Product Content / Empty State */}
-      {filteredItems.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center my-6 shadow-xs">
-          <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center mx-auto mb-4">
-            <Package className="w-8 h-8" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-900">
-            {items.length === 0
-              ? 'El inventario está vacío'
-              : 'No hay productos que coincidan con la búsqueda'}
-          </h3>
-          <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-6">
-            {items.length === 0
-              ? 'Puedes simular un mensaje de tu proveedor con foto y descripción o agregar productos manualmente.'
-              : 'Intenta cambiar los filtros de categoría o el término de búsqueda.'}
-          </p>
-          {items.length === 0 && (
-            <div className="flex items-center justify-center space-x-3">
-              <button
-                onClick={onOpenSimulator}
-                className="inline-flex items-center px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs shadow-xs transition cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4 mr-2 text-sky-200" />
-                <span>Simular Mensaje Telegram</span>
-              </button>
-              <button
-                onClick={onOpenAddProduct}
-                className="inline-flex items-center px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 text-xs font-medium transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4 mr-1.5" />
-                <span>Agregar Manualmente</span>
-              </button>
+              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                <button
+                  onClick={() => {
+                    const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
+                    setBarcodeItems(selectedProducts);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                  title="Imprimir etiquetas de código de barras para todos los productos seleccionados"
+                >
+                  <Barcode className="w-3.5 h-3.5" />
+                  <span>Imprimir Códigos ({selectedIds.length})</span>
+                </button>
+                <button
+                  onClick={handleTriggerBulkActivate}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                  title="Activar productos seleccionados para la venta"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Activar ({selectedIds.length})</span>
+                </button>
+                <button
+                  onClick={handleTriggerBulkDeactivate}
+                  className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                  title="Desactivar productos seleccionados (ocultar de la venta)"
+                >
+                  <Power className="w-3.5 h-3.5" />
+                  <span>Desactivar ({selectedIds.length})</span>
+                </button>
+                {onBulkDelete && (
+                  <button
+                    onClick={() => {
+                      const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
+                      onBulkDelete(selectedProducts);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                    title="Eliminar productos seleccionados (solo se eliminarán los que no tengan compras ni ventas vinculadas)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar ({selectedIds.length})</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedIds([])}
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           )}
-        </div>
-      ) : viewMode === 'grid' ? (
-        /* GRID VIEW */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredItems.map((item) => {
-            const cost = parseFloat(item.costPrice) || 0;
-            const sale = parseFloat(item.salePrice) || 0;
-            const profit = sale - cost;
-            const margin = cost > 0 ? Math.round((profit / cost) * 100) : 0;
-            const isSelected = selectedIds.includes(item.id);
-            const isUnseen = Boolean(
-              unseenProductIds && unseenProductIds.has(item.id) && item.rawTelegramMessage
-            );
 
-            const handleItemClick = () => {
-              if (isUnseen && onMarkProductAsSeen) {
-                onMarkProductAsSeen(item.id);
-              }
-              onSelectItem(item);
-            };
+          {/* Telegram Newly Arrived Products Highlight Announcement Banner */}
+          {unseenProductIds && unseenProductIds.size > 0 && (
+            <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-400/20 to-amber-500/10 border-2 border-amber-400 text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md shadow-amber-500/10 animate-fadeIn">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center font-black shadow-sm flex-shrink-0 animate-bounce ring-2 ring-amber-300">
+                  <Sparkles className="w-5 h-5 fill-slate-950" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-xs font-black text-slate-950 uppercase tracking-wider">
+                      ¡{unseenProductIds.size} Producto{unseenProductIds.size > 1 ? 's' : ''} Nuevo{unseenProductIds.size > 1 ? 's' : ''} de Telegram Resaltado{unseenProductIds.size > 1 ? 's' : ''}!
+                    </h4>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow-2xs border border-amber-500/30">
+                      ✨ RECIÉN INGRESADO
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-700 font-medium mt-0.5">
+                    Los productos con halo dorado y etiqueta brillante acaban de ingresar por Telegram. La etiqueta se quitará automáticamente al salir o volver a abrir el inventario.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 self-end sm:self-auto flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onMarkAllProductsAsSeen) onMarkAllProductsAsSeen();
+                    else if (onMarkAllAsSeen) onMarkAllAsSeen();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition shadow-xs cursor-pointer active:scale-95 flex items-center space-x-1.5 border border-amber-500/40"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Entendido / Quitar Resaltado</span>
+                </button>
+              </div>
+            </div>
+          )}
 
-            return (
-              <div
-                key={item.id}
-                onClick={() => {
+          {/* Product Content / Empty State */}
+          {filteredItems.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center my-6 shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center mx-auto mb-4">
+                <Package className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">
+                {items.length === 0
+                  ? 'El inventario está vacío'
+                  : 'No hay productos que coincidan con la búsqueda'}
+              </h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-6">
+                {items.length === 0
+                  ? 'Puedes simular un mensaje de tu proveedor con foto y descripción o agregar productos manualmente.'
+                  : 'Intenta cambiar los filtros de categoría o el término de búsqueda.'}
+              </p>
+              {items.length === 0 && (
+                <div className="flex items-center justify-center space-x-3">
+                  <button
+                    onClick={onOpenSimulator}
+                    className="inline-flex items-center px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs shadow-xs transition cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2 text-sky-200" />
+                    <span>Simular Mensaje Telegram</span>
+                  </button>
+                  <button
+                    onClick={onOpenAddProduct}
+                    className="inline-flex items-center px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 text-xs font-medium transition cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    <span>Agregar Manualmente</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : viewMode === 'grid' ? (
+            /* GRID VIEW */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredItems.map((item) => {
+                const cost = parseFloat(item.costPrice) || 0;
+                const sale = parseFloat(item.salePrice) || 0;
+                const profit = sale - cost;
+                const margin = cost > 0 ? Math.round((profit / cost) * 100) : 0;
+                const isSelected = selectedIds.includes(item.id);
+                const isUnseen = Boolean(
+                  unseenProductIds && unseenProductIds.has(item.id) && item.rawTelegramMessage
+                );
+
+                const handleItemClick = () => {
                   if (isUnseen && onMarkProductAsSeen) {
                     onMarkProductAsSeen(item.id);
                   }
-                }}
-                className={`bg-white border rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between group relative ${
-                  isSelected
-                    ? 'border-sky-500 ring-2 ring-sky-500/30 shadow-md'
-                    : isUnseen
-                    ? 'border-amber-400 ring-2 ring-amber-400 bg-gradient-to-b from-amber-100/40 via-amber-50/20 to-white shadow-xl shadow-amber-500/20 scale-[1.015]'
-                    : 'border-slate-300 hover:border-slate-400 hover:shadow-md shadow-sm'
-                }`}
-              >
-                {/* Top Image Preview & Badges */}
-                <div>
+                  onSelectItem(item);
+                };
+
+                return (
                   <div
-                    onClick={handleItemClick}
-                    className="relative aspect-video w-full bg-slate-100 cursor-pointer overflow-hidden border-b border-slate-200"
-                    title="Haz clic para ver detalles"
-                  >
-                    <ProductMediaDisplay
-                      imageUrl={item.imageUrl}
-                      videoUrl={item.videoUrl}
-                      name={item.name}
-                      className="w-full h-full relative"
-                      imageClassName="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      videoClassName="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      autoPlayVideo={true}
-                      showPlayBadge={true}
-                      placeholderText="Sin imagen ni video"
-                    />
-
-                    {/* Selection Checkbox Pill */}
-                    <button
-                      type="button"
-                      onClick={(e) => toggleSelectOne(item.id, e)}
-                      className={`absolute top-2.5 left-2.5 z-10 w-6 h-6 rounded-lg flex items-center justify-center transition shadow-xs backdrop-blur-md cursor-pointer ${
-                        isSelected
-                          ? 'bg-sky-600 text-white ring-2 ring-white/80'
-                          : 'bg-white/90 text-slate-800 hover:bg-white border border-slate-400'
+                    key={item.id}
+                    onClick={() => {
+                      if (isUnseen && onMarkProductAsSeen) {
+                        onMarkProductAsSeen(item.id);
+                      }
+                    }}
+                    className={`bg-white border rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between group relative ${isSelected
+                        ? 'border-sky-500 ring-2 ring-sky-500/30 shadow-md'
+                        : isUnseen
+                          ? 'border-amber-400 ring-2 ring-amber-400 bg-gradient-to-b from-amber-100/40 via-amber-50/20 to-white shadow-xl shadow-amber-500/20 scale-[1.015]'
+                          : 'border-slate-300 hover:border-slate-400 hover:shadow-md shadow-sm'
                       }`}
-                      title={isSelected ? 'Deseleccionar' : 'Seleccionar'}
-                    >
-                      {isSelected ? (
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                      ) : (
-                        <Square className="w-3.5 h-3.5 opacity-60" />
-                      )}
-                    </button>
-
-                    {/* Status badge */}
-                    <div className="absolute top-2.5 left-10">
-                      {getStatusBadge(item.status, item.stock)}
-                    </div>
-
-                    {/* Category & New badge */}
-                    <div className="absolute top-2.5 right-2.5 flex items-center space-x-1.5 z-10">
-                      {Math.max(0, Math.min(100, Number(item.discountPercent) || 0)) > 0 && (
-                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-gradient-to-r from-rose-600 to-amber-500 text-white shadow-xs animate-pulse">
-                          -{item.discountPercent}% OFF
-                        </span>
-                      )}
-                      {isUnseen && (
-                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-md ring-2 ring-amber-300 flex items-center space-x-1 animate-pulse">
-                          <Sparkles className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
-                          <span>NUEVO TELEGRAM</span>
-                        </span>
-                      )}
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-slate-800 border border-slate-300 shadow-2xs">
-                        {item.category}
-                      </span>
-                    </div>
-
-                    {/* Multi-photo badge if multiple photos */}
-                    {item.images && item.images.length > 1 && (
-                      <div className="absolute bottom-2 right-2 z-10">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white text-purple-800 border border-purple-300 flex items-center space-x-1 shadow-xs">
-                          <Images className="w-3 h-3 text-purple-600" />
-                          <span>{item.images.length} fotos</span>
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Video badge if video exists */}
-                    {item.videoUrl && (
-                      <div className="absolute bottom-2 left-2 z-10">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-950/90 text-sky-300 border border-sky-400/40 flex items-center space-x-1 shadow-xs backdrop-blur-xs">
-                          <Film className="w-3 h-3 text-sky-400" />
-                          <span>Video</span>
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Body Info */}
-                  <div className="p-4 space-y-2">
-                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                        <span className="font-mono text-[11px] font-black text-sky-800 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-300" title="Código SKU Interno">
-                          {item.sku}
-                        </span>
-                        {(() => {
-                          const suppCode = getEffectiveSupplierCode(item);
-                          if (!suppCode) return null;
-                          return (
-                            <button
-                              type="button"
-                              onClick={(e) => handleCopySupplierCode(suppCode, e)}
-                              className="font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
-                              title="Haz clic para copiar el SKU / Código de Proveedor al portapapeles"
-                            >
-                              <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
-                              <span className="max-w-[95px] truncate">{suppCode}</span>
-                              {copiedCode === suppCode ? (
-                                <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
-                              ) : (
-                                <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
-                              )}
-                            </button>
-                          );
-                        })()}
-                        {item.barcode && (
-                          <span className="font-mono text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-300 flex items-center space-x-1" title={`Código de barras del producto: ${item.barcode}`}>
-                            <Barcode className="w-2.5 h-2.5 text-slate-500" />
-                            <span className="max-w-[85px] truncate">{item.barcode}</span>
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => handleSupplierClick(item.supplierName, e)}
-                        className="text-[11px] text-slate-600 hover:text-purple-800 hover:bg-purple-50 px-2 py-0.5 rounded-lg transition truncate max-w-[130px] font-bold cursor-pointer border border-transparent hover:border-purple-200"
-                        title={`Abrir página web de ${item.supplierName || 'Proveedor'}`}
+                  >
+                    {/* Top Image Preview & Badges */}
+                    <div>
+                      <div
+                        onClick={handleItemClick}
+                        className="relative aspect-video w-full bg-slate-100 cursor-pointer overflow-hidden border-b border-slate-200"
+                        title="Haz clic para ver detalles"
                       >
-                        👤 {item.supplierName || 'Proveedor Telegram'}
-                      </button>
-                    </div>
+                        <ProductMediaDisplay
+                          imageUrl={item.imageUrl}
+                          videoUrl={item.videoUrl}
+                          name={item.name}
+                          className="w-full h-full relative"
+                          imageClassName="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          videoClassName="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          autoPlayVideo={true}
+                          showPlayBadge={true}
+                          placeholderText="Sin imagen ni video"
+                        />
 
-                    <h3
-                      onClick={handleItemClick}
-                      className="font-extrabold text-sm text-slate-900 line-clamp-2 hover:text-sky-600 cursor-pointer transition leading-snug"
-                    >
-                      {item.name}
-                    </h3>
-
-                    {/* Telegram new item indicator ribbon in card body */}
-                    {isUnseen && (
-                      <div className="p-2 rounded-xl bg-amber-100 border border-amber-400 text-[11px] font-black text-amber-950 flex items-center justify-between shadow-2xs">
-                        <div className="flex items-center space-x-1.5">
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                          <span>Ingresado por Telegram</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onMarkProductAsSeen) onMarkProductAsSeen(item.id);
-                          }}
-                          className="text-[10px] text-amber-900 hover:text-amber-950 font-black hover:underline cursor-pointer"
-                          title="Desmarcar este producto"
-                        >
-                          Listo ✓
-                        </button>
-                      </div>
-                    )}
-
-                    {item.description && (
-                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed font-medium">
-                        {item.description}
-                      </p>
-                    )}
-
-                    {/* Panel Financiero Completo (PVP, Costo, Costo c/IVA, Venta s/IVA, Venta c/IVA, Utilidad y Descuento) */}
-                    {(() => {
-                      const fin = calculateItemFinancials(item);
-                      return (
-                        <div className="pt-2.5 border-t border-slate-200 space-y-2 text-xs">
-                          {/* 1. Fila de Precio PVP & Descuento */}
-                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
-                            <div>
-                              <span className="text-[10px] text-slate-500 block font-black uppercase tracking-wider">
-                                {fin.hasDiscount ? 'Precio Oferta PVP' : 'Precio PVP'}
-                              </span>
-                              {fin.hasDiscount ? (
-                                <div className="flex items-baseline space-x-1.5 mt-0.5">
-                                  <span className="font-black text-rose-600 text-base font-mono">
-                                    ${fin.effectivePVP.toFixed(2)}
-                                  </span>
-                                  <span className="text-xs line-through text-slate-400 font-mono font-medium">
-                                    ${fin.pvpNum.toFixed(2)}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="font-black text-emerald-700 text-base font-mono mt-0.5 block">
-                                  ${fin.pvpNum.toFixed(2)} {currency}
-                                </span>
-                              )}
-                            </div>
-
-                            {fin.hasDiscount ? (
-                              <span className="px-2 py-1 rounded-lg text-[10px] font-black bg-rose-600 text-white shadow-2xs animate-pulse">
-                                🔥 -{fin.discountPercent}%
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                Activo
-                              </span>
-                            )}
-                          </div>
-
-                          {/* 2. Grid de Costo, Venta y Utilidad (6 Datos Solicitados) */}
-                          <div className="grid grid-cols-2 gap-1.5 text-[11px] font-mono">
-                            {/* Costo Sin IVA */}
-                            <div className="p-1.5 rounded-lg bg-amber-50/80 border border-amber-200 flex flex-col justify-between">
-                              <span className="text-[9px] font-bold text-amber-900 uppercase tracking-tight">Costo Sin IVA</span>
-                              <span className="font-black text-amber-950 text-xs">${fin.costWithoutTax.toFixed(2)}</span>
-                            </div>
-
-                            {/* Costo Con IVA */}
-                            <div className="p-1.5 rounded-lg bg-amber-100/70 border border-amber-300 flex flex-col justify-between">
-                              <span className="text-[9px] font-bold text-amber-900 uppercase tracking-tight">Costo Con IVA</span>
-                              <span className="font-black text-amber-950 text-xs">${fin.costWithTax.toFixed(2)}</span>
-                            </div>
-
-                            {/* Venta Sin IVA */}
-                            <div className="p-1.5 rounded-lg bg-sky-50/80 border border-sky-200 flex flex-col justify-between">
-                              <span className="text-[9px] font-bold text-sky-900 uppercase tracking-tight">Venta Sin IVA</span>
-                              <span className="font-black text-sky-950 text-xs">${fin.salePriceWithoutTax.toFixed(2)}</span>
-                            </div>
-
-                            {/* Venta Con IVA */}
-                            <div className="p-1.5 rounded-lg bg-sky-100/70 border border-sky-300 flex flex-col justify-between">
-                              <span className="text-[9px] font-bold text-sky-900 uppercase tracking-tight">Venta Con IVA</span>
-                              <span className="font-black text-sky-950 text-xs">${fin.salePriceWithTax.toFixed(2)}</span>
-                            </div>
-                          </div>
-
-                          {/* 3. Utilidad Real y Margen */}
-                          <div
-                            className={`p-2 rounded-xl border flex items-center justify-between gap-1.5 ${
-                              fin.isLoss
-                                ? 'bg-rose-50 border-rose-300 text-rose-950'
-                                : fin.isBreakEven
-                                ? 'bg-amber-50 border-amber-300 text-amber-950'
-                                : 'bg-emerald-50 border-emerald-300 text-emerald-950'
-                            }`}
-                            title={`Utilidad unitaria: Venta sin IVA ($${fin.salePriceWithoutTax.toFixed(2)}) - Costo sin IVA ($${fin.costWithoutTax.toFixed(2)})`}
-                          >
-                            <div className="flex items-center space-x-1 font-bold text-[10px] uppercase">
-                              <TrendingUp className={`w-3.5 h-3.5 ${fin.isLoss ? 'text-rose-600 rotate-180' : 'text-emerald-600'}`} />
-                              <span>Utilidad:</span>
-                            </div>
-                            <div className="text-right font-mono">
-                              <span className={`font-black text-xs block ${fin.isLoss ? 'text-rose-700' : 'text-emerald-800'}`}>
-                                {fin.isLoss ? `-$${Math.abs(fin.unitProfit).toFixed(2)}` : `+$${fin.unitProfit.toFixed(2)}`}
-                              </span>
-                              <span className="text-[9px] text-slate-500 font-bold block">
-                                ({fin.marginPercent > 0 ? '+' : ''}{fin.marginPercent.toFixed(1)}% marg.)
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Footer Controls: Stock Status & Actions */}
-                <div className="p-2.5 sm:p-3 bg-slate-100/90 border-t border-slate-200 flex flex-col xs:flex-row xs:items-center justify-between gap-2">
-                  {/* Stock indicator badges (Requirement #3) */}
-                  <div
-                    className="flex items-center space-x-1.5 flex-wrap gap-y-1"
-                    title={`Físico: ${item.physicalStock ?? item.stock} u. | Disponible: ${item.availableStock ?? item.stock} u. | Reservado: ${item.reservedStock ?? 0} u. | Por recibir: ${item.incomingStock ?? 0} u.`}
-                  >
-                    {(item.physicalStock !== undefined ? item.physicalStock : item.stock) > 0 ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-black text-emerald-950 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg shadow-2xs">
-                        <PackageCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>{item.availableStock !== undefined ? item.availableStock : item.stock} disp.</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-black text-purple-950 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-lg shadow-2xs">
-                        <Package className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                        <span>0 u.</span>
-                      </span>
-                    )}
-
-                    {(item.reservedStock || 0) > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-950 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md shadow-2xs">
-                        <Lock className="w-3 h-3 text-amber-600 shrink-0" />
-                        <span>{item.reservedStock} res.</span>
-                      </span>
-                    )}
-
-                    {(item.incomingStock || 0) > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-indigo-950 bg-indigo-100 border border-indigo-300 px-1.5 py-0.5 rounded-md shadow-2xs">
-                        <Truck className="w-3 h-3 text-indigo-600 shrink-0" />
-                        <span>+{item.incomingStock}</span>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Buttons */}
-                  <div className="flex items-center justify-end space-x-1 shrink-0 pt-1 xs:pt-0 border-t xs:border-t-0 border-slate-200">
-                    <button
-                      onClick={() => setBarcodeItems([item])}
-                      title="Imprimir etiqueta de código de barras para pegar al producto"
-                      className="p-1.5 rounded-lg text-sky-700 hover:text-sky-900 hover:bg-sky-100 transition cursor-pointer"
-                    >
-                      <Barcode className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setMarketingCopyItem(item)}
-                      title="Generar publicaciones con IA para Marketplace, WhatsApp y Redes"
-                      className="p-1.5 rounded-lg text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onSelectItem(item)}
-                      title="Ver detalle completo"
-                      className="p-1.5 rounded-lg text-slate-600 hover:text-sky-700 hover:bg-sky-100 transition cursor-pointer"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onEditItem(item)}
-                      title="Editar producto y costos"
-                      className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition cursor-pointer"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleRequestToggleStatus(item)}
-                      title={item.status === 'archived' ? 'Activar producto (Disponible)' : 'Desactivar producto (Inactivo)'}
-                      className={`p-1.5 rounded-lg transition cursor-pointer ${
-                        item.status === 'archived'
-                          ? 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
-                          : 'text-emerald-600 hover:text-amber-700 hover:bg-amber-50'
-                      }`}
-                    >
-                      <Power className="w-4 h-4" />
-                    </button>
-                    {onDeleteItem && (() => {
-                      const linkCheck = checkProductTransactionLink(item, orders, purchases);
-                      return linkCheck.isLinked ? (
-                        <button
-                          onClick={() => onDeleteItem(item.id)}
-                          title={`Protegido contra eliminación (${linkCheck.reasonText}). Haz clic para ver detalles.`}
-                          className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition cursor-pointer"
-                        >
-                          <Lock className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => onDeleteItem(item.id)}
-                          title="Eliminar producto definitivamente (sin compras ni ventas vinculadas)"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        /* TABLE VIEW */
-        <div className="bg-white border border-slate-300 rounded-2xl overflow-hidden shadow-sm">
-          <div className="overflow-x-auto overflow-y-hidden touch-pan-x">
-            <table className="w-full min-w-[640px] text-left text-xs text-slate-800">
-              <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300">
-                <tr>
-                  <th className="px-2 py-2 w-8">
-                    <button
-                      onClick={handleSelectAll}
-                      className="cursor-pointer text-slate-600 hover:text-sky-700"
-                    >
-                      {selectedIds.length === filteredItems.length && filteredItems.length > 0 ? (
-                        <CheckSquare className="w-4 h-4 text-sky-600" />
-                      ) : (
-                        <Square className="w-4 h-4" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="px-2 py-2">Producto</th>
-                  <th className="px-2 py-2">Proveedor</th>
-                  <th className="px-2 py-2">SKU</th>
-                  <th className="px-2 py-2">Categoría</th>
-                  <th className="px-2 py-2">Subtotal Venta</th>
-                  <th className="px-2 py-2">Precios & Utilidad</th>
-                  <th className="px-2 py-2">Stock</th>
-                  <th className="px-2 py-2">Estado</th>
-                  <th className="px-2 py-2 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {filteredItems.map((item) => {
-                  const sale = parseFloat(item.salePrice) || 0;
-                  const isSelected = selectedIds.includes(item.id);
-                  const isUnseen = Boolean(
-                    unseenProductIds && unseenProductIds.has(item.id) && item.rawTelegramMessage
-                  );
-
-                  const handleItemClick = () => {
-                    if (isUnseen && onMarkProductAsSeen) {
-                      onMarkProductAsSeen(item.id);
-                    }
-                    onSelectItem(item);
-                  };
-
-                  return (
-                    <tr
-                      key={item.id}
-                      onClick={() => {
-                        if (isUnseen && onMarkProductAsSeen) {
-                          onMarkProductAsSeen(item.id);
-                        }
-                      }}
-                      className={`transition duration-150 ${
-                        isSelected
-                          ? 'bg-sky-50/60'
-                          : isUnseen
-                          ? 'bg-amber-50/90 hover:bg-amber-100/90 border-l-4 border-l-amber-500'
-                          : 'hover:bg-slate-50/80'
-                      }`}
-                    >
-                      <td className="px-2 py-1.5">
+                        {/* Selection Checkbox Pill */}
                         <button
                           type="button"
                           onClick={(e) => toggleSelectOne(item.id, e)}
-                          className="cursor-pointer text-slate-500 hover:text-sky-600"
+                          className={`absolute top-2.5 left-2.5 z-10 w-6 h-6 rounded-lg flex items-center justify-center transition shadow-xs backdrop-blur-md cursor-pointer ${isSelected
+                              ? 'bg-sky-600 text-white ring-2 ring-white/80'
+                              : 'bg-white/90 text-slate-800 hover:bg-white border border-slate-400'
+                            }`}
+                          title={isSelected ? 'Deseleccionar' : 'Seleccionar'}
                         >
                           {isSelected ? (
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          ) : (
+                            <Square className="w-3.5 h-3.5 opacity-60" />
+                          )}
+                        </button>
+
+                        {/* Status badge */}
+                        <div className="absolute top-2.5 left-10">
+                          {getStatusBadge(item.status, item.stock)}
+                        </div>
+
+                        {/* Category & New badge */}
+                        <div className="absolute top-2.5 right-2.5 flex items-center space-x-1.5 z-10">
+                          {Math.max(0, Math.min(100, Number(item.discountPercent) || 0)) > 0 && (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-gradient-to-r from-rose-600 to-amber-500 text-white shadow-xs animate-pulse">
+                              -{item.discountPercent}% OFF
+                            </span>
+                          )}
+                          {isUnseen && (
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-slate-950 shadow-md ring-2 ring-amber-300 flex items-center space-x-1 animate-pulse">
+                              <Sparkles className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
+                              <span>NUEVO TELEGRAM</span>
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-slate-800 border border-slate-300 shadow-2xs">
+                            {item.category}
+                          </span>
+                        </div>
+
+                        {/* Multi-photo badge if multiple photos */}
+                        {item.images && item.images.length > 1 && (
+                          <div className="absolute bottom-2 right-2 z-10">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white text-purple-800 border border-purple-300 flex items-center space-x-1 shadow-xs">
+                              <Images className="w-3 h-3 text-purple-600" />
+                              <span>{item.images.length} fotos</span>
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Video badge if video exists */}
+                        {item.videoUrl && (
+                          <div className="absolute bottom-2 left-2 z-10">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-950/90 text-sky-300 border border-sky-400/40 flex items-center space-x-1 shadow-xs backdrop-blur-xs">
+                              <Film className="w-3 h-3 text-sky-400" />
+                              <span>Video</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Body Info */}
+                      <div className="p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                            <span className="font-mono text-[11px] font-black text-sky-800 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-300" title="Código SKU Interno">
+                              {item.sku}
+                            </span>
+                            {item.supplierCode && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleCopySupplierCode(item.supplierCode!, e)}
+                                className="font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
+                                title="Haz clic para copiar el SKU / Código de Proveedor al portapapeles"
+                              >
+                                <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
+                                <span className="max-w-[95px] truncate">{item.supplierCode}</span>
+                                {copiedCode === item.supplierCode ? (
+                                  <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                                ) : (
+                                  <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                                )}
+                              </button>
+                            )}
+                            {item.barcode && (
+                              <span className="font-mono text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-300 flex items-center space-x-1" title={`Código de barras del producto: ${item.barcode}`}>
+                                <Barcode className="w-2.5 h-2.5 text-slate-500" />
+                                <span className="max-w-[85px] truncate">{item.barcode}</span>
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleSupplierClick(item.supplierName, e)}
+                            className="text-[11px] text-slate-600 hover:text-purple-800 hover:bg-purple-50 px-2 py-0.5 rounded-lg transition truncate max-w-[130px] font-bold cursor-pointer border border-transparent hover:border-purple-200"
+                            title={`Abrir página web de ${item.supplierName || 'Proveedor'}`}
+                          >
+                            👤 {item.supplierName || 'Proveedor Telegram'}
+                          </button>
+                        </div>
+
+                        <h3
+                          onClick={handleItemClick}
+                          className="font-extrabold text-sm text-slate-900 line-clamp-2 hover:text-sky-600 cursor-pointer transition leading-snug"
+                        >
+                          {item.name}
+                        </h3>
+
+                        {/* Telegram new item indicator ribbon in card body */}
+                        {isUnseen && (
+                          <div className="p-2 rounded-xl bg-amber-100 border border-amber-400 text-[11px] font-black text-amber-950 flex items-center justify-between shadow-2xs">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                              <span>Ingresado por Telegram</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onMarkProductAsSeen) onMarkProductAsSeen(item.id);
+                              }}
+                              className="text-[10px] text-amber-900 hover:text-amber-950 font-black hover:underline cursor-pointer"
+                              title="Desmarcar este producto"
+                            >
+                              Listo ✓
+                            </button>
+                          </div>
+                        )}
+
+                        {item.description && (
+                          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed font-medium">
+                            {item.description}
+                          </p>
+                        )}
+
+                        {/* Panel Financiero Completo (PVP, Costo, Costo c/IVA, Venta s/IVA, Venta c/IVA, Utilidad y Descuento) */}
+                        {(() => {
+                          const fin = calculateItemFinancials(item);
+                          return (
+                            <div className="pt-2.5 border-t border-slate-200 space-y-2 text-xs">
+                              {/* 1. Fila de Precio PVP & Descuento */}
+                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                                <div>
+                                  <span className="text-[10px] text-slate-500 block font-black uppercase tracking-wider">
+                                    {fin.hasDiscount ? 'Precio Oferta PVP' : 'Precio PVP'}
+                                  </span>
+                                  {fin.hasDiscount ? (
+                                    <div className="flex items-baseline space-x-1.5 mt-0.5">
+                                      <span className="font-black text-rose-600 text-base font-mono">
+                                        ${fin.effectivePVP.toFixed(2)}
+                                      </span>
+                                      <span className="text-xs line-through text-slate-400 font-mono font-medium">
+                                        ${fin.pvpNum.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="font-black text-emerald-700 text-base font-mono mt-0.5 block">
+                                      ${fin.pvpNum.toFixed(2)} {currency}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {fin.hasDiscount ? (
+                                  <span className="px-2 py-1 rounded-lg text-[10px] font-black bg-rose-600 text-white shadow-2xs animate-pulse">
+                                    🔥 -{fin.discountPercent}%
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    Activo
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* 2. Grid de Costo, Venta y Utilidad (6 Datos Solicitados) */}
+                              <div className="grid grid-cols-2 gap-1.5 text-[11px] font-mono">
+                                {/* Costo Sin IVA */}
+                                <div className="p-1.5 rounded-lg bg-amber-50/80 border border-amber-200 flex flex-col justify-between">
+                                  <span className="text-[9px] font-bold text-amber-900 uppercase tracking-tight">Costo Sin IVA</span>
+                                  <span className="font-black text-amber-950 text-xs">${fin.costWithoutTax.toFixed(2)}</span>
+                                </div>
+
+                                {/* Costo Con IVA */}
+                                <div className="p-1.5 rounded-lg bg-amber-100/70 border border-amber-300 flex flex-col justify-between">
+                                  <span className="text-[9px] font-bold text-amber-900 uppercase tracking-tight">Costo Con IVA</span>
+                                  <span className="font-black text-amber-950 text-xs">${fin.costWithTax.toFixed(2)}</span>
+                                </div>
+
+                                {/* Venta Sin IVA */}
+                                <div className="p-1.5 rounded-lg bg-sky-50/80 border border-sky-200 flex flex-col justify-between">
+                                  <span className="text-[9px] font-bold text-sky-900 uppercase tracking-tight">Venta Sin IVA</span>
+                                  <span className="font-black text-sky-950 text-xs">${fin.salePriceWithoutTax.toFixed(2)}</span>
+                                </div>
+
+                                {/* Venta Con IVA */}
+                                <div className="p-1.5 rounded-lg bg-sky-100/70 border border-sky-300 flex flex-col justify-between">
+                                  <span className="text-[9px] font-bold text-sky-900 uppercase tracking-tight">Venta Con IVA</span>
+                                  <span className="font-black text-sky-950 text-xs">${fin.salePriceWithTax.toFixed(2)}</span>
+                                </div>
+                              </div>
+
+                              {/* 3. Utilidad Real y Margen */}
+                              <div
+                                className={`p-2 rounded-xl border flex items-center justify-between gap-1.5 ${fin.isLoss
+                                    ? 'bg-rose-50 border-rose-300 text-rose-950'
+                                    : fin.isBreakEven
+                                      ? 'bg-amber-50 border-amber-300 text-amber-950'
+                                      : 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                                  }`}
+                                title={`Utilidad unitaria: Venta sin IVA ($${fin.salePriceWithoutTax.toFixed(2)}) - Costo sin IVA ($${fin.costWithoutTax.toFixed(2)})`}
+                              >
+                                <div className="flex items-center space-x-1 font-bold text-[10px] uppercase">
+                                  <TrendingUp className={`w-3.5 h-3.5 ${fin.isLoss ? 'text-rose-600 rotate-180' : 'text-emerald-600'}`} />
+                                  <span>Utilidad:</span>
+                                </div>
+                                <div className="text-right font-mono">
+                                  <span className={`font-black text-xs block ${fin.isLoss ? 'text-rose-700' : 'text-emerald-800'}`}>
+                                    {fin.isLoss ? `-$${Math.abs(fin.unitProfit).toFixed(2)}` : `+$${fin.unitProfit.toFixed(2)}`}
+                                  </span>
+                                  <span className="text-[9px] text-slate-500 font-bold block">
+                                    ({fin.marginPercent > 0 ? '+' : ''}{fin.marginPercent.toFixed(1)}% marg.)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Footer Controls: Stock Status & Actions */}
+                    <div className="p-2.5 sm:p-3 bg-slate-100/90 border-t border-slate-200 flex flex-col xs:flex-row xs:items-center justify-between gap-2">
+                      {/* Stock indicator badges (Requirement #3) */}
+                      <div
+                        className="flex items-center space-x-1.5 flex-wrap gap-y-1"
+                        title={`Físico: ${item.physicalStock ?? item.stock} u. | Disponible: ${item.availableStock ?? item.stock} u. | Reservado: ${item.reservedStock ?? 0} u. | Por recibir: ${item.incomingStock ?? 0} u.`}
+                      >
+                        {(item.physicalStock !== undefined ? item.physicalStock : item.stock) > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-black text-emerald-950 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg shadow-2xs">
+                            <PackageCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>{item.availableStock !== undefined ? item.availableStock : item.stock} disp.</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-black text-purple-950 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-lg shadow-2xs">
+                            <Package className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                            <span>0 u.</span>
+                          </span>
+                        )}
+
+                        {(item.reservedStock || 0) > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-950 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md shadow-2xs">
+                            <Lock className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span>{item.reservedStock} res.</span>
+                          </span>
+                        )}
+
+                        {(item.incomingStock || 0) > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-indigo-950 bg-indigo-100 border border-indigo-300 px-1.5 py-0.5 rounded-md shadow-2xs">
+                            <Truck className="w-3 h-3 text-indigo-600 shrink-0" />
+                            <span>+{item.incomingStock}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Buttons */}
+                      <div className="flex items-center justify-end space-x-1 shrink-0 pt-1 xs:pt-0 border-t xs:border-t-0 border-slate-200">
+                        <button
+                          onClick={() => setBarcodeItems([item])}
+                          title="Imprimir etiqueta de código de barras para pegar al producto"
+                          className="p-1.5 rounded-lg text-sky-700 hover:text-sky-900 hover:bg-sky-100 transition cursor-pointer"
+                        >
+                          <Barcode className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setMarketingCopyItem(item)}
+                          title="Generar publicaciones con IA para Marketplace, WhatsApp y Redes"
+                          className="p-1.5 rounded-lg text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition cursor-pointer"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onSelectItem(item)}
+                          title="Ver detalle completo"
+                          className="p-1.5 rounded-lg text-slate-600 hover:text-sky-700 hover:bg-sky-100 transition cursor-pointer"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onEditItem(item)}
+                          title="Editar producto y costos"
+                          className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition cursor-pointer"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleRequestToggleStatus(item)}
+                          title={item.status === 'archived' ? 'Activar producto (Disponible)' : 'Desactivar producto (Inactivo)'}
+                          className={`p-1.5 rounded-lg transition cursor-pointer ${item.status === 'archived'
+                              ? 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
+                              : 'text-emerald-600 hover:text-amber-700 hover:bg-amber-50'
+                            }`}
+                        >
+                          <Power className="w-4 h-4" />
+                        </button>
+                        {onDeleteItem && (() => {
+                          const linkCheck = checkProductTransactionLink(item, orders, purchases);
+                          return linkCheck.isLinked ? (
+                            <button
+                              onClick={() => onDeleteItem(item.id)}
+                              title={`Protegido contra eliminación (${linkCheck.reasonText}). Haz clic para ver detalles.`}
+                              className="p-1.5 rounded-lg text-amber-600 hover:text-amber-800 hover:bg-amber-50 transition cursor-pointer"
+                            >
+                              <Lock className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => onDeleteItem(item.id)}
+                              title="Eliminar producto definitivamente (sin compras ni ventas vinculadas)"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* TABLE VIEW */
+            <div className="bg-white border border-slate-300 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto overflow-y-hidden touch-pan-x">
+                <table className="w-full min-w-[640px] text-left text-xs text-slate-800">
+                  <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300">
+                    <tr>
+                      <th className="px-2 py-2 w-8">
+                        <button
+                          onClick={handleSelectAll}
+                          className="cursor-pointer text-slate-600 hover:text-sky-700"
+                        >
+                          {selectedIds.length === filteredItems.length && filteredItems.length > 0 ? (
                             <CheckSquare className="w-4 h-4 text-sky-600" />
                           ) : (
                             <Square className="w-4 h-4" />
                           )}
                         </button>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-8 h-8 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 relative">
-                            <ProductMediaDisplay
-                              imageUrl={item.imageUrl}
-                              videoUrl={item.videoUrl}
-                              name={item.name}
-                              className="w-full h-full relative"
-                              imageClassName="w-full h-full object-cover"
-                              videoClassName="w-full h-full object-cover"
-                              autoPlayVideo={true}
-                              showPlayBadge={false}
-                              placeholderText=""
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center space-x-1">
-                              <span
-                                onClick={handleItemClick}
-                                className="font-bold text-slate-900 hover:text-sky-600 cursor-pointer block truncate max-w-[200px]"
-                              >
-                                {item.name}
-                              </span>
-                              {isUnseen && (
-                                <span className="inline-flex items-center text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-400 text-slate-950">
-                                  NUEVO
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-500 block truncate max-w-[140px]">
-                              {item.category}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <button
-                          type="button"
-                          onClick={(e) => handleSupplierClick(item.supplierName, e)}
-                          className="text-slate-700 hover:text-purple-700 font-bold block truncate max-w-[130px] text-left hover:underline cursor-pointer text-xs"
-                          title={`Abrir página web de ${item.supplierName || 'Proveedor'}`}
+                      </th>
+                      <th className="px-2 py-2">Producto</th>
+                      <th className="px-2 py-2">Proveedor</th>
+                      <th className="px-2 py-2">SKU</th>
+                      <th className="px-2 py-2">Categoría</th>
+                      <th className="px-2 py-2">Subtotal Venta</th>
+                      <th className="px-2 py-2">Precios & Utilidad</th>
+                      <th className="px-2 py-2">Stock</th>
+                      <th className="px-2 py-2">Estado</th>
+                      <th className="px-2 py-2 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {filteredItems.map((item) => {
+                      const sale = parseFloat(item.salePrice) || 0;
+                      const isSelected = selectedIds.includes(item.id);
+                      const isUnseen = Boolean(
+                        unseenProductIds && unseenProductIds.has(item.id) && item.rawTelegramMessage
+                      );
+
+                      const handleItemClick = () => {
+                        if (isUnseen && onMarkProductAsSeen) {
+                          onMarkProductAsSeen(item.id);
+                        }
+                        onSelectItem(item);
+                      };
+
+                      return (
+                        <tr
+                          key={item.id}
+                          onClick={() => {
+                            if (isUnseen && onMarkProductAsSeen) {
+                              onMarkProductAsSeen(item.id);
+                            }
+                          }}
+                          className={`transition duration-150 ${isSelected
+                              ? 'bg-sky-50/60'
+                              : isUnseen
+                                ? 'bg-amber-50/90 hover:bg-amber-100/90 border-l-4 border-l-amber-500'
+                                : 'hover:bg-slate-50/80'
+                            }`}
                         >
-                          👤 {item.supplierName || 'Proveedor Telegram'}
-                        </button>
-                      </td>
-                      <td className="px-2 py-1.5 font-mono text-xs">
-                        <span className="text-sky-700 font-bold block" title="SKU Interno">{item.sku}</span>
-                        {(() => {
-                          const suppCode = getEffectiveSupplierCode(item);
-                          if (!suppCode) return null;
-                          return (
+                          <td className="px-2 py-1.5">
                             <button
                               type="button"
-                              onClick={(e) => handleCopySupplierCode(suppCode, e)}
-                              className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 hover:border-amber-400 transition cursor-pointer mt-0.5 active:scale-95 group/copy shadow-2xs"
-                              title="Haz clic para copiar el SKU Proveedor al portapapeles"
+                              onClick={(e) => toggleSelectOne(item.id, e)}
+                              className="cursor-pointer text-slate-500 hover:text-sky-600"
                             >
-                              <span>Prov: {suppCode}</span>
-                              {copiedCode === suppCode ? (
-                                <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-sky-600" />
                               ) : (
-                                <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                                <Square className="w-4 h-4" />
                               )}
                             </button>
-                          );
-                        })()}
-                        {item.barcode && (
-                          <span className="text-[9px] text-slate-500 block truncate max-w-[100px]" title={`Código de barras: ${item.barcode}`}>
-                            {item.barcode}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5 text-slate-700 text-xs">{item.category}</td>
-                      <td className="px-2 py-1.5 font-mono text-xs">
-                        {(() => {
-                          const fin = calculateItemFinancials(item);
-                          return (
-                            <div>
-                              <span className="font-bold text-slate-900 font-mono">${fin.salePriceWithoutTax.toFixed(2)}</span>
-                              <span className="text-[9.5px] text-slate-400 block font-sans">Sin IVA</span>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-2 py-1.5 font-mono">
-                        {(() => {
-                          const fin = calculateItemFinancials(item);
-                          return (
-                            <div className="font-mono text-[11px] space-y-0.5 min-w-[170px]">
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="font-bold text-slate-900 text-xs">${fin.effectivePVP.toFixed(2)}</span>
-                                {fin.hasDiscount && (
-                                  <span className="text-[9px] font-black px-1 py-0.2 rounded bg-rose-600 text-white">
-                                    -{fin.discountPercent}%
-                                  </span>
-                                )}
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-8 h-8 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 relative">
+                                <ProductMediaDisplay
+                                  imageUrl={item.imageUrl}
+                                  videoUrl={item.videoUrl}
+                                  name={item.name}
+                                  className="w-full h-full relative"
+                                  imageClassName="w-full h-full object-cover"
+                                  videoClassName="w-full h-full object-cover"
+                                  autoPlayVideo={true}
+                                  showPlayBadge={false}
+                                  placeholderText=""
+                                />
                               </div>
-                              <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600">
-                                <span>Costo: <strong>${fin.costWithoutTax.toFixed(2)}</strong></span>
-                                <span className={`font-bold ${fin.isLoss ? 'text-rose-600' : 'text-emerald-700'}`}>
-                                  Util: {fin.isLoss ? `-$${Math.abs(fin.unitProfit).toFixed(2)}` : `+$${fin.unitProfit.toFixed(2)}`}
+                              <div className="min-w-0">
+                                <div className="flex items-center space-x-1">
+                                  <span
+                                    onClick={handleItemClick}
+                                    className="font-bold text-slate-900 hover:text-sky-600 cursor-pointer block truncate max-w-[200px]"
+                                  >
+                                    {item.name}
+                                  </span>
+                                  {isUnseen && (
+                                    <span className="inline-flex items-center text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-400 text-slate-950">
+                                      NUEVO
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-500 block truncate max-w-[140px]">
+                                  {item.category}
                                 </span>
                               </div>
                             </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <div className="flex items-center space-x-1 font-mono text-xs">
-                          {(item.physicalStock !== undefined ? item.physicalStock : item.stock) > 0 ? (
-                            <span className="font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-950 border border-emerald-300 text-[10px] flex items-center gap-1">
-                              <PackageCheck className="w-3 h-3 text-emerald-700" />
-                              <span>{item.availableStock !== undefined ? item.availableStock : item.stock} u. Disp.</span>
-                            </span>
-                          ) : (
-                            <span className="font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-950 border border-purple-300 text-[10px] flex items-center gap-1">
-                              <Package className="w-3 h-3 text-purple-700" />
-                              <span>0 u.</span>
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5">{getStatusBadge(item.status, item.stock)}</td>
-                      <td className="px-2 py-1.5 text-right">
-                        <div className="flex items-center justify-end space-x-1">
-                          <button
-                            onClick={() => setBarcodeItems([item])}
-                            title="Imprimir código de barras"
-                            className="p-1 rounded text-sky-600 hover:bg-sky-50 transition cursor-pointer"
-                          >
-                            <Barcode className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setMarketingCopyItem(item)}
-                            title="Generar copy con IA"
-                            className="p-1 rounded text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => onSelectItem(item)}
-                            className="p-1 rounded text-slate-500 hover:bg-slate-100 transition cursor-pointer"
-                            title="Ver detalle"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => onEditItem(item)}
-                            className="p-1 rounded text-slate-500 hover:bg-slate-100 transition cursor-pointer"
-                            title="Editar"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleRequestToggleStatus(item)}
-                            title={item.status === 'archived' ? 'Activar' : 'Desactivar'}
-                            className={`p-1 rounded transition cursor-pointer ${
-                              item.status === 'archived'
-                                ? 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
-                                : 'text-emerald-600 hover:text-amber-700 hover:bg-amber-50'
-                            }`}
-                          >
-                            <Power className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => handleSupplierClick(item.supplierName, e)}
+                              className="text-slate-700 hover:text-purple-700 font-bold block truncate max-w-[130px] text-left hover:underline cursor-pointer text-xs"
+                              title={`Abrir página web de ${item.supplierName || 'Proveedor'}`}
+                            >
+                              👤 {item.supplierName || 'Proveedor Telegram'}
+                            </button>
+                          </td>
+                          <td className="px-2 py-1.5 font-mono text-xs">
+                            <span className="text-sky-700 font-bold block" title="SKU Interno">{item.sku}</span>
+                            {item.supplierCode && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleCopySupplierCode(item.supplierCode!, e)}
+                                className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 hover:border-amber-400 transition cursor-pointer mt-0.5 active:scale-95 group/copy shadow-2xs"
+                                title="Haz clic para copiar el SKU Proveedor al portapapeles"
+                              >
+                                <span>Prov: {item.supplierCode}</span>
+                                {copiedCode === item.supplierCode ? (
+                                  <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                                ) : (
+                                  <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                                )}
+                              </button>
+                            )}
+                            {item.barcode && (
+                              <span className="text-[9px] text-slate-500 block truncate max-w-[100px]" title={`Código de barras: ${item.barcode}`}>
+                                {item.barcode}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-slate-700 text-xs">{item.category}</td>
+                          <td className="px-2 py-1.5 font-mono text-xs">
+                            {(() => {
+                              const fin = calculateItemFinancials(item);
+                              return (
+                                <div>
+                                  <span className="font-bold text-slate-900 font-mono">${fin.salePriceWithoutTax.toFixed(2)}</span>
+                                  <span className="text-[9.5px] text-slate-400 block font-sans">Sin IVA</span>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-2 py-1.5 font-mono">
+                            {(() => {
+                              const fin = calculateItemFinancials(item);
+                              return (
+                                <div className="font-mono text-[11px] space-y-0.5 min-w-[170px]">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="font-bold text-slate-900 text-xs">${fin.effectivePVP.toFixed(2)}</span>
+                                    {fin.hasDiscount && (
+                                      <span className="text-[9px] font-black px-1 py-0.2 rounded bg-rose-600 text-white">
+                                        -{fin.discountPercent}%
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600">
+                                    <span>Costo: <strong>${fin.costWithoutTax.toFixed(2)}</strong></span>
+                                    <span className={`font-bold ${fin.isLoss ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                      Util: {fin.isLoss ? `-$${Math.abs(fin.unitProfit).toFixed(2)}` : `+$${fin.unitProfit.toFixed(2)}`}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <div className="flex items-center space-x-1 font-mono text-xs">
+                              {(item.physicalStock !== undefined ? item.physicalStock : item.stock) > 0 ? (
+                                <span className="font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-950 border border-emerald-300 text-[10px] flex items-center gap-1">
+                                  <PackageCheck className="w-3 h-3 text-emerald-700" />
+                                  <span>{item.availableStock !== undefined ? item.availableStock : item.stock} u. Disp.</span>
+                                </span>
+                              ) : (
+                                <span className="font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-950 border border-purple-300 text-[10px] flex items-center gap-1">
+                                  <Package className="w-3 h-3 text-purple-700" />
+                                  <span>0 u.</span>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1.5">{getStatusBadge(item.status, item.stock)}</td>
+                          <td className="px-2 py-1.5 text-right">
+                            <div className="flex items-center justify-end space-x-1">
+                              <button
+                                onClick={() => setBarcodeItems([item])}
+                                title="Imprimir código de barras"
+                                className="p-1 rounded text-sky-600 hover:bg-sky-50 transition cursor-pointer"
+                              >
+                                <Barcode className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setMarketingCopyItem(item)}
+                                title="Generar copy con IA"
+                                className="p-1 rounded text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => onSelectItem(item)}
+                                className="p-1 rounded text-slate-500 hover:bg-slate-100 transition cursor-pointer"
+                                title="Ver detalle"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => onEditItem(item)}
+                                className="p-1 rounded text-slate-500 hover:bg-slate-100 transition cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleRequestToggleStatus(item)}
+                                title={item.status === 'archived' ? 'Activar' : 'Desactivar'}
+                                className={`p-1 rounded transition cursor-pointer ${item.status === 'archived'
+                                    ? 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
+                                    : 'text-emerald-600 hover:text-amber-700 hover:bg-amber-50'
+                                  }`}
+                              >
+                                <Power className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2051,16 +1994,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           setTimeout(() => setReparseToast(null), 3500);
         }}
       />
-
-      {/* Batch Promotional Flyers (.ZIP) Modal */}
-      {batchFlyerItems && batchFlyerItems.length > 0 && (
-        <BatchProductFlyersModal
-          items={batchFlyerItems}
-          onClose={() => setBatchFlyerItems(null)}
-          storeConfig={storeConfig}
-          currency={currency}
-        />
-      )}
 
       {reparseToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl border border-amber-500/50 flex items-center gap-2 animate-bounce">
