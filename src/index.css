@@ -371,4 +371,46 @@ video::-moz-media-controls-mute-button {
   animation: categoryPillGlow 3s ease-in-out infinite;
 }
 
+/* 7. Subtle Ambient & Border Glow Pulse for VIP Price Card */
+@keyframes vipCardPulseGlow {
+  0%, 100% {
+    box-shadow: 0 10px 30px -5px rgba(245, 158, 11, 0.25), 0 0 0 1px rgba(245, 158, 11, 0.35);
+  }
+  50% {
+    box-shadow: 0 14px 45px -5px rgba(245, 158, 11, 0.45), 0 0 0 2px rgba(251, 191, 36, 0.6);
+  }
+}
+
+.animate-vip-card-glow {
+  animation: vipCardPulseGlow 3.5s ease-in-out infinite;
+}
+
+@keyframes vipLightSweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  50%, 100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+.vip-card-light-sweep::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  animation: vipLightSweep 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  pointer-events: none;
+}
+
+
 

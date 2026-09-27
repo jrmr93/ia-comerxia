@@ -343,15 +343,19 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-slate-50/50 pb-32 animate-in fade-in duration-200">
-      {/* 1. TOP STICKY NAVIGATION BAR */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs px-3 sm:px-6 py-2.5">
+    <div ref={containerRef} className="min-h-screen bg-slate-50/60 pb-32 animate-in fade-in duration-200 relative overflow-hidden">
+      {/* POINT 1: AMBIENT GLOW BACKGROUND CIRCLES */}
+      <div className="absolute top-0 right-1/4 w-[500px] h-[350px] bg-amber-400/10 blur-[110px] pointer-events-none -z-10" />
+      <div className="absolute top-1/3 left-10 w-[400px] h-[300px] bg-emerald-400/10 blur-[110px] pointer-events-none -z-10" />
+
+      {/* 1. TOP STICKY NAVIGATION BAR WITH GLASSMORPHISM */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-xs px-3 sm:px-6 py-2.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
           {/* Back Button */}
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/80 text-xs font-bold transition cursor-pointer active:scale-95 shadow-2xs"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100/90 hover:bg-slate-200 text-slate-800 border border-slate-200/80 text-xs font-bold transition cursor-pointer active:scale-95 shadow-2xs"
             title="Volver al catálogo"
           >
             <ArrowLeft className="w-4 h-4 text-slate-700" />
@@ -471,9 +475,9 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
 
       {/* 3. MAIN PRODUCT SHOWCASE CONTAINER */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden p-4 sm:p-6 lg:p-8">
+        <div className="bg-white/90 backdrop-blur-md rounded-3xl border border-slate-200/90 shadow-md overflow-hidden p-4 sm:p-6 lg:p-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* LEFT COLUMN: MEDIA GALLERY (Photos & Video) */}
+            {/* LEFT COLUMN: MEDIA GALLERY WITH POINT 2 SPOTLIGHT ZOOM */}
             <div className="lg:col-span-6 flex flex-col space-y-4">
               {/* Media Mode Switcher (if video exists) */}
               {product.videoUrl && (
@@ -483,7 +487,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                     onClick={() => setActiveMediaMode('photo')}
                     className={`flex-1 py-1.5 rounded-lg text-center transition flex items-center justify-center space-x-1.5 cursor-pointer ${
                       effectiveMediaMode === 'photo'
-                        ? 'bg-white text-slate-900 shadow-xs'
+                        ? 'bg-white text-slate-900 shadow-xs font-black'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -495,7 +499,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                     onClick={() => setActiveMediaMode('video')}
                     className={`flex-1 py-1.5 rounded-lg text-center transition flex items-center justify-center space-x-1.5 cursor-pointer ${
                       effectiveMediaMode === 'video'
-                        ? 'bg-sky-600 text-white shadow-xs'
+                        ? 'bg-sky-600 text-white shadow-xs font-black'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -505,9 +509,9 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                 </div>
               )}
 
-              {/* Main Media Showcase Box with Mobile Touch Swipe */}
+              {/* POINT 2: Main Media Showcase Box with Spotlight Zoom & Touch Swipe */}
               <div
-                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/80 flex items-center justify-center shadow-xs select-none touch-pan-y"
+                className="group/media relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200/90 border border-slate-200/90 flex items-center justify-center shadow-sm hover:shadow-xl transition-all duration-300 select-none touch-pan-y"
                 onTouchStart={effectiveMediaMode === 'photo' ? handleTouchStart : undefined}
                 onTouchMove={effectiveMediaMode === 'photo' ? handleTouchMove : undefined}
                 onTouchEnd={effectiveMediaMode === 'photo' ? handleTouchEnd : undefined}
@@ -595,7 +599,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                         <img
                           src={activePhotoUrl}
                           alt={product.name}
-                          className="w-full h-full object-contain p-2 pointer-events-none"
+                          className="w-full h-full object-contain p-3 group-hover/media:scale-108 transition-transform duration-500 ease-out"
                           referrerPolicy="no-referrer"
                           onError={handleDetailImageError}
                         />
@@ -628,7 +632,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
 
                 {/* Media Counter Badge in Photo mode (Top Right) */}
                 {effectiveMediaMode === 'photo' && (
-                  <div className="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/70 text-white border border-white/20 backdrop-blur-xs flex items-center space-x-1 shadow pointer-events-none">
+                  <div className="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/75 text-white border border-white/20 backdrop-blur-md flex items-center space-x-1 shadow-md pointer-events-none">
                     <ImageIcon className="w-3 h-3 text-amber-300" />
                     <span>
                       {photos.length > 0 ? `${activeImageIdx + 1}/${photos.length}` : '1/1'}
@@ -640,14 +644,14 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                 {/* Video Badges & Return to Photos Button (when video is playing) */}
                 {effectiveMediaMode === 'video' && parsedVideo && (
                   <>
-                    {/* Platform Badge (Top Left with pointer-events-none so touches pass to iframe) */}
+                    {/* Platform Badge (Top Left with pointer-events-none) */}
                     <div className="absolute top-3 left-3 z-20 pointer-events-none">
                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-black/80 text-sky-300 border border-white/20 backdrop-blur-xs shadow-md">
                         {parsedVideo.platform.toUpperCase()}
                       </span>
                     </div>
 
-                    {/* Volver a Fotos Button (Top Right where it never obstructs YouTube controls) */}
+                    {/* Volver a Fotos Button (Top Right) */}
                     {photos.length > 0 && (
                       <button
                         type="button"
@@ -668,8 +672,8 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                 {/* Discount Badge */}
                 {hasDiscount && (
                   <div className="absolute top-3 left-3 z-10">
-                    <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-rose-600 to-amber-500 text-white shadow-md flex items-center space-x-1">
-                      <Flame className="w-3.5 h-3.5 fill-current" />
+                    <span className="px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-rose-600 via-red-500 to-amber-500 text-white shadow-lg shadow-rose-600/30 border border-white/30 flex items-center space-x-1.5 badge-pulse-glow">
+                      <Flame className="w-3.5 h-3.5 fill-current text-yellow-200" />
                       <span>OFERTA -{discountPercent}%</span>
                     </span>
                   </div>
@@ -681,7 +685,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                     <button
                       type="button"
                       onClick={goToPrevMedia}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-white/90 text-slate-800 border border-slate-200 hover:bg-white shadow-md transition cursor-pointer active:scale-95"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full bg-white/90 text-slate-800 border border-slate-200 hover:bg-white shadow-lg backdrop-blur-xs transition cursor-pointer active:scale-95"
                       title="Anterior"
                     >
                       <ChevronLeft className="w-5 h-5" />
@@ -689,7 +693,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                     <button
                       type="button"
                       onClick={goToNextMedia}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-white/90 text-slate-800 border border-slate-200 hover:bg-white shadow-md transition cursor-pointer active:scale-95"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full bg-white/90 text-slate-800 border border-slate-200 hover:bg-white shadow-lg backdrop-blur-xs transition cursor-pointer active:scale-95"
                       title="Siguiente"
                     >
                       <ChevronRight className="w-5 h-5" />
@@ -721,46 +725,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                 )}
               </div>
 
-              {/* Pagination Dots Indicator (Photos + Video) */}
-              {(photos.length > 1 || (photos.length > 0 && hasVideo)) && (
-                <div className="flex items-center justify-center space-x-1.5 py-1">
-                  {photos.map((_, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setActiveMediaMode('photo');
-                        setActiveImageIdx(idx);
-                      }}
-                      className={`transition-all duration-200 cursor-pointer ${
-                        effectiveMediaMode === 'photo' && activeImageIdx === idx
-                          ? 'w-6 h-2 rounded-full bg-amber-500 shadow-xs'
-                          : 'w-2 h-2 rounded-full bg-slate-300 hover:bg-slate-400'
-                      }`}
-                      title={`Foto ${idx + 1}`}
-                    />
-                  ))}
-                  {hasVideo && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveMediaMode('video')}
-                      className={`transition-all duration-200 cursor-pointer flex items-center justify-center ${
-                        effectiveMediaMode === 'video'
-                          ? 'px-2.5 h-5 rounded-full bg-sky-600 text-white text-[10px] font-bold shadow-xs'
-                          : 'w-5 h-2 rounded-full bg-sky-200 hover:bg-sky-300 text-sky-700'
-                      }`}
-                      title="Ver video del producto"
-                    >
-                      <Play className="w-2.5 h-2.5 fill-current" />
-                      {effectiveMediaMode === 'video' && (
-                        <span className="ml-1 text-[9px] uppercase">Video</span>
-                      )}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Media Thumbnails Carousel (Photos + Video) */}
+              {/* Thumbnails Carousel (Photos + Video) */}
               {(photos.length > 1 || hasVideo) && (
                 <div className="flex items-center space-x-2 overflow-x-auto py-1">
                   {photos.map((ph, idx) => (
@@ -771,9 +736,9 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                         setActiveMediaMode('photo');
                         setActiveImageIdx(idx);
                       }}
-                      className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition cursor-pointer flex-shrink-0 bg-white p-1 ${
+                      className={`w-16 h-16 rounded-2xl overflow-hidden border-2 transition cursor-pointer flex-shrink-0 bg-white p-1 ${
                         effectiveMediaMode === 'photo' && activeImageIdx === idx
-                          ? 'border-amber-400 ring-2 ring-amber-400/20 scale-105 shadow-xs'
+                          ? 'border-amber-400 ring-4 ring-amber-400/20 scale-105 shadow-md'
                           : 'border-slate-200 opacity-60 hover:opacity-100'
                       }`}
                     >
@@ -784,9 +749,9 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                     <button
                       type="button"
                       onClick={() => setActiveMediaMode('video')}
-                      className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition cursor-pointer flex-shrink-0 bg-slate-950 flex flex-col items-center justify-center p-1 ${
+                      className={`w-16 h-16 rounded-2xl overflow-hidden border-2 transition cursor-pointer flex-shrink-0 bg-slate-950 flex flex-col items-center justify-center p-1 ${
                         effectiveMediaMode === 'video'
-                          ? 'border-sky-500 ring-2 ring-sky-500/30 scale-105 shadow-md'
+                          ? 'border-sky-500 ring-4 ring-sky-500/30 scale-105 shadow-md'
                           : 'border-slate-200 opacity-70 hover:opacity-100'
                       }`}
                       title="Ver video del producto"
@@ -823,35 +788,41 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                   {product.name}
                 </h1>
 
-                {/* Pricing Box */}
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                {/* POINT 3: VIP PRICING CARD WITH RICH LUXURY COLORS & SUBTLE ANIMATION */}
+                <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-zinc-950 via-slate-900 to-zinc-950 text-white shadow-2xl border border-amber-500/30 space-y-3.5 relative overflow-hidden animate-vip-card-glow vip-card-light-sweep">
+                  {/* Ambient Light Orbs */}
+                  <div className="absolute -top-12 -right-12 w-44 h-44 bg-amber-500/15 rounded-full blur-3xl pointer-events-none animate-pulse" />
+                  <div className="absolute -bottom-12 -left-12 w-44 h-44 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
                   {hasDiscount ? (
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm line-through text-slate-400 font-semibold">
+                    <div className="relative z-10 space-y-1.5">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <span className="text-sm line-through text-slate-400 font-bold">
                           ${regularPrice.toFixed(2)} {currency}
                         </span>
-                        <span className="text-xs font-black px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200">
-                          AHORRAS ${savings.toFixed(2)} (-{discountPercent}%)
+                        <span className="px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-rose-500 via-amber-500 to-yellow-400 text-slate-950 shadow-lg shadow-amber-500/20 border border-yellow-200/40 flex items-center space-x-1.5 badge-pulse-glow glossy-sheen-effect">
+                          <Sparkles className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
+                          <span>AHORRAS ${savings.toFixed(2)} (-{discountPercent}%)</span>
                         </span>
                       </div>
-                      <div className="flex items-baseline space-x-2 mt-1">
-                        <span className="text-3xl sm:text-4xl font-black text-rose-600">
+                      <div className="flex items-baseline space-x-2 pt-0.5">
+                        <span className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-emerald-400 drop-shadow-sm">
                           ${effectivePrice.toFixed(2)}
                         </span>
-                        <span className="text-sm font-bold text-slate-500">{currency}</span>
+                        <span className="text-sm font-bold text-amber-300/90">{currency}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-baseline space-x-2">
-                      <span className="text-3xl sm:text-4xl font-black text-emerald-600">
+                    <div className="flex items-baseline space-x-2 relative z-10">
+                      <span className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-emerald-400 drop-shadow-sm">
                         ${regularPrice.toFixed(2)}
                       </span>
-                      <span className="text-sm font-bold text-slate-500">{currency}</span>
+                      <span className="text-sm font-bold text-amber-300/90">{currency}</span>
                     </div>
                   )}
-                  <p className="text-[11px] text-slate-500 flex items-center">
-                    <Truck className="w-3.5 h-3.5 mr-1 text-slate-400" />
+
+                  <p className="text-xs text-slate-300/90 flex items-center pt-2 border-t border-slate-800/90 relative z-10">
+                    <Truck className="w-4 h-4 mr-2 text-amber-400 shrink-0" />
                     <span>Envío directo a domicilio o retiro coordinado con la tienda</span>
                   </p>
                 </div>
@@ -883,7 +854,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                   </div>
                 </div>
 
-                {/* Primary Action Buttons */}
+                {/* POINT 4: PRIMARY ACTION BUTTONS WITH GLOW PULSE */}
                 <div className="space-y-3 pt-2">
                   {isCustomerView && (
                     <>
@@ -936,14 +907,14 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                         </div>
                       )}
 
-                      {/* 1. AGREGAR AL CARRITO (Primary) - Clear and legible */}
+                      {/* 1. AGREGAR AL CARRITO (Primary) - Vibrant Golden Glow Button */}
                       <button
                         type="button"
                         onClick={handleAdd}
-                        className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl font-black text-sm sm:text-base shadow-md transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 ${
+                        className={`w-full py-4 px-5 rounded-2xl font-black text-sm sm:text-base shadow-xl transition-all duration-200 flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 hover:-translate-y-0.5 ${
                           addedAnimation
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-amber-400 hover:bg-amber-500 text-slate-950 shadow-amber-400/20'
+                            ? 'bg-emerald-600 text-white shadow-emerald-600/30'
+                            : 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 shadow-amber-400/30 border border-amber-300/60'
                         }`}
                       >
                         {addedAnimation ? (
@@ -961,11 +932,11 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                         )}
                       </button>
 
-                      {/* 2. COMPRAR POR WHATSAPP (Direct simplified flow) */}
+                      {/* 2. COMPRAR POR WHATSAPP (Direct simplified flow) - Emerald Neon Glow Button */}
                       <button
                         type="button"
                         onClick={handleDirectBuy}
-                        className="w-full py-3.5 sm:py-4 px-4 rounded-2xl text-sm sm:text-base font-black transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 shadow-md bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-emerald-500/20"
+                        className="w-full py-4 px-5 rounded-2xl text-sm sm:text-base font-black transition-all duration-200 flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 hover:-translate-y-0.5 shadow-xl bg-gradient-to-r from-emerald-500 via-green-600 to-emerald-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-emerald-500/25 border border-emerald-400/40"
                       >
                         <MessageCircle className="w-5 h-5 fill-current" />
                         <span>Comprar por WhatsApp</span>
