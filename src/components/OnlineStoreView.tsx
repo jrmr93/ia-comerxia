@@ -1635,6 +1635,44 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   const [isStorePaymentsModalOpen, setIsStorePaymentsModalOpen] = useState(false);
   const [isStoreShippingModalOpen, setIsStoreShippingModalOpen] = useState(false);
 
+  // Native Mobile Back Button Interception to prevent leaving the page when a modal, drawer or sheet is open
+  const modalHistoryPushedRef = useRef<boolean>(false);
+
+  const isOverlayModalActive = Boolean(
+    isCartOpen ||
+    isFilterSheetOpen ||
+    isShareModalOpen ||
+    isManualOrderModalOpen ||
+    orderToEdit ||
+    orderToConfirm ||
+    orderToShip ||
+    orderToDeliver ||
+    orderToDelete ||
+    orderToCancel ||
+    orderForPartialDelivery ||
+    orderToPrintA4 ||
+    orderToSetShipping ||
+    orderForPendingShipping ||
+    orderToPrintShipping ||
+    orderToRequestShippingData ||
+    isStorePaymentsModalOpen ||
+    isStoreShippingModalOpen
+  );
+
+  // Sync window.history state when overlay modals/drawers open (excluding product detail page which manages its own history)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (isOverlayModalActive) {
+      if (!modalHistoryPushedRef.current && !window.history.state?.__online_store_modal__) {
+        window.history.pushState({ __online_store_modal__: true }, '');
+        modalHistoryPushedRef.current = true;
+      }
+    } else {
+      modalHistoryPushedRef.current = false;
+    }
+  }, [isOverlayModalActive]);
+
   // Sync inputs when storeConfig updates from backend ONLY IF the user hasn't edited the form locally
   React.useEffect(() => {
     if (storeConfig && !isFormDirty) {
