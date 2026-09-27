@@ -218,6 +218,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   const [itemsPerPage, setItemsPerPage] = useState<number>(12);
   const [defaultProductSort, setDefaultProductSort] = useState<string>('date_desc');
   const [defaultInitialCategory, setDefaultInitialCategory] = useState<string>('all');
+  const [categoryImages, setCategoryImages] = useState<Record<string, string>>({});
   const [instagramUrl, setInstagramUrl] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [address, setAddress] = useState('');
@@ -382,6 +383,14 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           if (data.itemsPerPage !== undefined) setItemsPerPage(Number(data.itemsPerPage) || 12);
           if (data.defaultProductSort) setDefaultProductSort(data.defaultProductSort);
           if (data.defaultInitialCategory !== undefined) setDefaultInitialCategory(data.defaultInitialCategory || 'all');
+          if (data.categoryImages) {
+            try {
+              const parsedCatImgs = typeof data.categoryImages === 'string' ? JSON.parse(data.categoryImages) : data.categoryImages;
+              if (parsedCatImgs && typeof parsedCatImgs === 'object') setCategoryImages(parsedCatImgs);
+            } catch (e) {
+              console.error('Error parsing categoryImages:', e);
+            }
+          }
           if (data.instagramUrl) setInstagramUrl(data.instagramUrl);
           if (data.websiteUrl) setWebsiteUrl(data.websiteUrl);
           if (data.address) setAddress(data.address);
@@ -677,6 +686,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
         itemsPerPage: Number(itemsPerPage) || 12,
         defaultProductSort,
         defaultInitialCategory,
+        categoryImages: JSON.stringify(categoryImages),
         instagramUrl: instagramUrl.trim(),
         websiteUrl: websiteUrl.trim(),
         address: address.trim(),
@@ -1383,6 +1393,75 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                 </p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* 🖼️ CATEGORY BANNER IMAGES CUSTOMIZATION */}
+        <div className="bg-gradient-to-br from-amber-50/50 via-white to-amber-50/20 border border-amber-200/80 rounded-2xl p-5 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between border-b border-amber-200/60 pb-3">
+            <div className="space-y-0.5">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-amber-600" />
+                Imágenes de Cabecera Personalizadas por Categoría
+              </h4>
+              <p className="text-[11px] text-slate-600 font-medium">
+                Personaliza la imagen completa de fondo para el panel de cada categoría en la tienda online vista cliente.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {Array.from(new Set(storeProducts.map((p) => p.category).filter(Boolean))).map((cat) => {
+              const currentImg = categoryImages[cat] || '';
+              return (
+                <div key={cat} className="p-3 bg-white border border-slate-200 rounded-xl space-y-2 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 truncate">
+                      <Tag className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      {cat}
+                    </span>
+                    {currentImg && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const copy = { ...categoryImages };
+                          delete copy[cat];
+                          setCategoryImages(copy);
+                        }}
+                        className="text-[10px] text-red-600 hover:text-red-800 font-bold cursor-pointer shrink-0"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 relative">
+                      {currentImg ? (
+                        <img src={currentImg} alt={cat} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-[9px] font-bold">
+                          Auto
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      type="text"
+                      value={currentImg}
+                      onChange={(e) => {
+                        setCategoryImages((prev) => ({
+                          ...prev,
+                          [cat]: e.target.value,
+                        }));
+                      }}
+                      placeholder="URL de imagen HD (https://...)"
+                      className="flex-1 text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 font-medium min-w-0"
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

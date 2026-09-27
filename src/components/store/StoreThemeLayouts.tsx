@@ -2027,6 +2027,16 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
   const ITEMS_PER_PAGE = isPaginationEnabled ? (Number(storeConfig?.itemsPerPage) || 12) : Math.max(1, filteredProducts.length);
   const [currentPage, setCurrentPage] = React.useState(1);
 
+  const categoryImagesMap: Record<string, string> = React.useMemo(() => {
+    if (!storeConfig?.categoryImages) return {};
+    if (typeof storeConfig.categoryImages === 'object') return storeConfig.categoryImages as Record<string, string>;
+    try {
+      return JSON.parse(storeConfig.categoryImages);
+    } catch (e) {
+      return {};
+    }
+  }, [storeConfig?.categoryImages]);
+
   // Reset to page 1 whenever filters or search change
   React.useEffect(() => {
     setCurrentPage(1);
@@ -2819,6 +2829,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 categoryName={selectedCategory}
                 itemCount={filteredProducts.length}
                 sampleProducts={filteredProducts}
+                customImageUrl={categoryImagesMap[selectedCategory]}
               />
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
                 {paginatedProducts.map((item) => (
@@ -2854,6 +2865,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                         categoryName={catName}
                         itemCount={totalInCat}
                         sampleProducts={catProducts}
+                        customImageUrl={categoryImagesMap[catName]}
                         onSelectCategory={(cat) => setSelectedCategory(cat)}
                       />
 

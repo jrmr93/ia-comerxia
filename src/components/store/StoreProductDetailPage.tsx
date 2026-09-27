@@ -24,11 +24,14 @@ import {
   Minus,
   Sparkles,
   MapPin,
+  Landmark,
+  Banknote,
 } from 'lucide-react';
 import { InventoryItem, StoreConfig, CartItem, CourierPartner, PaymentMethodPartner } from '../../types.ts';
 import { parseVideoUrl } from '../../utils/video-helper.ts';
 import { normalizeEcuadorPhone, buildWhatsAppLink } from '../../utils/phone.ts';
 import { getProductPhotosWithFallback, normalizeMediaUrl } from '../../utils/media-helper.ts';
+import { StoreLogisticsAndPaymentsSlider } from './StoreLogisticsAndPaymentsSlider.tsx';
 
 interface StoreProductDetailPageProps {
   product: InventoryItem;
@@ -82,6 +85,22 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
   const photos: string[] = React.useMemo(() => {
     return getProductPhotosWithFallback(product);
   }, [product.imageUrl, product.images, product.extractedAttributes]);
+
+  const activePaymentLogos: PaymentMethodPartner[] = React.useMemo(() => {
+    if (paymentPartners && paymentPartners.length > 0) {
+      return paymentPartners.filter((p) => p.active !== false);
+    }
+    if (!storeConfig?.paymentLogos) return [];
+    if (Array.isArray(storeConfig.paymentLogos)) {
+      return (storeConfig.paymentLogos as PaymentMethodPartner[]).filter((p) => p.active !== false);
+    }
+    try {
+      const parsed = JSON.parse(storeConfig.paymentLogos);
+      return Array.isArray(parsed) ? parsed.filter((p: any) => p.active !== false) : [];
+    } catch (e) {
+      return [];
+    }
+  }, [paymentPartners, storeConfig?.paymentLogos]);
 
   // Reset indices and scroll to top ONLY when the product ID changes (navigating to another product)
   useEffect(() => {
@@ -503,9 +522,9 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                 </div>
               )}
 
-              {/* Main Media Showcase Box with Mobile Touch Swipe */}
+              {/* Main Media Showcase Box with Mobile Touch Swipe & Zoom */}
               <div
-                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/80 flex items-center justify-center shadow-xs select-none touch-pan-y"
+                className="relative aspect-square rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/80 flex items-center justify-center shadow-xs select-none touch-pan-y group cursor-zoom-in"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
@@ -593,7 +612,7 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                         <img
                           src={activePhotoUrl}
                           alt={product.name}
-                          className="w-full h-full object-contain p-2 pointer-events-none"
+                          className="w-full h-full object-contain p-2 transition-transform duration-500 ease-out group-hover:scale-110 sm:group-hover:scale-115"
                           referrerPolicy="no-referrer"
                           onError={handleDetailImageError}
                         />
@@ -819,37 +838,92 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                   {product.name}
                 </h1>
 
-                {/* Pricing Box */}
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                {/* Pricing Box - VIP Luxury Card with Light Sweep & Gradient Effects */}
+                <div className="relative overflow-hidden p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white border border-amber-500/40 shadow-2xl space-y-3 group animate-vip-card-glow">
+                  {/* Light Sweep Sheen Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none vip-card-light-sweep" />
+
+                  {/* Ambient Glow Corner */}
+                  <div className="absolute -right-10 -top-10 w-44 h-44 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
+
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center gap-1.5 shadow-sm badge-pulse-glow">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> Precio VIP Garantizado
+                    </span>
+                    {hasDiscount && (
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md">
+                        -{discountPercent}% DCTO
+                      </span>
+                    )}
+                  </div>
+
                   {hasDiscount ? (
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm line-through text-slate-400 font-semibold">
+                        <span className="text-sm line-through text-slate-400 font-medium">
                           ${regularPrice.toFixed(2)} {currency}
                         </span>
-                        <span className="text-xs font-black px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200">
-                          AHORRAS ${savings.toFixed(2)} (-{discountPercent}%)
+                        <span className="text-[11px] font-black px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                          AHORRAS ${savings.toFixed(2)}
                         </span>
                       </div>
                       <div className="flex items-baseline space-x-2 mt-1">
-                        <span className="text-3xl sm:text-4xl font-black text-rose-600">
+                        <span className="text-3xl sm:text-4xl font-black text-amber-400 tracking-tight drop-shadow-md">
                           ${effectivePrice.toFixed(2)}
                         </span>
-                        <span className="text-sm font-bold text-slate-500">{currency}</span>
+                        <span className="text-sm font-extrabold text-slate-300">{currency}</span>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-baseline space-x-2">
-                      <span className="text-3xl sm:text-4xl font-black text-emerald-600">
+                      <span className="text-3xl sm:text-4xl font-black text-amber-400 tracking-tight drop-shadow-md">
                         ${regularPrice.toFixed(2)}
                       </span>
-                      <span className="text-sm font-bold text-slate-500">{currency}</span>
+                      <span className="text-sm font-extrabold text-slate-300">{currency}</span>
                     </div>
                   )}
-                  <p className="text-[11px] text-slate-500 flex items-center">
-                    <Truck className="w-3.5 h-3.5 mr-1 text-slate-400" />
-                    <span>Envío directo a domicilio o retiro coordinado con la tienda</span>
+
+                  <p className="text-[11px] text-slate-300/90 flex items-center gap-1.5 pt-2 border-t border-white/10">
+                    <Truck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>Envío directo a domicilio o despacho coordinado con la tienda</span>
                   </p>
+
+                  {/* Payment Method Logos Only (No Text Labels) */}
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-300 font-medium gap-2">
+                    <span className="flex items-center gap-1 text-slate-300 font-bold text-[10px]">
+                      <CreditCard className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Métodos aceptados:
+                    </span>
+                    <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none">
+                      {activePaymentLogos.length > 0 ? (
+                        activePaymentLogos.slice(0, 6).map((pm, idx) => (
+                          <div
+                            key={pm.id || idx}
+                            className="w-7 h-7 rounded-lg bg-white p-1 flex items-center justify-center border border-white/20 shadow-xs shrink-0 hover:scale-105 transition"
+                            title={pm.name || 'Método de Pago'}
+                          >
+                            {pm.logoUrl ? (
+                              <img src={pm.logoUrl} alt={pm.name || ''} className="w-full h-full object-contain" />
+                            ) : (
+                              <CreditCard className="w-3.5 h-3.5 text-slate-900" />
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        /* Clean Logo Icons Fallback (No Text) */
+                        <>
+                          <div className="w-7 h-7 rounded-lg bg-white p-1 flex items-center justify-center border border-white/20 shadow-xs shrink-0" title="Tarjeta de Crédito / Débito">
+                            <CreditCard className="w-3.5 h-3.5 text-indigo-700" />
+                          </div>
+                          <div className="w-7 h-7 rounded-lg bg-white p-1 flex items-center justify-center border border-white/20 shadow-xs shrink-0" title="Transferencia Bancaria Directa">
+                            <Landmark className="w-3.5 h-3.5 text-emerald-700" />
+                          </div>
+                          <div className="w-7 h-7 rounded-lg bg-white p-1 flex items-center justify-center border border-white/20 shadow-xs shrink-0" title="Efectivo / Contraentrega">
+                            <Banknote className="w-3.5 h-3.5 text-amber-700" />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Quantity Selector - Always available for customer orders */}

@@ -592,6 +592,7 @@ export interface StoreConfig {
   itemsPerPage?: number;
   defaultProductSort?: 'price_desc' | 'price_asc' | 'category' | 'date_desc' | 'random' | 'featured' | string;
   defaultInitialCategory?: string | null;
+  categoryImages?: Record<string, string> | string | null;
   promoPopup?: StorePromoPopupConfig | string | null;
   domain?: string;
 }
