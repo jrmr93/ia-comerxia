@@ -395,4 +395,120 @@ video::-moz-media-controls-mute-button {
   .mobile-destello-border {
     box-shadow: 0 0 8px 1px rgba(245, 158, 11, 0.2);
   }
-}
+}
+
+/* -------------------------------------------------------------------------- */
+/* CATEGORY HEADER BANNER SPECIAL VISUAL EFFECTS & TRANSITIONS                */
+/* -------------------------------------------------------------------------- */
+
+@keyframes categoryBannerShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-category-title-shimmer {
+  background: linear-gradient(90deg, #ffffff 0%, #fde68a 25%, #ffffff 50%, #fef08a 75%, #ffffff 100%);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: categoryBannerShimmer 6s linear infinite;
+}
+
+@keyframes categoryBannerSlowZoom {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04) rotate(0.3deg);
+  }
+}
+
+.animate-category-bg-zoom {
+  animation: categoryBannerSlowZoom 18s ease-in-out infinite alternate;
+}
+
+@keyframes floatParticleSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-6px) rotate(12deg);
+    opacity: 1;
+  }
+}
+
+.animate-float-particle {
+  animation: floatParticleSlow 4s ease-in-out infinite;
+}
+
+@keyframes goldPulseRing {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4), 0 10px 25px -5px rgba(15, 23, 42, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 18px 2px rgba(245, 158, 11, 0.35), 0 12px 30px -5px rgba(245, 158, 11, 0.2);
+  }
+}
+
+.animate-banner-gold-ring {
+  animation: goldPulseRing 5s ease-in-out infinite;
+}
+
+/* Mobile Phone Cellular Dynamic Continuous Animations */
+@keyframes mobileSheenSweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  40% {
+    transform: translateX(250%) skewX(-20deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+.animate-mobile-sheen-sweep {
+  animation: mobileSheenSweep 6.5s ease-in-out infinite;
+}
+
+@keyframes mobileGoldPulseBorder {
+  0%, 100% {
+    border-color: rgba(245, 158, 11, 0.4);
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.3), 0 0 10px rgba(245, 158, 11, 0.15);
+  }
+  50% {
+    border-color: rgba(245, 158, 11, 0.85);
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.35), 0 0 16px rgba(251, 191, 36, 0.4);
+  }
+}
+
+.animate-mobile-gold-border {
+  animation: mobileGoldPulseBorder 3.5s ease-in-out infinite;
+}
+
+@keyframes mobileCategoryBgZoom {
+  0%, 100% {
+    transform: scale(1.02);
+  }
+  50% {
+    transform: scale(1.09) rotate(0.4deg);
+  }
+}
+
+.animate-mobile-category-bg-zoom {
+  animation: mobileCategoryBgZoom 10s ease-in-out infinite alternate;
+}
+
+

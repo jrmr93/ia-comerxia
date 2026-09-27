@@ -92,57 +92,61 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
 
   return (
     <div className={`col-span-full my-3 sm:my-4 ${className}`}>
-      {/* Compact Height Container (User Request: "no sean muy altos, sean un poco más cortos de altura") */}
-      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-700/60 shadow-xl group transition-all duration-300 hover:shadow-amber-500/10 min-h-[110px] sm:min-h-[125px] glossy-sheen-effect">
-        {/* Full Cover Background Image with Zoom Effect */}
+      {/* Compact Height Container with Mobile-First Continuous Effects */}
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-amber-400/50 shadow-xl group transition-all duration-500 hover:border-amber-400 hover:shadow-[0_12px_35px_rgba(245,158,11,0.3)] animate-mobile-gold-border glossy-sheen-effect min-h-[115px] sm:min-h-[130px]">
+        {/* Full Cover Background Image with Mobile Continuous Breathing Zoom & Hover Scale */}
         <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110 animate-mobile-category-bg-zoom"
           style={{ backgroundImage: `url('${bgImage}')` }}
         />
 
-        {/* High-Contrast Dynamic Multi-layered Overlay with Custom Color & Transparency */}
-        <div className="absolute inset-0 backdrop-blur-[1px] transition-all duration-300" style={overlayBgStyle} />
+        {/* High-Contrast Dynamic Multi-layered Overlay */}
+        <div className="absolute inset-0 backdrop-blur-[2px] transition-all duration-500 group-hover:backdrop-blur-[1px]" style={overlayBgStyle} />
 
-        {/* Light Sweep Sheen Effect on Hover */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none" />
+        {/* Light Sweep Sheen Effect - Runs CONTINUOUSLY on Mobile and on Hover on Desktop */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-mobile-sheen-sweep group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none z-10" />
 
-        {/* Ambient Glows */}
-        <div className="absolute -right-10 -top-10 w-44 h-44 rounded-full bg-amber-400/15 blur-2xl pointer-events-none group-hover:bg-amber-400/25 transition duration-500" />
-        <div className="absolute -left-10 -bottom-10 w-44 h-44 rounded-full bg-indigo-500/15 blur-2xl pointer-events-none" />
+        {/* Dynamic Glass Sparkle Overlay Mesh */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-400/15 via-transparent to-purple-600/20 pointer-events-none" />
 
-        {/* Content Box (Compact Padding: p-4 sm:p-5 md:py-4.5 md:px-6) */}
-        <div className="relative z-10 p-4 sm:p-5 md:py-4 md:px-6 flex flex-row items-center justify-between gap-4">
+        {/* Radiant Ambient Glow Orbs (Pulsing continuously on mobile screens) */}
+        <div className="absolute -right-8 -top-8 w-44 h-44 sm:w-52 sm:h-52 rounded-full bg-amber-400/25 blur-2xl pointer-events-none animate-pulse" />
+        <div className="absolute -left-8 -bottom-8 w-44 h-44 sm:w-52 sm:h-52 rounded-full bg-indigo-500/25 blur-2xl pointer-events-none animate-pulse" />
+        <div className="absolute left-1/3 top-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-amber-300/15 blur-xl pointer-events-none animate-float-particle" />
+
+        {/* Content Box */}
+        <div className="relative z-10 p-3.5 sm:p-5 md:py-4 md:px-6 flex flex-row items-center justify-between gap-2.5 sm:gap-4">
           {/* Left Metadata & Title */}
-          <div className="space-y-1 sm:space-y-1.5 max-w-xl min-w-0">
-            <div className="flex items-center space-x-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/15 backdrop-blur-md border border-white/20 text-amber-300 flex items-center gap-1 shadow-sm">
-                <Layers className="w-3 h-3 text-amber-400" />
+          <div className="space-y-1 sm:space-y-1.5 max-w-xl min-w-0 flex-1">
+            <div className="flex items-center space-x-1.5 sm:space-x-2 flex-wrap gap-y-1">
+              <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-slate-900/90 backdrop-blur-md border border-amber-400/60 text-amber-300 flex items-center gap-1 shadow-md">
+                <Layers className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400 animate-float-particle" />
                 Categoría
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-900/80 backdrop-blur-md border border-slate-700 text-slate-200">
+              <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-slate-950/90 backdrop-blur-md border border-slate-700 text-slate-200">
                 {itemCount} {itemCount === 1 ? 'producto' : 'productos'}
               </span>
             </div>
 
-            <h2 className="text-sm xs:text-base sm:text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-1.5 sm:gap-2 drop-shadow-md leading-tight whitespace-normal break-words">
-              <span>{categoryName}</span>
+            <h2 className="text-sm xs:text-base sm:text-xl md:text-2xl font-black tracking-tight flex items-center gap-1.5 sm:gap-2 drop-shadow-md leading-tight whitespace-normal break-words">
+              <span className="animate-category-title-shimmer">{categoryName}</span>
               <Sparkles className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-amber-400 animate-pulse flex-shrink-0" />
             </h2>
 
-            <p className="text-[11px] sm:text-xs text-slate-300/90 font-medium truncate max-w-md hidden sm:block">
-              Colección exclusiva de <strong className="text-white font-bold">{categoryName}</strong> con envío garantizado.
+            <p className="text-[10px] sm:text-xs text-slate-200/95 font-medium line-clamp-1 max-w-md">
+              Colección exclusiva de <strong className="text-amber-300 font-bold">{categoryName}</strong>
             </p>
           </div>
 
-          {/* Right Action & Thumbs */}
-          <div className="flex items-center space-x-3 flex-shrink-0">
-            {/* Product Thumbnail Stack */}
+          {/* Right Action & Thumbs (Optimized for Mobile Phone display) */}
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+            {/* Product Thumbnail Stack - Visible on Mobile too! */}
             {thumbs.length > 0 && (
-              <div className="hidden md:flex items-center -space-x-2 overflow-hidden p-0.5">
-                {thumbs.map((item, idx) => (
+              <div className="flex items-center -space-x-2.5 sm:-space-x-2 overflow-visible p-0.5">
+                {thumbs.slice(0, 2).map((item, idx) => (
                   <div
                     key={item.id || idx}
-                    className="w-9 h-9 rounded-xl bg-slate-900/90 border-2 border-slate-700 overflow-hidden shadow-md transform group-hover:rotate-1 transition duration-200"
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-slate-900/90 border-2 border-amber-400/70 overflow-hidden shadow-md transform group-hover:rotate-3 group-hover:scale-110 active:scale-125 transition-all duration-300"
                     title={item.name}
                   >
                     <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
@@ -151,15 +155,15 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
               </div>
             )}
 
-            {/* Compact CTA Button */}
+            {/* Compact CTA Button with Mobile Pulse Accent */}
             {onSelectCategory && (
               <button
                 type="button"
                 onClick={() => onSelectCategory(categoryName)}
-                className="px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl font-black text-xs bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 text-slate-950 hover:from-amber-300 hover:to-amber-400 transition-all duration-200 cursor-pointer flex items-center space-x-1.5 shadow-lg shadow-amber-500/20 active:scale-95 group/btn whitespace-nowrap"
+                className="px-3 py-2 sm:px-5 sm:py-2.5 rounded-xl font-black text-[11px] sm:text-xs bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-slate-950 transition-all duration-300 cursor-pointer flex items-center space-x-1 sm:space-x-1.5 shadow-md shadow-amber-500/30 active:scale-95 group/btn whitespace-nowrap border border-amber-300/80 animate-destello-pulse"
               >
-                <span>Ver Colección</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform duration-200 stroke-[2.5]" />
+                <span>Ver</span>
+                <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover/btn:translate-x-1 transition-transform duration-300 stroke-[2.5]" />
               </button>
             )}
           </div>
@@ -168,3 +172,5 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
     </div>
   );
 };
+
+
