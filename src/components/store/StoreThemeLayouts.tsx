@@ -40,6 +40,10 @@ import {
   RotateCcw,
   Tag,
   Filter,
+  ArrowRight,
+  Gift,
+  ShoppingBag,
+  ExternalLink,
 } from 'lucide-react';
 import { CartItem, CustomerOrder, InventoryItem, StoreConfig, StoreTheme, CourierPartner, PaymentMethodPartner } from '../../types.ts';
 import { buildWhatsAppLink, toEcuadorInternationalPhone } from '../../utils/phone.ts';
@@ -103,6 +107,295 @@ const getProductPhotos = (item: InventoryItem): string[] => {
 // ----------------------------------------------------
 // 1. REUSABLE SUB-COMPONENTS
 // ----------------------------------------------------
+
+const DEFAULT_PROMO_DATA = {
+  active: true,
+  theme: 'christmas',
+  badge: '🎄 OFERTA ESPECIAL',
+  title: '¡Gran Venta Especial y Descuentos!',
+  description: 'Aprovecha promociones exclusivas, envíos rápidos a todo el país y atención personalizada vía WhatsApp.',
+  imageUrl: 'https://images.unsplash.com/photo-1543258103-a62bd96b300b?auto=format&fit=crop&w=900&q=85',
+  couponCode: 'OFERTA2026',
+  buttonText: '¡Pedir con Descuento por WhatsApp!',
+  actionType: 'whatsapp',
+  actionUrl: '',
+};
+
+export const InlineCommercialPoster: React.FC<{
+  storeConfig: StoreConfig;
+  categories: string[];
+  setSelectedCategory: (cat: string) => void;
+  setShowOffersOnly: (v: boolean) => void;
+  products?: InventoryItem[];
+  currency?: string;
+  onQuickViewProduct?: (item: InventoryItem) => void;
+}> = ({
+  storeConfig,
+  categories,
+  setSelectedCategory,
+  setShowOffersOnly,
+  products = [],
+  currency = 'USD',
+  onQuickViewProduct,
+}) => {
+  const [copiedCoupon, setCopiedCoupon] = React.useState(false);
+
+  const parsedPromo = React.useMemo(() => {
+    const raw = storeConfig?.promoPopup;
+    if (!raw) return DEFAULT_PROMO_DATA;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return { ...DEFAULT_PROMO_DATA, ...parsed };
+      } catch {
+        return DEFAULT_PROMO_DATA;
+      }
+    }
+    if (typeof raw === 'object') return { ...DEFAULT_PROMO_DATA, ...raw };
+    return DEFAULT_PROMO_DATA;
+  }, [storeConfig?.promoPopup]);
+
+  if (!parsedPromo || parsedPromo.active === false) {
+    return null;
+  }
+
+  const theme = parsedPromo.theme || 'christmas';
+
+  const getThemeStyles = (t: string) => {
+    switch (t) {
+      case 'christmas':
+        return {
+          badgeBg: 'bg-emerald-600/90 text-emerald-50 border-emerald-400/40',
+          ctaButton: 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-rose-600/30 border-rose-500',
+          fallbackImage: 'https://images.unsplash.com/photo-1543258103-a62bd96b300b?auto=format&fit=crop&w=900&q=85',
+        };
+      case 'black_friday':
+        return {
+          badgeBg: 'bg-red-600 text-white border-red-500/50',
+          ctaButton: 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-amber-500/30 font-black border-amber-400',
+          fallbackImage: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=900&q=85',
+        };
+      case 'super_deals':
+        return {
+          badgeBg: 'bg-amber-400 text-amber-950 border-amber-300',
+          ctaButton: 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white shadow-orange-600/30 border-orange-500',
+          fallbackImage: 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?auto=format&fit=crop&w=900&q=85',
+        };
+      case 'new_year':
+        return {
+          badgeBg: 'bg-amber-500/90 text-slate-950 border-amber-300',
+          ctaButton: 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-amber-500/30 font-black border-amber-400',
+          fallbackImage: 'https://images.unsplash.com/photo-1467810563316-b5476525c0f9?auto=format&fit=crop&w=900&q=85',
+        };
+      case 'clearance':
+        return {
+          badgeBg: 'bg-rose-600 text-white border-rose-400',
+          ctaButton: 'bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 text-white shadow-rose-600/30 border-rose-500',
+          fallbackImage: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=900&q=85',
+        };
+      default:
+        return {
+          badgeBg: 'bg-[#FFD100] text-slate-950 border-amber-400',
+          ctaButton: 'bg-[#FFD100] hover:bg-[#E6B800] text-slate-950 font-black border-amber-400 shadow-xl',
+          fallbackImage: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=900&q=85',
+        };
+    }
+  };
+
+  const themeStyle = getThemeStyles(theme);
+  const title = parsedPromo.title || '';
+  const description = parsedPromo.description || '';
+  const badge = parsedPromo.badge || '✨ OFERTA ESPECIAL';
+  const imageUrl = parsedPromo.imageUrl || parsedPromo.featuredProductImage || themeStyle.fallbackImage;
+  const couponCode = parsedPromo.couponCode || '';
+  const actionType = parsedPromo.actionType || 'whatsapp';
+  const actionUrl = parsedPromo.actionUrl || '';
+  const buttonText = parsedPromo.buttonText || (
+    actionType === 'catalog'
+      ? 'Explorar Catálogo con Descuento'
+      : actionType === 'url'
+      ? 'Aprovechar Oferta'
+      : actionType === 'product'
+      ? 'Ver Producto Estrella'
+      : 'Comprar por WhatsApp'
+  );
+
+  const handleCopyCoupon = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (couponCode) {
+      try {
+        navigator.clipboard.writeText(couponCode.trim());
+      } catch {}
+      setCopiedCoupon(true);
+      setTimeout(() => setCopiedCoupon(false), 2000);
+    }
+  };
+
+  const handleCtaClick = () => {
+    if (actionType === 'whatsapp') {
+      const couponText = couponCode ? ` con el cupón *${couponCode}*` : '';
+      const promoName = title || 'la promoción especial';
+      const productMention = parsedPromo.featuredProductName ? ` de *${parsedPromo.featuredProductName}*` : '';
+      const msg = `¡Hola *${storeConfig.storeName || ''}*! 👋 Vi la promoción${productMention} (${promoName})${couponText} en la tienda online y deseo consultar disponibilidad y realizar mi pedido.`;
+      
+      const cleanPhone = (storeConfig.whatsappNumber || '').replace(/\D/g, '');
+      window.open(buildWhatsAppLink(cleanPhone, msg), '_blank');
+    } else if (actionType === 'product' && parsedPromo.featuredProductId && onQuickViewProduct && products.length > 0) {
+      const item = products.find(p => String(p.id) === String(parsedPromo.featuredProductId));
+      if (item) {
+        onQuickViewProduct(item);
+      } else {
+        setShowOffersOnly(true);
+        setSelectedCategory('all');
+      }
+    } else if (actionType === 'catalog') {
+      setShowOffersOnly(true);
+      setSelectedCategory('all');
+    } else if (actionType === 'url' && actionUrl) {
+      window.open(actionUrl, '_blank');
+    } else {
+      const cleanPhone = (storeConfig.whatsappNumber || '').replace(/\D/g, '');
+      const msg = `¡Hola ${storeConfig.storeName || ''}! Me interesa la oferta: ${title || 'Afiche Comercial'}.`;
+      window.open(buildWhatsAppLink(cleanPhone, msg), '_blank');
+    }
+  };
+
+  const handleProductCardClick = () => {
+    if (onQuickViewProduct && parsedPromo.featuredProductId && products.length > 0) {
+      const item = products.find(p => String(p.id) === String(parsedPromo.featuredProductId));
+      if (item) onQuickViewProduct(item);
+    }
+  };
+
+  return (
+    <div className="mb-8 rounded-3xl overflow-hidden shadow-2xl border border-amber-400/30 relative min-h-[340px] sm:min-h-[400px] lg:min-h-[450px] flex flex-col justify-between p-6 sm:p-8 lg:p-10 transition-all duration-300 bg-slate-950 group">
+      {/* 1. Full Panel Background Image */}
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt={title || 'Afiche comercial'}
+          className="absolute inset-0 w-full h-full object-cover object-center rounded-3xl z-0 transition-transform duration-700 ease-out group-hover:scale-[1.02]"
+        />
+      )}
+
+      {/* 2. Soft Vignette Gradient Overlay for maximum readability without covering the image */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/45 to-slate-950/25 z-0 pointer-events-none" />
+
+      {/* 3. Top Elements (Badge & Coupon) floating directly on top of background image */}
+      <div className="relative z-10 flex items-center justify-between space-x-2 flex-wrap gap-y-2">
+        <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+          {badge && (
+            <span className={`px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-wider shadow-lg border ${themeStyle.badgeBg}`}>
+              {badge}
+            </span>
+          )}
+          {couponCode && (
+            <button
+              type="button"
+              onClick={handleCopyCoupon}
+              className="px-4 py-1.5 rounded-full bg-slate-950/85 hover:bg-slate-950 text-amber-300 border border-amber-400/50 text-xs font-mono font-bold flex items-center space-x-1.5 cursor-pointer transition active:scale-95 shadow-lg backdrop-blur-md"
+              title="Copiar código de cupón"
+            >
+              <Tag className="w-3.5 h-3.5 text-amber-400" />
+              <span>CUPÓN: <strong className="text-white">{couponCode}</strong></span>
+              {copiedCoupon ? (
+                <span className="text-emerald-400 font-sans text-[10px] ml-1 font-bold">¡Copiado!</span>
+              ) : (
+                <Copy className="w-3.5 h-3.5 ml-1 text-amber-400/80" />
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 4. Bottom Elements (Title, Description, Featured Product Card, CTA) floating directly on top of background image */}
+      <div className="relative z-10 mt-8 space-y-4 max-w-2xl">
+        {/* Title & Store name */}
+        {title && (
+          <div>
+            <span className="text-xs font-bold text-amber-300 drop-shadow-md uppercase tracking-wider block mb-1">
+              ⭐ {storeConfig.storeName || 'TIENDA ONLINE'}
+            </span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
+              {title}
+            </h2>
+          </div>
+        )}
+
+        {/* Description */}
+        {description && (
+          <p className="text-xs sm:text-sm text-zinc-100 font-medium leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] max-w-xl">
+            {description}
+          </p>
+        )}
+
+        {/* Featured Product Card (if configured) */}
+        {parsedPromo.featuredProductName && (
+          <div
+            onClick={handleProductCardClick}
+            className={`p-3 bg-slate-950/85 hover:bg-slate-950 backdrop-blur-md border border-amber-400/50 rounded-2xl flex items-center gap-3 shadow-2xl max-w-lg transition group ${
+              onQuickViewProduct && parsedPromo.featuredProductId ? 'cursor-pointer hover:border-amber-300' : ''
+            }`}
+            title={onQuickViewProduct && parsedPromo.featuredProductId ? 'Toca para ver este producto en la tienda' : undefined}
+          >
+            {parsedPromo.featuredProductImage ? (
+              <img
+                src={parsedPromo.featuredProductImage}
+                alt={parsedPromo.featuredProductName}
+                className="w-14 h-14 rounded-xl object-cover border border-amber-300/60 shadow-xs flex-shrink-0 group-hover:scale-105 transition"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center font-black text-xl flex-shrink-0 border border-amber-400/40 group-hover:scale-105 transition">
+                ⭐
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block truncate">
+                  ⭐ Producto Estrella de la Promoción
+                </span>
+                {onQuickViewProduct && parsedPromo.featuredProductId && (
+                  <span className="text-[10px] font-bold text-slate-950 bg-amber-400 px-2 py-0.5 rounded-full flex-shrink-0 group-hover:bg-amber-300 transition">
+                    Ver Producto →
+                  </span>
+                )}
+              </div>
+              <h4 className="text-xs sm:text-sm font-black text-white truncate mt-0.5">
+                {parsedPromo.featuredProductName}
+              </h4>
+              {parsedPromo.featuredProductPrice !== undefined && parsedPromo.featuredProductPrice !== null && (
+                <span className="text-xs font-black text-amber-300 block mt-0.5">
+                  {currency} {typeof parsedPromo.featuredProductPrice === 'number'
+                    ? parsedPromo.featuredProductPrice.toFixed(2)
+                    : String(parsedPromo.featuredProductPrice)}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* CTA Button */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={handleCtaClick}
+            className={`w-full sm:w-auto px-8 py-3.5 rounded-full font-black text-xs sm:text-sm transition shadow-2xl hover:scale-105 active:scale-95 flex items-center justify-center space-x-2 cursor-pointer border ${themeStyle.ctaButton}`}
+          >
+            {actionType === 'catalog' ? (
+              <ShoppingBag className="w-4 h-4" />
+            ) : actionType === 'url' ? (
+              <ExternalLink className="w-4 h-4" />
+            ) : (
+              <MessageCircle className="w-4 h-4 fill-current" />
+            )}
+            <span>{buttonText}</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const StoreHeader: React.FC<{
   props: StoreLayoutProps;
@@ -799,7 +1092,7 @@ export const BannerTicker: React.FC<{
     return (
       <div className="p-2.5 bg-yellow-300 border-3 border-black text-black font-black text-xs uppercase shadow-[4px_4px_0px_#000] flex items-center justify-between overflow-hidden">
         <div className="flex items-center space-x-2">
-          <span className="px-2 py-0.5 bg-black text-yellow-300 text-[10px] font-black">🔥 NOVEDAD:</span>
+          <span className="px-2 py-0.5 bg-black text-yellow-300 text-[10px] font-black">⭐ {storeConfig.storeName ? storeConfig.storeName.toUpperCase() : 'NOVEDAD'}:</span>
           <span>{storeConfig.bannerText}</span>
         </div>
         {storeConfig.whatsappNumber && (
@@ -1383,12 +1676,12 @@ export const ProductCardItem: React.FC<{
         {/* Offer & Category overlay pill */}
         <div className="absolute top-1.5 sm:top-2.5 left-1.5 sm:left-2.5 flex flex-col gap-1 z-10 max-w-[70%]">
           {hasDiscount && (
-            <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 text-white shadow-md shadow-rose-600/40 border border-white/40 flex items-center space-x-1 animate-destello-pulse">
-              <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-yellow-200 fill-yellow-200" />
-              <span>OFERTA -{discountPercent}%</span>
+            <span className="px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-[#FFD000] text-slate-950 shadow-md border border-amber-300 flex items-center space-x-1">
+              <Sparkles className="w-3 h-3 text-slate-950 fill-slate-950" />
+              <span>-{discountPercent}% OFF</span>
             </span>
           )}
-          <span className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-bold backdrop-blur-sm shadow-xs border truncate max-w-[120px] ${themeStyles.productCategoryBadge}`}>
+          <span className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold backdrop-blur-sm shadow-xs border truncate max-w-[120px] ${themeStyles.productCategoryBadge}`}>
             {item.category || 'General'}
           </span>
         </div>
@@ -1545,11 +1838,11 @@ export const ProductCardItem: React.FC<{
                     <button
                       type="button"
                       onClick={() => onAddToCart(item, 1)}
-                      className="min-h-[38px] py-2 px-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow-xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border border-amber-300"
+                      className="min-h-[38px] py-2 px-2.5 rounded-full bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black text-xs shadow-xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border border-amber-300"
                       title="Agregar al carrito"
                     >
                       <ShoppingCart className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="font-bold">Agregar</span>
+                      <span className="font-black">Agregar</span>
                     </button>
                   )}
 
@@ -1865,98 +2158,143 @@ export const PaymentShowcase: React.FC<{
 export const StoreFooter: React.FC<{
   props: StoreLayoutProps;
   variant?: 'standard' | 'boutique' | 'fresh' | 'brutalist' | 'cyber' | 'minimal';
-}> = ({ props, variant = 'standard' }) => {
-  const { storeConfig, activeTheme, themeStyles, isLogoAnimating, onLogoClick } = props;
+}> = ({ props }) => {
+  const { storeConfig, isLogoAnimating, onLogoClick } = props;
 
   return (
-    <div className={`rounded-3xl p-6 sm:p-8 border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 ${themeStyles.cardBg}`}>
-      <div className="flex items-center space-x-4">
-        <div
-          id="store-footer-logo"
-          onClick={onLogoClick}
-          className={`cursor-pointer select-none transition-all duration-300 transform-gpu ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
-            }`}
-        >
-          {/* Mobile view */}
-          <div className="md:hidden">
-            {storeConfig.logoUrl ? (
-              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
-                }`}>
-                <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain rounded-xl" />
-              </div>
-            ) : storeConfig.logoDesktopUrl ? (
-              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
-                }`}>
-                <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="w-full h-full object-contain rounded-xl" />
-              </div>
-            ) : (
-              <div className={`w-14 h-14 rounded-2xl text-white flex items-center justify-center flex-shrink-0 shadow-md ${activeTheme === 'boutique' ? 'bg-gradient-to-tr from-amber-600 to-amber-800' : activeTheme === 'fresh' ? 'bg-gradient-to-tr from-emerald-500 to-teal-700' : 'bg-gradient-to-tr from-sky-500 to-indigo-600'
-                }`}>
-                <Store className="w-7 h-7" />
-              </div>
-            )}
+    <footer className="bg-[#1C1C1C] text-zinc-300 rounded-3xl p-6 sm:p-10 border border-zinc-800 shadow-2xl space-y-8 my-8">
+      {/* Top 4 Columns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 border-b border-zinc-800 pb-8">
+        {/* Col 1: Store Brand Info (2 spans) */}
+        <div className="lg:col-span-2 space-y-3.5">
+          <div className="flex items-center space-x-3">
+            <div
+              id="store-footer-logo"
+              onClick={onLogoClick}
+              className={`cursor-pointer select-none transition-all duration-300 ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'}`}
+            >
+              {storeConfig.logoUrl ? (
+                <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-amber-500/40 p-1 flex items-center justify-center overflow-hidden shadow-xs">
+                  <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
+                </div>
+              ) : storeConfig.logoDesktopUrl ? (
+                <div className="h-12 max-w-[180px] rounded-xl bg-zinc-900 border border-amber-500/40 px-2 py-1 flex items-center justify-center overflow-hidden shadow-xs">
+                  <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto object-contain" />
+                </div>
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center font-black shadow-md border border-amber-300">
+                  <Store className="w-6 h-6" />
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white tracking-tight">
+                {storeConfig.storeName || 'Lotengoo'}
+              </h3>
+              <p className="text-[11px] text-[#FFD000] font-mono font-bold uppercase tracking-widest">
+                Tienda Online Oficial
+              </p>
+            </div>
           </div>
 
-          {/* Desktop view */}
-          <div className="hidden md:block">
-            {storeConfig.logoDesktopUrl ? (
-              <div className={`h-16 max-w-[240px] rounded-2xl border px-3 py-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
-                }`}>
-                <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto max-w-full object-contain" />
-              </div>
-            ) : storeConfig.logoUrl ? (
-              <div className={`w-16 h-16 rounded-2xl border p-1 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden ${activeTheme === 'boutique' ? 'bg-zinc-900 border-amber-500/30' : 'bg-white border-slate-200'
-                }`}>
-                <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain rounded-xl" />
-              </div>
-            ) : (
-              <div className={`w-14 h-14 rounded-2xl text-white flex items-center justify-center flex-shrink-0 shadow-md ${activeTheme === 'boutique' ? 'bg-gradient-to-tr from-amber-600 to-amber-800' : activeTheme === 'fresh' ? 'bg-gradient-to-tr from-emerald-500 to-teal-700' : 'bg-gradient-to-tr from-sky-500 to-indigo-600'
-                }`}>
-                <Store className="w-7 h-7" />
-              </div>
+          <p className="text-xs text-zinc-400 leading-relaxed max-w-sm">
+            {storeConfig.description ||
+              'Compras fáciles, en un solo lugar. La plataforma digital de compras rápidas, seguras y con entregas confiables a todo el país.'}
+          </p>
+
+          <div className="flex items-center space-x-2 pt-1">
+            {storeConfig.whatsappNumber && (
+              <a
+                href={buildWhatsAppLink(storeConfig.whatsappNumber)}
+                target="_blank"
+                rel="noreferrer"
+                className="w-8 h-8 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition cursor-pointer"
+                title="WhatsApp Directo"
+              >
+                <MessageCircle className="w-4 h-4" />
+              </a>
+            )}
+            {props.onOpenShareModal && (
+              <button
+                type="button"
+                onClick={props.onOpenShareModal}
+                className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700 flex items-center justify-center hover:bg-[#FFD000] hover:text-slate-950 transition cursor-pointer"
+                title="Compartir tienda"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>
 
-        <div>
-          <h4 className={`text-base font-black ${themeStyles.headerText}`}>
-            {storeConfig.storeName || 'Comerxia Store'}
-          </h4>
-          <p className={`text-xs mt-0.5 max-w-md ${themeStyles.productDescription}`}>
-            {storeConfig.description || 'Catálogo de productos exclusivos con entregas y pedidos inmediatos.'}
-          </p>
-          <div className={`flex items-center space-x-3 text-[11px] mt-1.5 font-medium flex-wrap gap-y-1 ${themeStyles.productDescription}`}>
-            <span>✓ Envíos a Nivel Nacional</span>
-            <span>•</span>
-            <span>✓ Atención Personalizada</span>
-            {storeConfig.address && (
-              <>
-                <span>•</span>
-                <span className={`flex items-center font-semibold ${themeStyles.productTitle}`}>
-                  <MapPin className="w-3 h-3 text-rose-500 mr-1" />
-                  {storeConfig.address}
-                </span>
-              </>
+        {/* Col 2: Sobre Lotengoo */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-black text-white uppercase tracking-wider">Sobre Lotengoo</h4>
+          <ul className="space-y-2 text-xs text-zinc-400">
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Quiénes somos</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Trabaja con nosotros</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Prensa y noticias</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Sostenibilidad</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Inversionistas</li>
+          </ul>
+        </div>
+
+        {/* Col 3: Atención al Cliente */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-black text-white uppercase tracking-wider">Atención al Cliente</h4>
+          <ul className="space-y-2 text-xs text-zinc-400">
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Centro de ayuda</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Devoluciones y garantías</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Rastreo de envíos</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Facturación electrónica</li>
+            {storeConfig.whatsappNumber && (
+              <li>
+                <a
+                  href={buildWhatsAppLink(storeConfig.whatsappNumber)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[#FFD000] transition cursor-pointer inline-flex items-center gap-1"
+                >
+                  <MessageCircle className="w-3 h-3 text-emerald-400" />
+                  <span>Contacto y WhatsApp</span>
+                </a>
+              </li>
             )}
-          </div>
+          </ul>
+        </div>
+
+        {/* Col 4: Términos y Legal */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-black text-white uppercase tracking-wider">Términos y Legal</h4>
+          <ul className="space-y-2 text-xs text-zinc-400">
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Términos y condiciones</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Aviso de privacidad</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Políticas de cookies</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Seguridad de compras</li>
+            <li className="hover:text-[#FFD000] transition cursor-pointer">Defensa del consumidor</li>
+          </ul>
         </div>
       </div>
 
-      {storeConfig.whatsappNumber && (
-        <a
-          href={buildWhatsAppLink(
-            storeConfig.whatsappNumber,
-            `¡Hola! Estoy visitando el catálogo de ${storeConfig.storeName || 'la tienda'} y quisiera más información.`
-          )}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition cursor-pointer flex-shrink-0 space-x-2"
-        >
-          <MessageCircle className="w-4 h-4" />
-          <span>Contactar por WhatsApp</span>
-        </a>
-      )}
-    </div>
+      {/* Bottom Payment Badges & Copyright */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-zinc-500">
+        <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+          <span className="font-bold text-zinc-400 mr-1 text-[11px]">Métodos de pago aceptados:</span>
+          {['VISA', 'MASTERCARD', 'AMERICAN EXPRESS', 'PAYPAL', 'SPEI'].map((pm) => (
+            <span
+              key={pm}
+              className="px-2.5 py-1 rounded bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-bold text-zinc-300"
+            >
+              {pm}
+            </span>
+          ))}
+        </div>
+
+        <p className="text-[11px] font-medium text-zinc-400">
+          © 2026 {storeConfig.storeName || 'Lotengoo.com'} - Tu tienda online. Todos los derechos reservados.
+        </p>
+      </div>
+    </footer>
   );
 };
 
@@ -2002,6 +2340,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     isLogoAnimating,
     onLogoClick,
     themeStyles,
+    currency = 'USD',
   } = props;
 
   // Calculate real-time cart subtotal
@@ -2148,28 +2487,35 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
   return (
     <div className="space-y-4 pb-12">
       {/* ========================================================================= */}
-      {/* 1. AMAZON & ALIEXPRESS MODERN LIGHT STICKY SEARCH & NAVIGATION BAR       */}
-      {/* When scrolling on cellular mode, only the modern search bar remains!    */}
+      {/* 1. LOTENGOO PURE WHITE STICKY SEARCH & NAVIGATION BAR                    */}
       {/* ========================================================================= */}
       <div
         id="marketplace-sticky-header"
         className={`sticky ${scrollDirection === 'down'
             ? '-translate-y-full opacity-0 pointer-events-none'
             : scrollDirection === 'up'
-              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-amber-400/30'
-              : `${isCustomerOnly ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
-          } text-slate-900 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b ${isScrolled ? 'border-amber-400/80 shadow-md' : 'border-slate-200/90'
-          } transition-all duration-300 transform`}
-        style={{
-          background: 'linear-gradient(180deg, #f59f0be3 0%, #fae5afff 35%, #fdfbeaff 70%, #ffffffff 100%)',
-        }}
+              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200'
+              : `${isCustomerOnly || isCustomerView || isCustomerMode ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
+          } bg-white text-slate-900 shadow-xs -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b border-slate-200 transition-all duration-300 transform`}
       >
-        {/* Upper Row: Store Brand + Desktop Mega Search Box + Quick Actions (WhatsApp, Cart) */}
+        {/* Yellow Announcement Ribbon */}
+        <div className="bg-[#FFD000] text-slate-950 text-[11px] font-bold py-1 px-3 -mx-3 sm:-mx-6 lg:-mx-8 flex items-center justify-between border-b border-amber-400">
+          <div className="flex items-center space-x-2 truncate">
+            <span className="font-mono font-black uppercase tracking-wider text-[10px]">
+              ⭐ {storeConfig.storeName ? storeConfig.storeName.toUpperCase() : 'TIENDA ONLINE'}
+            </span>
+            <span className="truncate">
+              {storeConfig.bannerText || 'Sumamos miles de ofertas con Envío & Devolución gratis'}
+            </span>
+          </div>
+        </div>
+
+        {/* Upper Row: Store Brand + Desktop Mega Search Box + Cart */}
         <div
           className={`${isScrolled ? 'hidden md:flex' : 'flex'
-            } py-2 sm:py-3 items-center justify-between gap-2 sm:gap-4 border-b border-amber-400/30 transition-all duration-300`}
+            } py-3 items-center justify-between gap-3 sm:gap-6 border-b border-slate-100 transition-all duration-300`}
         >
-          {/* Brand & Store Identity (Light, Crisp & Visually Elegant) */}
+          {/* Brand & Store Identity */}
           <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
             <div
               id="store-marketplace-logo"
@@ -2178,80 +2524,54 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 }`}
               title="Logo de la tienda"
             >
-              {/* Mobile view */}
-              <div className="md:hidden">
-                {storeConfig.logoUrl ? (
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white border-2 border-amber-400 overflow-hidden shadow-xs flex items-center justify-center p-1">
-                    <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
-                  </div>
-                ) : storeConfig.logoDesktopUrl ? (
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white border-2 border-amber-400 overflow-hidden shadow-xs flex items-center justify-center p-1">
-                    <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-400 via-amber-500 to-orange-500 text-slate-950 flex items-center justify-center shadow-xs font-black border border-amber-300">
-                    <Store className="w-5 h-5" />
-                  </div>
-                )}
-              </div>
-
-              {/* Desktop view */}
-              <div className="hidden md:block">
+              <div className="flex items-center space-x-2">
                 {storeConfig.logoDesktopUrl ? (
-                  <div className="h-10 sm:h-11 max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border-2 border-amber-400 overflow-hidden shadow-xs flex items-center justify-center px-2 py-0.5">
+                  <div className="h-10 sm:h-11 max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-slate-200 overflow-hidden shadow-xs flex items-center justify-center px-2 py-0.5">
                     <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto max-w-full object-contain" />
                   </div>
                 ) : storeConfig.logoUrl ? (
-                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-white border-2 border-amber-400 overflow-hidden shadow-xs flex items-center justify-center p-1">
+                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-white border border-slate-200 overflow-hidden shadow-xs flex items-center justify-center p-1">
                     <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
                   </div>
                 ) : (
-                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-400 via-amber-500 to-orange-500 text-slate-950 flex items-center justify-center shadow-xs font-black border border-amber-300">
+                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-sm font-black border border-amber-300">
                     <Store className="w-6 h-6" />
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div className="min-w-0 flex flex-col justify-center">
-              <div className="flex items-center space-x-1.5">
-                <span className="font-black text-xs sm:text-sm md:text-base text-slate-900 hover:text-amber-600 tracking-tight truncate max-w-[130px] xs:max-w-[180px] sm:max-w-[240px] md:max-w-[300px] transition">
-                  {storeConfig.storeName || 'Tienda Oficial'}
-                </span>
-                <span className="px-1.5 py-0.2 rounded-full text-[8px] sm:text-[9px] font-black bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 flex items-center gap-0.5 shadow-xs border border-amber-300 flex-shrink-0">
-                  <BadgeCheck className="w-2.5 h-2.5 fill-slate-950 text-amber-400" />
-                  <span className="tracking-tighter">OFICIAL</span>
-                </span>
-              </div>
-              <div className="flex items-center text-[9px] sm:text-[10px] text-slate-500 font-medium">
-                <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-500 mr-0.5 flex-shrink-0" />
-                <span className="truncate max-w-[110px] xs:max-w-[150px] sm:max-w-none">Envíos a todo el país</span>
+                <div className="min-w-0 flex flex-col justify-center">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-black text-sm sm:text-base md:text-lg text-slate-950 tracking-tight truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[240px]">
+                      {storeConfig.storeName || 'Lotengoo'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-medium">Todo en un solo lugar</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Desktop Mega Search Bar (Clean Solid White Input contrasting on the Gradient Header Panel) */}
+          {/* Desktop Mega Search Bar (Clean Pure White Input with Lotengoo Yellow Search Button) */}
           <div className="hidden md:block flex-1 max-w-2xl min-w-0">
-            <div className="flex items-center bg-white rounded-xl shadow-xs border-2 border-amber-400 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-400/30 overflow-hidden transition-all">
+            <div className="flex items-center bg-slate-50 rounded-xl shadow-inner border border-slate-300 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 overflow-hidden transition-all">
               {/* Category Dropdown integrated on the left */}
-              <div className="relative flex-shrink-0 bg-slate-50 border-r border-slate-200">
+              <div className="relative flex-shrink-0 bg-slate-100 border-r border-slate-300">
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="appearance-none bg-transparent hover:bg-slate-100 text-slate-900 text-xs font-bold pl-2.5 pr-6 py-2 focus:outline-none cursor-pointer max-w-[130px] truncate"
-                  title="Filtrar por categoría"
+                  className="appearance-none bg-transparent hover:bg-slate-200 text-slate-800 text-xs font-bold pl-3 pr-7 py-2.5 focus:outline-none cursor-pointer max-w-[140px] truncate"
+                  title="Todas las categorías"
                 >
-                  <option value="all">Todas ({products.length})</option>
+                  <option value="all">Todas las categorías</option>
                   {categories.map((c) => (
                     <option key={c} value={c}>
                       {c} ({categoryCounts[c] || 0})
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-3 h-3 text-slate-600 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-600 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
-              {/* Main Smart Search Input with Live Fuzzy Dropdown */}
+              {/* Main Smart Search Input */}
               <StoreSmartSearchBar
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
@@ -2262,59 +2582,33 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 storeConfig={storeConfig}
               />
 
-              {/* Signature Amber Search Button */}
+              {/* Signature Lotengoo Yellow Search Button */}
               <button
                 type="button"
-                className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black px-3.5 sm:px-4 py-2 flex items-center justify-center transition cursor-pointer flex-shrink-0 shadow-xs active:scale-95"
+                className="bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black px-4 py-2.5 flex items-center justify-center transition cursor-pointer flex-shrink-0 shadow-xs active:scale-95"
                 title="Buscar productos"
               >
-                <Search className="w-4 h-4 stroke-[2.5]" />
+                <Search className="w-4 h-4 text-slate-950 stroke-[2.5]" />
               </button>
             </div>
           </div>
 
-          {/* Right Action Controls: WhatsApp, Share, Cart */}
-          <div className="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
-            {/* WhatsApp Concierge - Responsive */}
-            {isCustomerView && storeConfig.whatsappNumber && (
-              <a
-                href={buildWhatsAppLink(storeConfig.whatsappNumber)}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center space-x-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs cursor-pointer flex-shrink-0"
-                title="Atención directa por WhatsApp"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">Atención</span>
-              </a>
-            )}
-
-            {/* Share Store */}
-            {isCustomerView && onOpenShareModal && (
-              <button
-                type="button"
-                onClick={onOpenShareModal}
-                className="hidden sm:flex items-center space-x-1 p-2 sm:px-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition cursor-pointer"
-                title="Compartir tienda"
-              >
-                <Share2 className="w-3.5 h-3.5 text-amber-600" />
-                <span className="hidden xl:inline">Compartir</span>
-              </button>
-            )}
+          {/* Right Action Controls: Carrito Pill */}
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
 
             {/* Merchant Tab Switcher in Admin preview */}
             {!isCustomerMode && !isCustomerOnly && (
               <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs gap-1">
                 <button
                   onClick={() => setStoreTab('catalog')}
-                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer ${storeTab === 'catalog' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer ${storeTab === 'catalog' ? 'bg-[#FFD000] text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                 >
                   Catálogo
                 </button>
                 <button
                   onClick={() => setStoreTab('orders')}
-                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${storeTab === 'orders' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${storeTab === 'orders' ? 'bg-[#FFD000] text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                 >
                   <span>Pedidos</span>
@@ -2323,12 +2617,12 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               </div>
             )}
 
-            {/* Shopping Cart Button */}
+            {/* Lotengoo Yellow Shopping Cart Button */}
             {isCustomerView && (
               <button
                 type="button"
                 onClick={onOpenCart}
-                className="flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs font-black transition cursor-pointer shadow-sm active:scale-95 flex-shrink-0"
+                className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 rounded-full bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 text-xs font-black transition cursor-pointer shadow-sm active:scale-95 flex-shrink-0 border border-amber-400"
                 title="Ver carrito de compras"
               >
                 <div className="relative">
@@ -2339,9 +2633,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                     </span>
                   )}
                 </div>
-                <div className="flex flex-col text-left leading-none">
-                  <span className="text-[9px] font-bold text-slate-800 uppercase tracking-tighter hidden xs:inline">Carrito</span>
-                  <span className="text-xs font-mono font-black">${cartSubtotal.toFixed(2)}</span>
+                <div className="flex items-center space-x-1">
+                  <span className="text-xs font-black text-slate-950">Carrito</span>
+                  <span className="text-xs font-mono font-bold text-slate-800">({cartTotalItems})</span>
                 </div>
               </button>
             )}
@@ -2511,72 +2805,69 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
           </div>
         </div>
 
-        {/* Desktop Lower Row: Amazon Department Ribbon & Fast Filter Toggles (Spacious MD+ screens) */}
-        <div className="hidden md:flex py-2 items-center justify-between gap-2 text-xs overflow-x-auto scrollbar-none border-t border-amber-300/30">
-          {/* Department / Category Modern Dropdown List (Desktop PC Mode Only) */}
-          <div className="relative flex-shrink-0">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="appearance-none bg-white/90 hover:bg-white text-slate-900 border border-amber-300/80 rounded-lg pl-8 pr-7 py-1 text-xs font-bold focus:outline-none cursor-pointer shadow-2xs max-w-[220px] truncate transition"
-              title="Seleccionar Categoría"
-            >
-              <option value="all">Todas las Categorías ({products.length})</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat} ({categoryCounts[cat] || 0})
-                </option>
-              ))}
-            </select>
-            <Tag className="w-3.5 h-3.5 text-amber-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+        {/* Desktop Lower Row: Lotengoo Department Ribbon & Fast Filter Toggles (Spacious MD+ screens) */}
+        <div className="hidden md:flex py-2.5 items-center justify-between gap-4 text-xs font-bold text-slate-800 border-t border-slate-100 overflow-x-auto scrollbar-none">
+          {/* Department Links & Categories Dropdown */}
+          <div className="flex items-center space-x-5 flex-shrink-0">
+            <div className="relative flex-shrink-0">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="appearance-none bg-slate-100 hover:bg-slate-200 text-slate-950 font-black rounded-full pl-8 pr-7 py-1.5 text-xs focus:outline-none cursor-pointer border border-slate-300 transition"
+                title="Seleccionar Categoría"
+              >
+                <option value="all">≡ Categorías ({products.length})</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat} ({categoryCounts[cat] || 0})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-700 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
 
-          {/* Quick Toggles: Offers, Stock, Sort */}
-          <div className="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
-            {/* Ofertas Flash */}
             <button
-              type="button"
               onClick={() => setShowOffersOnly(!showOffersOnly)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer flex items-center space-x-1 border ${showOffersOnly
-                ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs font-black'
-                : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
-                }`}
-              title="Filtrar productos con descuento"
+              className={`hover:text-amber-600 transition cursor-pointer flex items-center gap-1.5 ${
+                showOffersOnly ? 'text-amber-600 font-black' : 'text-slate-700'
+              }`}
             >
-              <Flame className={`w-3.5 h-3.5 ${showOffersOnly ? 'text-rose-600 fill-rose-600' : 'text-rose-500'}`} />
-              <span className="whitespace-nowrap">Ofertas</span>
+              <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span>Ofertas Flash</span>
             </button>
 
-            {/* En Stock (Solo en vista admin) */}
-            {!isCustomerView && (
+            {categories.slice(0, 4).map((cat) => (
               <button
-                type="button"
-                onClick={() => setInStockOnly(!inStockOnly)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center space-x-1 border ${inStockOnly
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs font-black'
-                  : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
-                  }`}
-                title="Mostrar solo productos con stock disponible"
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`hover:text-amber-600 transition cursor-pointer ${
+                  selectedCategory === cat ? 'text-amber-600 font-black underline' : 'text-slate-700'
+                }`}
               >
-                <Check className={`w-3.5 h-3.5 ${inStockOnly ? 'text-emerald-700' : 'text-slate-500'}`} />
-                <span className="whitespace-nowrap">En Stock</span>
+                {cat}
               </button>
-            )}
+            ))}
+          </div>
+
+          {/* Right Side: Vender en Lotengoo & Sort Selector */}
+          <div className="flex items-center space-x-3 flex-shrink-0">
+            <span className="text-slate-600 hover:text-slate-900 cursor-pointer font-bold flex items-center gap-1">
+              <span>🤝 Vender en Lotengoo</span>
+            </span>
 
             {/* Sort Selector */}
             <div className="relative">
               <select
                 value={sortBy}
                 onChange={(e: any) => setSortBy(e.target.value)}
-                className="appearance-none bg-white/90 hover:bg-white text-slate-800 border border-amber-300/60 rounded-lg pl-2 pr-5 py-1 text-xs font-semibold focus:outline-none cursor-pointer"
+                className="appearance-none bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-full pl-3 pr-7 py-1 text-xs font-semibold focus:outline-none cursor-pointer"
               >
                 <option value="featured">Destacados</option>
                 <option value="price_asc">Menor Precio</option>
                 <option value="price_desc">Mayor Precio</option>
                 <option value="name">Nombre: A-Z</option>
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
         </div>
@@ -2853,8 +3144,64 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
         })()
       )}
 
+      {/* Inline Commercial Poster (Replaces Hero Grid & Trust Badges when active, renders NOTHING when inactive) */}
+      {selectedCategory === 'all' && !searchQuery && (
+        <div className="space-y-6 mb-6">
+          <InlineCommercialPoster
+            storeConfig={storeConfig}
+            categories={categories}
+            setSelectedCategory={setSelectedCategory}
+            setShowOffersOnly={setShowOffersOnly}
+            products={products}
+            currency={currency}
+            onQuickViewProduct={props.onQuickViewProduct}
+          />
+
+          {/* Popular Categories Carousel/Grid */}
+          <div id="store-popular-categories" className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-amber-600 uppercase tracking-widest block">
+                  EXPLORA POR DEPARTAMENTO
+                </span>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">Categorías Populares</h3>
+              </div>
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
+              >
+                <span>Ver todo el catálogo</span>
+                <ChevronRight className="w-3.5 h-3.5 text-amber-500" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+              {categories.slice(0, 6).map((cat, idx) => {
+                const isSelected = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                      isSelected
+                        ? 'bg-[#FFD000] border-amber-400 text-slate-950 font-black shadow-sm'
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-800 shadow-inner">
+                      {idx === 0 ? <Zap className="w-5 h-5 text-amber-500" /> : idx === 1 ? <ImageIcon className="w-5 h-5 text-sky-500" /> : idx === 2 ? <Tag className="w-5 h-5 text-rose-500" /> : idx === 3 ? <Store className="w-5 h-5 text-emerald-500" /> : idx === 4 ? <Sparkles className="w-5 h-5 text-purple-500" /> : <Flame className="w-5 h-5 text-orange-500" />}
+                    </div>
+                    <span className="text-xs font-bold truncate max-w-full">{cat}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================================= */}
-      {/* 3. PRODUCTS GRID FIRST! (STRICT USER DIRECTIVE: PRODUCTS ALWAYS FIRST)    */}
+      {/* 3. PRODUCTS GRID                                                         */}
       {/* ========================================================================= */}
       {filteredProducts.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center my-6 space-y-3 shadow-xs">
@@ -3031,9 +3378,91 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       )}
 
       {/* ========================================================================= */}
-      {/* 4. ALL OTHER PANELS DISPLAYED AFTER THE PRODUCTS (AS REQUESTED)           */}
+      {/* 4. ALL OTHER PANELS DISPLAYED AFTER THE PRODUCTS                         */}
       {/* ========================================================================= */}
       <div className="space-y-6 pt-4 border-t border-slate-200">
+        {/* Lotengoo Unboxing App Banner & Newsletter VIP Club */}
+        {isCustomerView && (
+          <div className="space-y-6">
+            {/* Unboxing App Card */}
+            <div className="bg-[#1F1F1F] text-white rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xl border border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-3 max-w-xl">
+                <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-[#FFD000]/20 text-[#FFD000] border border-[#FFD000]/40 font-black text-[10px] uppercase tracking-wider">
+                  📦 EXPERIENCIA LOTENGOO UNBOXING
+                </span>
+                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+                  Compras fáciles, <br />
+                  <span className="text-[#FFD000]">en un solo lugar.</span>
+                </h3>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  Cada paquete llega embalado con nuestra caja insignia y etiqueta de garantía. Descarga la App oficial de Lotengoo o compra directamente con seguimiento en tiempo real vía WhatsApp y SMS.
+                </p>
+                <div className="flex items-center space-x-3 pt-2 flex-wrap gap-y-2">
+                  <button
+                    type="button"
+                    className="px-5 py-2.5 rounded-full bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black text-xs transition shadow-md cursor-pointer active:scale-95"
+                  >
+                    Descargar la App
+                  </button>
+                  <span className="text-[11px] text-zinc-400 font-medium">Disponible para iOS & Android</span>
+                </div>
+              </div>
+
+              <div className="w-full md:w-64 h-36 rounded-2xl bg-gradient-to-tr from-[#FFD000] to-yellow-500 text-slate-950 p-5 flex flex-col justify-between shadow-lg relative overflow-hidden flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <Store className="w-8 h-8 text-slate-950" />
+                  <span className="text-[9px] font-mono font-black bg-slate-950 text-[#FFD000] px-2 py-0.5 rounded-full">OFFICIAL APP</span>
+                </div>
+                <div>
+                  <span className="text-xs font-black block">Lotengoo Mobile</span>
+                  <span className="text-[10px] font-medium text-slate-800">Seguimiento 24/7 de tus pedidos</span>
+                </div>
+              </div>
+            </div>
+
+            {/* VIP Newsletter Box */}
+            <div className="bg-[#FFD000] text-slate-950 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 max-w-xl">
+                <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-slate-950 text-[#FFD000] font-black text-[10px] uppercase tracking-wider">
+                  ⭐ CLUB LOTENGOO VIP
+                </span>
+                <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-950 leading-tight">
+                  Recibe $200 MXN de descuento en tu primera compra
+                </h3>
+                <p className="text-xs text-slate-900 font-medium">
+                  Suscríbete para recibir cupones exclusivos, acceso anticipado a Ventas Nocturnas y lanzamientos de temporada directamente en tu correo.
+                </p>
+              </div>
+
+              <div className="w-full md:w-auto flex-shrink-0">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    alert('¡Gracias por suscribirte a Club Lotengoo!');
+                  }}
+                  className="flex flex-col sm:flex-row items-center gap-2"
+                >
+                  <input
+                    type="email"
+                    required
+                    placeholder="Ingresa tu correo electrónico..."
+                    className="w-full sm:w-72 px-4 py-3 rounded-full bg-white text-slate-900 placeholder:text-slate-400 text-xs font-bold focus:outline-none border-2 border-slate-950 shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full sm:w-auto px-6 py-3 rounded-full bg-[#1F1F1F] hover:bg-black text-white font-black text-xs transition cursor-pointer shadow-md active:scale-95 whitespace-nowrap"
+                  >
+                    Suscribirme →
+                  </button>
+                </form>
+                <span className="text-[10px] text-slate-800 font-medium block mt-2 text-center md:text-left">
+                  🔒 Sin spam. Cancela tu suscripción en cualquier momento.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Promotional Announcement Ticker */}
         <BannerTicker props={props} variant="standard" />
 

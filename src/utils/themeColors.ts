@@ -17,7 +17,7 @@ export interface ThemeColorPalette {
 }
 
 export const DEFAULT_THEME_COLORS: Record<StoreTheme, string[]> = {
-  classic: ['#0284c7', '#2563eb', '#10b981', '#f8fafc'],
+  classic: ['#FFD000', '#FFC700', '#1F1F1F', '#F4F4F4'],
   boutique: ['#f59e0b', '#eab308', '#27272a', '#09090b'],
   fresh: ['#059669', '#0d9488', '#06b6d4', '#ecfdf5'],
   brutalist: ['#fde047', '#fb7185', '#34d399', '#000000'],

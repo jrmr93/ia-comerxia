@@ -11,6 +11,11 @@
     max-width: 100vw;
   }
 
+  .store-montserrat-theme,
+  .store-montserrat-theme * {
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  }
+
   /* Clean modern light scrollbars */
   ::-webkit-scrollbar {
     width: 6px;

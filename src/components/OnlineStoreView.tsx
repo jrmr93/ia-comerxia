@@ -3905,7 +3905,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   };
 
   return (
-    <div className={`space-y-6 animate-fadeIn ${isCustomerView ? 'pb-28 sm:pb-32' : 'pb-16'} ${isCustomerView && activeTheme === 'boutique' ? 'text-zinc-100' : ''}`}>
+    <div className={`store-montserrat-theme animate-fadeIn ${isCustomerView ? 'pb-28 sm:pb-32 space-y-0 pt-0' : 'space-y-6 pb-16'} ${isCustomerView && activeTheme === 'boutique' ? 'text-zinc-100' : ''}`}>
       {/* Toast alert */}
       {toastMessage && (
         <div className={`fixed ${isCustomerView ? 'bottom-20 sm:bottom-22' : 'bottom-6'} right-6 z-[65] bg-emerald-950/95 border border-emerald-500 text-emerald-200 px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-2 text-xs font-semibold animate-bounce`}>
@@ -6727,25 +6727,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         />
       )}
 
-      {/* MODAL: PUBLIC PROMOTIONAL CAMPAIGN POPUP / BANNER */}
-      {(isCustomerOnly || storeTab === 'catalog') && (
-        <StorePromoModal
-          config={storeConfig?.promoPopup}
-          storeName={storeConfig?.storeName || 'Comerxia Store'}
-          whatsappNumber={storeConfig?.whatsappNumber || ''}
-          currency={currency}
-          onFilterOffers={() => {
-            setShowOffersOnly(true);
-            setSelectedCategory('all');
-          }}
-          onSelectProduct={(productId) => {
-            const found = products.find((p) => String(p.id) === String(productId));
-            if (found) {
-              setQuickViewProduct(found);
-            }
-          }}
-        />
-      )}
+      {/* MODAL: PUBLIC PROMOTIONAL CAMPAIGN POPUP / BANNER REMOVED (commercial poster is now rendered inline in place of hero banner) */}
 
       {/* STATIC FIXED BOTTOM NAVIGATION BAR (Customer View) - Hidden when Filter & Categories Sheet is Open */}
       {isCustomerView && !isFilterSheetOpen && (
