@@ -1839,7 +1839,7 @@ export const ProductCardItem: React.FC<{
                     <button
                       type="button"
                       onClick={() => onAddToCart(item, 1)}
-                      className="min-h-[38px] py-2 px-2.5 rounded-full bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black text-xs shadow-xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border border-amber-300"
+                      className="min-h-[38px] py-2 px-2.5 rounded-xl bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black text-xs shadow-xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border border-amber-300/80"
                       title="Agregar al carrito"
                     >
                       <ShoppingCart className="w-3.5 h-3.5 flex-shrink-0" />
@@ -1850,7 +1850,7 @@ export const ProductCardItem: React.FC<{
                   <button
                     type="button"
                     onClick={(e) => onDirectBuyProduct(item, e)}
-                    className="min-h-[38px] py-2 px-2.5 rounded-xl transition flex items-center justify-center space-x-1 font-black text-xs cursor-pointer shadow-xs active:scale-95 bg-emerald-600 hover:bg-emerald-500 text-white"
+                    className="min-h-[38px] py-2 px-2.5 rounded-xl transition flex items-center justify-center space-x-1 font-black text-xs cursor-pointer shadow-xs active:scale-95 bg-emerald-600 hover:bg-emerald-700 text-white"
                     title="Comprar directo por WhatsApp"
                   >
                     <MessageCircle className="w-3.5 h-3.5 flex-shrink-0 fill-current" />
@@ -1858,15 +1858,15 @@ export const ProductCardItem: React.FC<{
                   </button>
                 </div>
 
-                {/* Secondary Action: Compartir por WhatsApp (Full width, clear and comfortable on mobile) */}
+                {/* Secondary Action: Compartir por WhatsApp (Clean neutral style) */}
                 <button
                   type="button"
                   onClick={(e) => onShareProductWhatsApp(item, e)}
-                  className={`w-full min-h-[34px] py-1.5 px-3 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border-zinc-700' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                  className={`w-full min-h-[34px] py-1.5 px-3 rounded-xl border font-bold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 border-zinc-700/80' : 'bg-slate-100 hover:bg-slate-200/90 text-slate-800 border-slate-200/90'
                     }`}
                   title="Compartir por WhatsApp"
                 >
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                   <span className="font-bold text-xs">Compartir Producto</span>
                 </button>
               </div>
@@ -2499,19 +2499,8 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             : scrollDirection === 'up'
               ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200'
               : `${isCustomerOnly || isCustomerView || isCustomerMode ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
-          } bg-white text-slate-900 shadow-xs -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b border-slate-200 transition-all duration-300 transform`}
+          } bg-white text-slate-900 shadow-[0_4px_20px_rgba(0,0,0,0.06)] -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b-2 border-[#FFD000] transition-all duration-300 transform`}
       >
-        {/* Yellow Announcement Ribbon */}
-        <div className="bg-[#FFD000] text-slate-950 text-[11px] font-bold py-1 px-3 -mx-3 sm:-mx-6 lg:-mx-8 flex items-center justify-between border-b border-amber-400">
-          <div className="flex items-center space-x-2 truncate">
-            <span className="font-mono font-black uppercase tracking-wider text-[10px]">
-              ⭐ {storeConfig.storeName ? storeConfig.storeName.toUpperCase() : 'TIENDA ONLINE'}
-            </span>
-            <span className="truncate">
-              {storeConfig.bannerText || 'Sumamos miles de ofertas con Envío & Devolución gratis'}
-            </span>
-          </div>
-        </div>
 
         {/* Upper Row: Store Brand + Desktop Mega Search Box + Cart */}
         <div
@@ -3178,23 +3167,26 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               </button>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+            <div className="flex sm:grid sm:grid-cols-6 gap-2.5 sm:gap-3 overflow-x-auto scrollbar-none pb-2 sm:pb-0 -mx-1 px-1 sm:mx-0 sm:px-0 snap-x snap-mandatory">
               {categories.slice(0, 6).map((cat, idx) => {
                 const isSelected = selectedCategory === cat;
                 return (
                   <button
                     key={cat}
+                    type="button"
                     onClick={() => setSelectedCategory(cat)}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                    className={`flex-shrink-0 w-[115px] sm:w-auto p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 snap-start ${
                       isSelected
                         ? 'bg-[#FFD000] border-amber-400 text-slate-950 font-black shadow-sm'
                         : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
                     }`}
                   >
-                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-800 shadow-inner">
-                      {idx === 0 ? <Zap className="w-5 h-5 text-amber-500" /> : idx === 1 ? <ImageIcon className="w-5 h-5 text-sky-500" /> : idx === 2 ? <Tag className="w-5 h-5 text-rose-500" /> : idx === 3 ? <Store className="w-5 h-5 text-emerald-500" /> : idx === 4 ? <Sparkles className="w-5 h-5 text-purple-500" /> : <Flame className="w-5 h-5 text-orange-500" />}
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-800 shadow-inner shrink-0">
+                      {idx === 0 ? <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" /> : idx === 1 ? <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-sky-500" /> : idx === 2 ? <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500" /> : idx === 3 ? <Store className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" /> : idx === 4 ? <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" /> : <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />}
                     </div>
-                    <span className="text-xs font-bold truncate max-w-full">{cat}</span>
+                    <span className="text-[11px] sm:text-xs font-bold leading-tight line-clamp-2 text-center h-7 sm:h-8 flex items-center justify-center max-w-full break-words">
+                      {cat}
+                    </span>
                   </button>
                 );
               })}

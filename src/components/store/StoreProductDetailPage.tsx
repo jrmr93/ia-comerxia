@@ -1007,12 +1007,13 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                       )}
 
                       {/* 1. AGREGAR AL CARRITO (Primary) - Clear and legible */}
+                      {/* 1. AGREGAR AL CARRITO */}
                       <button
                         type="button"
                         onClick={handleAdd}
-                        className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl font-black text-sm sm:text-base shadow-md transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 ${addedAnimation
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-amber-400 hover:bg-amber-500 text-slate-950 shadow-amber-400/20'
+                        className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl font-black text-sm sm:text-base shadow-md transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 border border-amber-300/80 ${addedAnimation
+                            ? 'bg-emerald-600 text-white border-emerald-500'
+                            : 'bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 shadow-amber-400/20'
                           }`}
                       >
                         {addedAnimation ? (
@@ -1034,37 +1035,37 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                       <button
                         type="button"
                         onClick={handleDirectBuy}
-                        className="w-full py-3.5 sm:py-4 px-4 rounded-2xl text-sm sm:text-base font-black transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 shadow-md bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-emerald-500/20"
+                        className="w-full py-3.5 sm:py-4 px-4 rounded-2xl text-sm sm:text-base font-black transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
                       >
                         <MessageCircle className="w-5 h-5 fill-current" />
                         <span>Comprar por WhatsApp</span>
                       </button>
 
-                      {/* 3. CONSULTAR DIRECTAMENTE POR WHATSAPP */}
-                      {storeConfig.whatsappNumber && (
+                      {/* 3. SECUNDARIOS: CONSULTAR ASESOR & COMPARTIR (Grilla limpia de 2 columnas) */}
+                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                        {storeConfig.whatsappNumber && (
+                          <button
+                            type="button"
+                            onClick={handleDirectWhatsAppOrder}
+                            className="py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 bg-slate-100 hover:bg-slate-200/90 text-slate-800 border border-slate-200/90 shadow-2xs"
+                            title="Consultar con un asesor por WhatsApp"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span className="truncate">Consultar Asesor</span>
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={handleDirectWhatsAppOrder}
-                          className="w-full py-2.5 sm:py-3 px-4 rounded-2xl text-xs sm:text-sm font-bold transition flex items-center justify-center space-x-2 cursor-pointer active:scale-95 border border-emerald-300/80 bg-emerald-50/70 hover:bg-emerald-100/80 text-emerald-800"
+                          onClick={(e) => onShareProductWhatsApp(product, e)}
+                          className="py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 bg-slate-100 hover:bg-slate-200/90 text-slate-800 border border-slate-200/90 shadow-2xs"
+                          title="Compartir por WhatsApp"
                         >
-                          <MessageCircle className="w-4 h-4 text-emerald-600" />
-                          <span>Consultar asesor por WhatsApp</span>
+                          <Share2 className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                          <span className="truncate">Compartir Producto</span>
                         </button>
-                      )}
+                      </div>
                     </>
                   )}
-
-                  {/* Share product options */}
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={(e) => onShareProductWhatsApp(product, e)}
-                      className="w-full py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 shadow-2xs"
-                    >
-                      <MessageCircle className="w-4 h-4 text-emerald-600" />
-                      <span>Compartir por WhatsApp</span>
-                    </button>
-                  </div>
                 </div>
 
                 {/* Description Box */}
