@@ -8,7 +8,8 @@ export type FlyerTemplateStyle =
   | 'rose_gold'
   | 'pastel_pink'
   | 'lavender_glam'
-  | 'coral_sunset';
+  | 'coral_sunset'
+  | 'luxury_gold_ia';
 
 export interface SocialFlyerOptions {
   productImageUrl?: string;
@@ -316,6 +317,23 @@ export async function generateSocialFlyer(options: SocialFlyerOptions): Promise<
     grad.addColorStop(0.6, '#ffedd5');
     grad.addColorStop(1, '#fecdd3');
     ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+  } else if (templateStyle === 'luxury_gold_ia') {
+    // 👑 Luxury Gold IA / Parfum Noir Studio (Black & Gold Premium Studio Backdrop)
+    const grad = ctx.createLinearGradient(0, 0, size, size);
+    grad.addColorStop(0, '#0a0a0c');
+    grad.addColorStop(0.35, '#181512');
+    grad.addColorStop(0.7, '#261e12');
+    grad.addColorStop(1, '#050506');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    // Warm gold radial spotlight
+    const radial = ctx.createRadialGradient(size * 0.7, size * 0.45, 50, size * 0.7, size * 0.45, 500);
+    radial.addColorStop(0, 'rgba(217, 119, 6, 0.35)');
+    radial.addColorStop(0.6, 'rgba(180, 83, 9, 0.12)');
+    radial.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = radial;
     ctx.fillRect(0, 0, size, size);
   } else {
     // Studio Gradient (Default Modern Indigo/Sky)

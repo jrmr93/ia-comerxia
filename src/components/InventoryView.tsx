@@ -11,6 +11,7 @@ import {
   Copy,
   Database,
   DollarSign,
+  Download,
   Edit,
   Eye,
   Film,
@@ -22,6 +23,7 @@ import {
   Lock,
   MessageSquare,
   Minus,
+  Palette,
   Percent,
   BrainCircuit,
   Loader2,
@@ -45,6 +47,7 @@ import {
   Truck,
   X,
 } from 'lucide-react';
+import JSZip from 'jszip';
 import { CustomerOrder, InventoryItem, StoreConfig, TelegramMessage, Supplier } from '../types.ts';
 import { TelegramMessagesFeed } from './TelegramMessagesFeed.tsx';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
@@ -56,6 +59,29 @@ import { checkProductTransactionLink } from '../utils/productIntegrity.ts';
 import { DeactivateConfirmationModal } from './DeactivateConfirmationModal.tsx';
 import { ShareStoreModal } from './ShareStoreModal.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
+import { generateSocialFlyer, FlyerTemplateStyle } from '../utils/socialFlyerGenerator.ts';
+
+function getItemPhotos(item: InventoryItem): string[] {
+  const photos: string[] = [];
+  if (Array.isArray(item.images)) {
+    item.images.forEach((img) => {
+      if (typeof img === 'string' && img.trim()) photos.push(img.trim());
+    });
+  } else if (typeof item.images === 'string' && item.images.trim()) {
+    try {
+      const parsed = JSON.parse(item.images);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((img) => {
+          if (typeof img === 'string' && img.trim()) photos.push(img.trim());
+        });
+      }
+    } catch {}
+  }
+  if (item.imageUrl && item.imageUrl.trim() && !photos.includes(item.imageUrl.trim())) {
+    photos.unshift(item.imageUrl.trim());
+  }
+  return photos;
+}
 
 export function calculateItemFinancials(item: InventoryItem) {
   let salePriceNum = parseFloat(String(item.salePrice || '0')) || 0;
@@ -448,6 +474,72 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [isProcessingStatus, setIsProcessingStatus] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [shareInitialCategory, setShareInitialCategory] = useState<string>('');
+
+  // Bulk Promotional Flyer Generator State & Logic
+  const [showBulkFlyerModal, setShowBulkFlyerModal] = useState<boolean>(false);
+  const [bulkFlyerStyle, setBulkFlyerStyle] = useState<FlyerTemplateStyle>('luxury_gold_ia');
+  const [isGeneratingBulkFlyers, setIsGeneratingBulkFlyers] = useState<boolean>(false);
+  const [bulkFlyerProgress, setBulkFlyerProgress] = useState<{ current: number; total: number; currentName: string } | null>(null);
+
+  const handleGenerateBulkFlyers = async () => {
+    const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
+    if (selectedProducts.length === 0) return;
+
+    setIsGeneratingBulkFlyers(true);
+    setBulkFlyerProgress({ current: 0, total: selectedProducts.length, currentName: 'Iniciando...' });
+
+    try {
+      const zip = new JSZip();
+      let count = 0;
+
+      for (const item of selectedProducts) {
+        count++;
+        setBulkFlyerProgress({ current: count, total: selectedProducts.length, currentName: item.name });
+
+        const photos = getItemPhotos(item);
+        const activeWhatsapp = storeConfig?.whatsappNumber || storeConfig?.whatsapp_number || storeConfig?.phone || '';
+        const discPct = Number(item.discountPercent) || 0;
+        const salePriceNum = parseFloat(String(item.salePrice || '0')) || 0;
+        const origPriceNum = discPct > 0 ? (salePriceNum / (1 - discPct / 100)) : null;
+
+        const flyerB64 = await generateSocialFlyer({
+          productImageUrls: photos,
+          productName: item.name,
+          salePrice: salePriceNum,
+          originalPrice: origPriceNum,
+          discountPercent: discPct > 0 ? discPct : null,
+          currency: currency || 'USD',
+          storeName: storeConfig?.storeName || 'COMERXIA STORE',
+          storeLogoUrl: storeConfig?.logoDesktopUrl || storeConfig?.logoUrl || null,
+          whatsappNumber: activeWhatsapp,
+          templateStyle: bulkFlyerStyle,
+        });
+
+        const base64Data = flyerB64.replace(/^data:image\/png;base64,/, '');
+        const cleanName = item.name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+        zip.file(`flyer_${item.sku || item.id}_${cleanName}.png`, base64Data, { base64: true });
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      link.download = `flyers_promocionales_comerxia_${dateStr}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast(`✅ ¡Descargado archivo comprimido (.zip) con ${selectedProducts.length} imágenes promocionales!`);
+      setShowBulkFlyerModal(false);
+    } catch (err) {
+      console.error('Error al generar flyers masivos:', err);
+      showToast('⚠️ Ocurrió un error al generar las imágenes promocionales en lote');
+    } finally {
+      setIsGeneratingBulkFlyers(false);
+      setBulkFlyerProgress(null);
+    }
+  };
 
   // Keep marketingCopyItem in sync with items without losing newly appended images
   useEffect(() => {
@@ -1201,6 +1293,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
 
               <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                <button
+                  onClick={() => setShowBulkFlyerModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs shadow-xs transition flex items-center space-x-1.5 cursor-pointer border border-amber-300 active:scale-95"
+                  title="Generar imágenes promocionales (flyers HD 1080x1080) para todos los productos seleccionados y descargar archivo ZIP"
+                >
+                  <Palette className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Generar Flyers ({selectedIds.length})</span>
+                </button>
                 <button
                   onClick={() => {
                     const selectedProducts = items.filter((it) => selectedIds.includes(it.id));
@@ -2003,6 +2103,150 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           setTimeout(() => setReparseToast(null), 3500);
         }}
       />
+
+      {/* Modal de Generación Masiva de Flyers Promocionales en ZIP */}
+      {showBulkFlyerModal && (
+        <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5 my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FFD000] text-slate-950 flex items-center justify-center font-black shadow-sm border border-amber-300">
+                  <Palette className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">
+                    Generador Masivo de Imágenes Promocionales
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Genera flyers HD (1080x1080px) para los {selectedIds.length} productos seleccionados y descárgalos en un archivo .zip
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isGeneratingBulkFlyers}
+                onClick={() => setShowBulkFlyerModal(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Style selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                <span>Seleccionar Estilo de Plantilla Promocional:</span>
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { id: 'luxury_gold_ia', label: '👑 Luxury Gold IA (Parfum/Elite)', color: 'bg-gradient-to-r from-amber-950 via-zinc-950 to-black text-amber-300 border-amber-500/60 font-black' },
+                  { id: 'studio', label: '🌟 Studio Gradiente', color: 'from-slate-900 to-indigo-900 text-white' },
+                  { id: 'dark', label: '⚡ Minimalista Oscuro', color: 'from-slate-950 to-slate-800 text-amber-400' },
+                  { id: 'clean', label: '🟢 Oferta Limpia', color: 'bg-white border-slate-300 text-slate-900' },
+                  { id: 'neon', label: '🔥 Neón Redes', color: 'from-indigo-950 to-emerald-950 text-emerald-400' },
+                  { id: 'rose_gold', label: '🌸 Rosa Gold Chic', color: 'from-rose-950 via-rose-900 to-rose-950 text-amber-200' },
+                ].map((styleItem) => (
+                  <button
+                    key={styleItem.id}
+                    type="button"
+                    disabled={isGeneratingBulkFlyers}
+                    onClick={() => setBulkFlyerStyle(styleItem.id as FlyerTemplateStyle)}
+                    className={`p-2 rounded-xl text-xs font-bold border transition flex items-center justify-center text-center cursor-pointer ${
+                      bulkFlyerStyle === styleItem.id
+                        ? 'border-amber-500 ring-2 ring-amber-500/30 shadow-sm font-black scale-[1.02]'
+                        : 'border-slate-200 hover:border-slate-300'
+                    } ${styleItem.color}`}
+                  >
+                    {styleItem.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Product List Summary */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">
+                Productos seleccionados a procesar ({selectedIds.length}):
+              </label>
+              <div className="max-h-48 overflow-y-auto space-y-1.5 p-2 bg-slate-50 border border-slate-200 rounded-2xl">
+                {items
+                  .filter((it) => selectedIds.includes(it.id))
+                  .map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200 text-xs">
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <Package className="w-4 h-4 text-slate-400" />
+                          )}
+                        </div>
+                        <span className="font-bold text-slate-900 truncate max-w-[280px]">{item.name}</span>
+                      </div>
+                      <span className="font-mono font-bold text-slate-700 shrink-0 ml-2">
+                        ${Number(item.salePrice || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Progress status if generating */}
+            {isGeneratingBulkFlyers && bulkFlyerProgress && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-2 text-xs text-amber-950 animate-fadeIn">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                    <span>Generando flyer {bulkFlyerProgress.current} de {bulkFlyerProgress.total}...</span>
+                  </span>
+                  <span>{Math.round((bulkFlyerProgress.current / bulkFlyerProgress.total) * 100)}%</span>
+                </div>
+                <div className="w-full h-2 bg-amber-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500 transition-all duration-200"
+                    style={{ width: `${(bulkFlyerProgress.current / bulkFlyerProgress.total) * 100}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-amber-800 truncate">
+                  Procesando: <strong className="font-bold">{bulkFlyerProgress.currentName}</strong>
+                </p>
+              </div>
+            )}
+
+            {/* Footer controls */}
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isGeneratingBulkFlyers}
+                onClick={() => setShowBulkFlyerModal(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isGeneratingBulkFlyers}
+                onClick={handleGenerateBulkFlyers}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 transition flex items-center space-x-2 cursor-pointer disabled:opacity-50 active:scale-95 border border-amber-300"
+              >
+                {isGeneratingBulkFlyers ? (
+                  <>
+                    <Loader2 className="w-4 h-4 text-slate-950 animate-spin" />
+                    <span>Procesando Lote...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 text-slate-950" />
+                    <span>Generar y Descargar Archivo ZIP (.zip)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {reparseToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl border border-amber-500/50 flex items-center gap-2 animate-bounce">

@@ -2073,6 +2073,7 @@ ${shippingBullets}${addressSectionFallback}${websiteSectionFallback}`.trim();
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {[
+                    { id: 'luxury_gold_ia', label: '👑 Luxury Gold IA (Parfum/Elite)', color: 'bg-gradient-to-r from-amber-950 via-zinc-950 to-black text-amber-300 border-amber-500/60 font-black' },
                     { id: 'studio', label: '🌟 Studio Gradiente', color: 'from-slate-900 to-indigo-900 text-white' },
                     { id: 'dark', label: '⚡ Minimalista Oscuro', color: 'from-slate-950 to-slate-800 text-amber-400' },
                     { id: 'clean', label: '🟢 Oferta Limpia', color: 'bg-white border-slate-300 text-slate-900' },
