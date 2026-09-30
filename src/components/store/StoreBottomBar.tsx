@@ -36,7 +36,7 @@ export const StoreBottomBar: React.FC<StoreBottomBarProps> = ({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  // Outer container theme styling
+  // Outer container theme styling (Pure white theme default)
   const barContainerClasses = isBoutique
     ? 'bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 text-zinc-300 shadow-[0_-4px_25px_rgba(0,0,0,0.5)]'
     : isCyber

@@ -49,6 +49,7 @@ import { CartItem, CustomerOrder, InventoryItem, StoreConfig, StoreTheme, Courie
 import { buildWhatsAppLink, toEcuadorInternationalPhone } from '../../utils/phone.ts';
 import { StoreSmartSearchBar } from './StoreSmartSearchBar.tsx';
 import { CategoryTransitionBanner } from './CategoryTransitionBanner.tsx';
+import { DEFAULT_FALLBACK_PAYMENTS } from './StoreLogisticsAndPaymentsSlider.tsx';
 import { searchProductsFuzzy } from '../../utils/fuzzySearch.ts';
 import { getThemeColors, ThemeColorPalette } from '../../utils/themeColors.ts';
 import { ProductMediaDisplay } from '../ProductMediaDisplay.tsx';
@@ -2159,14 +2160,17 @@ export const StoreFooter: React.FC<{
   props: StoreLayoutProps;
   variant?: 'standard' | 'boutique' | 'fresh' | 'brutalist' | 'cyber' | 'minimal';
 }> = ({ props }) => {
-  const { storeConfig, isLogoAnimating, onLogoClick } = props;
+  const { storeConfig, paymentPartners, isLogoAnimating, onLogoClick } = props;
+
+  const rawPayments = paymentPartners && paymentPartners.length > 0 ? paymentPartners : DEFAULT_FALLBACK_PAYMENTS;
+  const activePayments = rawPayments.filter((p) => p.active !== false);
 
   return (
     <footer className="bg-[#1C1C1C] text-zinc-300 rounded-3xl p-6 sm:p-10 border border-zinc-800 shadow-2xl space-y-8 my-8">
-      {/* Top 4 Columns */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 border-b border-zinc-800 pb-8">
-        {/* Col 1: Store Brand Info (2 spans) */}
-        <div className="lg:col-span-2 space-y-3.5">
+      {/* Top 3 Store Information Sections (Without Links) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 border-b border-zinc-800 pb-8">
+        {/* Col 1: Store Brand & Identity */}
+        <div className="space-y-3.5">
           <div className="flex items-center space-x-3">
             <div
               id="store-footer-logo"
@@ -2189,7 +2193,7 @@ export const StoreFooter: React.FC<{
             </div>
             <div>
               <h3 className="text-lg font-black text-white tracking-tight">
-                {storeConfig.storeName || 'Lotengoo'}
+                {storeConfig.storeName || 'Tienda Oficial'}
               </h3>
               <p className="text-[11px] text-[#FFD000] font-mono font-bold uppercase tracking-widest">
                 Tienda Online Oficial
@@ -2199,7 +2203,7 @@ export const StoreFooter: React.FC<{
 
           <p className="text-xs text-zinc-400 leading-relaxed max-w-sm">
             {storeConfig.description ||
-              'Compras fáciles, en un solo lugar. La plataforma digital de compras rápidas, seguras y con entregas confiables a todo el país.'}
+              'Catálogo digital con envíos y pedidos directos por WhatsApp. Compras fáciles, rápidas y 100% seguras.'}
           </p>
 
           <div className="flex items-center space-x-2 pt-1">
@@ -2227,66 +2231,54 @@ export const StoreFooter: React.FC<{
           </div>
         </div>
 
-        {/* Col 2: Sobre Lotengoo */}
+        {/* Col 2: Información de Envíos y Cobertura */}
         <div className="space-y-3">
-          <h4 className="text-xs font-black text-white uppercase tracking-wider">Sobre Lotengoo</h4>
-          <ul className="space-y-2 text-xs text-zinc-400">
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Quiénes somos</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Trabaja con nosotros</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Prensa y noticias</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Sostenibilidad</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Inversionistas</li>
+          <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+            <Truck className="w-4 h-4 text-[#FFD000]" />
+            <span>Información de Envíos</span>
+          </h4>
+          <ul className="space-y-2 text-xs text-zinc-400 leading-relaxed">
+            <li>• Envíos rápidos y seguros a nivel nacional.</li>
+            <li>• Despacho inmediato y número de guía para seguimiento.</li>
+            <li>• Embalaje de alta protección garantizado en cada producto.</li>
+            <li>• Entregas a domicilio y retiro en punto de atención.</li>
           </ul>
         </div>
 
-        {/* Col 3: Atención al Cliente */}
+        {/* Col 3: Compra Segura y Garantía */}
         <div className="space-y-3">
-          <h4 className="text-xs font-black text-white uppercase tracking-wider">Atención al Cliente</h4>
-          <ul className="space-y-2 text-xs text-zinc-400">
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Centro de ayuda</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Devoluciones y garantías</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Rastreo de envíos</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Facturación electrónica</li>
-            {storeConfig.whatsappNumber && (
-              <li>
-                <a
-                  href={buildWhatsAppLink(storeConfig.whatsappNumber)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-[#FFD000] transition cursor-pointer inline-flex items-center gap-1"
-                >
-                  <MessageCircle className="w-3 h-3 text-emerald-400" />
-                  <span>Contacto y WhatsApp</span>
-                </a>
-              </li>
-            )}
-          </ul>
-        </div>
-
-        {/* Col 4: Términos y Legal */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-black text-white uppercase tracking-wider">Términos y Legal</h4>
-          <ul className="space-y-2 text-xs text-zinc-400">
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Términos y condiciones</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Aviso de privacidad</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Políticas de cookies</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Seguridad de compras</li>
-            <li className="hover:text-[#FFD000] transition cursor-pointer">Defensa del consumidor</li>
+          <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[#FFD000]" />
+            <span>Garantía y Atención</span>
+          </h4>
+          <ul className="space-y-2 text-xs text-zinc-400 leading-relaxed">
+            <li>• Productos 100% verificados y calidad comprobada.</li>
+            <li>• Atención al cliente y asesoría personalizada directa.</li>
+            <li>• Múltiples medios de pago: transferencias, depósitos y tarjetas.</li>
+            <li>• Confirmación inmediata de pedido vía WhatsApp.</li>
           </ul>
         </div>
       </div>
 
-      {/* Bottom Payment Badges & Copyright */}
+      {/* Bottom Payment Badges with Icons & Copyright */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-zinc-500">
         <div className="flex items-center space-x-2 flex-wrap gap-y-2">
           <span className="font-bold text-zinc-400 mr-1 text-[11px]">Métodos de pago aceptados:</span>
-          {['VISA', 'MASTERCARD', 'AMERICAN EXPRESS', 'PAYPAL', 'SPEI'].map((pm) => (
-            <span
-              key={pm}
-              className="px-2.5 py-1 rounded bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-bold text-zinc-300"
+          {activePayments.map((pm, idx) => (
+            <div
+              key={pm.id || idx}
+              className="px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-[10px] font-bold text-zinc-200 flex items-center space-x-2 shadow-2xs hover:border-amber-400/50 transition"
+              title={pm.details || pm.name}
             >
-              {pm}
-            </span>
+              {pm.logoUrl ? (
+                <div className="w-5 h-5 rounded bg-white/10 p-0.5 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <img src={pm.logoUrl} alt={pm.name} className="w-full h-full object-contain" />
+                </div>
+              ) : (
+                <CreditCard className="w-4 h-4 text-[#FFD000] flex-shrink-0" />
+              )}
+              <span className="truncate max-w-[130px]">{pm.name}</span>
+            </div>
           ))}
         </div>
 
@@ -2406,9 +2398,20 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     [categoryImagesMap]
   );
 
-  // Reset to page 1 whenever filters or search change
+  // Reset to page 1 and scroll to top whenever filters or search change
   React.useEffect(() => {
     setCurrentPage(1);
+    if (searchQuery.trim().length > 0 || selectedCategory !== 'all') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (typeof document !== 'undefined') {
+        document.documentElement?.scrollTo({ top: 0, behavior: 'smooth' });
+        document.body?.scrollTo({ top: 0, behavior: 'smooth' });
+        const anchorEl = document.getElementById('store-products-anchor') || document.getElementById('marketplace-sticky-header');
+        if (anchorEl) {
+          anchorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }
   }, [searchQuery, selectedCategory, showOffersOnly, inStockOnly, sortBy]);
 
   const totalPages = isPaginationEnabled ? Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)) : 1;
@@ -3381,88 +3384,6 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       {/* 4. ALL OTHER PANELS DISPLAYED AFTER THE PRODUCTS                         */}
       {/* ========================================================================= */}
       <div className="space-y-6 pt-4 border-t border-slate-200">
-        {/* Lotengoo Unboxing App Banner & Newsletter VIP Club */}
-        {isCustomerView && (
-          <div className="space-y-6">
-            {/* Unboxing App Card */}
-            <div className="bg-[#1F1F1F] text-white rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xl border border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="space-y-3 max-w-xl">
-                <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-[#FFD000]/20 text-[#FFD000] border border-[#FFD000]/40 font-black text-[10px] uppercase tracking-wider">
-                  📦 EXPERIENCIA LOTENGOO UNBOXING
-                </span>
-                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
-                  Compras fáciles, <br />
-                  <span className="text-[#FFD000]">en un solo lugar.</span>
-                </h3>
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  Cada paquete llega embalado con nuestra caja insignia y etiqueta de garantía. Descarga la App oficial de Lotengoo o compra directamente con seguimiento en tiempo real vía WhatsApp y SMS.
-                </p>
-                <div className="flex items-center space-x-3 pt-2 flex-wrap gap-y-2">
-                  <button
-                    type="button"
-                    className="px-5 py-2.5 rounded-full bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black text-xs transition shadow-md cursor-pointer active:scale-95"
-                  >
-                    Descargar la App
-                  </button>
-                  <span className="text-[11px] text-zinc-400 font-medium">Disponible para iOS & Android</span>
-                </div>
-              </div>
-
-              <div className="w-full md:w-64 h-36 rounded-2xl bg-gradient-to-tr from-[#FFD000] to-yellow-500 text-slate-950 p-5 flex flex-col justify-between shadow-lg relative overflow-hidden flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <Store className="w-8 h-8 text-slate-950" />
-                  <span className="text-[9px] font-mono font-black bg-slate-950 text-[#FFD000] px-2 py-0.5 rounded-full">OFFICIAL APP</span>
-                </div>
-                <div>
-                  <span className="text-xs font-black block">Lotengoo Mobile</span>
-                  <span className="text-[10px] font-medium text-slate-800">Seguimiento 24/7 de tus pedidos</span>
-                </div>
-              </div>
-            </div>
-
-            {/* VIP Newsletter Box */}
-            <div className="bg-[#FFD000] text-slate-950 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="space-y-2 max-w-xl">
-                <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-slate-950 text-[#FFD000] font-black text-[10px] uppercase tracking-wider">
-                  ⭐ CLUB LOTENGOO VIP
-                </span>
-                <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-950 leading-tight">
-                  Recibe $200 MXN de descuento en tu primera compra
-                </h3>
-                <p className="text-xs text-slate-900 font-medium">
-                  Suscríbete para recibir cupones exclusivos, acceso anticipado a Ventas Nocturnas y lanzamientos de temporada directamente en tu correo.
-                </p>
-              </div>
-
-              <div className="w-full md:w-auto flex-shrink-0">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    alert('¡Gracias por suscribirte a Club Lotengoo!');
-                  }}
-                  className="flex flex-col sm:flex-row items-center gap-2"
-                >
-                  <input
-                    type="email"
-                    required
-                    placeholder="Ingresa tu correo electrónico..."
-                    className="w-full sm:w-72 px-4 py-3 rounded-full bg-white text-slate-900 placeholder:text-slate-400 text-xs font-bold focus:outline-none border-2 border-slate-950 shadow-inner"
-                  />
-                  <button
-                    type="submit"
-                    className="w-full sm:w-auto px-6 py-3 rounded-full bg-[#1F1F1F] hover:bg-black text-white font-black text-xs transition cursor-pointer shadow-md active:scale-95 whitespace-nowrap"
-                  >
-                    Suscribirme →
-                  </button>
-                </form>
-                <span className="text-[10px] text-slate-800 font-medium block mt-2 text-center md:text-left">
-                  🔒 Sin spam. Cancela tu suscripción en cualquier momento.
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Promotional Announcement Ticker */}
         <BannerTicker props={props} variant="standard" />
 
@@ -3509,12 +3430,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
           </div>
         </div>
 
-        {/* Store Footer (Customer View Only) */}
-        {isCustomerView && (
-          <div className="space-y-6">
-            <StoreFooter props={props} variant="standard" />
-          </div>
-        )}
+
       </div>
     </div>
   );

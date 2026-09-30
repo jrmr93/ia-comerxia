@@ -77,6 +77,7 @@ export const StoreSmartSearchBar: React.FC<StoreSmartSearchBarProps> = ({
               setIsOpen(false);
             } else if (e.key === 'Enter') {
               setIsOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }
           }}
           placeholder={placeholder}
@@ -88,6 +89,7 @@ export const StoreSmartSearchBar: React.FC<StoreSmartSearchBarProps> = ({
             onClick={() => {
               setSearchQuery('');
               setIsOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className="absolute right-2 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 rounded-full hover:bg-slate-100 transition"
             title="Limpiar búsqueda"
@@ -105,11 +107,14 @@ export const StoreSmartSearchBar: React.FC<StoreSmartSearchBarProps> = ({
             <div className="px-3.5 py-2.5 bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-transparent border-b border-amber-200/60 flex items-center justify-between">
               <div className="flex items-center space-x-2 text-xs text-amber-900 font-medium">
                 <Sparkles className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 animate-pulse" />
-                <span>¿Quisiste decir <strong className="font-extrabold text-amber-700 underline underline-offset-2 cursor-pointer" onClick={() => setSearchQuery(didYouMean)}>{didYouMean}</strong>?</span>
+                <span>¿Quisiste decir <strong className="font-extrabold text-amber-700 underline underline-offset-2 cursor-pointer" onClick={() => { setSearchQuery(didYouMean); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{didYouMean}</strong>?</span>
               </div>
               <button
                 type="button"
-                onClick={() => setSearchQuery(didYouMean)}
+                onClick={() => {
+                  setSearchQuery(didYouMean);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 className="text-[11px] font-bold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200/80 px-2 py-0.5 rounded-md transition cursor-pointer"
               >
                 Aplicar
@@ -130,6 +135,7 @@ export const StoreSmartSearchBar: React.FC<StoreSmartSearchBarProps> = ({
                   onClick={() => {
                     if (onSelectCategory) onSelectCategory(cat);
                     setIsOpen(false);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-amber-100 hover:text-amber-900 px-2.5 py-0.5 rounded-full transition cursor-pointer whitespace-nowrap"
                 >
