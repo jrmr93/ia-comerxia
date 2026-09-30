@@ -1416,6 +1416,133 @@ export function stripTrailingTags(text: string): string {
   return cleaned.trim();
 }
 
+const ADMINISTRATIVE_ATTRIBUTE_KEYS = new Set([
+  'costprice',
+  'cost_price',
+  'costwithouttax',
+  'costwithtax',
+  'cost_without_tax',
+  'cost_with_tax',
+  'costoptions',
+  'cost_options',
+  'selectedcostprice',
+  'selected_cost_price',
+  'issuppliergift',
+  'is_supplier_gift',
+  'suppliergift',
+  'cost',
+  'costo',
+  'costos',
+  'taxrate',
+  'tax_rate',
+  'saletaxpercent',
+  'sale_tax_percent',
+  'purchasetaxpercent',
+  'purchase_tax_percent',
+  'haspurchasetax',
+  'has_purchase_tax',
+  'applysaletax',
+  'apply_sale_tax',
+  'tax',
+  'iva',
+  'porcentaje_iva',
+  'porcentajeiva',
+  'profitamount',
+  'profit_amount',
+  'profitmarginpercent',
+  'profit_margin_percent',
+  'profitmargin',
+  'profit_margin',
+  'margin',
+  'utility',
+  'utilidad',
+  'utilidades',
+  'gain',
+  'ganancia',
+  'ganancias',
+  'interest',
+  'interes',
+  'intereses',
+  'financialcost',
+  'financial_cost',
+  'comision',
+  'comisiones',
+  'suppliername',
+  'supplier_name',
+  'suppliercode',
+  'supplier_code',
+  'supplier',
+  'proveedor',
+  'codigo_proveedor',
+  'codigoproveedor',
+  'images',
+  'imageslist',
+  'images_list',
+  'totalphotos',
+  'total_photos',
+  'extractedattributes',
+  'extracted_attributes',
+  'rawtelegrammessage',
+  'raw_telegram_message',
+  'rawtext',
+  'raw_text',
+  'parsedat',
+  'parsed_at',
+  'updatedat',
+  'updated_at',
+  'createdat',
+  'created_at',
+  'userid',
+  'user_id',
+  'id',
+  'videourl',
+  'video_url',
+  'video',
+]);
+
+export function isCustomerFacingAttributeKey(key: string): boolean {
+  if (!key) return false;
+  const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return !ADMINISTRATIVE_ATTRIBUTE_KEYS.has(cleanKey);
+}
+
+export function sanitizeUniversalCopy(text: string): string {
+  if (!text) return '';
+  let cleaned = stripTrailingTags(text);
+
+  // Remove characteristics/features/attributes headers
+  cleaned = cleaned.replace(/^\s*•?\s*✨?\s*CARACTERÍSTICAS[^\n]*$/gmi, '');
+  cleaned = cleaned.replace(/^\s*•?\s*✨?\s*CARACTERISTICAS[^\n]*$/gmi, '');
+  cleaned = cleaned.replace(/^\s*•?\s*✨?\s*ATRIBUTOS[^\n]*$/gmi, '');
+
+  const lines = cleaned.split('\n');
+  const filteredLines = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+
+    // Filter out lines that explicitly mention internal administrative or financial terms
+    if (
+      /^\s*•?\s*(?:costo|cost|cost\s*price|costo\s*sin\s*iva|costo\s*con\s*iva|precio\s*costo|iva|impuesto|porcentaje\s*iva|utilidad|ganancia|margen|interes|interés|comisión|comision|proveedor|supplier|costoptions|selectedcostprice|issuppliergift)\s*:/i.test(line)
+    ) {
+      return false;
+    }
+
+    // Filter out raw key-value attribute dumps if the line looks like `• Key: Value` or `Key: Value`, unless it's an allowed structural header
+    const attrMatch = line.match(/^\s*•?\s*([a-zA-Z_0-9\s/ÁÉÍÓÚáéíóúÑñ]+)\s*:\s*(.+)$/);
+    if (attrMatch) {
+      const keyName = attrMatch[1].trim();
+      const isAllowedHeader = /^(?:PRECIO|PRECIO PVP FINAL|ESTADO|CÓDIGO \/ SKU|DISPONIBILIDAD|DESCRIPCIÓN GENERAL DEL PRODUCTO|PEDIDOS Y CONTACTO DIRECTO|MÉTODOS DE PAGO|EMPRESAS DE ENVÍO \/ ENTREGAS|UBICACIÓN \/ DIRECCIÓN DE LA TIENDA|TIENDA ONLINE \/ CATÁLOGO)$/i.test(keyName);
+      if (!isAllowedHeader) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  return filteredLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /**
  * Generates a single universal marketing sales publication with high converting order,
  * clean line breaks, emojis/icons, payment method titles and couriers, using Google Gemini AI.
@@ -1472,27 +1599,12 @@ export async function generateProductMarketingCopy(
   const addressSectionFallback = storeAddress ? `\n\n📍 UBICACIÓN / DIRECCIÓN DE LA TIENDA:\n• ${storeAddress}` : '';
   const websiteSectionFallback = (options.showWebsite !== false && websiteUrl) ? `\n\n🌐 TIENDA ONLINE / CATÁLOGO:\n• ${websiteUrl}` : '';
 
-  let parsedAttributes: Record<string, any> = {};
-  if (product.extractedAttributes) {
-    try {
-      parsedAttributes =
-        typeof product.extractedAttributes === 'string'
-          ? JSON.parse(product.extractedAttributes)
-          : product.extractedAttributes;
-    } catch {}
-  }
-
-  const attributesSummary = Object.entries(parsedAttributes)
-    .filter(([k]) => k !== 'images' && k !== 'totalPhotos' && k !== 'costOptions' && k !== 'selectedCostPrice' && k !== 'profitMarginPercent')
-    .map(([k, v]) => `• ${k.replace(/_/g, ' ')}: ${Array.isArray(v) ? v.join(', ') : String(v)}`)
-    .join('\n');
-
   const showStock = options.showStock !== false;
   const showPhone = options.showPhone !== false;
   const showSku = options.showSku !== false;
   const showWebsite = options.showWebsite !== false && Boolean(websiteUrl);
 
-  // Fallback builder with strict order, icons and double line breaks (without trailing tags)
+  // Fallback builder with strict order, icons and double line breaks (without trailing tags or raw attribute dumps)
   const buildFallbackCopies = (): MarketingCopyOutput => {
     const rawTags = Array.isArray(product.tags)
       ? product.tags
@@ -1518,15 +1630,13 @@ export async function generateProductMarketingCopy(
       ? `• Escríbenos por mensaje privado o al WhatsApp ${whatsappNumber} para coordinar tu entrega hoy mismo.`
       : `• Escríbenos por mensaje privado para coordinar tu entrega hoy mismo.`;
 
-    const universalText = `🔥 ${product.name.toUpperCase()} 🔥
+    const universalText = sanitizeUniversalCopy(`🔥 ${product.name.toUpperCase()} 🔥
 
-💰 PRECIO: ${priceStr}
+💰 PRECIO PVP FINAL: ${priceStr}
 📦 ESTADO: 100% Nuevo en caja sellada
 ${skuLine}${stockLine}
-✨ CARACTERÍSTICAS DESTACADAS:
-${cleanDesc ? `• ${cleanDesc}` : '• Alta calidad, durabilidad y excelente rendimiento garantizado.'}
-${attributesSummary ? attributesSummary : '• Diseño moderno, ergonómico y materiales de primera.'}
-• ${warranty}
+📝 DESCRIPCIÓN GENERAL DEL PRODUCTO:
+${cleanDesc ? cleanDesc : 'Producto de excelente calidad, durabilidad y alto rendimiento garantizado.'}
 
 📲 PEDIDOS Y CONTACTO DIRECTO:
 ${contactLine}
@@ -1535,7 +1645,7 @@ ${contactLine}
 ${paymentBulletPoints}
 
 🚚 EMPRESAS DE ENVÍO / ENTREGAS:
-${shippingBulletPoints}${addressSectionFallback}${websiteSectionFallback}`.trim();
+${shippingBulletPoints}${addressSectionFallback}${websiteSectionFallback}`.trim());
 
     return {
       title: product.name.trim(),
@@ -1581,14 +1691,12 @@ Genera:
 5. "universalDescription": La publicación universal completa, llamativa, ordenada y lista para copiar y pegar. IMPORTANTE: NO incluyas hashtags (#), tags ni etiquetas al final de esta publicación universal; los tags van únicamente en el campo "tags".
 
 DATOS DEL PRODUCTO:
-- Nombre: ${product.name}
+- Nombre del Producto: ${product.name}
 ${showSku ? `- SKU / Código: ${product.sku || 'N/A'}` : '- (NO INCLUIR CÓDIGO / SKU EN EL TEXTO)'}
 - Categoría: ${product.category || 'General'}
-- Precio de Venta: ${priceStr}
+- Precio de Venta al Público (PVP FINAL): ${priceStr}
 ${showStock ? `- Stock disponible: ${product.stock ?? 1} unidades` : '- (NO INCLUIR CANTIDAD DE STOCK / UNIDADES EN EL TEXTO)'}
-- Descripción base: ${product.description || 'Producto de alta demanda y calidad.'}
-- Atributos/Especificaciones:
-${attributesSummary || 'Producto nuevo y garantizado'}
+- Descripción General del Producto: ${product.description || 'Producto nuevo de primera calidad, excelente durabilidad y alto rendimiento.'}
 - Nombre de la Tienda: ${storeName}
 ${storeAddress ? `- Dirección / Ubicación Física de la Tienda: ${storeAddress}` : ''}
 ${showWebsite && websiteUrl ? `- Enlace del Catálogo / Tienda Online: ${websiteUrl}` : ''}
@@ -1605,31 +1713,29 @@ ${shippingBulletPoints}
 
 REGLAS ESTRICTAS DE FORMATO Y ESTRUCTURA:
 1. ORDEN Y SALTOS DE LÍNEA:
-   - Debe usar saltos de línea claros (doble salto de línea entre secciones) para que sea súper legible, visual y organized.
-   - Debe incluir iconos/emojis llamativos y adecuados al inicio de cada sección y viñeta.
+   - Debe usar saltos de línea claros (doble salto de línea entre secciones) para que sea súper legible y organizado.
+   - Debe incluir iconos/emojis llamativos al inicio de cada sección.
 2. ESTRUCTURA EXACTA DE LA PUBLICACIÓN UNIVERSAL:
    - Encabezado con el nombre en mayúsculas y emojis (ej: 🔥 NOMBRE 🔥)
-   - 💰 PRECIO: ${priceStr}
+   - 💰 PRECIO PVP FINAL: ${priceStr}
    - 📦 ESTADO: 100% Nuevo / Garantizado
    ${showSku ? `- 🏷️ CÓDIGO / SKU: ${product.sku || 'N/A'}` : ''}
    ${showStock ? `- 📊 DISPONIBILIDAD: ${product.stock ?? 1} unidades listas para entrega` : ''}
-   - ✨ CARACTERÍSTICAS Y BENEFICIOS: (viñetas con viñeta • e iconos de beneficios clave)
+   - 📝 DESCRIPCIÓN GENERAL DEL PRODUCTO: (Redactar ÚNICAMENTE la descripción general fluida y comercial del producto. ESTRICTAMENTE PROHIBIDO incluir secciones de características, atributos o viñetas de especificaciones con pares clave:valor como "• color: negro" o "• marca: X").
    - 📲 PEDIDOS Y CONTACTO DIRECTO: (${showPhone && whatsappNumber ? `llamado a la acción con WhatsApp ${whatsappNumber}` : 'llamado a la acción por mensaje privado / DM sin números telefónicos'})
-   - 💳 MÉTODOS DE PAGO: (OBLIGATORIO: listar ÚNICAMENTE los títulos de los métodos de pago con viñetas •, sin descripciones, sin datos bancarios ni explicaciones)
+   - 💳 MÉTODOS DE PAGO: (OBLIGATORIO: listar ÚNICAMENTE los títulos de los métodos de pago con viñetas •, sin descripciones ni explicaciones)
    - 🚚 EMPRESAS DE ENVÍO / ENTREGAS: (OBLIGATORIO: listar las empresas de envío con viñetas •)
    ${storeAddress ? `- 📍 UBICACIÓN / DIRECCIÓN DE LA TIENDA:\n• ${storeAddress}` : ''}
    ${showWebsite && websiteUrl ? `- 🌐 TIENDA ONLINE / CATÁLOGO:\n• ${websiteUrl}` : ''}
    (REGLA ABSOLUTA: Termina al final tras la última sección indicada. NO añadas hashtags (#), tags ni líneas de etiquetas al final).
 
+⚠️ REGLA CRÍTICA ABSOLUTA: PROHIBIDO INCLUIR ATRIBUTOS, CARACTERÍSTICAS TÉCNICAS EN VIÑETAS, COSTOS INTERNOS, IVA, UTILIDADES, MARGEN, INTERESES O PROVEEDORES. La publicación es pública para clientes finales y solo debe mostrar la DESCRIPCIÓN GENERAL DEL PRODUCTO y el PRECIO PVP FINAL.
 ${!showSku ? '⚠️ REGLA CRÍTICA: NO incluyas ninguna mención de SKU ni código de producto en la publicación universal.\n' : ''}${!showStock ? '⚠️ REGLA CRÍTICA: NO incluyas stock, ni cantidad de unidades disponibles en la publicación.\n' : ''}${!showPhone ? '⚠️ REGLA CRÍTICA: NO incluyas ningún número de WhatsApp ni número de teléfono en la publicación.\n' : ''}${!showWebsite ? '⚠️ REGLA: NO incluyas enlace web ni URL de sitio web en la publicación.\n' : ''}⚠️ REGLA CRÍTICA DE TAGS: NO incluyas ningún hashtag ni lista de tags dentro ni al final de "universalDescription". Los tags se devuelven exclusivamente en el campo de array JSON "tags".
 
 Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
 
     const cacheKey = `${product.name}_${product.sku || ''}_${priceVal}_${tone}_${showStock}_${showPhone}_${showSku}_${showWebsite}`;
-    const cachedEntry = copyCache.get(cacheKey);
-    if (cachedEntry && Date.now() - cachedEntry.timestamp < CACHE_TTL_MS) {
-      return cachedEntry.data;
-    }
+    copyCache.delete(cacheKey);
 
     if (isLmStudio && aiConfig) {
       try {
@@ -1643,7 +1749,7 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
           const cleanLocal = localText.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/, '').trim();
           const parsed = JSON.parse(cleanLocal) as MarketingCopyOutput;
           if (parsed && (parsed.universalDescription || parsed.title)) {
-            let cleanedUniversal = stripTrailingTags(parsed.universalDescription || '');
+            let cleanedUniversal = sanitizeUniversalCopy(parsed.universalDescription || '');
             if (showWebsite && websiteUrl && !cleanedUniversal.toLowerCase().includes(websiteUrl.toLowerCase())) {
               cleanedUniversal = `${cleanedUniversal}\n\n🌐 TIENDA ONLINE / CATÁLOGO:\n• ${websiteUrl}`.trim();
             }
@@ -1721,7 +1827,18 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
         if (text) {
           const parsed = JSON.parse(text) as MarketingCopyOutput;
           if (parsed.universalDescription && parsed.universalDescription.trim().length > 30) {
-            let cleanedUniversal = stripTrailingTags(parsed.universalDescription);
+            let cleanedUniversal = sanitizeUniversalCopy(parsed.universalDescription);
+            if (showWebsite && websiteUrl && !cleanedUniversal.toLowerCase().includes(websiteUrl.toLowerCase())) {
+              cleanedUniversal = `${cleanedUniversal}\n\n🌐 TIENDA ONLINE / CATÁLOGO:\n• ${websiteUrl}`.trim();
+            }
+            parsed.title = parsed.title?.trim() || product.name.trim();
+            parsed.price = parsed.price?.trim() || `$${priceVal.toFixed(2)}`;
+            parsed.sku = parsed.sku?.trim() || product.sku || '';
+            parsed.tags = Array.isArray(parsed.tags) && parsed.tags.length > 0
+              ? parsed.tags.map((t) => String(t).replace(/^#/, '').trim()).filter(Boolean)
+              : [product.category || 'tienda', 'oferta', 'ventas'];
+            parsed.universalDescription = cleanedUniversal;
+            parsed.allInOne = cleanedUniversal;
             if (showWebsite && websiteUrl && !cleanedUniversal.toLowerCase().includes(websiteUrl.toLowerCase())) {
               cleanedUniversal = `${cleanedUniversal}\n\n🌐 TIENDA ONLINE / CATÁLOGO:\n• ${websiteUrl}`.trim();
             }

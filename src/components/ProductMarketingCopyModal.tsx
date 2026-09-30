@@ -56,7 +56,37 @@ function stripTrailingTags(text: string): string {
   cleaned = cleaned.replace(/(\r?\n)+\s*(?:#[\w\u00C0-\u017F\d_-]+(?:\s+|$))+$/gi, '');
   cleaned = cleaned.replace(/(\r?\n)+\s*(?:Tags|Etiquetas|Hashtags)\s*:[^\n]*$/gi, '');
   cleaned = cleaned.replace(/(\r?\n)+\s*(?:#[\w\u00C0-\u017F\d_-]+(?:\s+|$))+$/gi, '');
-  return cleaned.trim();
+
+  // Remove characteristics/attributes headers
+  cleaned = cleaned.replace(/^\s*•?\s*✨?\s*CARACTERÍSTICAS[^\n]*$/gmi, '');
+  cleaned = cleaned.replace(/^\s*•?\s*✨?\s*CARACTERISTICAS[^\n]*$/gmi, '');
+  cleaned = cleaned.replace(/^\s*•?\s*✨?\s*ATRIBUTOS[^\n]*$/gmi, '');
+  
+  const lines = cleaned.split('\n');
+  const filtered = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+
+    if (
+      /^\s*•?\s*(?:costo|cost\s*price|costo\s*sin\s*iva|costo\s*con\s*iva|precio\s*costo|iva|impuesto|porcentaje\s*iva|utilidad|ganancia|margen|interes|interés|comisión|comision|proveedor|supplier)\s*:/i.test(line)
+    ) {
+      return false;
+    }
+
+    // Filter out raw key-value attribute dumps unless allowed structural header
+    const attrMatch = line.match(/^\s*•?\s*([a-zA-Z_0-9\s/ÁÉÍÓÚáéíóúÑñ]+)\s*:\s*(.+)$/);
+    if (attrMatch) {
+      const keyName = attrMatch[1].trim();
+      const isAllowedHeader = /^(?:PRECIO|PRECIO PVP FINAL|ESTADO|CÓDIGO \/ SKU|DISPONIBILIDAD|DESCRIPCIÓN GENERAL DEL PRODUCTO|PEDIDOS Y CONTACTO DIRECTO|MÉTODOS DE PAGO|EMPRESAS DE ENVÍO \/ ENTREGAS|UBICACIÓN \/ DIRECCIÓN DE LA TIENDA|TIENDA ONLINE \/ CATÁLOGO)$/i.test(keyName);
+      if (!isAllowedHeader) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  return filtered.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 interface ProductMarketingCopyModalProps {
@@ -621,13 +651,11 @@ export const ProductMarketingCopyModal: React.FC<ProductMarketingCopyModalProps>
 
       const fallbackUniversal = `🔥 ${item.name.toUpperCase()} 🔥
 
-💰 PRECIO: $${priceVal} ${currency}
+💰 PRECIO PVP FINAL: $${priceVal} ${currency}
 📦 ESTADO: 100% Nuevo en caja sellada / Garantizado
 ${skuLine}${stockLine}
-✨ CARACTERÍSTICAS Y BENEFICIOS:
-${cleanDesc ? `• ${cleanDesc}` : '• Producto nuevo de primera calidad, excelente durabilidad y alto rendimiento.'}
-• Garantía de satisfacción y producto 100% original.
-• Entrega rápida y confiable.
+📝 DESCRIPCIÓN GENERAL DEL PRODUCTO:
+${cleanDesc ? cleanDesc : 'Producto nuevo de primera calidad, excelente durabilidad y alto rendimiento garantizado.'}
 
 📲 PEDIDOS Y CONTACTO DIRECTO:
 ${contactLine}

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
-import { db, isPostgresConfigured } from './index.ts';
+import { db, pool, isPostgresConfigured } from './index.ts';
 import { aiConfigs, customerOrders, customers, ecuadorApiConfigs, payphoneConfigs, inventoryItems, payments, purchases, serverDomainConfigs, sriConfigs, sriInvoices, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
 import { validateEcuadorId } from '../utils/ecuadorIdValidator.ts';
@@ -1161,6 +1161,7 @@ export async function createInventoryItem(data: {
   status?: string;
   rawTelegramMessage?: string;
   marketingCopy?: string;
+  isSupplierGift?: boolean;
 }) {
   let finalSku = data.sku?.trim();
   if (!finalSku || finalSku === 'AUTO' || finalSku.startsWith('PROD-') || finalSku.startsWith('CAL-') || finalSku.startsWith('GEN-')) {
@@ -3381,8 +3382,8 @@ export async function getStoreConfig(userId: number = 1) {
       const cfg = configs[0];
       const { theme, themeColors } = parseThemeAndColors(cfg.theme);
       const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
-      const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
-      const showCategoryHeader = cfg.showCategoryHeader !== undefined ? cfg.showCategoryHeader : (cfg.show_category_header !== undefined ? cfg.show_category_header : true);
+      const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : ((cfg as any).prioritize_offers_first !== undefined ? (cfg as any).prioritize_offers_first : true);
+      const showCategoryHeader = cfg.showCategoryHeader !== undefined ? cfg.showCategoryHeader : ((cfg as any).show_category_header !== undefined ? (cfg as any).show_category_header : true);
       const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3443,8 +3444,8 @@ export async function getStoreConfig(userId: number = 1) {
     const cfg = created[0];
     const { theme, themeColors } = parseThemeAndColors(cfg.theme);
     const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
-    const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
-    const showCategoryHeader = cfg.showCategoryHeader !== undefined ? cfg.showCategoryHeader : (cfg.show_category_header !== undefined ? cfg.show_category_header : true);
+    const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : ((cfg as any).prioritize_offers_first !== undefined ? (cfg as any).prioritize_offers_first : true);
+    const showCategoryHeader = cfg.showCategoryHeader !== undefined ? cfg.showCategoryHeader : ((cfg as any).show_category_header !== undefined ? (cfg as any).show_category_header : true);
     const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
     const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
     const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';
@@ -3476,8 +3477,8 @@ export async function getStoreConfig(userId: number = 1) {
     if (cfg) {
       const { theme, themeColors } = parseThemeAndColors(cfg.theme);
       const showOutOfStock = cfg.showOutOfStock !== undefined ? cfg.showOutOfStock : true;
-      const prioritizeOffersFirst = cfg.prioritizeOffersFirst !== undefined ? cfg.prioritizeOffersFirst : (cfg.prioritize_offers_first !== undefined ? cfg.prioritize_offers_first : true);
-      const showCategoryHeader = cfg.showCategoryHeader !== undefined ? cfg.showCategoryHeader : (cfg.show_category_header !== undefined ? cfg.show_category_header : true);
+      const prioritizeOffersFirst = (cfg as any).prioritizeOffersFirst !== undefined ? (cfg as any).prioritizeOffersFirst : ((cfg as any).prioritize_offers_first !== undefined ? (cfg as any).prioritize_offers_first : true);
+      const showCategoryHeader = (cfg as any).showCategoryHeader !== undefined ? (cfg as any).showCategoryHeader : ((cfg as any).show_category_header !== undefined ? (cfg as any).show_category_header : true);
       const isActive = cfg.isActive !== undefined ? cfg.isActive : true;
       const maintenanceTitle = cfg.maintenanceTitle || 'Tienda Temporalmente Pausada';
       const maintenanceMessage = cfg.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!';

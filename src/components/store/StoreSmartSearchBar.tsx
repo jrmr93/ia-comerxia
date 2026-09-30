@@ -29,7 +29,7 @@ export const StoreSmartSearchBar: React.FC<StoreSmartSearchBarProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const currencySymbol = storeConfig?.currencySymbol || '$';
+  const currencySymbol = storeConfig?.currency || '$';
 
   // Compute live fuzzy search suggestions
   const fuzzyResult = React.useMemo(() => {

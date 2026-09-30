@@ -2497,9 +2497,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
         className={`sticky ${scrollDirection === 'down'
             ? '-translate-y-full opacity-0 pointer-events-none'
             : scrollDirection === 'up'
-              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200'
+              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200/80'
               : `${isCustomerOnly || isCustomerView || isCustomerMode ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
-          } bg-white text-slate-900 shadow-[0_4px_20px_rgba(0,0,0,0.06)] -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b-2 border-[#FFD000] transition-all duration-300 transform`}
+          } bg-white/95 backdrop-blur-md text-slate-900 shadow-[0_4px_16px_rgba(0,0,0,0.04)] -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b border-slate-200/90 transition-all duration-300 transform`}
       >
 
         {/* Upper Row: Store Brand + Desktop Mega Search Box + Cart */}
@@ -2570,7 +2570,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 products={products}
                 categories={categories}
                 onSelectCategory={(cat) => setSelectedCategory(cat)}
-                onSelectProduct={(item) => setSelectedProductDetail(item)}
+                onSelectProduct={(item) => props.onQuickViewProduct(item)}
                 storeConfig={storeConfig}
               />
 
@@ -3256,7 +3256,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 const presentCategories = Array.from(
                   new Set(paginatedProducts.map((p) => p.category || 'General'))
                 );
-                const shouldShowBanner = storeConfig?.showCategoryHeader !== false;
+                const shouldShowBanner = storeConfig?.showCategoryHeader !== undefined ? Boolean(storeConfig.showCategoryHeader) : true;
 
                 return presentCategories.map((catName) => {
                   const catProducts = paginatedProducts.filter(

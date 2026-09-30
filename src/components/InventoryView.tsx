@@ -67,7 +67,7 @@ function getItemPhotos(item: InventoryItem): string[] {
     item.images.forEach((img) => {
       if (typeof img === 'string' && img.trim()) photos.push(img.trim());
     });
-  } else if (typeof item.images === 'string' && item.images.trim()) {
+  } else if (typeof (item.images as any) === 'string' && (item.images as any).trim()) {
     try {
       const parsed = JSON.parse(item.images);
       if (Array.isArray(parsed)) {
@@ -304,6 +304,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const { authFetch } = useAuth();
   const [reparsingId, setReparsingId] = useState<number | null>(null);
   const [reparseToast, setReparseToast] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setReparseToast(msg);
+    setTimeout(() => setReparseToast(null), 3500);
+  };
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const handleCopySupplierCode = (code: string, e: React.MouseEvent) => {
@@ -497,7 +501,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         setBulkFlyerProgress({ current: count, total: selectedProducts.length, currentName: item.name });
 
         const photos = getItemPhotos(item);
-        const activeWhatsapp = storeConfig?.whatsappNumber || storeConfig?.whatsapp_number || storeConfig?.phone || '';
+        const activeWhatsapp = storeConfig?.whatsappNumber || (storeConfig as any)?.whatsapp_number || (storeConfig as any)?.phone || '';
         const discPct = Number(item.discountPercent) || 0;
         const salePriceNum = parseFloat(String(item.salePrice || '0')) || 0;
         const origPriceNum = discPct > 0 ? (salePriceNum / (1 - discPct / 100)) : null;
