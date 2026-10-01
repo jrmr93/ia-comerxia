@@ -1612,19 +1612,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
   const [isLogoAnimating, setIsLogoAnimating] = useState<boolean>(false);
   const logoTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  const handleLogoClick = () => {
-    if (logoTimeoutRef.current) {
-      clearTimeout(logoTimeoutRef.current);
-    }
-    setIsLogoAnimating(false);
-    // Restart animation cycle
-    requestAnimationFrame(() => {
-      setIsLogoAnimating(true);
-      logoTimeoutRef.current = setTimeout(() => {
-        setIsLogoAnimating(false);
-      }, 2000);
-    });
-  };
+
 
   // Cleanup logo timeout on unmount
   React.useEffect(() => {
@@ -1876,10 +1864,18 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }, 40);
   }, [isCustomerView]);
 
-  // Static Bottom Bar: Home icon handler (Return to catalog or scroll to top)
+  // Static Bottom Bar & Store Logo: Home icon handler (Return to catalog, reset filters/categories, close modals, scroll to top)
   const handleBottomBarHome = useCallback(() => {
     setIsStorePaymentsModalOpen(false);
     setIsStoreShippingModalOpen(false);
+    setIsCartOpen(false);
+    setIsFilterSheetOpen(false);
+    setIsShareModalOpen(false);
+    setSelectedCategory('all');
+    setSearchQuery('');
+    setInStockOnly(false);
+    setShowOffersOnly(false);
+
     if (quickViewProduct) {
       handleBackToCatalog();
       setTimeout(() => {
@@ -1889,6 +1885,23 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [quickViewProduct, handleBackToCatalog]);
+
+  // Logo Click handler: Trigger bounce animation & return to home catalog
+  const handleLogoClick = useCallback(() => {
+    if (logoTimeoutRef.current) {
+      clearTimeout(logoTimeoutRef.current);
+    }
+    setIsLogoAnimating(false);
+    // Restart animation cycle
+    requestAnimationFrame(() => {
+      setIsLogoAnimating(true);
+      logoTimeoutRef.current = setTimeout(() => {
+        setIsLogoAnimating(false);
+      }, 2000);
+    });
+
+    handleBottomBarHome();
+  }, [handleBottomBarHome]);
 
   // Listen to browser / mobile native Back and Forward buttons (popstate)
   useEffect(() => {

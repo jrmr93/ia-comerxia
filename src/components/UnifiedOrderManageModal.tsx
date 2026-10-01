@@ -51,6 +51,7 @@ import { directPrintShippingTicket } from './ShippingTicketModal.tsx';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
 import { OrderPrintA4Modal } from './OrderPrintA4Modal.tsx';
 import { calculateLineItem, calculateInvoiceTotals, extractBaseUnitPriceWithoutTax, extractItemTaxPercent } from '../utils/ecuadorTaxCalculator.ts';
+import { searchProductsFuzzy } from '../utils/fuzzySearch.ts';
 
 export interface UnifiedOrderManageModalProps {
   order: CustomerOrder | null;
@@ -873,18 +874,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     setShowCustomerDropdown(false);
   };
 
-  // Products Search Filter
+  // Products Search Filter (Using Store Fuzzy Search Algorithm)
   const filteredCatalogProducts = useMemo(() => {
-    const q = productSearch.trim().toLowerCase();
-    if (!q) return [];
-    return products
-      .filter((p) => {
-        const nameMatch = (p.name || '').toLowerCase().includes(q);
-        const skuMatch = (p.sku || '').toLowerCase().includes(q);
-        const barMatch = (p.barcode || '').toLowerCase().includes(q);
-        return nameMatch || skuMatch || barMatch;
-      })
-      .slice(0, 8);
+    if (!productSearch.trim()) return [];
+    return searchProductsFuzzy(products, productSearch, { includeArchived: true }).matches.slice(0, 8);
   }, [productSearch, products]);
 
   const handleAddProduct = (prod: InventoryItem) => {

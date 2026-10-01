@@ -48,6 +48,7 @@ import { PurchaseSupplierContactModal } from './PurchaseSupplierContactModal.tsx
 import { PurchaseRecordCard } from './PurchaseRecordCard.tsx';
 import { directPrintOrder } from '../utils/directOrderPrint.ts';
 import { OrderPrintA4Modal } from './OrderPrintA4Modal.tsx';
+import { searchProductsFuzzy } from '../utils/fuzzySearch.ts';
 import {
   extractPurchasePhotos,
   generatePurchasePhotosCollage,
@@ -2320,17 +2321,10 @@ const PurchaseFormModal: React.FC<PurchaseFormModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Filtered catalog products for picker
+  // Filtered catalog products for picker (Using Store Fuzzy Search Algorithm)
   const filteredCatalog = useMemo(() => {
     if (!productSearch.trim()) return [];
-    const q = productSearch.toLowerCase();
-    return inventoryItems
-      .filter((it) =>
-        it.name?.toLowerCase().includes(q) ||
-        it.sku?.toLowerCase().includes(q) ||
-        (it.barcode && it.barcode.toLowerCase().includes(q))
-      )
-      .slice(0, 10);
+    return searchProductsFuzzy(inventoryItems, productSearch, { includeArchived: true }).matches.slice(0, 10);
   }, [inventoryItems, productSearch]);
 
   // Regla ERP #2: Control de productos duplicados al agregar desde el catálogo
