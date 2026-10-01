@@ -1839,22 +1839,22 @@ export const ProductCardItem: React.FC<{
                     <button
                       type="button"
                       onClick={() => onAddToCart(item, 1)}
-                      className="min-h-[38px] py-2 px-2.5 rounded-xl bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black text-xs shadow-xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border border-amber-300/80"
+                      className="min-h-[40px] py-2 px-2.5 rounded-xl bg-white hover:bg-amber-50/90 text-amber-800 font-extrabold text-xs shadow-2xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border-2 border-[#FFD000]"
                       title="Agregar al carrito"
                     >
-                      <ShoppingCart className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="font-black">Agregar</span>
+                      <ShoppingCart className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                      <span className="font-extrabold text-amber-800">Agregar</span>
                     </button>
                   )}
 
                   <button
                     type="button"
                     onClick={(e) => onDirectBuyProduct(item, e)}
-                    className="min-h-[38px] py-2 px-2.5 rounded-xl transition flex items-center justify-center space-x-1 font-black text-xs cursor-pointer shadow-xs active:scale-95 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    title="Comprar directo por WhatsApp"
+                    className="min-h-[40px] py-2 px-2.5 rounded-xl transition flex items-center justify-center space-x-1 font-extrabold text-xs cursor-pointer shadow-xs active:scale-95 bg-[#FFD000] hover:bg-[#E6B800] text-amber-950"
+                    title="Comprar directo"
                   >
-                    <MessageCircle className="w-3.5 h-3.5 flex-shrink-0 fill-current" />
-                    <span className="font-black">Comprar</span>
+                    <ShoppingBag className="w-4 h-4 text-amber-950 stroke-[2.5] flex-shrink-0" />
+                    <span className="font-extrabold text-amber-950">Comprar</span>
                   </button>
                 </div>
 
@@ -4348,10 +4348,10 @@ export const AdminStoreCatalog: React.FC<{ props: StoreLayoutProps }> = ({ props
                       <button
                         type="button"
                         onClick={(e) => props.onDirectBuyProduct(item, e)}
-                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-xs active:scale-95"
-                        title="Comprar directo por WhatsApp"
+                        className="flex-1 py-2 px-3 rounded-xl bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 font-extrabold text-xs sm:text-sm transition cursor-pointer flex items-center justify-center space-x-1.5 shadow-xs active:scale-95"
+                        title="Comprar directo"
                       >
-                        <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                        <ShoppingBag className="w-4 h-4 text-amber-950 stroke-[2.5] flex-shrink-0" />
                         <span>Comprar</span>
                       </button>
                     ) : (
