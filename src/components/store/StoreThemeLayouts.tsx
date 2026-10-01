@@ -2562,8 +2562,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           {/* Upper Row: Store Brand + Desktop Mega Search Box + Cart */}
           <div
-            className={`${isScrolled ? 'hidden md:flex' : 'flex'
-              } py-3 items-center justify-between gap-3 sm:gap-6 border-b border-slate-200/60 transition-all duration-300 relative z-10`}
+            className="flex py-3 items-center justify-between gap-3 sm:gap-6 border-b border-slate-200/60 transition-all duration-300 relative z-10"
           >
             {/* Brand & Store Identity */}
             <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
@@ -2729,197 +2728,184 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 <Search className="w-3.5 h-3.5 stroke-[2.5]" />
               </button>
             </div>
+          </div>
+        </div>
 
-            {/* When scrolled on mobile in customer mode, maintain direct access to cart */}
-            {isScrolled && isCustomerView && (
+        {/* Mobile Quick Filters & Controls Bar: SINGLE SCROLLABLE ROW ONLY (Phone Mode) - Shown only at top of page */}
+        {!isScrolled && (
+          <div className="block md:hidden border-t border-amber-300/30 py-1.5 overflow-x-auto scrollbar-none -mx-1 px-1">
+            <div className="flex items-center space-x-1.5 flex-nowrap w-max">
+              {/* Dedicated Filter & Categories Sheet Button */}
               <button
                 type="button"
-                onClick={onOpenCart}
-                className="relative p-2 rounded-xl bg-slate-950 hover:bg-slate-900 text-amber-400 transition cursor-pointer shadow-xs active:scale-95 flex-shrink-0 border border-slate-800"
-                title="Ver carrito de compras"
+                onClick={() => setIsMobileFilterOpen(true)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 border shadow-2xs active:scale-95 flex-shrink-0 ${activeFilterCount > 0
+                  ? 'bg-amber-400 text-slate-950 font-black border-amber-400 shadow-xs'
+                  : 'bg-white/90 hover:bg-white text-slate-800 border-amber-300/60'
+                  }`}
               >
-                <ShoppingCart className="w-4 h-4 text-amber-400" />
-                {cartTotalItems > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-0.5 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center shadow-xs border border-white">
-                    {cartTotalItems}
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Filtros y Categorías</span>
+                {activeFilterCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-slate-950 text-amber-300 text-[10px] font-black flex items-center justify-center ml-0.5">
+                    {activeFilterCount}
                   </span>
                 )}
               </button>
-            )}
-          </div>
-        </div>
 
-        {/* Mobile Quick Filters & Controls Bar: SINGLE SCROLLABLE ROW ONLY (Phone Mode) */}
-        <div className="block md:hidden border-t border-amber-300/30 py-1.5 overflow-x-auto scrollbar-none -mx-1 px-1">
-          <div className="flex items-center space-x-1.5 flex-nowrap w-max">
-            {/* Dedicated Filter & Categories Sheet Button */}
-            <button
-              type="button"
-              onClick={() => setIsMobileFilterOpen(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 border shadow-2xs active:scale-95 flex-shrink-0 ${activeFilterCount > 0
-                ? 'bg-amber-400 text-slate-950 font-black border-amber-400 shadow-xs'
-                : 'bg-white/90 hover:bg-white text-slate-800 border-amber-300/60'
-                }`}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Filtros y Categorías</span>
-              {activeFilterCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-slate-950 text-amber-300 text-[10px] font-black flex items-center justify-center ml-0.5">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-
-            {/* Ofertas Flash Toggle */}
-            <button
-              type="button"
-              onClick={() => setShowOffersOnly(!showOffersOnly)}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 border flex-shrink-0 active:scale-95 ${showOffersOnly
-                ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs font-black'
-                : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
-                }`}
-              title="Filtrar productos con descuento"
-            >
-              <Flame className={`w-3.5 h-3.5 ${showOffersOnly ? 'text-rose-600 fill-rose-600' : 'text-rose-500'}`} />
-              <span className="whitespace-nowrap">Ofertas</span>
-            </button>
-
-            {/* Quick Sorter */}
-            <div className="relative flex-shrink-0">
-              <select
-                value={sortBy}
-                onChange={(e: any) => setSortBy(e.target.value)}
-                className="appearance-none bg-white/90 hover:bg-white text-slate-800 border border-amber-300/60 rounded-xl pl-2.5 pr-6 py-1.5 text-xs font-bold focus:outline-none cursor-pointer"
-              >
-                <option value="featured">Destacados</option>
-                <option value="price_asc">Menor Precio</option>
-                <option value="price_desc">Mayor Precio</option>
-                <option value="name">A - Z</option>
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-
-            {/* En Stock (Solo en vista admin) */}
-            {!isCustomerView && (
+              {/* Ofertas Flash Toggle */}
               <button
                 type="button"
-                onClick={() => setInStockOnly(!inStockOnly)}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 border flex-shrink-0 active:scale-95 ${inStockOnly
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs font-black'
+                onClick={() => setShowOffersOnly(!showOffersOnly)}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 border flex-shrink-0 active:scale-95 ${showOffersOnly
+                  ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-xs font-black'
                   : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
                   }`}
-                title="Mostrar solo productos con stock disponible"
+                title="Filtrar productos con descuento"
               >
-                <Check className={`w-3.5 h-3.5 ${inStockOnly ? 'text-emerald-700' : 'text-slate-500'}`} />
-                <span className="whitespace-nowrap">En Stock</span>
+                <Flame className={`w-3.5 h-3.5 ${showOffersOnly ? 'text-rose-600 fill-rose-600' : 'text-rose-500'}`} />
+                <span className="whitespace-nowrap">Ofertas</span>
               </button>
-            )}
 
-            {/* Subtle Divider */}
-            <div className="h-4 w-px bg-amber-300/70 flex-shrink-0" />
+              {/* Quick Sorter */}
+              <div className="relative flex-shrink-0">
+                <select
+                  value={sortBy}
+                  onChange={(e: any) => setSortBy(e.target.value)}
+                  className="appearance-none bg-white/90 hover:bg-white text-slate-800 border border-amber-300/60 rounded-xl pl-2.5 pr-6 py-1.5 text-xs font-bold focus:outline-none cursor-pointer"
+                >
+                  <option value="featured">Destacados</option>
+                  <option value="price_asc">Menor Precio</option>
+                  <option value="price_desc">Mayor Precio</option>
+                  <option value="name">A - Z</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
 
-            {/* Category Chips in the exact same single scrollable row */}
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === 'all'
-                ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
-                : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
+              {/* En Stock (Solo en vista admin) */}
+              {!isCustomerView && (
+                <button
+                  type="button"
+                  onClick={() => setInStockOnly(!inStockOnly)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 border flex-shrink-0 active:scale-95 ${inStockOnly
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs font-black'
+                    : 'bg-white/90 text-slate-700 hover:bg-white border-amber-300/60'
+                    }`}
+                  title="Mostrar solo productos con stock disponible"
+                >
+                  <Check className={`w-3.5 h-3.5 ${inStockOnly ? 'text-emerald-700' : 'text-slate-500'}`} />
+                  <span className="whitespace-nowrap">En Stock</span>
+                </button>
+              )}
+
+              {/* Subtle Divider */}
+              <div className="h-4 w-px bg-amber-300/70 flex-shrink-0" />
+
+              {/* Category Chips in the exact same single scrollable row */}
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${selectedCategory === 'all'
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
+                  : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
+                  }`}
+              >
+                <span>☰ Todos</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedCategory === 'all' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-200 text-slate-600'}`}>
+                  {products.length}
+                </span>
+              </button>
+
+              {categories.map((cat) => {
+                const count = categoryCounts[cat] || 0;
+                const isSel = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${isSel
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
+                      : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
+                      }`}
+                  >
+                    <span>{cat}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSel ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-200 text-slate-600'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Desktop Lower Row: Lotengoo Department Ribbon & Fast Filter Toggles - Shown only at top of page */}
+        {!isScrolled && (
+          <div className="hidden md:flex py-2.5 items-center justify-between gap-4 text-xs font-bold text-slate-800 border-t border-slate-100 overflow-x-auto scrollbar-none">
+            {/* Department Links & Categories Dropdown */}
+            <div className="flex items-center space-x-5 flex-shrink-0">
+              <div className="relative flex-shrink-0">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="appearance-none bg-slate-100 hover:bg-slate-200 text-slate-950 font-black rounded-full pl-8 pr-7 py-1.5 text-xs focus:outline-none cursor-pointer border border-slate-300 transition"
+                  title="Seleccionar Categoría"
+                >
+                  <option value="all">≡ Categorías</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-700 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              <button
+                onClick={() => setShowOffersOnly(!showOffersOnly)}
+                className={`hover:text-amber-600 transition cursor-pointer flex items-center gap-1.5 ${
+                  showOffersOnly ? 'text-amber-600 font-black' : 'text-slate-700'
                 }`}
-            >
-              <span>☰ Todos</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedCategory === 'all' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-200 text-slate-600'}`}>
-                {products.length}
-              </span>
-            </button>
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <span>Ofertas Flash</span>
+              </button>
 
-            {categories.map((cat) => {
-              const count = categoryCounts[cat] || 0;
-              const isSel = selectedCategory === cat;
-              return (
+              {categories.slice(0, 5).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center space-x-1.5 flex-shrink-0 ${isSel
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs border border-amber-400'
-                    : 'bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-amber-300/60'
-                    }`}
+                  className={`hover:text-amber-600 transition cursor-pointer py-1 ${
+                    selectedCategory === cat ? 'text-slate-950 font-black border-b-2 border-amber-400' : 'text-slate-700'
+                  }`}
                 >
-                  <span>{cat}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSel ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-200 text-slate-600'}`}>
-                    {count}
-                  </span>
+                  {cat}
                 </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Desktop Lower Row: Lotengoo Department Ribbon & Fast Filter Toggles (Spacious MD+ screens) */}
-        <div className="hidden md:flex py-2.5 items-center justify-between gap-4 text-xs font-bold text-slate-800 border-t border-slate-100 overflow-x-auto scrollbar-none">
-          {/* Department Links & Categories Dropdown */}
-          <div className="flex items-center space-x-5 flex-shrink-0">
-            <div className="relative flex-shrink-0">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="appearance-none bg-slate-100 hover:bg-slate-200 text-slate-950 font-black rounded-full pl-8 pr-7 py-1.5 text-xs focus:outline-none cursor-pointer border border-slate-300 transition"
-                title="Seleccionar Categoría"
-              >
-                <option value="all">≡ Categorías</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-700 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              ))}
             </div>
 
-            <button
-              onClick={() => setShowOffersOnly(!showOffersOnly)}
-              className={`hover:text-amber-600 transition cursor-pointer flex items-center gap-1.5 ${
-                showOffersOnly ? 'text-amber-600 font-black' : 'text-slate-700'
-              }`}
-            >
-              <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-              <span>Ofertas Flash</span>
-            </button>
+            {/* Right Side: Vender en Lotengoo & Sort Selector */}
+            <div className="flex items-center space-x-3 flex-shrink-0">
+              <span className="text-slate-600 hover:text-slate-900 cursor-pointer font-bold flex items-center gap-1">
+                <span>🤝 Vender en Lotengoo</span>
+              </span>
 
-            {categories.slice(0, 5).map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`hover:text-amber-600 transition cursor-pointer py-1 ${
-                  selectedCategory === cat ? 'text-slate-950 font-black border-b-2 border-amber-400' : 'text-slate-700'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Right Side: Vender en Lotengoo & Sort Selector */}
-          <div className="flex items-center space-x-3 flex-shrink-0">
-            <span className="text-slate-600 hover:text-slate-900 cursor-pointer font-bold flex items-center gap-1">
-              <span>🤝 Vender en Lotengoo</span>
-            </span>
-
-            {/* Sort Selector */}
-            <div className="relative">
-              <select
-                value={sortBy}
-                onChange={(e: any) => setSortBy(e.target.value)}
-                className="appearance-none bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-full pl-3 pr-7 py-1 text-xs font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="featured">Destacados</option>
-                <option value="price_asc">Menor Precio</option>
-                <option value="price_desc">Mayor Precio</option>
-                <option value="name">Nombre: A-Z</option>
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              {/* Sort Selector */}
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e: any) => setSortBy(e.target.value)}
+                  className="appearance-none bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-full pl-3 pr-7 py-1 text-xs font-semibold focus:outline-none cursor-pointer"
+                >
+                  <option value="featured">Destacados</option>
+                  <option value="price_asc">Menor Precio</option>
+                  <option value="price_desc">Mayor Precio</option>
+                  <option value="name">Nombre: A-Z</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
 
