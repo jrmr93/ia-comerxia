@@ -1754,74 +1754,74 @@ export const ProductCardItem: React.FC<{
       </div>
 
       {/* Body */}
-      <div className="p-2.5 sm:p-4 flex-1 flex flex-col justify-between space-y-2 sm:space-y-3">
+      <div className="p-2.5 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2 sm:space-y-2.5">
         <div>
-          <div className="flex items-center justify-between text-[10px] mb-1 font-mono text-slate-400">
-            <span className="font-medium text-[10px]">SKU: {item.sku}</span>
-            <span className="truncate max-w-[100px] sm:max-w-[130px] font-sans font-medium text-[10px] text-slate-500">{item.category || 'Producto'}</span>
+          <div className="flex items-center justify-between text-[9px] sm:text-[10px] mb-1 font-mono text-slate-400">
+            <span className="font-medium text-[9px] sm:text-[10px]">SKU: {item.sku}</span>
+            <span className="truncate max-w-[90px] sm:max-w-[120px] font-sans font-medium text-[9px] sm:text-[10px] text-slate-500">{item.category || 'Producto'}</span>
           </div>
 
           <h3
             onClick={() => onQuickViewProduct(item)}
-            className="text-[15px] font-bold line-clamp-2 transition cursor-pointer leading-snug hover:text-amber-600 text-slate-900"
+            className="text-xs sm:text-[15px] font-bold line-clamp-2 transition cursor-pointer leading-snug hover:text-amber-600 text-slate-900"
           >
             {item.name}
           </h3>
 
           {/* Amazon / AliExpress Social Proof & Ratings */}
-          <div className="flex items-center space-x-1.5 mt-1 flex-wrap gap-y-0.5">
+          <div className="flex items-center space-x-1 mt-1 flex-wrap gap-y-0.5">
             <div className="flex items-center text-amber-400">
-              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-              <span className="text-[10px] font-black text-slate-800 ml-0.5">
+              <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-amber-400 text-amber-400" />
+              <span className="text-[9px] sm:text-[10px] font-black text-slate-800 ml-0.5">
                 {(4.7 + (item.id % 4) * 0.1).toFixed(1)}
               </span>
             </div>
-            <span className="text-[10px] text-slate-500 font-medium">
+            <span className="text-[9px] sm:text-[10px] text-slate-500 font-medium">
               (+{((item.id * 13) % 150) + 30} vendidos)
             </span>
           </div>
 
           {item.description && (
-            <p className="text-xs font-normal line-clamp-2 mt-1 leading-relaxed text-slate-500">
+            <p className="text-[11px] sm:text-xs font-normal line-clamp-2 mt-1 leading-relaxed text-slate-500">
               {item.description}
             </p>
           )}
 
         </div>
 
-        <div className={`pt-2 sm:pt-3 border-t space-y-2 sm:space-y-2.5 ${activeTheme === 'boutique' ? 'border-zinc-800' : 'border-slate-100'}`}>
+        <div className={`pt-2 sm:pt-2.5 border-t space-y-1.5 sm:space-y-2 ${activeTheme === 'boutique' ? 'border-zinc-800' : 'border-slate-100'}`}>
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-medium text-slate-500">
-              {hasDiscount ? 'Oferta Especial:' : 'Precio:'}
+            <span className="text-[11px] sm:text-xs font-medium text-slate-500">
+              {hasDiscount ? 'Oferta:' : 'Precio:'}
             </span>
             {hasDiscount ? (
               <div className="text-right">
-                <div className="flex items-center justify-end space-x-1 sm:space-x-1.5">
-                  <span className="text-xs line-through text-slate-400 font-normal">
+                <div className="flex items-center justify-end space-x-1">
+                  <span className="text-[10px] sm:text-xs line-through text-slate-400 font-normal">
                     ${regularPrice.toFixed(2)}
                   </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-600 text-white shadow-2xs">
+                  <span className="text-[9px] sm:text-[10px] font-bold px-1 py-0.2 rounded bg-rose-600 text-white shadow-2xs">
                     -{discountPercent}%
                   </span>
                 </div>
                 <div className="flex items-baseline justify-end">
-                  <span className="text-xl font-extrabold text-rose-600">
+                  <span className="text-base sm:text-xl font-extrabold text-rose-600">
                     ${effectivePrice.toFixed(2)}
                   </span>
-                  <span className="text-xs ml-1 font-medium text-slate-500">
+                  <span className="text-[10px] sm:text-xs ml-0.5 font-medium text-slate-500">
                     {currency}
                   </span>
                 </div>
-                <span className="text-[10px] font-medium text-emerald-600 block">
+                <span className="text-[9px] sm:text-[10px] font-medium text-emerald-600 block">
                   Ahorras ${(regularPrice - effectivePrice).toFixed(2)}
                 </span>
               </div>
             ) : (
               <div className="text-right">
-                <span className="text-xl font-extrabold text-slate-900">
+                <span className="text-base sm:text-xl font-extrabold text-slate-900">
                   ${regularPrice.toFixed(2)}
                 </span>
-                <span className="text-xs ml-1 font-medium text-slate-500">
+                <span className="text-[10px] sm:text-xs ml-0.5 font-medium text-slate-500">
                   {currency}
                 </span>
               </div>
@@ -1831,31 +1831,31 @@ export const ProductCardItem: React.FC<{
           {/* Action buttons */}
           <div>
             {isCustomerView ? (
-              <div className="space-y-2 pt-0.5">
-                <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+              <div className="space-y-1.5 sm:space-y-2 pt-0.5">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                   {inCart ? (
-                    <div className={`flex items-center justify-between rounded-full px-2 py-1 border ${activeTheme === 'boutique' ? 'bg-zinc-800 border-amber-500/50 text-zinc-100' : 'bg-amber-50 border-amber-400 text-slate-900'
+                    <div className={`flex items-center justify-between rounded-full px-1 py-0.5 sm:px-1.5 sm:py-1 border ${activeTheme === 'boutique' ? 'bg-zinc-800 border-amber-500/50 text-zinc-100' : 'bg-amber-50 border-amber-400 text-slate-900'
                       }`}>
                       <button
                         type="button"
                         onClick={() => onUpdateCartQty(item.id, inCart.quantity - 1)}
-                        className={`w-6 h-6 rounded-full flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
+                        className={`w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 rounded-full flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
                           }`}
                         title="Reducir una unidad"
                       >
-                        <Minus className="w-3 h-3 stroke-[2.5]" />
+                        <Minus className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[2.5]" />
                       </button>
-                      <span className="text-sm font-bold font-mono px-1 text-slate-900">
+                      <span className="text-[11px] sm:text-xs font-bold font-mono px-0.5 text-slate-900">
                         {inCart.quantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => onUpdateCartQty(item.id, inCart.quantity + 1)}
-                        className={`w-6 h-6 rounded-full flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
+                        className={`w-4.5 h-4.5 sm:w-5.5 sm:h-5.5 rounded-full flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
                           }`}
                         title="Aumentar una unidad"
                       >
-                        <Plus className="w-3 h-3 stroke-[2.5]" />
+                        <Plus className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[2.5]" />
                       </button>
                     </div>
                   ) : (
@@ -1865,7 +1865,7 @@ export const ProductCardItem: React.FC<{
                           <img
                             src={campaignBadgeConfig.url}
                             alt="Campaña"
-                            className="w-6 h-6 sm:w-7.5 sm:h-7.5 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                            className="w-4.5 h-4.5 sm:w-6 sm:h-6 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                             }}
@@ -1875,15 +1875,15 @@ export const ProductCardItem: React.FC<{
                       <button
                         type="button"
                         onClick={() => onAddToCart(item, 1)}
-                        className="min-h-[38px] sm:min-h-[42px] py-2 px-2.5 rounded-full bg-white hover:bg-slate-50 text-slate-900 font-bold text-sm transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 border border-slate-200 shadow-2xs w-full min-w-0"
+                        className="min-h-[32px] sm:min-h-[36px] py-1 sm:py-1.5 px-1 sm:px-2 rounded-full bg-white hover:bg-slate-50 text-slate-900 font-bold transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border border-slate-200 shadow-2xs w-full min-w-0"
                         title="Agregar al carrito"
                       >
-                        <svg className="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <circle cx="9" cy="21" r="1" fill="#3B82F6" stroke="#3B82F6" />
                           <circle cx="20" cy="21" r="1" fill="#3B82F6" stroke="#3B82F6" />
                           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
                         </svg>
-                        <span className="font-bold text-sm text-slate-900 truncate">Agregar</span>
+                        <span className="font-bold text-[10px] xs:text-[11px] sm:text-xs text-slate-900 whitespace-nowrap">Agregar</span>
                       </button>
                     </div>
                   )}
@@ -1894,7 +1894,7 @@ export const ProductCardItem: React.FC<{
                         <img
                           src={campaignBadgeConfig.url}
                           alt="Campaña"
-                          className="w-6 h-6 sm:w-7.5 sm:h-7.5 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                          className="w-4.5 h-4.5 sm:w-6 sm:h-6 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                           }}
@@ -1904,15 +1904,15 @@ export const ProductCardItem: React.FC<{
                     <button
                       type="button"
                       onClick={(e) => onDirectBuyProduct(item, e)}
-                      className="min-h-[38px] sm:min-h-[42px] py-2 px-2.5 rounded-full transition flex items-center justify-center space-x-1.5 font-extrabold text-sm cursor-pointer shadow-xs active:scale-95 bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 w-full min-w-0"
+                      className="min-h-[32px] sm:min-h-[36px] py-1 sm:py-1.5 px-1 sm:px-2 rounded-full transition flex items-center justify-center space-x-1 font-extrabold cursor-pointer shadow-xs active:scale-95 bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 w-full min-w-0"
                       title="Comprar directo"
                     >
-                      <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                      <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" viewBox="0 0 24 24" fill="none">
                         <rect x="2" y="5" width="20" height="14" rx="2" fill="#0EA5E9" />
                         <line x1="2" y1="10" x2="22" y2="10" stroke="#0369A1" strokeWidth="3" />
                         <rect x="5" y="14" width="4" height="2" fill="#FEF08A" />
                       </svg>
-                      <span className="font-extrabold text-sm text-slate-950 truncate">Comprar</span>
+                      <span className="font-extrabold text-[10px] xs:text-[11px] sm:text-xs text-slate-950 whitespace-nowrap">Comprar</span>
                     </button>
                   </div>
                 </div>
@@ -1921,13 +1921,13 @@ export const ProductCardItem: React.FC<{
                 <button
                   type="button"
                   onClick={(e) => onShareProductWhatsApp(item, e)}
-                  className="w-full min-h-[36px] sm:min-h-[40px] py-2 px-3 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 font-bold text-sm transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs active:scale-95"
+                  className="w-full min-h-[30px] sm:min-h-[34px] py-1 sm:py-1.5 px-1.5 sm:px-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 font-bold transition flex items-center justify-center space-x-1 cursor-pointer shadow-2xs active:scale-95"
                   title="Compartir por WhatsApp"
                 >
-                  <svg className="w-4 h-4 text-[#10B981] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#10B981] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                   </svg>
-                  <span className="font-bold text-sm text-slate-800 truncate">Compartir Producto</span>
+                  <span className="font-bold text-[10px] xs:text-[11px] sm:text-xs text-slate-800 whitespace-nowrap">Compartir Producto</span>
                 </button>
               </div>
             ) : (
@@ -3298,20 +3298,20 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   />
                 ) : null;
               })()}
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3.5 md:gap-4">
                 {paginatedProducts.map((item) => (
                   <ProductCardItem key={item.id} item={item} props={props} />
                 ))}
               </div>
             </div>
           ) : searchQuery || storeConfig?.showCategoryHeader === false ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3.5 md:gap-4">
               {paginatedProducts.map((item) => (
                 <ProductCardItem key={item.id} item={item} props={props} />
               ))}
             </div>
           ) : (
-            <div className="space-y-10">
+            <div className="space-y-8">
               {(() => {
                 const presentCategories = Array.from(
                   new Set(paginatedProducts.map((p) => p.category || 'General'))
@@ -3328,7 +3328,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   const catCfg = getCustomCategoryHeaderConfig(catName);
 
                   return (
-                    <div key={catName} className="space-y-4">
+                    <div key={catName} className="space-y-3.5">
                       {/* Category Header Panel with Full Background Image FIRST */}
                       {shouldShowBanner && (
                         <CategoryTransitionBanner
@@ -3343,7 +3343,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                       )}
 
                       {/* Category Products Grid NEXT */}
-                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3.5 md:gap-4">
                         {catProducts.map((item) => (
                           <ProductCardItem key={item.id} item={item} props={props} />
                         ))}

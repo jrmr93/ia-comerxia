@@ -1058,9 +1058,9 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                         <button
                           type="button"
                           onClick={handleAdd}
-                          className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl font-extrabold text-sm sm:text-base shadow-xs transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 border-2 ${addedAnimation
+                          className={`w-full py-3.5 sm:py-4 px-4 rounded-full font-bold text-sm sm:text-base shadow-2xs transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 border ${addedAnimation
                               ? 'bg-emerald-600 text-white border-emerald-500'
-                              : 'bg-white hover:bg-amber-50/90 text-amber-800 border-[#FFD000]'
+                              : 'bg-white hover:bg-slate-50 text-slate-900 border-slate-200'
                             }`}
                         >
                           {addedAnimation ? (
@@ -1070,8 +1070,12 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                             </>
                           ) : (
                             <>
-                              <ShoppingCart className="w-5 h-5 stroke-[2.5] text-amber-600" />
-                              <span className="font-extrabold text-amber-800">
+                              <svg className="w-5 h-5 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="9" cy="21" r="1" fill="#3B82F6" stroke="#3B82F6" />
+                                <circle cx="20" cy="21" r="1" fill="#3B82F6" stroke="#3B82F6" />
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                              </svg>
+                              <span className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
                                 Agregar al Carrito • ${(effectivePrice * quantity).toFixed(2)} {currency}
                               </span>
                             </>
@@ -1096,33 +1100,41 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                         <button
                           type="button"
                           onClick={handleDirectBuy}
-                          className="w-full py-3.5 sm:py-4 px-4 rounded-2xl text-sm sm:text-base font-extrabold transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 shadow-md bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 shadow-amber-400/20"
+                          className="w-full py-3 sm:py-3.5 px-4 rounded-full text-xs sm:text-sm font-extrabold transition flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shadow-xs bg-[#FFD000] hover:bg-[#E6B800] text-slate-950"
                         >
-                          <ShoppingBag className="w-5 h-5 stroke-[2.5] text-amber-950" />
-                          <span className="font-extrabold text-amber-950">Comprar por WhatsApp</span>
+                          <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                            <rect x="2" y="5" width="20" height="14" rx="2" fill="#0EA5E9" />
+                            <line x1="2" y1="10" x2="22" y2="10" stroke="#0369A1" strokeWidth="3" />
+                            <rect x="5" y="14" width="4" height="2" fill="#FEF08A" />
+                          </svg>
+                          <span className="font-extrabold text-xs sm:text-sm text-slate-950">Comprar por WhatsApp</span>
                         </button>
                       </div>
 
                       {/* 3. SECUNDARIOS: CONSULTAR ASESOR & COMPARTIR (Grilla limpia de 2 columnas) */}
-                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
                         {storeConfig.whatsappNumber && (
                           <button
                             type="button"
                             onClick={handleDirectWhatsAppOrder}
-                            className="py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 bg-slate-100 hover:bg-slate-200/90 text-slate-800 border border-slate-200/90 shadow-2xs"
+                            className="py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-full text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs"
                             title="Consultar con un asesor por WhatsApp"
                           >
-                            <MessageCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span className="truncate">Consultar Asesor</span>
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#10B981] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                            </svg>
+                            <span className="truncate text-xs font-bold">Consultar Asesor</span>
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={(e) => onShareProductWhatsApp(product, e)}
-                          className="py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 bg-slate-100 hover:bg-slate-200/90 text-slate-800 border border-slate-200/90 shadow-2xs"
+                          className="py-2.5 px-3 rounded-full text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs"
                           title="Compartir por WhatsApp"
                         >
-                          <Share2 className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                          <svg className="w-4 h-4 text-[#10B981] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                          </svg>
                           <span className="truncate">Compartir Producto</span>
                         </button>
                       </div>
