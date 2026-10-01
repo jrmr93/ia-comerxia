@@ -2456,21 +2456,32 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     [categoryImagesMap]
   );
 
-  // Reset to page 1 and scroll to top whenever filters or search change
+  // Reset to page 1 whenever filters or search change
   React.useEffect(() => {
     setCurrentPage(1);
-    if (searchQuery.trim().length > 0 || selectedCategory !== 'all') {
+    if (selectedCategory !== 'all' && !searchQuery.trim()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      if (typeof document !== 'undefined') {
-        document.documentElement?.scrollTo({ top: 0, behavior: 'smooth' });
-        document.body?.scrollTo({ top: 0, behavior: 'smooth' });
-        const anchorEl = document.getElementById('store-products-anchor') || document.getElementById('marketplace-sticky-header');
-        if (anchorEl) {
+    }
+  }, [searchQuery, selectedCategory, showOffersOnly, inStockOnly, sortBy]);
+
+  // When a search returns matching products, smoothly scroll to bring the first matched product / search results grid into view under the sticky header
+  const prevSearchQueryRef = React.useRef('');
+  React.useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+    const wasEmpty = prevSearchQueryRef.current.trim() === '';
+    prevSearchQueryRef.current = searchQuery;
+
+    if (trimmedQuery.length > 0 && filteredProducts.length > 0) {
+      const anchorEl = document.getElementById('store-products-anchor') || document.getElementById('marketplace-sticky-header');
+      if (anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        // If starting a new search or user is scrolled down past the products grid
+        if (wasEmpty || rect.top < -20 || rect.top > window.innerHeight * 0.4) {
           anchorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }
     }
-  }, [searchQuery, selectedCategory, showOffersOnly, inStockOnly, sortBy]);
+  }, [searchQuery, filteredProducts.length]);
 
   const totalPages = isPaginationEnabled ? Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)) : 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -2552,12 +2563,15 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       {/* ========================================================================= */}
       <div
         id="marketplace-sticky-header"
-        className={`sticky ${scrollDirection === 'down'
+        className={`sticky ${
+          searchQuery.trim().length > 0
+            ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200/80'
+            : scrollDirection === 'down'
             ? '-translate-y-full opacity-0 pointer-events-none'
             : scrollDirection === 'up'
-              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200/80'
-              : `${isCustomerOnly || isCustomerView || isCustomerMode ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
-          } w-full left-0 right-0 top-0 m-0 p-0 bg-white text-slate-900 shadow-xs border-b border-slate-200 transition-all duration-300 transform relative overflow-hidden group`}
+            ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200/80'
+            : `${isCustomerOnly || isCustomerView || isCustomerMode ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
+        } w-full left-0 right-0 top-0 m-0 p-0 bg-white text-slate-900 shadow-xs border-b border-slate-200 transition-all duration-300 transform relative overflow-hidden group`}
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           {/* Upper Row: Store Brand + Smart Search Box + Cart (Single Row on Mobile & Desktop) */}
@@ -2572,27 +2586,27 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 className="cursor-pointer select-none relative group/logo"
                 title="Logo de la tienda"
               >
-                <div className="flex items-center space-x-2.5 relative z-10">
+                <div className="flex items-center space-x-1.5 xs:space-x-2.5 relative z-10">
                   {storeConfig.logoDesktopUrl ? (
                     <div className="h-9 sm:h-11 max-w-[40px] md:max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center px-1 md:px-2 py-0.5">
                       <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto max-w-full object-contain" />
                     </div>
                   ) : storeConfig.logoUrl ? (
-                    <div className="w-9 sm:w-10 md:w-11 h-9 sm:h-10 md:h-11 rounded-xl bg-[#FFD000] border border-amber-400 overflow-hidden shadow-xs flex items-center justify-center p-1">
+                    <div className="w-8 xs:w-9 sm:w-10 md:w-11 h-8 xs:h-9 sm:h-10 md:h-11 rounded-xl bg-[#FFD000] border border-amber-400 overflow-hidden shadow-xs flex items-center justify-center p-1 flex-shrink-0">
                       <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
                     </div>
                   ) : (
-                    <div className="w-9 sm:w-10 md:w-11 h-9 sm:h-10 md:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-md font-black border border-amber-400">
-                      <Store className="w-5 h-5 md:w-6 md:h-6 text-slate-950" />
+                    <div className="w-8 xs:w-9 sm:w-10 md:w-11 h-8 xs:h-9 sm:h-10 md:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-md font-black border border-amber-400 flex-shrink-0">
+                      <Store className="w-4 h-4 xs:w-5 xs:h-5 md:w-6 md:h-6 text-slate-950" />
                     </div>
                   )}
-                  <div className="hidden md:flex flex-col justify-center">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="font-black text-base sm:text-lg md:text-xl text-slate-950 tracking-tight truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[240px]">
+                  <div className={`${isScrolled ? 'hidden md:flex' : 'flex'} flex-col justify-center transition-all duration-200 flex-shrink-0`}>
+                    <div className="flex items-center space-x-1">
+                      <span className="font-black text-xs xs:text-sm sm:text-base md:text-xl text-slate-950 tracking-tight whitespace-nowrap">
                         {storeConfig.storeName || 'Lotengoo.com'}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">TU TIENDA ONLINE</span>
+                    <span className="hidden sm:inline-block text-[10px] text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">TU TIENDA ONLINE</span>
                   </div>
                 </div>
               </div>

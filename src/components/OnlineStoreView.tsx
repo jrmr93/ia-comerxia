@@ -917,20 +917,16 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }
   }, [storeConfig?.defaultProductSort]);
 
-  // Always scroll to top of store view whenever a customer performs a search or changes category
+  // Scroll to top of store view when category changes (do not jump scroll while customer is typing search query)
   useEffect(() => {
-    if (isCustomerView && (searchQuery.trim().length > 0 || selectedCategory !== 'all')) {
+    if (isCustomerView && selectedCategory !== 'all' && !searchQuery.trim()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       if (typeof document !== 'undefined') {
         document.documentElement?.scrollTo({ top: 0, behavior: 'smooth' });
         document.body?.scrollTo({ top: 0, behavior: 'smooth' });
-        const anchorEl = document.getElementById('store-products-anchor') || document.getElementById('marketplace-sticky-header');
-        if (anchorEl) {
-          anchorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
       }
     }
-  }, [searchQuery, selectedCategory, isCustomerView]);
+  }, [selectedCategory, isCustomerView]);
 
   // Stable random seed map for 'random' initial product order
   const randomOrderSeedMap = useMemo(() => {
@@ -1875,6 +1871,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     setSearchQuery('');
     setInStockOnly(false);
     setShowOffersOnly(false);
+    setSortBy('featured');
 
     if (quickViewProduct) {
       handleBackToCatalog();
