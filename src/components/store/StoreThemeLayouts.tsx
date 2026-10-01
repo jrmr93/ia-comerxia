@@ -2497,36 +2497,44 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
         className={`sticky ${scrollDirection === 'down'
             ? '-translate-y-full opacity-0 pointer-events-none'
             : scrollDirection === 'up'
-              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200/80'
+              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-xl ring-1 ring-slate-200/80'
               : `${isCustomerOnly || isCustomerView || isCustomerMode ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
-          } bg-white/95 backdrop-blur-md text-slate-900 shadow-[0_4px_16px_rgba(0,0,0,0.04)] -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b border-slate-200/90 transition-all duration-300 transform`}
+          } bg-white/95 backdrop-blur-xl text-slate-900 shadow-[0_8px_30px_rgba(0,0,0,0.06)] -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b border-slate-200/90 transition-all duration-300 transform relative overflow-hidden group`}
       >
+        {/* Permanent Subtle Animated Ambient Glow Layer */}
+        <div className="absolute inset-0 animate-store-header-glow pointer-events-none opacity-90" />
+
+        {/* Permanent Animated Gradient Shimmer Sweep Line at the Bottom Edge */}
+        <div className="store-header-shimmer-bar" />
 
         {/* Upper Row: Store Brand + Desktop Mega Search Box + Cart */}
         <div
           className={`${isScrolled ? 'hidden md:flex' : 'flex'
-            } py-3 items-center justify-between gap-3 sm:gap-6 border-b border-slate-100 transition-all duration-300`}
+            } py-3 items-center justify-between gap-3 sm:gap-6 border-b border-slate-200/60 transition-all duration-300 relative z-10`}
         >
           {/* Brand & Store Identity */}
           <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
             <div
               id="store-marketplace-logo"
               onClick={onLogoClick}
-              className={`cursor-pointer select-none transition-transform ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-105 active:scale-95'
+              className={`cursor-pointer select-none transition-all duration-300 relative group/logo ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-[1.03] active:scale-95'
                 }`}
               title="Logo de la tienda"
             >
-              <div className="flex items-center space-x-2">
+              {/* Permanent Ambient Glow Aura behind logo */}
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-400/40 via-yellow-300/30 to-amber-500/40 blur-md opacity-60 group-hover/logo:opacity-100 transition-opacity duration-500 animate-pulse pointer-events-none" />
+
+              <div className="flex items-center space-x-2 relative z-10">
                 {storeConfig.logoDesktopUrl ? (
-                  <div className="h-10 sm:h-11 max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-slate-200 overflow-hidden shadow-xs flex items-center justify-center px-2 py-0.5">
+                  <div className="h-10 sm:h-11 max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center px-2 py-0.5">
                     <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto max-w-full object-contain" />
                   </div>
                 ) : storeConfig.logoUrl ? (
-                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-white border border-slate-200 overflow-hidden shadow-xs flex items-center justify-center p-1">
+                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center p-1">
                     <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
                   </div>
                 ) : (
-                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-sm font-black border border-amber-300">
+                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-md font-black border border-amber-400">
                     <Store className="w-6 h-6" />
                   </div>
                 )}
@@ -2542,9 +2550,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             </div>
           </div>
 
-          {/* Desktop Mega Search Bar (Clean Pure White Input with Lotengoo Yellow Search Button) */}
-          <div className="hidden md:block flex-1 max-w-2xl min-w-0">
-            <div className="flex items-center bg-slate-50 rounded-xl shadow-inner border border-slate-300 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 overflow-hidden transition-all">
+          {/* Desktop Mega Search Bar (Clean Pure White Input with Permanent Subtle Aura & Lotengoo Yellow Search Button) */}
+          <div className="hidden md:block flex-1 max-w-2xl min-w-0 relative">
+            <div className="flex items-center bg-white rounded-xl search-bar-premium-aura border border-amber-400/80 focus-within:border-amber-500 focus-within:ring-4 focus-within:ring-amber-400/25 overflow-hidden transition-all duration-300">
               {/* Category Dropdown integrated on the left */}
               <div className="relative flex-shrink-0 bg-slate-100 border-r border-slate-300">
                 <select
