@@ -229,30 +229,6 @@ export const StorePaymentMethodsModal: React.FC<StorePaymentMethodsModalProps> =
           </div>
         </div>
 
-        {/* MODAL FOOTER */}
-        <div
-          className={`p-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0 ${
-            isBoutique
-              ? 'border-zinc-800 bg-zinc-900/50'
-              : isCyber
-              ? 'border-cyan-900 bg-[#0a1526]'
-              : isBrutalist
-              ? 'border-t-2 border-black bg-zinc-100'
-              : 'border-slate-100 bg-slate-50/60'
-          }`}
-        >
-          <p className="text-[11px] opacity-70 text-center sm:text-left">
-            ¿Tienes dudas con tu cuenta o transferencia?
-          </p>
-          <button
-            type="button"
-            onClick={handleOpenWhatsApp}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shadow-xs"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>Consultar por WhatsApp</span>
-          </button>
-        </div>
       </div>
     </div>
   );
