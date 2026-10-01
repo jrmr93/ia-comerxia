@@ -2560,11 +2560,11 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
           } w-full left-0 right-0 top-0 m-0 p-0 bg-white text-slate-900 shadow-xs border-b border-slate-200 transition-all duration-300 transform relative overflow-hidden group`}
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          {/* Upper Row: Store Brand + Desktop Mega Search Box + Cart */}
+          {/* Upper Row: Store Brand + Smart Search Box + Cart (Single Row on Mobile & Desktop) */}
           <div
-            className="flex py-3 items-center justify-between gap-3 sm:gap-6 border-b border-slate-200/60 transition-all duration-300 relative z-10"
+            className="flex py-2.5 sm:py-3 items-center justify-between gap-1.5 sm:gap-6 border-b border-slate-200/60 transition-all duration-300 relative z-10"
           >
-            {/* Brand & Store Identity */}
+            {/* Brand & Store Identity (Small logo icon ONLY on mobile, full brand details on desktop) */}
             <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
               <div
                 id="store-marketplace-logo"
@@ -2574,19 +2574,19 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               >
                 <div className="flex items-center space-x-2.5 relative z-10">
                   {storeConfig.logoDesktopUrl ? (
-                    <div className="h-10 sm:h-11 max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center px-2 py-0.5">
+                    <div className="h-9 sm:h-11 max-w-[40px] md:max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center px-1 md:px-2 py-0.5">
                       <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto max-w-full object-contain" />
                     </div>
                   ) : storeConfig.logoUrl ? (
-                    <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#FFD000] border border-amber-400 overflow-hidden shadow-xs flex items-center justify-center p-1">
+                    <div className="w-9 sm:w-10 md:w-11 h-9 sm:h-10 md:h-11 rounded-xl bg-[#FFD000] border border-amber-400 overflow-hidden shadow-xs flex items-center justify-center p-1">
                       <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
                     </div>
                   ) : (
-                    <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-md font-black border border-amber-400">
-                      <Store className="w-6 h-6 text-slate-950" />
+                    <div className="w-9 sm:w-10 md:w-11 h-9 sm:h-10 md:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-md font-black border border-amber-400">
+                      <Store className="w-5 h-5 md:w-6 md:h-6 text-slate-950" />
                     </div>
                   )}
-                  <div className="min-w-0 flex flex-col justify-center">
+                  <div className="hidden md:flex flex-col justify-center">
                     <div className="flex items-center space-x-1.5">
                       <span className="font-black text-base sm:text-lg md:text-xl text-slate-950 tracking-tight truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[240px]">
                         {storeConfig.storeName || 'Lotengoo.com'}
@@ -2598,138 +2598,97 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               </div>
             </div>
 
-          {/* Desktop Mega Search Bar (Pure White Input + Lotengoo Yellow Search Button) */}
-          <div className="hidden md:block flex-1 max-w-2xl min-w-0 relative">
-            <div className="flex items-center bg-white rounded-xl border border-slate-300 focus-within:border-amber-400 overflow-hidden transition-all duration-200">
-              {/* Category Dropdown integrated on the left */}
-              <div className="relative flex-shrink-0 bg-slate-100 border-r border-slate-300">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="appearance-none bg-transparent hover:bg-slate-200 text-slate-800 text-xs font-bold pl-3 pr-7 py-2.5 focus:outline-none cursor-pointer max-w-[140px] truncate"
-                  title="Todas las categorías"
-                >
-                  <option value="all">Todas las categorías</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-600 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-
-              {/* Main Smart Search Input */}
-              <StoreSmartSearchBar
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                products={products}
-                categories={categories}
-                onSelectCategory={(cat) => setSelectedCategory(cat)}
-                onSelectProduct={(item) => props.onQuickViewProduct(item)}
-                storeConfig={storeConfig}
-              />
-
-              {/* Signature Lotengoo Yellow Search Button */}
-              <button
-                type="button"
-                className="bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black px-4 py-2.5 flex items-center justify-center transition cursor-pointer flex-shrink-0 shadow-xs active:scale-95"
-                title="Buscar productos"
-              >
-                <Search className="w-4 h-4 text-slate-950 stroke-[2.5]" />
-              </button>
-            </div>
-          </div>
-
-          {/* Right Action Controls: Carrito Pill */}
-          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-
-            {/* Merchant Tab Switcher in Admin preview */}
-            {!isCustomerMode && !isCustomerOnly && (
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs gap-1">
-                <button
-                  onClick={() => setStoreTab('catalog')}
-                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer ${storeTab === 'catalog' ? 'bg-[#FFD000] text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  Catálogo
-                </button>
-                <button
-                  onClick={() => setStoreTab('orders')}
-                  className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${storeTab === 'orders' ? 'bg-[#FFD000] text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  <span>Pedidos</span>
-                  {pendingCount > 0 && <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
-                </button>
-              </div>
-            )}
-
-            {/* Lotengoo Yellow Shopping Cart Button */}
-            {isCustomerView && (
-              <button
-                type="button"
-                onClick={onOpenCart}
-                className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 rounded-full bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 text-xs font-black transition cursor-pointer shadow-sm active:scale-95 flex-shrink-0 border border-amber-400"
-                title="Ver carrito de compras"
-              >
-                <div className="relative">
-                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950" />
-                  {cartTotalItems > 0 && (
-                    <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center shadow-xs border border-white animate-bounce">
-                      {cartTotalItems}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs font-black text-slate-950">Carrito</span>
-                  <span className="text-xs font-mono font-bold text-slate-800">({cartTotalItems})</span>
-                </div>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Mobile Search & Filter Console (Clean, Modern, Stays Sticky on Cellular Scroll) */}
-        <div
-          className={`block md:hidden ${isScrolled ? 'py-2 px-0.5' : 'py-2 border-b border-amber-400/20'
-            } transition-all duration-300`}
-        >
-          <div
-            className={`flex items-center gap-2 ${isScrolled ? 'bg-white/80 backdrop-blur-xs p-1 rounded-2xl shadow-xs border border-amber-400/50 ring-2 ring-amber-400/15' : ''
-              }`}
-          >
-            {/* Search Input Box (Clean Solid White Input contrasting on the Gradient Header Panel) */}
-            <div className="flex-1 flex items-center bg-white rounded-xl shadow-xs border border-amber-400 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-400/30 overflow-hidden transition-all">
-              <div className="relative flex-1 flex items-center bg-white">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar productos..."
-                  className="w-full pl-8 pr-7 py-2 text-xs text-slate-900 placeholder:text-slate-400 bg-white focus:outline-none font-medium"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-                    title="Limpiar búsqueda"
+            {/* Smart Search Bar (Desktop with Category Dropdown; Mobile clean single-line input) */}
+            <div className="flex-1 max-w-2xl min-w-0 mx-1 sm:mx-2 relative">
+              <div className="flex items-center bg-white rounded-xl border border-slate-300 focus-within:border-amber-400 overflow-hidden transition-all duration-200">
+                {/* Category Dropdown integrated on the left (Desktop Only) */}
+                <div className="hidden md:block relative flex-shrink-0 bg-slate-100 border-r border-slate-300">
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="appearance-none bg-transparent hover:bg-slate-200 text-slate-800 text-xs font-bold pl-3 pr-7 py-2.5 focus:outline-none cursor-pointer max-w-[140px] truncate"
+                    title="Todas las categorías"
                   >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                    <option value="all">Todas las categorías</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-600 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* Main Smart Search Input */}
+                <StoreSmartSearchBar
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  products={products}
+                  categories={categories}
+                  onSelectCategory={(cat) => setSelectedCategory(cat)}
+                  onSelectProduct={(item) => props.onQuickViewProduct(item)}
+                  storeConfig={storeConfig}
+                />
+
+                {/* Signature Lotengoo Yellow Search Button */}
+                <button
+                  type="button"
+                  className="bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 font-black px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-center transition cursor-pointer flex-shrink-0 shadow-xs active:scale-95"
+                  title="Buscar productos"
+                >
+                  <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-950 stroke-[2.5]" />
+                </button>
               </div>
-              <button
-                type="button"
-                className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-3 py-2 flex items-center justify-center flex-shrink-0 transition active:scale-95 cursor-pointer"
-                title="Buscar"
-              >
-                <Search className="w-3.5 h-3.5 stroke-[2.5]" />
-              </button>
+            </div>
+
+            {/* Right Action Controls: Carrito Pill / Icon */}
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+
+              {/* Merchant Tab Switcher in Admin preview */}
+              {!isCustomerMode && !isCustomerOnly && (
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs gap-1">
+                  <button
+                    onClick={() => setStoreTab('catalog')}
+                    className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer ${storeTab === 'catalog' ? 'bg-[#FFD000] text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                  >
+                    Catálogo
+                  </button>
+                  <button
+                    onClick={() => setStoreTab('orders')}
+                    className={`px-2 py-1 sm:px-2.5 rounded-lg font-bold transition cursor-pointer flex items-center space-x-1 ${storeTab === 'orders' ? 'bg-[#FFD000] text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                  >
+                    <span>Pedidos</span>
+                    {pendingCount > 0 && <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
+                  </button>
+                </div>
+              )}
+
+              {/* Lotengoo Yellow Shopping Cart Button */}
+              {isCustomerView && (
+                <button
+                  type="button"
+                  onClick={onOpenCart}
+                  className="flex items-center space-x-2 px-2.5 sm:px-4 py-2 rounded-full bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 text-xs font-black transition cursor-pointer shadow-sm active:scale-95 flex-shrink-0 border border-amber-400"
+                  title="Ver carrito de compras"
+                >
+                  <div className="relative">
+                    <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950" />
+                    {cartTotalItems > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center shadow-xs border border-white animate-bounce">
+                        {cartTotalItems}
+                      </span>
+                    )}
+                  </div>
+                  <div className="hidden md:flex items-center space-x-1">
+                    <span className="text-xs font-black text-slate-950">Carrito</span>
+                    <span className="text-xs font-mono font-bold text-slate-800">({cartTotalItems})</span>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
-        </div>
 
         {/* Mobile Quick Filters & Controls Bar: SINGLE SCROLLABLE ROW ONLY (Phone Mode) - Shown only at top of page */}
         {!isScrolled && (
