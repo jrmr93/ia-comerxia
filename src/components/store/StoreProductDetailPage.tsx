@@ -6,6 +6,7 @@ import {
   MessageCircle,
   Copy,
   ShoppingCart,
+  ShoppingBag,
   Check,
   Flame,
   Tag,
@@ -1006,14 +1007,13 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                         </div>
                       )}
 
-                      {/* 1. AGREGAR AL CARRITO (Primary) - Clear and legible */}
                       {/* 1. AGREGAR AL CARRITO */}
                       <button
                         type="button"
                         onClick={handleAdd}
-                        className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl font-black text-sm sm:text-base shadow-md transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 border border-amber-300/80 ${addedAnimation
+                        className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl font-extrabold text-sm sm:text-base shadow-xs transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 border-2 ${addedAnimation
                             ? 'bg-emerald-600 text-white border-emerald-500'
-                            : 'bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 shadow-amber-400/20'
+                            : 'bg-white hover:bg-amber-50/90 text-amber-800 border-[#FFD000]'
                           }`}
                       >
                         {addedAnimation ? (
@@ -1023,22 +1023,22 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                           </>
                         ) : (
                           <>
-                            <ShoppingCart className="w-5 h-5 stroke-[2.5]" />
-                            <span>
+                            <ShoppingCart className="w-5 h-5 stroke-[2.5] text-amber-600" />
+                            <span className="font-extrabold text-amber-800">
                               Agregar al Carrito • ${(effectivePrice * quantity).toFixed(2)} {currency}
                             </span>
                           </>
                         )}
                       </button>
 
-                      {/* 2. COMPRAR POR WHATSAPP (Direct simplified flow) */}
+                      {/* 2. COMPRAR POR WHATSAPP */}
                       <button
                         type="button"
                         onClick={handleDirectBuy}
-                        className="w-full py-3.5 sm:py-4 px-4 rounded-2xl text-sm sm:text-base font-black transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+                        className="w-full py-3.5 sm:py-4 px-4 rounded-2xl text-sm sm:text-base font-extrabold transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 shadow-md bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 shadow-amber-400/20"
                       >
-                        <MessageCircle className="w-5 h-5 fill-current" />
-                        <span>Comprar por WhatsApp</span>
+                        <ShoppingBag className="w-5 h-5 stroke-[2.5] text-amber-950" />
+                        <span className="font-extrabold text-amber-950">Comprar por WhatsApp</span>
                       </button>
 
                       {/* 3. SECUNDARIOS: CONSULTAR ASESOR & COMPARTIR (Grilla limpia de 2 columnas) */}

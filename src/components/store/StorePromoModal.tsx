@@ -291,7 +291,7 @@ export const StorePromoModal: React.FC<StorePromoModalProps> = ({
                 <img
                   src={displayImage}
                   alt={parsedConfig.title}
-                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
+                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-105 mobile-auto-zoom animate-mobile-category-bg-zoom"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent" />
 

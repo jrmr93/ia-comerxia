@@ -5209,7 +5209,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
             {/* Cart Header */}
             <div className="p-4 border-b flex items-center justify-between bg-slate-50/80 border-slate-200">
               <div className="flex items-center space-x-2">
-                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-300">
                   <ShoppingCart className="w-5 h-5" />
                 </div>
                 <div>
@@ -5617,15 +5617,15 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                     )}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer flex items-center justify-center space-x-2 shadow-xs"
+                    className="w-full py-2.5 rounded-xl bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 font-extrabold text-xs transition cursor-pointer flex items-center justify-center space-x-2 shadow-xs"
                   >
-                    <MessageCircle className="w-4 h-4" />
+                    <ShoppingBag className="w-4 h-4 text-amber-950 stroke-[2.5]" />
                     <span>Confirmar / Enviar por WhatsApp</span>
                   </a>
                 )}
 
-                <div className="w-full p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-left text-xs text-emerald-800 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <div className="w-full p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-left text-xs text-amber-900 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-600 flex-shrink-0" />
                   <span>Tu orden ha sido generada con éxito y está lista para coordinar.</span>
                 </div>
 
@@ -5640,7 +5640,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                     <span className="text-slate-500">Teléfono:</span>
                     <span>{lastPlacedOrder.customerPhone}</span>
                   </div>
-                  <div className="flex justify-between font-bold pt-1 text-emerald-700">
+                  <div className="flex justify-between font-bold pt-1 text-amber-800">
                     <span>Total:</span>
                     <span>${Number(lastPlacedOrder.totalAmount).toFixed(2)} {currency}</span>
                   </div>
@@ -5651,7 +5651,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                     setCartStep('cart');
                     setIsCartOpen(false);
                   }}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-xs transition cursor-pointer shadow-md active:scale-95"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition cursor-pointer shadow-md active:scale-95"
                 >
                   Continuar en la Tienda
                 </button>
@@ -5678,7 +5678,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                   )}
                   <div className="flex justify-between text-sm font-black pt-1 border-t border-slate-200 text-slate-900">
                     <span>Total:</span>
-                    <span className="font-mono text-emerald-700">
+                    <span className="font-mono text-amber-800 font-extrabold">
                       ${cartTotal.toFixed(2)} {currency}
                     </span>
                   </div>
@@ -5696,16 +5696,16 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                     <button
                       disabled={isSubmittingOrder}
                       onClick={handleSendViaWhatsApp}
-                      className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:opacity-50 text-white font-black text-sm sm:text-base shadow-lg shadow-emerald-500/25 transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 tracking-wide"
+                      className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-[#FFD000] hover:bg-[#E6B800] disabled:opacity-50 text-amber-950 font-extrabold text-sm sm:text-base shadow-md shadow-amber-400/20 transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 tracking-wide"
                     >
                       {isSubmittingOrder ? (
                         <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <Loader2 className="w-5 h-5 animate-spin text-amber-950" />
                           <span>Creando pedido en el sistema...</span>
                         </>
                       ) : (
                         <>
-                          <MessageCircle className="w-5 h-5 fill-current shrink-0" />
+                          <ShoppingBag className="w-5 h-5 text-amber-950 stroke-[2.5] shrink-0" />
                           <span>Comprar por WhatsApp</span>
                         </>
                       )}

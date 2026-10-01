@@ -96,7 +96,7 @@ export const CategoryTransitionBanner: React.FC<CategoryTransitionBannerProps> =
       <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-amber-400/50 shadow-xl group transition-all duration-500 hover:border-amber-400 hover:shadow-[0_12px_35px_rgba(245,158,11,0.35)] animate-banner-panel-float animate-mobile-gold-border glossy-sheen-effect min-h-[115px] sm:min-h-[130px]">
         {/* Full Cover Background Image with Continuous Camera Panning Motion */}
         <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-115 animate-category-bg-pan"
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-115 animate-category-bg-pan animate-mobile-category-bg-zoom mobile-auto-zoom"
           style={{ backgroundImage: `url('${bgImage}')` }}
         />
 
