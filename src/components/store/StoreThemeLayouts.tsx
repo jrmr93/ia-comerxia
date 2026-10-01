@@ -2521,9 +2521,6 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 }`}
               title="Logo de la tienda"
             >
-              {/* Permanent Ambient Glow Aura behind logo */}
-              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-400/40 via-yellow-300/30 to-amber-500/40 blur-md opacity-60 group-hover/logo:opacity-100 transition-opacity duration-500 animate-pulse pointer-events-none" />
-
               <div className="flex items-center space-x-2 relative z-10">
                 {storeConfig.logoDesktopUrl ? (
                   <div className="h-10 sm:h-11 max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center px-2 py-0.5">
