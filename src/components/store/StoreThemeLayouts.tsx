@@ -1325,10 +1325,10 @@ export const CategorySelector: React.FC<{
               className="w-full appearance-none bg-zinc-950 border border-zinc-800 hover:border-amber-500/50 text-zinc-100 text-xs font-bold rounded-xl pl-9 pr-8 py-2.5 focus:outline-none focus:border-amber-500 transition cursor-pointer shadow-xs"
               title="Seleccionar categoría"
             >
-              <option value="all">Todas las Piezas ({products.length})</option>
+              <option value="all">Todas las Piezas</option>
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
-                  {cat} ({categoryCounts[cat] || 0})
+                  {cat}
                 </option>
               ))}
             </select>
@@ -1389,10 +1389,10 @@ export const CategorySelector: React.FC<{
               className="w-full appearance-none bg-white text-black font-black uppercase text-xs border-2 border-black rounded-none pl-9 pr-8 py-2.5 shadow-[2px_2px_0px_#000] focus:bg-yellow-100 focus:outline-none cursor-pointer transition"
               title="Seleccionar categoría"
             >
-              <option value="all">TODAS LAS CATEGORÍAS ({products.length})</option>
+              <option value="all">TODAS LAS CATEGORÍAS</option>
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
-                  {cat.toUpperCase()} ({categoryCounts[cat] || 0})
+                  {cat.toUpperCase()}
                 </option>
               ))}
             </select>
@@ -1451,10 +1451,10 @@ export const CategorySelector: React.FC<{
               className="w-full appearance-none bg-[#070d18] text-cyan-300 font-mono text-xs border border-cyan-500 rounded-none pl-9 pr-8 py-2.5 focus:outline-none focus:border-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.4)] cursor-pointer"
               title="Seleccionar protocolo / categoría"
             >
-              <option value="all">&gt; ALL_ITEMS ({products.length})</option>
+              <option value="all">&gt; ALL_ITEMS</option>
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
-                  &gt; {cat.toUpperCase()} [{categoryCounts[cat] || 0}]
+                  &gt; {cat.toUpperCase()}
                 </option>
               ))}
             </select>
@@ -1511,10 +1511,10 @@ export const CategorySelector: React.FC<{
               className="w-full appearance-none bg-teal-50/60 hover:bg-teal-50 border border-teal-300 text-slate-900 text-xs font-bold rounded-xl pl-9 pr-8 py-2 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs transition"
               title="Filtrar por categoría"
             >
-              <option value="all">Todas las Categorías ({products.length})</option>
+              <option value="all">Todas las Categorías</option>
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
-                  {cat} ({categoryCounts[cat] || 0})
+                  {cat}
                 </option>
               ))}
             </select>
@@ -1562,10 +1562,10 @@ export const CategorySelector: React.FC<{
             className="w-full appearance-none bg-white border border-stone-300 hover:border-stone-400 text-stone-900 text-xs font-medium rounded-full pl-9 pr-8 py-2 shadow-2xs focus:outline-none focus:ring-1 focus:ring-stone-400 cursor-pointer transition text-center"
             title="Filtrar por categoría"
           >
-            <option value="all">Todas las Categorías ({products.length})</option>
+            <option value="all">Todas las Categorías</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>
-                {cat} ({categoryCounts[cat] || 0})
+                {cat}
               </option>
             ))}
           </select>
@@ -1608,10 +1608,10 @@ export const CategorySelector: React.FC<{
           className="w-full appearance-none bg-white border border-slate-300 hover:border-amber-500 text-slate-900 text-xs font-bold rounded-xl pl-9 pr-8 py-2 transition cursor-pointer shadow-2xs focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20"
           title="Filtrar por categoría"
         >
-          <option value="all">Todas las Categorías ({products.length})</option>
+          <option value="all">Todas las Categorías</option>
           {categories.map((cat) => (
             <option key={cat} value={cat}>
-              {cat} ({categoryCounts[cat] || 0})
+              {cat}
             </option>
           ))}
         </select>
@@ -2612,7 +2612,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                   <option value="all">Todas las categorías</option>
                   {categories.map((c) => (
                     <option key={c} value={c}>
-                      {c} ({categoryCounts[c] || 0})
+                      {c}
                     </option>
                   ))}
                 </select>
@@ -2864,10 +2864,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 className="appearance-none bg-slate-100 hover:bg-slate-200 text-slate-950 font-black rounded-full pl-8 pr-7 py-1.5 text-xs focus:outline-none cursor-pointer border border-slate-300 transition"
                 title="Seleccionar Categoría"
               >
-                <option value="all">≡ Categorías ({products.length})</option>
+                <option value="all">≡ Categorías</option>
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>
-                    {cat} ({categoryCounts[cat] || 0})
+                    {cat}
                   </option>
                 ))}
               </select>
