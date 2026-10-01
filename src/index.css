@@ -113,10 +113,10 @@
 .animate-store-header-glow {
   background: linear-gradient(
     90deg,
-    rgba(255, 208, 0, 0.06) 0%,
-    rgba(99, 102, 241, 0.07) 30%,
-    rgba(236, 72, 153, 0.07) 65%,
-    rgba(255, 208, 0, 0.06) 100%
+    rgba(255, 208, 0, 0.08) 0%,
+    rgba(0, 0, 0, 0.04) 30%,
+    rgba(245, 158, 11, 0.08) 65%,
+    rgba(255, 208, 0, 0.08) 100%
   );
   background-size: 200% 200%;
   animation: storeHeaderAmbientGlow 7s ease-in-out infinite;
@@ -143,9 +143,9 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 208, 0, 0.3) 20%,
+    rgba(255, 208, 0, 0.4) 20%,
     rgba(255, 208, 0, 1) 50%,
-    rgba(147, 51, 234, 0.85) 80%,
+    rgba(0, 0, 0, 0.95) 80%,
     transparent 100%
   );
   animation: storeHeaderShimmerSweep 3.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
