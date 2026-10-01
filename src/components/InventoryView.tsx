@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -60,6 +60,7 @@ import { DeactivateConfirmationModal } from './DeactivateConfirmationModal.tsx';
 import { ShareStoreModal } from './ShareStoreModal.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
 import { generateSocialFlyer, FlyerTemplateStyle } from '../utils/socialFlyerGenerator.ts';
+import { searchProductsFuzzy } from '../utils/fuzzySearch.ts';
 
 function getItemPhotos(item: InventoryItem): string[] {
   const photos: string[] = [];
@@ -609,52 +610,61 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const inTransitCount = items.filter((it) => (it.incomingStock || 0) > 0).length;
   const reservedCount = items.filter((it) => (it.reservedStock || 0) > 0).length;
 
+  // Compute fuzzy search matches and ranking
+  const fuzzyResult = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return { matchesSet: null, didYouMean: null, matchOrderMap: null };
+    }
+    const res = searchProductsFuzzy(items, searchQuery, { includeArchived: true });
+    const matchesSet = new Set(res.matches.map((m) => m.id));
+    const matchOrderMap = new Map<number, number>();
+    res.matches.forEach((m, idx) => matchOrderMap.set(m.id, idx));
+    return { matchesSet, didYouMean: res.didYouMean, matchOrderMap };
+  }, [items, searchQuery]);
+
   // Filter items
-  const filteredItems = items.filter((it) => {
-    const matchesCategory =
-      selectedCategory === 'all' || (it.category || 'General') === selectedCategory;
-    const matchesSupplier =
-      selectedSupplier === 'all' ||
-      ((it.supplierName && it.supplierName.trim()) || 'Proveedor Telegram') === selectedSupplier;
-    const disc = Math.max(0, Math.min(100, Number(it.discountPercent) || 0));
-    const matchesStatus =
-      statusFilter === 'all'
-        ? true
-        : statusFilter === 'offers'
-          ? disc > 0
-          : statusFilter === 'available'
-            ? it.status !== 'archived'
-            : statusFilter === 'in_stock'
-              ? (it.availableStock !== undefined ? it.availableStock : (it.stock || 0)) > 0
-              : statusFilter === 'in_transit'
-                ? (it.incomingStock || 0) > 0
-                : statusFilter === 'reserved'
-                  ? (it.reservedStock || 0) > 0
-                  : statusFilter === 'archived'
-                    ? it.status === 'archived'
-                    : it.status === statusFilter;
-    const matchesOffer = !activeShowOffersOnly || disc > 0;
-    const effectiveSupplierCode = it.supplierCode || (it as any).supplier_code || (
-      it.extractedAttributes ? (() => {
-        try {
-          const p = typeof it.extractedAttributes === 'string' ? JSON.parse(it.extractedAttributes) : it.extractedAttributes;
-          return p?.supplierCode || p?.supplier_code || p?.sku_proveedor || null;
-        } catch { return null; }
-      })() : null
-    );
+  const filteredItems = useMemo(() => {
+    const rawFiltered = items.filter((it) => {
+      const matchesCategory =
+        selectedCategory === 'all' || (it.category || 'General') === selectedCategory;
+      const matchesSupplier =
+        selectedSupplier === 'all' ||
+        ((it.supplierName && it.supplierName.trim()) || 'Proveedor Telegram') === selectedSupplier;
+      const disc = Math.max(0, Math.min(100, Number(it.discountPercent) || 0));
+      const matchesStatus =
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'offers'
+            ? disc > 0
+            : statusFilter === 'available'
+              ? it.status !== 'archived'
+              : statusFilter === 'in_stock'
+                ? (it.availableStock !== undefined ? it.availableStock : (it.stock || 0)) > 0
+                : statusFilter === 'in_transit'
+                  ? (it.incomingStock || 0) > 0
+                  : statusFilter === 'reserved'
+                    ? (it.reservedStock || 0) > 0
+                    : statusFilter === 'archived'
+                      ? it.status === 'archived'
+                      : it.status === statusFilter;
+      const matchesOffer = !activeShowOffersOnly || disc > 0;
 
-    const matchesSearch =
-      !searchQuery.trim() ||
-      it.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      it.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (effectiveSupplierCode && String(effectiveSupplierCode).toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (it.barcode && it.barcode.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (it.description && it.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (it.tags && it.tags.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (it.supplierName && it.supplierName.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesSearch =
+        !searchQuery.trim() || (fuzzyResult.matchesSet ? fuzzyResult.matchesSet.has(it.id) : true);
 
-    return matchesCategory && matchesSupplier && matchesStatus && matchesOffer && matchesSearch;
-  });
+      return matchesCategory && matchesSupplier && matchesStatus && matchesOffer && matchesSearch;
+    });
+
+    if (searchQuery.trim() && fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.size > 0) {
+      return [...rawFiltered].sort((a, b) => {
+        const orderA = fuzzyResult.matchOrderMap!.has(a.id) ? fuzzyResult.matchOrderMap!.get(a.id)! : 999999;
+        const orderB = fuzzyResult.matchOrderMap!.has(b.id) ? fuzzyResult.matchOrderMap!.get(b.id)! : 999999;
+        return orderA - orderB;
+      });
+    }
+
+    return rawFiltered;
+  }, [items, selectedCategory, selectedSupplier, statusFilter, activeShowOffersOnly, searchQuery, fuzzyResult]);
 
   const hasActiveFilters =
     selectedCategory !== 'all' ||
@@ -1067,6 +1077,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <X className="w-3.5 h-3.5 sm:hidden" />
                     <span className="hidden sm:inline">Limpiar</span>
                   </button>
+                )}
+                {searchQuery.trim() && fuzzyResult.didYouMean && filteredItems.length > 0 && (
+                  <div className="text-[11px] text-slate-600 font-medium pt-1 px-1 flex items-center space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>¿Quisiste decir:</span>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery(fuzzyResult.didYouMean!)}
+                      className="text-sky-700 font-bold hover:underline cursor-pointer"
+                    >
+                      "{fuzzyResult.didYouMean}"
+                    </button>
+                    <span>?</span>
+                  </div>
                 )}
               </div>
 

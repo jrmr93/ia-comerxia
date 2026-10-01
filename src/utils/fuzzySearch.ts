@@ -83,17 +83,23 @@ export interface FuzzySearchResult {
   exactMatch: boolean;
 }
 
+export interface SearchOptions {
+  includeArchived?: boolean;
+}
+
 /**
  * High-performance search function with multi-word typo tolerance, category suggestions, and "Did you mean?" suggestions.
  */
 export function searchProductsFuzzy(
   products: InventoryItem[],
-  query: string
+  query: string,
+  options?: SearchOptions
 ): {
   matches: InventoryItem[];
   didYouMean: string | null;
   suggestedCategories: string[];
 } {
+  const includeArchived = options?.includeArchived ?? false;
   const rawQ = query.trim();
   if (!rawQ) {
     return { matches: products, didYouMean: null, suggestedCategories: [] };
@@ -109,19 +115,32 @@ export function searchProductsFuzzy(
   const scoredList: FuzzySearchResult[] = [];
 
   (products || []).forEach((item) => {
-    if (item.status === 'archived') return;
+    if (!includeArchived && item.status === 'archived') return;
 
     const name = item.name || '';
     const sku = item.sku || '';
     const category = item.category || '';
     const tags = item.tags || '';
     const desc = item.description || '';
+    const barcode = item.barcode || '';
+    const supplierName = item.supplierName || '';
+    const supplierCode = item.supplierCode || (item as any).supplier_code || (
+      item.extractedAttributes ? (() => {
+        try {
+          const p = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
+          return p?.supplierCode || p?.supplier_code || p?.sku_proveedor || null;
+        } catch { return null; }
+      })() : null
+    ) || '';
 
     const normName = normalizeFuzzyText(name);
     const normSku = normalizeFuzzyText(sku);
     const normCategory = normalizeFuzzyText(category);
     const normDesc = normalizeFuzzyText(desc);
     const normTags = normalizeFuzzyText(tags);
+    const normBarcode = normalizeFuzzyText(String(barcode));
+    const normSupplierName = normalizeFuzzyText(supplierName);
+    const normSupplierCode = normalizeFuzzyText(String(supplierCode));
 
     // 1. Exact substring check across all fields
     const isExact =
@@ -129,7 +148,10 @@ export function searchProductsFuzzy(
       normSku.includes(normQuery) ||
       normCategory.includes(normQuery) ||
       normDesc.includes(normQuery) ||
-      normTags.includes(normQuery);
+      normTags.includes(normQuery) ||
+      (normBarcode && normBarcode.includes(normQuery)) ||
+      (normSupplierCode && normSupplierCode.includes(normQuery)) ||
+      (normSupplierName && normSupplierName.includes(normQuery));
 
     if (isExact) {
       scoredList.push({ item, score: 1.0, exactMatch: true });
@@ -144,11 +166,23 @@ export function searchProductsFuzzy(
     for (const token of queryTokens) {
       const nameScore = fuzzyWordMatchScore(token, name);
       const skuScore = normSku.includes(token) ? 1.0 : 0;
+      const barcodeScore = normBarcode.includes(token) ? 1.0 : 0;
+      const supplierCodeScore = normSupplierCode.includes(token) ? 1.0 : 0;
       const categoryScore = fuzzyWordMatchScore(token, category);
       const tagScore = fuzzyWordMatchScore(token, tags);
+      const supplierNameScore = fuzzyWordMatchScore(token, supplierName);
       const descScore = fuzzyWordMatchScore(token, desc) * 0.7;
 
-      const bestTokenScore = Math.max(nameScore, skuScore, categoryScore, tagScore, descScore);
+      const bestTokenScore = Math.max(
+        nameScore,
+        skuScore,
+        barcodeScore,
+        supplierCodeScore,
+        categoryScore,
+        tagScore,
+        supplierNameScore,
+        descScore
+      );
       if (bestTokenScore < minTokenScore) {
         minTokenScore = bestTokenScore;
       }
