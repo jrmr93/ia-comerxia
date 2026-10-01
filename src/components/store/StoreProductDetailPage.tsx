@@ -319,6 +319,40 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
   const effectivePrice = hasDiscount ? regularPrice * (1 - discountPercent / 100) : regularPrice;
   const savings = hasDiscount ? regularPrice - effectivePrice : 0;
 
+  const campaignBadgeConfig = React.useMemo(() => {
+    const raw = storeConfig?.promoPopup;
+    if (!raw) return null;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (parsed && typeof parsed === 'object') {
+        const isActive = parsed.campaignBadgeActive !== false;
+        const position = parsed.campaignBadgePosition || 'buy_button';
+        const mode = parsed.campaignBadgeMode || 'random';
+
+        const urls: string[] = Array.isArray(parsed.campaignBadgeUrls) && parsed.campaignBadgeUrls.length > 0
+          ? parsed.campaignBadgeUrls.filter(Boolean)
+          : (parsed.campaignBadgeUrl ? [parsed.campaignBadgeUrl] : []);
+
+        if (isActive && urls.length > 0) {
+          let chosenUrl = urls[0];
+          if (mode === 'random' && urls.length > 1) {
+            const itemIdNum = typeof product.id === 'number'
+              ? product.id
+              : (String(product.id).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
+            const iconIndex = Math.abs(itemIdNum) % urls.length;
+            chosenUrl = urls[iconIndex];
+          } else if (parsed.campaignBadgeUrl) {
+            chosenUrl = parsed.campaignBadgeUrl;
+          }
+          return { url: chosenUrl, position };
+        }
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }, [storeConfig?.promoPopup, product.id]);
+
   // Related products from same category or popular
   const relatedProducts = React.useMemo(() => {
     const others = allProducts.filter(
@@ -1008,38 +1042,66 @@ export const StoreProductDetailPage: React.FC<StoreProductDetailPageProps> = ({
                       )}
 
                       {/* 1. AGREGAR AL CARRITO */}
-                      <button
-                        type="button"
-                        onClick={handleAdd}
-                        className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl font-extrabold text-sm sm:text-base shadow-xs transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 border-2 ${addedAnimation
-                            ? 'bg-emerald-600 text-white border-emerald-500'
-                            : 'bg-white hover:bg-amber-50/90 text-amber-800 border-[#FFD000]'
-                          }`}
-                      >
-                        {addedAnimation ? (
-                          <>
-                            <Check className="w-5 h-5 stroke-[3]" />
-                            <span>¡Agregado al Carrito ({quantity})!</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingCart className="w-5 h-5 stroke-[2.5] text-amber-600" />
-                            <span className="font-extrabold text-amber-800">
-                              Agregar al Carrito • ${(effectivePrice * quantity).toFixed(2)} {currency}
-                            </span>
-                          </>
+                      <div className="relative w-full">
+                        {campaignBadgeConfig && (campaignBadgeConfig.position === 'add_button' || campaignBadgeConfig.position === 'both') && (
+                          <div className="absolute -top-3.5 -left-1.5 sm:-top-4 sm:-left-2 z-20 pointer-events-none flex items-center justify-center animate-subtle-badge-zoom">
+                            <img
+                              src={campaignBadgeConfig.url}
+                              alt="Campaña"
+                              className="w-7 h-7 sm:w-8.5 sm:h-8.5 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          </div>
                         )}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={handleAdd}
+                          className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl font-extrabold text-sm sm:text-base shadow-xs transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 border-2 ${addedAnimation
+                              ? 'bg-emerald-600 text-white border-emerald-500'
+                              : 'bg-white hover:bg-amber-50/90 text-amber-800 border-[#FFD000]'
+                            }`}
+                        >
+                          {addedAnimation ? (
+                            <>
+                              <Check className="w-5 h-5 stroke-[3]" />
+                              <span>¡Agregado al Carrito ({quantity})!</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="w-5 h-5 stroke-[2.5] text-amber-600" />
+                              <span className="font-extrabold text-amber-800">
+                                Agregar al Carrito • ${(effectivePrice * quantity).toFixed(2)} {currency}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </div>
 
                       {/* 2. COMPRAR POR WHATSAPP */}
-                      <button
-                        type="button"
-                        onClick={handleDirectBuy}
-                        className="w-full py-3.5 sm:py-4 px-4 rounded-2xl text-sm sm:text-base font-extrabold transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 shadow-md bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 shadow-amber-400/20"
-                      >
-                        <ShoppingBag className="w-5 h-5 stroke-[2.5] text-amber-950" />
-                        <span className="font-extrabold text-amber-950">Comprar por WhatsApp</span>
-                      </button>
+                      <div className="relative w-full">
+                        {campaignBadgeConfig && (campaignBadgeConfig.position === 'buy_button' || campaignBadgeConfig.position === 'both') && (
+                          <div className="absolute -top-3.5 -left-1.5 sm:-top-4 sm:-left-2 z-20 pointer-events-none flex items-center justify-center animate-subtle-badge-zoom">
+                            <img
+                              src={campaignBadgeConfig.url}
+                              alt="Campaña"
+                              className="w-7 h-7 sm:w-8.5 sm:h-8.5 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleDirectBuy}
+                          className="w-full py-3.5 sm:py-4 px-4 rounded-2xl text-sm sm:text-base font-extrabold transition flex items-center justify-center space-x-2.5 cursor-pointer active:scale-95 shadow-md bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 shadow-amber-400/20"
+                        >
+                          <ShoppingBag className="w-5 h-5 stroke-[2.5] text-amber-950" />
+                          <span className="font-extrabold text-amber-950">Comprar por WhatsApp</span>
+                        </button>
+                      </div>
 
                       {/* 3. SECUNDARIOS: CONSULTAR ASESOR & COMPARTIR (Grilla limpia de 2 columnas) */}
                       <div className="grid grid-cols-2 gap-2 pt-0.5">

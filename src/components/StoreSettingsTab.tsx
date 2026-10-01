@@ -48,6 +48,8 @@ import {
   Share2,
   Smartphone,
   Laptop,
+  ShoppingBag,
+  ShoppingCart,
 } from 'lucide-react';
 import { StoreConfig, StoreTheme, CourierPartner, PaymentMethodPartner, StorePromoPopupConfig, InventoryItem } from '../types.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -276,6 +278,19 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   const [promoPosterStyle, setPromoPosterStyle] = useState<string>('commercial_studio');
   const [promoCandidateImages, setPromoCandidateImages] = useState<Array<{ url: string; title: string; source: string; tag: string }>>([]);
 
+  // Campaign Badge Icon Overlays for Product Buttons (Single vs Random Collection)
+  const [promoCampaignBadgeUrl, setPromoCampaignBadgeUrl] = useState<string | null>('https://cdn-icons-png.flaticon.com/512/744/744546.png');
+  const [promoCampaignBadgeUrls, setPromoCampaignBadgeUrls] = useState<string[]>([
+    'https://cdn-icons-png.flaticon.com/512/744/744546.png', // Gorro de navidad
+    'https://cdn-icons-png.flaticon.com/512/3702/3702674.png', // Árbol navideño
+    'https://cdn-icons-png.flaticon.com/512/4213/4213651.png', // Regalo
+    'https://cdn-icons-png.flaticon.com/512/1828/1828884.png', // Estrella
+  ]);
+  const [promoCampaignBadgeActive, setPromoCampaignBadgeActive] = useState<boolean>(true);
+  const [promoCampaignBadgePosition, setPromoCampaignBadgePosition] = useState<'buy_button' | 'add_button' | 'both' | string>('buy_button');
+  const [promoCampaignBadgeMode, setPromoCampaignBadgeMode] = useState<'single' | 'random' | string>('random');
+  const [webSearchTarget, setWebSearchTarget] = useState<'afiche' | 'badge'>('afiche');
+
   const productCategories = useMemo(() => {
     const set = new Set<string>();
     storeProducts.forEach((p) => {
@@ -432,6 +447,13 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                 if (parsedPromo.featuredProductPrice !== undefined) setPromoFeaturedProductPrice(parsedPromo.featuredProductPrice);
                 if (parsedPromo.featuredProductImage !== undefined) setPromoFeaturedProductImage(parsedPromo.featuredProductImage);
                 if (parsedPromo.featuredCategory !== undefined) setPromoCategory(parsedPromo.featuredCategory);
+                if (parsedPromo.campaignBadgeUrl !== undefined) setPromoCampaignBadgeUrl(parsedPromo.campaignBadgeUrl);
+                if (Array.isArray(parsedPromo.campaignBadgeUrls) && parsedPromo.campaignBadgeUrls.length > 0) {
+                  setPromoCampaignBadgeUrls(parsedPromo.campaignBadgeUrls.filter(Boolean));
+                }
+                if (parsedPromo.campaignBadgeActive !== undefined) setPromoCampaignBadgeActive(Boolean(parsedPromo.campaignBadgeActive));
+                if (parsedPromo.campaignBadgePosition !== undefined) setPromoCampaignBadgePosition(parsedPromo.campaignBadgePosition);
+                if (parsedPromo.campaignBadgeMode !== undefined) setPromoCampaignBadgeMode(parsedPromo.campaignBadgeMode);
                 if (parsedPromo.featuredProductId) {
                   setPromoFocalType('product');
                 } else if (parsedPromo.featuredCategory) {
@@ -727,6 +749,11 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
           featuredProductPrice: (promoFocalType === 'product' && promoIncludeProductCard) ? promoFeaturedProductPrice : undefined,
           featuredProductImage: (promoFocalType === 'product' && promoIncludeProductCard) ? promoFeaturedProductImage : undefined,
           featuredCategory: promoFocalType === 'category' ? promoCategory : undefined,
+          campaignBadgeUrl: promoCampaignBadgeUrl || null,
+          campaignBadgeUrls: promoCampaignBadgeUrls.filter(Boolean),
+          campaignBadgeActive: promoCampaignBadgeActive,
+          campaignBadgePosition: promoCampaignBadgePosition,
+          campaignBadgeMode: promoCampaignBadgeMode,
         }),
       };
 
@@ -2428,6 +2455,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  setWebSearchTarget('afiche');
                   const q = promoFeaturedProductName || promoCategory || `${storeName} comercial banner`;
                   setWebSearchQuery(q);
                   setShowWebSearchModal(true);
@@ -2721,6 +2749,338 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
             )}
           </div>
         </div>
+
+        {/* SECCIÓN DEDICADA: ICONO / DISTINTIVO DE CAMPAÑA SOBRE BOTONES DE PRODUCTOS */}
+        <div className="mt-5 p-4 sm:p-5 bg-gradient-to-br from-amber-500/10 via-amber-100/40 to-slate-900/5 rounded-2xl border-2 border-amber-400/80 shadow-md space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-300/60 pb-3">
+            <div className="flex items-center space-x-2">
+              <Sparkles className="w-5 h-5 text-amber-600 fill-amber-500 animate-pulse" />
+              <div>
+                <h4 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wide">
+                  Icono / Distintivo de Campaña Promocional sobre Botón de Productos
+                </h4>
+                <p className="text-[11px] font-semibold text-slate-600">
+                  Coloca un ícono temático (ej. gorro de Navidad, Cyber, Black Friday) sobre el botón "Comprar" de cada tarjeta de producto
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle Switch Active State */}
+            <label className="inline-flex items-center space-x-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-amber-300 shadow-2xs">
+              <input
+                type="checkbox"
+                checked={promoCampaignBadgeActive}
+                onChange={(e) => setPromoCampaignBadgeActive(e.target.checked)}
+                className="w-4 h-4 text-amber-500 rounded focus:ring-amber-400 cursor-pointer"
+              />
+              <span className="text-xs font-bold text-slate-800 select-none">
+                {promoCampaignBadgeActive ? '✅ Icono de Campaña Activo' : '❌ Desactivado'}
+              </span>
+            </label>
+          </div>
+
+          {promoCampaignBadgeActive && (
+            <div className="space-y-4">
+              {/* Selector de Modo: Icono Único vs Selección Aleatoria Dinámica */}
+              <div className="p-3 bg-white rounded-xl border border-amber-300 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
+                <div>
+                  <span className="text-xs font-bold text-slate-900 block">Modo de Visualización en Productos:</span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Elige si deseas un solo icono fijo o rotación aleatoria entre varios iconos en la tienda
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setPromoCampaignBadgeMode('random')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer flex items-center space-x-1.5 ${
+                      promoCampaignBadgeMode === 'random'
+                        ? 'bg-amber-400 text-slate-950 border-amber-500 font-extrabold shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>🎲 Selección Aleatoria (Varios)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPromoCampaignBadgeMode('single')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer flex items-center space-x-1.5 ${
+                      promoCampaignBadgeMode === 'single'
+                        ? 'bg-amber-400 text-slate-950 border-amber-500 font-extrabold shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>🎯 Icono Único Fijo</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Colección Activa de Iconos (si está en Modo Aleatorio) */}
+              {promoCampaignBadgeMode === 'random' && (
+                <div className="p-3.5 bg-amber-50/80 rounded-xl border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      Colección de Iconos para Rotación Aleatoria ({promoCampaignBadgeUrls.length}):
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Cada producto mostrará un icono de esta lista
+                    </span>
+                  </div>
+
+                  {promoCampaignBadgeUrls.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {promoCampaignBadgeUrls.map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="relative p-1.5 rounded-xl bg-white border border-amber-300 shadow-2xs flex items-center space-x-1.5 group"
+                        >
+                          <img src={url} alt="Icono" className="w-7 h-7 object-contain" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPromoCampaignBadgeUrls((prev) => prev.filter((u) => u !== url));
+                            }}
+                            className="p-1 rounded-full bg-rose-100 text-rose-700 hover:bg-rose-200 transition cursor-pointer"
+                            title="Eliminar de la colección"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 text-center text-xs text-amber-800 bg-amber-100/60 rounded-lg font-medium">
+                      No hay iconos en la colección. Toca los íconos de abajo para añadirlos a la rotación.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Presets Rápidos de Campañas Famosas */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-2">
+                  {promoCampaignBadgeMode === 'random'
+                    ? '1. Seleccionar o Alternar Iconos para la Colección Aleatoria:'
+                    : '1. Seleccionar Icono de Campaña Predefinido:'}
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    {
+                      name: '🎅 Gorro Navidad',
+                      url: 'https://cdn-icons-png.flaticon.com/512/744/744546.png',
+                    },
+                    {
+                      name: '🎄 Árbol Navideño',
+                      url: 'https://cdn-icons-png.flaticon.com/512/3702/3702674.png',
+                    },
+                    {
+                      name: '🎁 Regalo Navideño',
+                      url: 'https://cdn-icons-png.flaticon.com/512/4213/4213651.png',
+                    },
+                    {
+                      name: '❤️ San Valentín',
+                      url: 'https://cdn-icons-png.flaticon.com/512/1077/1077035.png',
+                    },
+                    {
+                      name: '🎃 Halloween',
+                      url: 'https://cdn-icons-png.flaticon.com/512/3429/3429807.png',
+                    },
+                    {
+                      name: '⚡ Cyber Monday',
+                      url: 'https://cdn-icons-png.flaticon.com/512/1170/1170627.png',
+                    },
+                    {
+                      name: '🏷️ Black Friday',
+                      url: 'https://cdn-icons-png.flaticon.com/512/2956/2956820.png',
+                    },
+                    {
+                      name: '🔥 Hot Sale / Fuego',
+                      url: 'https://cdn-icons-png.flaticon.com/512/785/785116.png',
+                    },
+                    {
+                      name: '⭐ Estrella Oferta',
+                      url: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png',
+                    },
+                    {
+                      name: '👑 Corona Premium',
+                      url: 'https://cdn-icons-png.flaticon.com/512/616/616490.png',
+                    },
+                  ].map((item) => {
+                    const isSelected = promoCampaignBadgeMode === 'random'
+                      ? promoCampaignBadgeUrls.includes(item.url)
+                      : promoCampaignBadgeUrl === item.url;
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => {
+                          if (promoCampaignBadgeMode === 'random') {
+                            if (promoCampaignBadgeUrls.includes(item.url)) {
+                              setPromoCampaignBadgeUrls((prev) => prev.filter((u) => u !== item.url));
+                            } else {
+                              setPromoCampaignBadgeUrls((prev) => [...prev, item.url]);
+                            }
+                          } else {
+                            setPromoCampaignBadgeUrl(item.url);
+                          }
+                        }}
+                        className={`p-2 rounded-xl border text-left flex items-center space-x-2 transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-400 text-slate-950 border-amber-500 font-extrabold shadow-md ring-2 ring-amber-400'
+                            : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      >
+                        <img src={item.url} alt={item.name} className="w-6 h-6 object-contain flex-shrink-0" />
+                        <span className="text-[11px] font-bold truncate">{item.name}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-slate-950 font-black ml-auto" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Acciones para Buscar en Web o Subir Icono Personalizado */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWebSearchTarget('badge');
+                    setWebSearchQuery(`${promoBadge || 'Navidad'} icono png transparente`);
+                    setShowWebSearchModal(true);
+                    handleSearchWebPromos(`${promoBadge || 'Navidad'} icono png transparente`);
+                  }}
+                  className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-sky-50 border border-sky-300 text-sky-800 text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer shadow-2xs active:scale-95"
+                >
+                  <Search className="w-4 h-4 text-sky-600" />
+                  <span>Buscar Iconos en Internet</span>
+                </button>
+
+                <label className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer shadow-2xs active:scale-95 text-center">
+                  <UploadCloud className="w-4 h-4 text-emerald-600" />
+                  <span>Subir Icono (PNG/SVG)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        try {
+                          const b64 = await processLogoImageFile(f, 300);
+                          setPromoCampaignBadgeUrl(b64);
+                          if (!promoCampaignBadgeUrls.includes(b64)) {
+                            setPromoCampaignBadgeUrls((prev) => [...prev, b64]);
+                          }
+                        } catch (err: any) {
+                          alert(err.message || 'Error al procesar icono');
+                        }
+                      }
+                    }}
+                  />
+                </label>
+
+                {/* URL Input directo */}
+                <div className="flex items-center space-x-1.5">
+                  <input
+                    type="text"
+                    value={promoCampaignBadgeUrl || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPromoCampaignBadgeUrl(val);
+                      if (val && !promoCampaignBadgeUrls.includes(val)) {
+                        setPromoCampaignBadgeUrls((prev) => [...prev, val]);
+                      }
+                    }}
+                    placeholder="O pega URL de icono PNG..."
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 shadow-2xs"
+                  />
+                  {promoCampaignBadgeUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setPromoCampaignBadgeUrl('')}
+                      className="p-2 rounded-xl bg-rose-100 text-rose-700 hover:bg-rose-200 transition cursor-pointer"
+                      title="Quitar icono"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Selector de Posición sobre Botones */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-amber-300/40">
+                <label className="text-xs font-bold text-slate-800">
+                  Posición del Icono en Tarjeta de Productos:
+                </label>
+                <div className="flex items-center space-x-2">
+                  {[
+                    { id: 'buy_button', label: 'Sobre Botón "Comprar"' },
+                    { id: 'add_button', label: 'Sobre Botón "Agregar"' },
+                    { id: 'both', label: 'En Ambos Botones' },
+                  ].map((pos) => (
+                    <button
+                      key={pos.id}
+                      type="button"
+                      onClick={() => setPromoCampaignBadgePosition(pos.id as any)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                        promoCampaignBadgePosition === pos.id
+                          ? 'bg-amber-400 text-amber-950 border-amber-500 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pos.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vista Previa en Vivo Dinámica para Varios Productos */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2 shadow-2xs">
+                <span className="text-xs font-bold text-slate-800 block">
+                  Vista previa en tiempo real (Simulación de catálogo con distribución aleatoria):
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                  {[
+                    { id: 1, name: 'Producto 1' },
+                    { id: 2, name: 'Producto 2' },
+                    { id: 3, name: 'Producto 3' },
+                  ].map((item) => {
+                    const icons = promoCampaignBadgeMode === 'random' && promoCampaignBadgeUrls.length > 0
+                      ? promoCampaignBadgeUrls
+                      : (promoCampaignBadgeUrl ? [promoCampaignBadgeUrl] : []);
+                    const iconForProduct = icons.length > 0 ? icons[(item.id - 1) % icons.length] : null;
+
+                    return (
+                      <div key={item.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-700">{item.name}</span>
+                        <div className="relative inline-block">
+                          {iconForProduct && (
+                            <div className="absolute -top-3.5 -left-2 z-20 pointer-events-none flex items-center justify-center animate-subtle-badge-zoom">
+                              <img
+                                src={iconForProduct}
+                                alt="Campaña"
+                                className="w-7 h-7 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                              />
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            className="py-1 px-3 rounded-lg font-extrabold text-[11px] bg-[#FFD000] text-amber-950 flex items-center space-x-1 shadow-2xs"
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5 text-amber-950 stroke-[2.5]" />
+                            <span>Comprar</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* MODAL: BÚSQUEDA DE AFICHES EN LA WEB */}
@@ -2811,7 +3171,11 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
                       key={idx}
                       type="button"
                       onClick={() => {
-                        setPromoImageUrl(img.url);
+                        if (webSearchTarget === 'badge') {
+                          setPromoCampaignBadgeUrl(img.url);
+                        } else {
+                          setPromoImageUrl(img.url);
+                        }
                         setShowWebSearchModal(false);
                       }}
                       className="group relative rounded-xl overflow-hidden border border-slate-200 aspect-[16/10] text-left cursor-pointer hover:border-sky-500 hover:shadow-md transition"

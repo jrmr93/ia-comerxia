@@ -241,6 +241,8 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
           className={imageClassName}
           referrerPolicy="no-referrer"
           onError={handleImageError}
+          loading="lazy"
+          decoding="async"
         />
         {cleanVideoUrl && showPlayBadge && (
           <button

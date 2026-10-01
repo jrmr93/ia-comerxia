@@ -1649,6 +1649,40 @@ export const ProductCardItem: React.FC<{
   const regularPrice = Number(item.salePrice) || 0;
   const effectivePrice = hasDiscount ? regularPrice * (1 - discountPercent / 100) : regularPrice;
 
+  const campaignBadgeConfig = React.useMemo(() => {
+    const raw = storeConfig?.promoPopup;
+    if (!raw) return null;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (parsed && typeof parsed === 'object') {
+        const isActive = parsed.campaignBadgeActive !== false;
+        const position = parsed.campaignBadgePosition || 'buy_button';
+        const mode = parsed.campaignBadgeMode || 'random';
+
+        const urls: string[] = Array.isArray(parsed.campaignBadgeUrls) && parsed.campaignBadgeUrls.length > 0
+          ? parsed.campaignBadgeUrls.filter(Boolean)
+          : (parsed.campaignBadgeUrl ? [parsed.campaignBadgeUrl] : []);
+
+        if (isActive && urls.length > 0) {
+          let chosenUrl = urls[0];
+          if (mode === 'random' && urls.length > 1) {
+            const itemIdNum = typeof item.id === 'number'
+              ? item.id
+              : (String(item.id).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
+            const iconIndex = Math.abs(itemIdNum) % urls.length;
+            chosenUrl = urls[iconIndex];
+          } else if (parsed.campaignBadgeUrl) {
+            chosenUrl = parsed.campaignBadgeUrl;
+          }
+          return { url: chosenUrl, position };
+        }
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }, [storeConfig?.promoPopup, item.id]);
+
   return (
     <div
       id={`product-card-${item.id}`}
@@ -1658,16 +1692,16 @@ export const ProductCardItem: React.FC<{
       {/* Top Image Preview */}
       <div
         onClick={() => onQuickViewProduct(item)}
-        className={`aspect-square relative overflow-hidden cursor-pointer transition glossy-sheen-effect ${themeStyles.productImageBg}`}
+        className={`aspect-square relative overflow-hidden cursor-pointer transition ${themeStyles.productImageBg}`}
       >
         <ProductMediaDisplay
           imageUrl={photos[0] || item.imageUrl}
           candidateImages={photos}
           videoUrl={item.videoUrl}
           name={item.name}
-          className="w-full h-full relative glossy-sheen-effect"
-          imageClassName="w-full h-full object-cover group-hover:scale-105 mobile-auto-zoom transition-transform duration-300"
-          videoClassName="w-full h-full object-cover group-hover:scale-105 mobile-auto-zoom transition-transform duration-300"
+          className="w-full h-full relative"
+          imageClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          videoClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           autoPlayVideo={true}
           showPlayBadge={false}
           placeholderText="Sin imagen"
@@ -1797,8 +1831,8 @@ export const ProductCardItem: React.FC<{
           {/* Action buttons */}
           <div>
             {isCustomerView ? (
-              <div className="space-y-1 sm:space-y-1.5">
-                <div className="grid grid-cols-2 gap-1.5">
+              <div className="space-y-1.5 sm:space-y-2 pt-0.5">
+                <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   {inCart ? (
                     <div className={`flex items-center justify-between rounded-xl px-1.5 py-1 border ${activeTheme === 'boutique' ? 'bg-zinc-800 border-amber-500/50 text-zinc-100' : 'bg-amber-50 border-amber-400 text-slate-900'
                       }`}>
@@ -1825,26 +1859,54 @@ export const ProductCardItem: React.FC<{
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => onAddToCart(item, 1)}
-                      className="min-h-[36px] sm:min-h-[40px] py-1.5 sm:py-2 px-1 sm:px-2.5 rounded-xl bg-white hover:bg-amber-50/90 text-amber-800 font-extrabold text-[11px] sm:text-xs shadow-2xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border-2 border-[#FFD000] w-full min-w-0"
-                      title="Agregar al carrito"
-                    >
-                      <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600 flex-shrink-0" />
-                      <span className="font-extrabold text-amber-800 truncate">Agregar</span>
-                    </button>
+                    <div className="relative w-full min-w-0">
+                      {campaignBadgeConfig && (campaignBadgeConfig.position === 'add_button' || campaignBadgeConfig.position === 'both') && (
+                        <div className="absolute -top-3 -left-1 sm:-top-3.5 sm:-left-1.5 z-20 pointer-events-none flex items-center justify-center animate-subtle-badge-zoom">
+                          <img
+                            src={campaignBadgeConfig.url}
+                            alt="Campaña"
+                            className="w-6 h-6 sm:w-7.5 sm:h-7.5 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onAddToCart(item, 1)}
+                        className="min-h-[36px] sm:min-h-[40px] py-1.5 sm:py-2 px-1 sm:px-2 rounded-xl bg-white hover:bg-amber-50/90 text-amber-800 font-extrabold text-[11px] sm:text-xs shadow-2xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border-2 border-[#FFD000] w-full min-w-0"
+                        title="Agregar al carrito"
+                      >
+                        <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600 flex-shrink-0" />
+                        <span className="font-extrabold text-amber-800 truncate">Agregar</span>
+                      </button>
+                    </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={(e) => onDirectBuyProduct(item, e)}
-                    className="min-h-[36px] sm:min-h-[40px] py-1.5 sm:py-2 px-1 sm:px-2.5 rounded-xl transition flex items-center justify-center space-x-1 font-extrabold text-[11px] sm:text-xs cursor-pointer shadow-xs active:scale-95 bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 w-full min-w-0"
-                    title="Comprar directo"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-950 stroke-[2.5] flex-shrink-0" />
-                    <span className="font-extrabold text-amber-950 truncate">Comprar</span>
-                  </button>
+                  <div className="relative w-full min-w-0">
+                    {campaignBadgeConfig && (campaignBadgeConfig.position === 'buy_button' || campaignBadgeConfig.position === 'both') && (
+                      <div className="absolute -top-3 -left-1 sm:-top-3.5 sm:-left-1.5 z-20 pointer-events-none flex items-center justify-center animate-subtle-badge-zoom">
+                        <img
+                          src={campaignBadgeConfig.url}
+                          alt="Campaña"
+                          className="w-6 h-6 sm:w-7.5 sm:h-7.5 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => onDirectBuyProduct(item, e)}
+                      className="min-h-[36px] sm:min-h-[40px] py-1.5 sm:py-2 px-1 sm:px-2 rounded-xl transition flex items-center justify-center space-x-1 font-extrabold text-[11px] sm:text-xs cursor-pointer shadow-xs active:scale-95 bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 w-full min-w-0"
+                      title="Comprar directo"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-950 stroke-[2.5] flex-shrink-0" />
+                      <span className="font-extrabold text-amber-950 truncate">Comprar</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Secondary Action: Compartir por WhatsApp (Clean neutral style) */}

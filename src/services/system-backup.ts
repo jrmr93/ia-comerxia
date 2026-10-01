@@ -60,6 +60,28 @@ import { normalizeMediaUrl, normalizeJsonMediaArray } from '../utils/media-helpe
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
+function normalizePromoPopupMedia(rawPromo: any): string | null {
+  if (!rawPromo) return null;
+  try {
+    const parsed = typeof rawPromo === 'string' ? JSON.parse(rawPromo) : rawPromo;
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.campaignBadgeUrl) {
+        parsed.campaignBadgeUrl = normalizeMediaUrl(parsed.campaignBadgeUrl) || null;
+      }
+      if (Array.isArray(parsed.campaignBadgeUrls)) {
+        parsed.campaignBadgeUrls = parsed.campaignBadgeUrls.map((u: string) => normalizeMediaUrl(u)).filter(Boolean);
+      }
+      if (parsed.imageUrl) {
+        parsed.imageUrl = normalizeMediaUrl(parsed.imageUrl) || null;
+      }
+      return JSON.stringify(parsed);
+    }
+    return String(rawPromo);
+  } catch {
+    return typeof rawPromo === 'string' ? rawPromo : JSON.stringify(rawPromo);
+  }
+}
+
 export interface FullSystemBackupManifest {
   version: string;
   system: string;
@@ -421,9 +443,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
       logoDesktopUrl: normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url) || null,
       courierLogos: normalizeJsonMediaArray(sc.courierLogos || sc.courier_logos),
       paymentLogos: normalizeJsonMediaArray(sc.paymentLogos || sc.payment_logos),
-      promoPopup: typeof (sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup) === 'object'
-        ? JSON.stringify(sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup)
-        : ((sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup) || null),
+      promoPopup: normalizePromoPopupMedia(sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup),
     };
   });
 
@@ -1044,7 +1064,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
       const rawCatImgs = sc.categoryImages !== undefined ? sc.categoryImages : sc.category_images;
       const catImgsStr = typeof rawCatImgs === 'object' && rawCatImgs !== null ? JSON.stringify(rawCatImgs) : (rawCatImgs || null);
       const rawPromo = sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup;
-      const promoStr = typeof rawPromo === 'object' && rawPromo !== null ? JSON.stringify(rawPromo) : (rawPromo || null);
+      const promoStr = normalizePromoPopupMedia(rawPromo);
 
       sql += `INSERT INTO store_configs (id, user_id, store_name, whatsapp_number, description, banner_text, delivery_fee, min_order_amount, currency, is_active, maintenance_title, maintenance_message, allow_catalog_browsing, show_stock, show_out_of_stock, prioritize_offers_first, enable_pagination, items_per_page, default_product_sort, default_initial_category, instagram_url, website_url, address, logo_url, logo_desktop_url, courier_logos, payment_logos, theme, category_images, promo_popup) VALUES (${sc.id || 1}, ${sc.userId || 1}, ${escapeSqlString(sc.storeName || 'Comerxia Store')}, ${escapeSqlString(sc.whatsappNumber)}, ${escapeSqlString(sc.description)}, ${escapeSqlString(sc.bannerText)}, ${sc.deliveryFee || 0}, ${sc.minOrderAmount || 0}, ${escapeSqlString(sc.currency || 'USD')}, ${sc.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(sc.maintenanceTitle || 'Tienda Temporalmente Pausada')}, ${escapeSqlString(sc.maintenanceMessage || 'Estamos actualizando nuestro catálogo e inventario. ¡Volvemos muy pronto!')}, ${sc.allowCatalogBrowsing ? 'TRUE' : 'FALSE'}, ${sc.showStock !== false ? 'TRUE' : 'FALSE'}, ${sc.showOutOfStock !== false ? 'TRUE' : 'FALSE'}, ${sc.prioritizeOffersFirst !== false ? 'TRUE' : 'FALSE'}, ${sc.enablePagination ? 'TRUE' : 'FALSE'}, ${sc.itemsPerPage || 12}, ${escapeSqlString(sc.defaultProductSort || 'date_desc')}, ${escapeSqlString(sc.defaultInitialCategory)}, ${escapeSqlString(sc.instagramUrl)}, ${escapeSqlString(sc.websiteUrl)}, ${escapeSqlString(sc.address)}, ${escapeSqlString(normalizeMediaUrl(sc.logoUrl || sc.logo_url))}, ${escapeSqlString(normalizeMediaUrl(sc.logoDesktopUrl || sc.logo_desktop_url))}, ${escapeSqlString(normCourierLogos)}, ${escapeSqlString(normPaymentLogos)}, ${escapeSqlString(effectiveThemeSql)}, ${escapeSqlString(catImgsStr)}, ${escapeSqlString(promoStr)}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, store_name = EXCLUDED.store_name, whatsapp_number = EXCLUDED.whatsapp_number, description = EXCLUDED.description, banner_text = EXCLUDED.banner_text, delivery_fee = EXCLUDED.delivery_fee, min_order_amount = EXCLUDED.min_order_amount, currency = EXCLUDED.currency, is_active = EXCLUDED.is_active, maintenance_title = EXCLUDED.maintenance_title, maintenance_message = EXCLUDED.maintenance_message, allow_catalog_browsing = EXCLUDED.allow_catalog_browsing, show_stock = EXCLUDED.show_stock, show_out_of_stock = EXCLUDED.show_out_of_stock, prioritize_offers_first = EXCLUDED.prioritize_offers_first, enable_pagination = EXCLUDED.enable_pagination, items_per_page = EXCLUDED.items_per_page, default_product_sort = EXCLUDED.default_product_sort, default_initial_category = EXCLUDED.default_initial_category, instagram_url = EXCLUDED.instagram_url, website_url = EXCLUDED.website_url, address = EXCLUDED.address, logo_url = EXCLUDED.logo_url, logo_desktop_url = EXCLUDED.logo_desktop_url, courier_logos = EXCLUDED.courier_logos, payment_logos = EXCLUDED.payment_logos, theme = EXCLUDED.theme, category_images = EXCLUDED.category_images, promo_popup = EXCLUDED.promo_popup, updated_at = NOW();\n`;
     }
@@ -1531,7 +1551,7 @@ export async function restoreCompleteJsonDump(
           }
 
           const rawPromo = sc.promoPopup !== undefined ? sc.promoPopup : sc.promo_popup;
-          const promoStr = typeof rawPromo === 'object' && rawPromo !== null ? JSON.stringify(rawPromo) : (rawPromo || null);
+          const promoStr = normalizePromoPopupMedia(rawPromo);
 
           const rawCatImgs = sc.categoryImages !== undefined ? sc.categoryImages : sc.category_images;
           const catImgsStr = typeof rawCatImgs === 'object' && rawCatImgs !== null ? JSON.stringify(rawCatImgs) : (rawCatImgs || null);

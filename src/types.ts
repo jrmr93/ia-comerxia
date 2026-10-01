@@ -560,6 +560,11 @@ export interface StorePromoPopupConfig {
   featuredProductPrice?: number | string;
   featuredProductImage?: string;
   featuredCategory?: string;
+  campaignBadgeUrl?: string | null;
+  campaignBadgeUrls?: string[];
+  campaignBadgeActive?: boolean;
+  campaignBadgePosition?: 'buy_button' | 'add_button' | 'both' | string;
+  campaignBadgeMode?: 'single' | 'random' | string;
 }
 
 export interface CategoryHeaderConfig {
