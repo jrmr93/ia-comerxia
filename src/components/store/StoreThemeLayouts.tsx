@@ -1756,14 +1756,14 @@ export const ProductCardItem: React.FC<{
       {/* Body */}
       <div className="p-2.5 sm:p-4 flex-1 flex flex-col justify-between space-y-2 sm:space-y-3">
         <div>
-          <div className={`flex items-center justify-between text-[10px] sm:text-[11px] mb-1 font-mono ${themeStyles.productCategory}`}>
-            <span>SKU: {item.sku}</span>
-            <span className="truncate max-w-[90px] sm:max-w-[120px] font-sans font-medium">{item.category || 'Producto'}</span>
+          <div className="flex items-center justify-between text-[10px] mb-1 font-mono text-slate-400">
+            <span className="font-medium text-[10px]">SKU: {item.sku}</span>
+            <span className="truncate max-w-[100px] sm:max-w-[130px] font-sans font-medium text-[10px] text-slate-500">{item.category || 'Producto'}</span>
           </div>
 
           <h3
             onClick={() => onQuickViewProduct(item)}
-            className={`text-xs sm:text-sm font-bold line-clamp-2 transition cursor-pointer leading-snug hover:text-amber-600 ${themeStyles.productTitle}`}
+            className="text-[15px] font-bold line-clamp-2 transition cursor-pointer leading-snug hover:text-amber-600 text-slate-900"
           >
             {item.name}
           </h3>
@@ -1782,7 +1782,7 @@ export const ProductCardItem: React.FC<{
           </div>
 
           {item.description && (
-            <p className={`text-[11px] sm:text-xs line-clamp-2 mt-1 leading-relaxed ${themeStyles.productDescription}`}>
+            <p className="text-xs font-normal line-clamp-2 mt-1 leading-relaxed text-slate-500">
               {item.description}
             </p>
           )}
@@ -1791,37 +1791,37 @@ export const ProductCardItem: React.FC<{
 
         <div className={`pt-2 sm:pt-3 border-t space-y-2 sm:space-y-2.5 ${activeTheme === 'boutique' ? 'border-zinc-800' : 'border-slate-100'}`}>
           <div className="flex items-baseline justify-between">
-            <span className={`text-[10px] sm:text-xs font-semibold ${themeStyles.productDescription}`}>
+            <span className="text-xs font-medium text-slate-500">
               {hasDiscount ? 'Oferta Especial:' : 'Precio:'}
             </span>
             {hasDiscount ? (
               <div className="text-right">
                 <div className="flex items-center justify-end space-x-1 sm:space-x-1.5">
-                  <span className="text-[10px] sm:text-xs line-through text-slate-400 font-semibold">
+                  <span className="text-xs line-through text-slate-400 font-normal">
                     ${regularPrice.toFixed(2)}
                   </span>
-                  <span className="text-[9px] sm:text-[10px] font-black px-1 sm:px-1.5 py-0.2 rounded bg-rose-600 text-white shadow-2xs">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-600 text-white shadow-2xs">
                     -{discountPercent}%
                   </span>
                 </div>
                 <div className="flex items-baseline justify-end">
-                  <span className="text-base sm:text-lg font-black text-rose-600">
+                  <span className="text-xl font-extrabold text-rose-600">
                     ${effectivePrice.toFixed(2)}
                   </span>
-                  <span className={`text-[9px] sm:text-[10px] ml-1 font-bold ${themeStyles.productDescription}`}>
+                  <span className="text-xs ml-1 font-medium text-slate-500">
                     {currency}
                   </span>
                 </div>
-                <span className="text-[9px] font-bold text-emerald-600 block">
+                <span className="text-[10px] font-medium text-emerald-600 block">
                   Ahorras ${(regularPrice - effectivePrice).toFixed(2)}
                 </span>
               </div>
             ) : (
               <div className="text-right">
-                <span className={`text-base sm:text-lg font-black text-slate-900 ${themeStyles.productPrice}`}>
+                <span className="text-xl font-extrabold text-slate-900">
                   ${regularPrice.toFixed(2)}
                 </span>
-                <span className={`text-[9px] sm:text-[10px] ml-1 font-bold ${themeStyles.productDescription}`}>
+                <span className="text-xs ml-1 font-medium text-slate-500">
                   {currency}
                 </span>
               </div>
@@ -1831,27 +1831,27 @@ export const ProductCardItem: React.FC<{
           {/* Action buttons */}
           <div>
             {isCustomerView ? (
-              <div className="space-y-1.5 sm:space-y-2 pt-0.5">
+              <div className="space-y-2 pt-0.5">
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   {inCart ? (
-                    <div className={`flex items-center justify-between rounded-xl px-1.5 py-1 border ${activeTheme === 'boutique' ? 'bg-zinc-800 border-amber-500/50 text-zinc-100' : 'bg-amber-50 border-amber-400 text-slate-900'
+                    <div className={`flex items-center justify-between rounded-full px-2 py-1 border ${activeTheme === 'boutique' ? 'bg-zinc-800 border-amber-500/50 text-zinc-100' : 'bg-amber-50 border-amber-400 text-slate-900'
                       }`}>
                       <button
                         type="button"
                         onClick={() => onUpdateCartQty(item.id, inCart.quantity - 1)}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
+                        className={`w-6 h-6 rounded-full flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
                           }`}
                         title="Reducir una unidad"
                       >
                         <Minus className="w-3 h-3 stroke-[2.5]" />
                       </button>
-                      <span className="text-xs font-black font-mono px-1 text-slate-900">
+                      <span className="text-sm font-bold font-mono px-1 text-slate-900">
                         {inCart.quantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => onUpdateCartQty(item.id, inCart.quantity + 1)}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
+                        className={`w-6 h-6 rounded-full flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-900 text-amber-300 hover:bg-zinc-700' : 'bg-white hover:bg-amber-100 text-slate-900'
                           }`}
                         title="Aumentar una unidad"
                       >
@@ -1875,11 +1875,15 @@ export const ProductCardItem: React.FC<{
                       <button
                         type="button"
                         onClick={() => onAddToCart(item, 1)}
-                        className="min-h-[36px] sm:min-h-[40px] py-1.5 sm:py-2 px-1 sm:px-2 rounded-xl bg-white hover:bg-amber-50/90 text-amber-800 font-extrabold text-[11px] sm:text-xs shadow-2xs transition flex items-center justify-center space-x-1 cursor-pointer active:scale-95 border-2 border-[#FFD000] w-full min-w-0"
+                        className="min-h-[38px] sm:min-h-[42px] py-2 px-2.5 rounded-full bg-white hover:bg-slate-50 text-slate-900 font-bold text-sm transition flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 border border-slate-200 shadow-2xs w-full min-w-0"
                         title="Agregar al carrito"
                       >
-                        <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600 flex-shrink-0" />
-                        <span className="font-extrabold text-amber-800 truncate">Agregar</span>
+                        <svg className="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="9" cy="21" r="1" fill="#3B82F6" stroke="#3B82F6" />
+                          <circle cx="20" cy="21" r="1" fill="#3B82F6" stroke="#3B82F6" />
+                          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                        </svg>
+                        <span className="font-bold text-sm text-slate-900 truncate">Agregar</span>
                       </button>
                     </div>
                   )}
@@ -1900,45 +1904,48 @@ export const ProductCardItem: React.FC<{
                     <button
                       type="button"
                       onClick={(e) => onDirectBuyProduct(item, e)}
-                      className="min-h-[36px] sm:min-h-[40px] py-1.5 sm:py-2 px-1 sm:px-2 rounded-xl transition flex items-center justify-center space-x-1 font-extrabold text-[11px] sm:text-xs cursor-pointer shadow-xs active:scale-95 bg-[#FFD000] hover:bg-[#E6B800] text-amber-950 w-full min-w-0"
+                      className="min-h-[38px] sm:min-h-[42px] py-2 px-2.5 rounded-full transition flex items-center justify-center space-x-1.5 font-extrabold text-sm cursor-pointer shadow-xs active:scale-95 bg-[#FFD000] hover:bg-[#E6B800] text-slate-950 w-full min-w-0"
                       title="Comprar directo"
                     >
-                      <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-950 stroke-[2.5] flex-shrink-0" />
-                      <span className="font-extrabold text-amber-950 truncate">Comprar</span>
+                      <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                        <rect x="2" y="5" width="20" height="14" rx="2" fill="#0EA5E9" />
+                        <line x1="2" y1="10" x2="22" y2="10" stroke="#0369A1" strokeWidth="3" />
+                        <rect x="5" y="14" width="4" height="2" fill="#FEF08A" />
+                      </svg>
+                      <span className="font-extrabold text-sm text-slate-950 truncate">Comprar</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Secondary Action: Compartir por WhatsApp (Clean neutral style) */}
+                {/* Secondary Action: Compartir por WhatsApp */}
                 <button
                   type="button"
                   onClick={(e) => onShareProductWhatsApp(item, e)}
-                  className={`w-full min-h-[32px] sm:min-h-[36px] py-1 sm:py-1.5 px-2 sm:px-3 rounded-xl border font-bold text-[11px] sm:text-xs transition flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer shadow-2xs active:scale-95 ${activeTheme === 'boutique' ? 'bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 border-zinc-700/80' : 'bg-slate-100/90 hover:bg-slate-200 text-slate-800 border-slate-200/90'
-                    }`}
+                  className="w-full min-h-[36px] sm:min-h-[40px] py-2 px-3 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 font-bold text-sm transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-2xs active:scale-95"
                   title="Compartir por WhatsApp"
                 >
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                  <span className="font-bold text-[11px] sm:text-xs text-slate-800 truncate">Compartir Producto</span>
+                  <svg className="w-4 h-4 text-[#10B981] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                  </svg>
+                  <span className="font-bold text-sm text-slate-800 truncate">Compartir Producto</span>
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-1.5 pt-1">
                 <button
                   onClick={() => onQuickViewProduct(item)}
-                  className={`min-h-[36px] py-1.5 sm:py-2 px-2 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs ${activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                    }`}
+                  className="min-h-[36px] py-2 px-2 rounded-full border border-slate-200 font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs bg-slate-50 hover:bg-slate-100 text-slate-700"
                 >
                   <Eye className="w-3.5 h-3.5 text-sky-500" />
-                  <span className="truncate">Ver Detalle</span>
+                  <span className="truncate text-xs font-semibold">Ver Detalle</span>
                 </button>
                 <button
                   type="button"
                   onClick={(e) => onShareProductWhatsApp(item, e)}
-                  className={`min-h-[36px] py-1.5 sm:py-2 px-2 rounded-xl border font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs ${activeTheme === 'boutique' ? 'bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border-zinc-700' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                    }`}
+                  className="min-h-[36px] py-2 px-2 rounded-full border border-emerald-200 font-semibold text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
                 >
                   <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="truncate">WhatsApp</span>
+                  <span className="truncate text-xs font-semibold">WhatsApp</span>
                 </button>
               </div>
             )}
@@ -2539,7 +2546,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     (searchQuery.trim().length > 0 ? 1 : 0);
 
   return (
-    <div className="space-y-4 pb-12">
+    <div className="space-y-4 pb-12 w-full">
       {/* ========================================================================= */}
       {/* 1. LOTENGOO PURE WHITE STICKY SEARCH & NAVIGATION BAR                    */}
       {/* ========================================================================= */}
@@ -2548,59 +2555,53 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
         className={`sticky ${scrollDirection === 'down'
             ? '-translate-y-full opacity-0 pointer-events-none'
             : scrollDirection === 'up'
-              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-xl ring-1 ring-slate-200/80'
+              ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-200/80'
               : `${isCustomerOnly || isCustomerView || isCustomerMode ? 'top-0' : 'top-16'} z-30 translate-y-0 opacity-100`
-          } bg-white/95 backdrop-blur-xl text-slate-900 shadow-[0_8px_30px_rgba(0,0,0,0.06)] -mx-4 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 border-b border-slate-200/90 transition-all duration-300 transform relative overflow-hidden group`}
+          } w-full left-0 right-0 top-0 m-0 p-0 bg-white text-slate-900 shadow-xs border-b border-slate-200 transition-all duration-300 transform relative overflow-hidden group`}
       >
-        {/* Permanent Subtle Animated Ambient Glow Layer */}
-        <div className="absolute inset-0 animate-store-header-glow pointer-events-none opacity-90" />
-
-        {/* Permanent Animated Gradient Shimmer Sweep Line at the Bottom Edge */}
-        <div className="store-header-shimmer-bar" />
-
-        {/* Upper Row: Store Brand + Desktop Mega Search Box + Cart */}
-        <div
-          className={`${isScrolled ? 'hidden md:flex' : 'flex'
-            } py-3 items-center justify-between gap-3 sm:gap-6 border-b border-slate-200/60 transition-all duration-300 relative z-10`}
-        >
-          {/* Brand & Store Identity */}
-          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-            <div
-              id="store-marketplace-logo"
-              onClick={onLogoClick}
-              className={`cursor-pointer select-none transition-all duration-300 relative group/logo ${isLogoAnimating ? 'animate-store-logo-bounce' : 'hover:scale-[1.03] active:scale-95'
-                }`}
-              title="Logo de la tienda"
-            >
-              <div className="flex items-center space-x-2 relative z-10">
-                {storeConfig.logoDesktopUrl ? (
-                  <div className="h-10 sm:h-11 max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center px-2 py-0.5">
-                    <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto max-w-full object-contain" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          {/* Upper Row: Store Brand + Desktop Mega Search Box + Cart */}
+          <div
+            className={`${isScrolled ? 'hidden md:flex' : 'flex'
+              } py-3 items-center justify-between gap-3 sm:gap-6 border-b border-slate-200/60 transition-all duration-300 relative z-10`}
+          >
+            {/* Brand & Store Identity */}
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+              <div
+                id="store-marketplace-logo"
+                onClick={onLogoClick}
+                className="cursor-pointer select-none relative group/logo"
+                title="Logo de la tienda"
+              >
+                <div className="flex items-center space-x-2.5 relative z-10">
+                  {storeConfig.logoDesktopUrl ? (
+                    <div className="h-10 sm:h-11 max-w-[180px] lg:max-w-[220px] rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center px-2 py-0.5">
+                      <img src={storeConfig.logoDesktopUrl} alt={storeConfig.storeName} className="h-full w-auto max-w-full object-contain" />
+                    </div>
+                  ) : storeConfig.logoUrl ? (
+                    <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#FFD000] border border-amber-400 overflow-hidden shadow-xs flex items-center justify-center p-1">
+                      <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
+                    </div>
+                  ) : (
+                    <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-md font-black border border-amber-400">
+                      <Store className="w-6 h-6 text-slate-950" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="font-black text-base sm:text-lg md:text-xl text-slate-950 tracking-tight truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[240px]">
+                        {storeConfig.storeName || 'Lotengoo.com'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">TU TIENDA ONLINE</span>
                   </div>
-                ) : storeConfig.logoUrl ? (
-                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-white border border-amber-300/60 overflow-hidden shadow-xs flex items-center justify-center p-1">
-                    <img src={storeConfig.logoUrl} alt={storeConfig.storeName} className="w-full h-full object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center shadow-md font-black border border-amber-400">
-                    <Store className="w-6 h-6" />
-                  </div>
-                )}
-                <div className="min-w-0 flex flex-col justify-center">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="font-black text-sm sm:text-base md:text-lg text-slate-950 tracking-tight truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[240px]">
-                      {storeConfig.storeName || 'Lotengoo'}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-medium">Todo en un solo lugar</span>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Desktop Mega Search Bar (Clean Pure White Input with Permanent Subtle Aura & Lotengoo Yellow Search Button) */}
+          {/* Desktop Mega Search Bar (Pure White Input + Lotengoo Yellow Search Button) */}
           <div className="hidden md:block flex-1 max-w-2xl min-w-0 relative">
-            <div className="flex items-center bg-white rounded-xl search-bar-premium-aura border border-amber-400/80 focus-within:border-amber-500 focus-within:ring-4 focus-within:ring-amber-400/25 overflow-hidden transition-all duration-300">
+            <div className="flex items-center bg-white rounded-xl border border-slate-300 focus-within:border-amber-400 overflow-hidden transition-all duration-200">
               {/* Category Dropdown integrated on the left */}
               <div className="relative flex-shrink-0 bg-slate-100 border-r border-slate-300">
                 <select
@@ -2884,12 +2885,12 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               <span>Ofertas Flash</span>
             </button>
 
-            {categories.slice(0, 4).map((cat) => (
+            {categories.slice(0, 5).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`hover:text-amber-600 transition cursor-pointer ${
-                  selectedCategory === cat ? 'text-amber-600 font-black underline' : 'text-slate-700'
+                className={`hover:text-amber-600 transition cursor-pointer py-1 ${
+                  selectedCategory === cat ? 'text-slate-950 font-black border-b-2 border-amber-400' : 'text-slate-700'
                 }`}
               >
                 {cat}
@@ -2920,6 +2921,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
           </div>
         </div>
       </div>
+    </div>
 
       {/* ========================================================================= */}
       {/* 2. DEDICATED MOBILE FILTER MODAL / BOTTOM SHEET (LIGHT & CLEAR THEME)    */}
@@ -3117,7 +3119,9 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
         </div>
       )}
 
-      {/* Active Filter Feedback Pill */}
+      {/* Main Catalog Body Container */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-6 pt-2">
+        {/* Active Filter Feedback Pill */}
       {(searchQuery || selectedCategory !== 'all' || showOffersOnly || inStockOnly || sortBy !== 'featured') && (
         <div className="flex items-center justify-between bg-slate-100 border border-slate-200 rounded-xl px-3 sm:px-4 py-2 text-xs text-slate-700 shadow-2xs">
           <div className="flex items-center space-x-1.5 sm:space-x-2 flex-wrap gap-y-1">
@@ -3478,10 +3482,11 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
           </div>
         </div>
 
-
+        <StoreFooter props={props} variant="standard" />
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 /**

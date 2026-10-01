@@ -1543,7 +1543,7 @@ function InventoryApp() {
       )}
 
       {/* Main Container */}
-      <main className={`flex-1 max-w-7xl w-full mx-auto ${isCustomerOnly ? 'px-2.5 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-6' : 'px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6'}`}>
+      <main className={`flex-1 w-full mx-auto ${isCustomerOnly || activeTab === 'store' ? 'max-w-full p-0 m-0' : 'max-w-7xl px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6'}`}>
         {!isCustomerOnly && syncFeedback && (
           <div className="mb-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs animate-fadeIn">
             <span>{syncFeedback}</span>

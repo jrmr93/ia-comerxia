@@ -3,7 +3,12 @@
 @layer base {
 
   html,
-  body {
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     background-color: #f8fafc;
     color: #0f172a;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
