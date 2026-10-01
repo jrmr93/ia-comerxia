@@ -2103,12 +2103,12 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               </div>
             )}
 
-            {/* 4 Columns with Proportional Widths: CI (4 cols), Name (3 cols), Phone (3 cols), Email (2 cols) */}
+            {/* 2-Row Grid Layout with Spacious Proportional Widths: Row 1 (CI 6 cols, Name 6 cols), Row 2 (Phone 6 cols, Email 6 cols) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-              {/* 1. Cédula / RUC con autocompletado y validación (4 Columns) */}
-              <div className="lg:col-span-4 relative flex flex-col justify-start">
+              {/* 1. Cédula / RUC con autocompletado y validación (6 Columns) */}
+              <div className="lg:col-span-6 relative flex flex-col justify-start">
                 <div className="h-6 flex items-center justify-between mb-1.5">
-                  <label className="text-slate-700 font-bold text-xs flex items-center gap-1">
+                  <label className="text-slate-700 font-bold text-[11px] sm:text-xs flex items-center gap-1">
                     <span>Documento SRI:</span>
                   </label>
                   <button
@@ -2125,19 +2125,19 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
 
                 <div className="flex gap-1.5">
-                  {/* Selector de Tipo de Documento */}
+                  {/* Selector de Tipo de Documento Ultra-Compacto */}
                   <select
                     value={docType}
                     onChange={(e) => handleSelectDocType(e.target.value as any)}
-                    className="h-10 px-2 rounded-xl bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-800 focus:outline-none focus:border-emerald-500 transition cursor-pointer shrink-0"
+                    className="h-10 w-20 sm:w-24 px-1 rounded-xl bg-slate-100 border border-slate-200 text-[10px] sm:text-[11px] font-bold text-slate-800 focus:outline-none focus:border-emerald-500 transition cursor-pointer shrink-0"
                   >
-                    <option value="05">Cédula (05)</option>
-                    <option value="04">RUC (04)</option>
-                    <option value="07">Cons. Final (07)</option>
-                    <option value="06">Pasaporte (06)</option>
+                    <option value="05">Cédula</option>
+                    <option value="04">RUC</option>
+                    <option value="07">Cons. Final</option>
+                    <option value="06">Pasaporte</option>
                   </select>
 
-                  <div className="relative flex-1">
+                  <div className="relative flex-1 min-w-0">
                     <CreditCard className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
                     <input
                       type="text"
@@ -2172,11 +2172,11 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                           : docType === '04'
                             ? '13 dígitos (RUC)'
                             : docType === '06'
-                              ? 'Pasaporte (Alfanumérico)'
+                              ? 'Pasaporte'
                               : '10 dígitos (Cédula)'
                       }
-                      className={`w-full h-10 pl-8 pr-7 rounded-xl font-mono text-xs sm:text-sm focus:outline-none font-semibold transition ${docType === '07'
-                          ? 'bg-purple-50/80 border border-purple-300 text-purple-900 font-bold'
+                      className={`w-full h-10 pl-8 pr-7 rounded-xl font-mono text-xs sm:text-sm tracking-normal focus:outline-none font-bold transition ${docType === '07'
+                          ? 'bg-purple-50/80 border border-purple-300 text-purple-900'
                           : customerCi.trim()
                             ? idValidation?.isValid
                               ? 'bg-emerald-50/50 border border-emerald-400 text-slate-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100'
@@ -2270,10 +2270,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               </div>
 
-              {/* 2. Nombre o Razón Social (3 Columns) */}
-              <div className="lg:col-span-3 flex flex-col justify-start">
+              {/* 2. Nombre o Razón Social (6 Columns) */}
+              <div className="lg:col-span-6 flex flex-col justify-start">
                 <div className="h-6 flex items-center justify-between mb-1.5">
-                  <label className="text-slate-700 font-bold text-xs">
+                  <label className="text-slate-700 font-bold text-[11px] sm:text-xs">
                     Nombre o Razón Social:
                   </label>
                 </div>
@@ -2284,8 +2284,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     value={customerName}
                     title={customerName || 'Nombre o Razón Social'}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Ej. María Gómez"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-medium"
+                    placeholder="Ej. María Gómez / Importadora Gómez S.A."
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-semibold"
                   />
                 </div>
                 <div className="min-h-[22px] flex items-center mt-1">
@@ -2293,10 +2293,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               </div>
 
-              {/* 3. Teléfono / WhatsApp (3 Columns) */}
-              <div className="lg:col-span-3 flex flex-col justify-start">
+              {/* 3. Teléfono / WhatsApp (6 Columns) */}
+              <div className="lg:col-span-6 flex flex-col justify-start">
                 <div className="h-6 flex items-center justify-between mb-1.5">
-                  <label className="text-slate-700 font-bold text-xs">
+                  <label className="text-slate-700 font-bold text-[11px] sm:text-xs">
                     Teléfono / WhatsApp: <span className="text-rose-500 font-bold">*</span>
                   </label>
                   {phoneValidation?.isValid && phoneValidation.whatsappDigits && (
@@ -2323,7 +2323,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     title={customerPhone || 'Número de contacto WhatsApp'}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="Ej. 0983302390"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition"
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-semibold"
                   />
                 </div>
                 <div className="min-h-[22px] flex items-center mt-1">
@@ -2342,10 +2342,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 </div>
               </div>
 
-              {/* 4. Correo Electrónico (2 Columns) */}
-              <div className="lg:col-span-2 flex flex-col justify-start">
+              {/* 4. Correo Electrónico (6 Columns) */}
+              <div className="lg:col-span-6 flex flex-col justify-start">
                 <div className="h-6 flex items-center justify-between mb-1.5">
-                  <label className="text-slate-700 font-bold text-xs">
+                  <label className="text-slate-700 font-bold text-[11px] sm:text-xs">
                     Correo Electrónico:
                   </label>
                 </div>
@@ -2357,11 +2357,11 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     title={customerEmail || 'Correo Electrónico'}
                     onChange={(e) => setCustomerEmail(e.target.value)}
                     placeholder="cliente@ejemplo.com"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-medium"
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition font-semibold"
                   />
                 </div>
                 <div className="min-h-[22px] flex items-center mt-1">
-                  <p className="text-[10px] text-slate-400">Opcional</p>
+                  <p className="text-[10px] text-slate-400">Opcional para envío de factura comprobante</p>
                 </div>
               </div>
             </div>
@@ -2370,7 +2370,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
             <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
               <div className="flex items-center gap-1.5 shrink-0">
                 <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                <label className="text-xs font-bold text-slate-700">
+                <label className="text-[11px] sm:text-xs font-bold text-slate-700">
                   Dirección Residencial / Fiscal (Opcional):
                 </label>
               </div>
@@ -2380,7 +2380,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                 title={customerFiscalAddress || 'Dirección residencial o fiscal del cliente'}
                 onChange={(e) => setCustomerFiscalAddress(e.target.value)}
                 placeholder="Domicilio fiscal o residencial del cliente para facturación o registro en CRM..."
-                className="flex-1 h-10 px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 font-medium transition"
+                className="flex-1 h-10 px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 font-semibold transition"
               />
             </div>
           </div>
@@ -3208,21 +3208,21 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               </div>
             ) : (
               <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs bg-white">
-                {/* Table Header (Formato Prefactura SRI 7 Columnas Exactas) */}
-                <div className="hidden lg:grid lg:grid-cols-12 gap-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-extrabold uppercase tracking-wider border-b border-slate-800">
+                {/* Table Header (Formato Prefactura SRI 7 Columnas Exactas Rebalanceadas) */}
+                <div className="hidden lg:grid lg:grid-cols-12 gap-1.5 px-2.5 py-1.5 bg-slate-900 text-white text-[9px] font-extrabold uppercase tracking-wider border-b border-slate-800">
                   <div className="col-span-1 text-center">N°</div>
-                  <div className="col-span-2 flex items-center gap-1.5">
-                    <Receipt className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Código / SKU</span>
+                  <div className="col-span-2 flex items-center gap-1">
+                    <Receipt className="w-3 h-3 text-purple-400 shrink-0" />
+                    <span className="truncate">Código/SKU</span>
                   </div>
-                  <div className="col-span-3">Producto</div>
-                  <div className="col-span-1 text-center">Cantidad</div>
-                  <div className="col-span-2 text-right" title="Precio unitario de venta sin IVA">Precio Sin IVA ($)</div>
-                  <div className="col-span-1 text-right" title="Descuento unitario otorgado en dólares">Descuento ($)</div>
-                  <div className="col-span-2 text-right" title="Subtotal base imponible de la línea sin IVA">Total ($)</div>
+                  <div className="col-span-3 truncate">Producto</div>
+                  <div className="col-span-2 text-center">Cantidad</div>
+                  <div className="col-span-2 text-right" title="Precio unitario de venta sin IVA">Precio ($)</div>
+                  <div className="col-span-1 text-right" title="Descuento unitario otorgado en dólares">Desc ($)</div>
+                  <div className="col-span-1 text-right" title="Subtotal base imponible de la línea sin IVA">Total</div>
                 </div>
 
-                {/* Items List - Formato Prefactura SRI (7 Columnas) */}
+                {/* Items List - Formato Prefactura SRI (7 Columnas Rebalanceadas) */}
                 <div className="divide-y divide-slate-200 max-h-72 overflow-y-auto">
                   {items.map((it, idx) => {
                     const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
@@ -3241,14 +3241,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                     const itemSubtotal = calculatedRow.lineSubtotal;
 
                     return (
-                      <div key={idx} className="p-3 lg:px-3 lg:py-2.5 lg:grid lg:grid-cols-12 gap-2 items-center hover:bg-purple-50/30 transition border-b border-slate-200/80 text-xs">
+                      <div key={idx} className="p-2 lg:px-2.5 lg:py-2 lg:grid lg:grid-cols-12 gap-1.5 items-center hover:bg-purple-50/30 transition border-b border-slate-200/80 text-xs">
                         {/* 1. N° (Número de producto) */}
                         <div className="col-span-1 flex items-center justify-center font-mono font-bold text-slate-500 text-xs mb-1 lg:mb-0">
-                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">#{idx + 1}</span>
+                          <span className="bg-slate-100 px-1 py-0.5 rounded text-[9px] border border-slate-200">#{idx + 1}</span>
                         </div>
 
                         {/* 2. Código de barras / SKU / SKU Proveedor */}
-                        <div className="col-span-2 flex flex-col font-mono text-xs truncate mb-1 lg:mb-0">
+                        <div className="col-span-2 flex flex-col font-mono text-[11px] truncate mb-1 lg:mb-0">
                           <span className="truncate font-bold text-purple-900" title={it.barcode || it.sku}>{it.barcode || it.sku || (it.id ? `PRD-${it.id}` : '—')}</span>
                           {((it as any).supplierCode || match?.supplierCode) && (
                             <button
@@ -3260,28 +3260,28 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                   showToast(`✓ SKU Proveedor (${supplierCode}) copiado`);
                                 }
                               }}
-                              className="inline-flex items-center gap-1 text-[10px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1 py-0.2 rounded font-semibold cursor-pointer w-max transition"
+                              className="inline-flex items-center gap-0.5 text-[9px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1 py-0.2 rounded font-semibold cursor-pointer w-max transition"
                               title="Copiar SKU Proveedor al portapapeles"
                             >
-                              <span className="truncate max-w-[75px]">Prov: {(it as any).supplierCode || match?.supplierCode}</span>
+                              <span className="truncate max-w-[65px]">Prov: {(it as any).supplierCode || match?.supplierCode}</span>
                               <Copy className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
                             </button>
                           )}
                         </div>
 
                         {/* 3. Nombre del producto */}
-                        <div className="col-span-3 flex items-center gap-2 min-w-0 mb-1 lg:mb-0">
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                        <div className="col-span-3 flex items-center gap-1.5 min-w-0 mb-1 lg:mb-0">
+                          <div className="w-6 h-6 rounded-md bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
                             {it.imageUrl ? (
                               <img src={it.imageUrl} alt={it.name} className="w-full h-full object-cover" />
                             ) : (
-                              <Package className="w-3.5 h-3.5 text-slate-400" />
+                              <Package className="w-3 h-3 text-slate-400" />
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold text-slate-900 truncate text-xs">{it.name}</p>
+                            <p className="font-bold text-slate-900 truncate text-[11px]" title={it.name}>{it.name}</p>
                             {avail < it.quantity && (
-                              <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-1 rounded">
+                              <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-1 rounded block truncate">
                                 Faltan {it.quantity - avail} un.
                               </span>
                             )}
@@ -3289,8 +3289,8 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                         </div>
 
                         {/* 4. Cantidad */}
-                        <div className="col-span-1 flex justify-center mb-1 lg:mb-0">
-                          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-slate-50 h-7">
+                        <div className="col-span-2 flex justify-center mb-1 lg:mb-0">
+                          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-slate-50 h-6.5">
                             <button
                               type="button"
                               onClick={() => {
@@ -3304,19 +3304,19 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                   setItems((prev) => prev.filter((_, i) => i !== idx));
                                 }
                               }}
-                              className="w-5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
+                              className="w-4.5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Minus className="w-2.5 h-2.5" />
                             </button>
-                            <span className="w-5 text-center text-xs font-mono font-bold text-slate-900">{it.quantity}</span>
+                            <span className="w-4.5 text-center text-[11px] font-mono font-bold text-slate-900">{it.quantity}</span>
                             <button
                               type="button"
                               onClick={() => {
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, quantity: item.quantity + 1 } : item)));
                               }}
-                              className="w-5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
+                              className="w-4.5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-2.5 h-2.5" />
                             </button>
                           </div>
                         </div>
@@ -3325,7 +3325,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                         <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
                           <span className="text-[10px] text-slate-500 font-bold lg:hidden">Precio sin IVA:</span>
                           <div className="relative flex items-center" title={`Precio de venta unitario sin IVA: $${Number(it.salePrice || 0).toFixed(2)}`}>
-                            <span className="text-xs text-purple-600 font-bold absolute left-2 pointer-events-none">$</span>
+                            <span className="text-[10px] text-purple-600 font-bold absolute left-1.5 pointer-events-none">$</span>
                             <input
                               type="number"
                               step="0.01"
@@ -3340,7 +3340,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 }
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, salePrice: newP, marginPercent: newMargin } : item)));
                               }}
-                              className="w-24 h-8 pl-5 pr-1.5 rounded-lg bg-purple-50/40 border border-purple-200 text-right font-mono font-bold text-purple-950 text-xs focus:outline-none focus:bg-white focus:border-purple-600 transition"
+                              className="w-16 h-6.5 pl-3.5 pr-1 rounded-lg bg-purple-50/40 border border-purple-200 text-right font-mono font-bold text-purple-950 text-[11px] focus:outline-none focus:bg-white focus:border-purple-600 transition"
                             />
                           </div>
                         </div>
@@ -3349,7 +3349,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                         <div className="col-span-1 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
                           <span className="text-[10px] text-slate-500 font-bold lg:hidden">Descuento:</span>
                           <div className="relative flex items-center" title={`Descuento aplicado: $${Number(it.discount || 0).toFixed(2)}`}>
-                            <span className="text-xs text-slate-400 font-bold absolute left-2 pointer-events-none">$</span>
+                            <span className="text-[10px] text-slate-400 font-bold absolute left-1.5 pointer-events-none">$</span>
                             <input
                               type="number"
                               step="0.01"
@@ -3359,15 +3359,15 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 const newDisc = Math.max(0, Number(e.target.value) || 0);
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, discount: newDisc } : item)));
                               }}
-                              className="w-20 h-8 pl-4 pr-1.5 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-xs focus:outline-none focus:bg-white focus:border-purple-500 transition"
+                              className="w-12 h-6.5 pl-3 pr-1 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-[10px] focus:outline-none focus:bg-white focus:border-purple-500 transition"
                             />
                           </div>
                         </div>
 
                         {/* 7. Total ($) */}
-                        <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1">
+                        <div className="col-span-1 flex items-center justify-between lg:justify-end gap-1">
                           <span className="text-[10px] text-slate-500 font-bold lg:hidden">Total:</span>
-                          <span className="font-mono font-bold text-xs text-purple-950 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-200 inline-block">
+                          <span className="font-mono font-bold text-[11px] text-purple-950 bg-purple-100 px-1 py-0.5 rounded border border-purple-200 inline-block truncate" title={`Subtotal: $${itemSubtotal.toFixed(2)}`}>
                             ${itemSubtotal.toFixed(2)}
                           </span>
                           <button
@@ -3379,10 +3379,10 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                               }
                               setItems((prev) => prev.filter((_, i) => i !== idx));
                             }}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition cursor-pointer ml-1"
+                            className="p-0.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition cursor-pointer"
                             title="Quitar ítem"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
