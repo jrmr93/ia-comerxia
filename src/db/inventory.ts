@@ -10488,7 +10488,7 @@ export async function cleanTestData(
     | 'reset_all'
     | 'reset_all_with_products',
   _userId?: number,
-  options?: { targetStockQuantity?: number }
+  options?: { targetStockQuantity?: number; targetProductId?: number; singleProductStock?: number }
 ) {
   const state = storage.getState();
   const summary: {
@@ -10731,6 +10731,53 @@ export async function cleanTestData(
       } catch (err) {
         console.warn('Error resetting products stock in SQL:', err);
       }
+    }
+  }
+
+  // 9b. Ajustar Stock de un Producto Específico
+  if (action === ('adjust_single_product_stock' as any)) {
+    const targetProdId = options?.targetProductId;
+    const targetStock = options?.singleProductStock !== undefined
+      ? Math.max(0, options.singleProductStock)
+      : (options?.targetStockQuantity !== undefined ? Math.max(0, options.targetStockQuantity) : 0);
+
+    let updatedProdName = '';
+    let updatedProdSku = '';
+
+    if (targetProdId) {
+      if (state.inventoryItems) {
+        const found = state.inventoryItems.find((it) => it.id === targetProdId);
+        if (found) {
+          found.stock = targetStock;
+          found.status = targetStock > 0 ? 'available' : 'sold_out';
+          found.updatedAt = new Date().toISOString();
+          updatedProdName = found.name;
+          updatedProdSku = found.sku;
+        }
+      }
+      if (isPostgresConfigured()) {
+        try {
+          const [updated] = await db
+            .update(inventoryItems)
+            .set({
+              stock: targetStock,
+              status: targetStock > 0 ? 'available' : 'sold_out',
+              updatedAt: new Date(),
+            })
+            .where(eq(inventoryItems.id, targetProdId))
+            .returning();
+          if (updated) {
+            updatedProdName = updated.name;
+            updatedProdSku = updated.sku;
+          }
+        } catch (err) {
+          console.warn('Error adjusting single product stock in SQL:', err);
+        }
+      }
+      summary.stockResetProducts = 1;
+      summary.message = `✓ Stock del producto "${updatedProdName || 'Producto'}" ${updatedProdSku ? `(SKU: ${updatedProdSku})` : ''} ajustado con éxito a ${targetStock} unidades en bodega.`;
+    } else {
+      summary.message = '⚠️ No se especificó ningún producto para ajustar su stock.';
     }
   }
 

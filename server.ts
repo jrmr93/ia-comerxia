@@ -4990,7 +4990,7 @@ async function startServer() {
 
   app.post('/api/admin/clean-test-data', optionalAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { action, actions, targetStockQuantity } = req.body || {};
+      const { action, actions, targetStockQuantity, targetProductId, singleProductStock } = req.body || {};
       const validActions = [
         'orders',
         'purchases',
@@ -5001,6 +5001,7 @@ async function startServer() {
         'telegram',
         'analytics',
         'reset_stock',
+        'adjust_single_product_stock',
         'reset_customer_balances',
         'reset_supplier_balances',
         'sri_invoices',
@@ -5023,7 +5024,7 @@ async function startServer() {
       const messages: string[] = [];
 
       for (const act of requestedActions) {
-        const result = await cleanTestData(act as any, req.dbUserId, { targetStockQuantity });
+        const result = await cleanTestData(act as any, req.dbUserId, { targetStockQuantity, targetProductId, singleProductStock });
         results.push({ action: act, message: result.message });
         if (result.message) {
           messages.push(result.message);

@@ -25,6 +25,8 @@ import {
   CheckCheck,
   Server,
   FileSpreadsheet,
+  Search,
+  Package,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 
@@ -40,6 +42,7 @@ export type CleanActionType =
   | 'telegram'
   | 'analytics'
   | 'reset_stock'
+  | 'adjust_single_product_stock'
   | 'sri_invoices'
   | 'all_transactions'
   | 'reset_all'
@@ -76,12 +79,39 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
   const [targetStockQuantity, setTargetStockQuantity] = useState<number>(10);
   const [confirmed, setConfirmed] = useState<boolean>(false);
 
+  // Single Product Stock Adjustment States
+  const [singleProductStock, setSingleProductStock] = useState<number>(10);
+  const [targetProductId, setTargetProductId] = useState<number | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [productSearchQuery, setProductSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchingProducts, setSearchingProducts] = useState<boolean>(false);
+
   const [isCleaning, setIsCleaning] = useState<boolean>(false);
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSearchProducts = async (query: string) => {
+    if (!query || !query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    try {
+      setSearchingProducts(true);
+      const res = await authFetch(`/api/inventory?search=${encodeURIComponent(query.trim())}`);
+      if (res.ok) {
+        const items = await res.json();
+        setSearchResults(Array.isArray(items) ? items.slice(0, 10) : []);
+      }
+    } catch (err) {
+      console.warn('Error searching products in DevTestingTab:', err);
+    } finally {
+      setSearchingProducts(false);
+    }
+  };
 
   const toggleAction = (actionId: CleanActionType) => {
     setConfirmed(false);
@@ -159,6 +189,8 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
         body: JSON.stringify({
           actions: selectedActions,
           targetStockQuantity: Number(targetStockQuantity) || 0,
+          targetProductId: targetProductId || (selectedProduct?.id || null),
+          singleProductStock: Number(singleProductStock) || 0,
         }),
       });
 
@@ -348,6 +380,17 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
         'Establece una cantidad fija de stock físico (ej. 0 unidades para agotar o 10/20 unidades para pruebas) en todos los productos sin borrar los artículos.',
       preserves: 'Conserva todos los productos, fotos, precios y descripciones.',
       countLabel: stats ? `${stats.totalStockUnits} unidades en ${stats.productsCount} productos` : undefined,
+    },
+    {
+      id: 'adjust_single_product_stock',
+      title: 'Ajustar Stock de 1 Producto en Específico (Buscar e Individual)',
+      icon: Package,
+      color: 'amber',
+      badge: 'Producto Individual',
+      description:
+        'Busca un producto individual de tu catálogo por su nombre o código SKU y ajusta manualmente sus unidades de stock en bodega a conveniencia.',
+      preserves: 'Modifica únicamente el producto seleccionado sin alterar el resto del catálogo ni las ventas.',
+      countLabel: selectedProduct ? `Seleccionado: ${selectedProduct.name} (Stock: ${selectedProduct.stock || 0} un.)` : undefined,
     },
     {
       id: 'customers',
@@ -775,6 +818,135 @@ export const DevTestingTab: React.FC<DevTestingTabProps> = ({ onSuccess }) => {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Special parameter: Single Product Stock Adjustment when adjust_single_product_stock is chosen */}
+          {selectedActions.includes('adjust_single_product_stock') && (
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-300 space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center space-x-2 text-xs font-bold text-amber-900">
+                <Sliders className="w-4 h-4 text-amber-600" />
+                <span>Ajustar Stock de un Producto en Específico:</span>
+              </div>
+
+              {/* Product Search Input */}
+              <div className="relative">
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  1. Buscar Producto en Catálogo (por Nombre o SKU):
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Escribe el nombre o código SKU del producto..."
+                    value={productSearchQuery}
+                    onChange={(e) => {
+                      setProductSearchQuery(e.target.value);
+                      handleSearchProducts(e.target.value);
+                    }}
+                    className="w-full px-3 py-2 pl-9 rounded-xl border border-amber-300 bg-white text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs"
+                  />
+                  <Search className="w-4 h-4 text-amber-600 absolute left-3 top-2.5" />
+                  {searchingProducts && (
+                    <Loader2 className="w-4 h-4 text-amber-600 animate-spin absolute right-3 top-2.5" />
+                  )}
+                </div>
+
+                {/* Search Results Dropdown */}
+                {searchResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-30 divide-y divide-slate-100">
+                    {searchResults.map((prod) => (
+                      <div
+                        key={prod.id}
+                        onClick={() => {
+                          setSelectedProduct(prod);
+                          setTargetProductId(prod.id);
+                          setSingleProductStock(Number(prod.stock) || 0);
+                          setSearchResults([]);
+                          setProductSearchQuery(`${prod.name} (${prod.sku || 'Sin SKU'})`);
+                        }}
+                        className="p-2.5 hover:bg-amber-50 flex items-center justify-between cursor-pointer transition"
+                      >
+                        <div className="flex items-center space-x-2.5 overflow-hidden">
+                          {prod.imageUrl ? (
+                            <img src={prod.imageUrl} alt="" className="w-8 h-8 rounded-md object-cover border shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-md bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-[10px] shrink-0">
+                              IMG
+                            </div>
+                          )}
+                          <div className="truncate">
+                            <p className="text-xs font-bold text-slate-900 truncate">{prod.name}</p>
+                            <p className="text-[10px] text-slate-500">SKU: {prod.sku || 'N/A'} • Precio: ${prod.salePrice || '0.00'}</p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold px-2 py-0.5 bg-amber-100 text-amber-900 rounded-md shrink-0">
+                          Stock actual: {prod.stock || 0} un.
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Product Card & Stock Adjustment */}
+              {selectedProduct ? (
+                <div className="p-3 bg-white rounded-xl border border-amber-300 shadow-2xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+                    <div className="flex items-center space-x-3">
+                      {selectedProduct.imageUrl ? (
+                        <img src={selectedProduct.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
+                          PROD
+                        </div>
+                      )}
+                      <div>
+                        <h6 className="text-xs font-black text-slate-900">{selectedProduct.name}</h6>
+                        <p className="text-[11px] text-slate-500">
+                          SKU: <span className="font-semibold text-slate-700">{selectedProduct.sku || 'N/A'}</span> • Stock actual en bodega: <strong className="text-amber-800">{selectedProduct.stock || 0} un.</strong>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-slate-800">2. Ingresa el Nuevo Stock Deseado para este Producto:</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100000"
+                        value={singleProductStock}
+                        onChange={(e) => setSingleProductStock(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="w-24 px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <span className="text-xs font-semibold text-slate-600">unidades</span>
+
+                      <div className="flex items-center space-x-1 pl-2">
+                        {[0, 5, 10, 50, 100].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setSingleProductStock(val)}
+                            className={`px-2 py-1 rounded-md text-[10px] font-bold border transition cursor-pointer ${
+                              singleProductStock === val
+                                ? 'bg-amber-600 text-white border-amber-600'
+                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                            }`}
+                          >
+                            {val === 0 ? '0 (Agotado)' : `${val} un`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-100/50 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium flex items-center space-x-2">
+                  <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Utiliza la barra de búsqueda arriba para encontrar y seleccionar el producto que deseas ajustar.</span>
+                </div>
+              )}
             </div>
           )}
 
