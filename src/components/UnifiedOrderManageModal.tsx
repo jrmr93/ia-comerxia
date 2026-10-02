@@ -930,14 +930,14 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
     setShowProductDropdown(false);
   };
 
-  // Barcode / SKU scanner compatibility: 100% exact match auto-adds when Enter is pressed
+  // Barcode / SKU scanner compatibility: Enter key adds the first/matching product from search list
   const handleProductSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const query = productSearch.trim().toLowerCase();
       if (!query) return;
 
-      // Check 100% match on Barcode or SKU
+      // 1. Check 100% exact match on Barcode or SKU
       const exactBarcodeOrSkuMatch = products.find((p) => {
         const bar = (p.barcode || '').trim().toLowerCase();
         const sku = (p.sku || '').trim().toLowerCase();
@@ -946,22 +946,29 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
 
       if (exactBarcodeOrSkuMatch) {
         handleAddProduct(exactBarcodeOrSkuMatch);
-        showToast(`✓ Producto agregado por código: ${exactBarcodeOrSkuMatch.name}`);
+        showToast(`✓ Producto agregado: ${exactBarcodeOrSkuMatch.name}`);
+        setProductSearch('');
+        setShowProductDropdown(false);
         return;
       }
 
-      // Check 100% match on Name
+      // 2. Check 100% exact match on Name
       const exactNameMatch = products.find((p) => (p.name || '').trim().toLowerCase() === query);
       if (exactNameMatch) {
         handleAddProduct(exactNameMatch);
         showToast(`✓ Producto agregado: ${exactNameMatch.name}`);
+        setProductSearch('');
+        setShowProductDropdown(false);
         return;
       }
 
-      // If only 1 product matches the search filter
-      if (filteredCatalogProducts.length === 1) {
-        handleAddProduct(filteredCatalogProducts[0]);
-        showToast(`✓ Producto agregado: ${filteredCatalogProducts[0].name}`);
+      // 3. Fallback: Add the FIRST product from filteredCatalogProducts suggestions list
+      if (filteredCatalogProducts.length > 0) {
+        const firstProd = filteredCatalogProducts[0];
+        handleAddProduct(firstProd);
+        showToast(`✓ Producto agregado: ${firstProd.name}`);
+        setProductSearch('');
+        setShowProductDropdown(false);
       }
     }
   };
@@ -3208,47 +3215,56 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
               </div>
             ) : (
               <div className="border border-slate-300 rounded-xl overflow-hidden shadow-xs bg-white">
-                {/* Table Header (Formato Prefactura SRI 7 Columnas Exactas Rebalanceadas) */}
-                <div className="hidden lg:grid lg:grid-cols-12 gap-1.5 px-2.5 py-1.5 bg-slate-900 text-white text-[9px] font-extrabold uppercase tracking-wider border-b border-slate-800">
+                {/* Table Header (Formato Prefactura SRI 7 Columnas Elegantes) */}
+                <div className="hidden lg:grid lg:grid-cols-12 gap-1 px-2 py-1.5 bg-slate-900 text-white text-[9px] font-extrabold uppercase tracking-wider border-b border-slate-800">
                   <div className="col-span-1 text-center">N°</div>
-                  <div className="col-span-2 flex items-center gap-1">
+                  <div className="col-span-2 flex items-center gap-1 min-w-0">
                     <Receipt className="w-3 h-3 text-purple-400 shrink-0" />
                     <span className="truncate">Código/SKU</span>
                   </div>
                   <div className="col-span-3 truncate">Producto</div>
-                  <div className="col-span-2 text-center">Cantidad</div>
+                  <div className="col-span-1 text-center">Cantidad</div>
                   <div className="col-span-2 text-right" title="Precio unitario de venta sin IVA">Precio ($)</div>
                   <div className="col-span-1 text-right" title="Descuento unitario otorgado en dólares">Desc ($)</div>
-                  <div className="col-span-1 text-right" title="Subtotal base imponible de la línea sin IVA">Total</div>
+                  <div className="col-span-2 text-right" title="Subtotal base imponible de la línea sin IVA">Total ($)</div>
                 </div>
 
-                {/* Items List - Formato Prefactura SRI (7 Columnas Rebalanceadas) */}
+                {/* Items List - Formato Prefactura SRI (7 Columnas Alineadas) */}
                 <div className="divide-y divide-slate-200 max-h-72 overflow-y-auto">
                   {items.map((it, idx) => {
                     const match = products.find((p) => p.id === it.id || (it.sku && p.sku && p.sku.toLowerCase() === it.sku.toLowerCase()));
                     const avail = match ? Math.max(0, Number(match.stock || 0)) : 0;
                     const unitCost = Number(it.costPrice ?? match?.costWithoutTax ?? match?.costPrice ?? 0);
+                    const isShippingLine = it.sku === 'ENVIO-DOMICILIO' || it.name === 'Servicios de entrega' || it.id === -999;
+                    const itemTaxPercent = isShippingLine ? 0 : extractItemTaxPercent(it, 15, match);
+
                     const calculatedRow = calculateLineItem({
+                      id: it.id,
+                      name: it.name,
+                      sku: it.sku,
                       costWithoutTax: unitCost,
                       unitSalePrice: Number(it.salePrice || 0),
-                      profitValue: (it as any).marginPercent !== undefined ? Number((it as any).marginPercent) : undefined,
-                      profitCalculationMode: 'MARKUP_PERCENT',
+                      pricingMode: 'EXCLUDING_TAX',
                       discount: Number(it.discount || 0),
                       quantity: Number(it.quantity || 1),
-                      applySaleTax,
-                      saleTaxPercent,
+                      applySaleTax: itemTaxPercent > 0,
+                      saleTaxPercent: itemTaxPercent,
+                      isCardPayment: isCardPaymentMethod,
+                      cardCommissionPercent: isCardPaymentMethod ? cardCommissionPercent : 0,
                     });
                     const itemSubtotal = calculatedRow.lineSubtotal;
 
                     return (
-                      <div key={idx} className="p-2 lg:px-2.5 lg:py-2 lg:grid lg:grid-cols-12 gap-1.5 items-center hover:bg-purple-50/30 transition border-b border-slate-200/80 text-xs">
-                        {/* 1. N° (Número de producto) */}
+                      <div key={idx} className={`p-2 lg:px-2 lg:py-1.5 lg:grid lg:grid-cols-12 gap-1 items-center transition border-b border-slate-200/80 text-xs ${
+                        isCardPaymentMethod ? 'bg-amber-50/20 hover:bg-amber-50/40' : 'hover:bg-purple-50/30'
+                      }`}>
+                        {/* 1. N° (1 Column) */}
                         <div className="col-span-1 flex items-center justify-center font-mono font-bold text-slate-500 text-xs mb-1 lg:mb-0">
                           <span className="bg-slate-100 px-1 py-0.5 rounded text-[9px] border border-slate-200">#{idx + 1}</span>
                         </div>
 
-                        {/* 2. Código de barras / SKU / SKU Proveedor */}
-                        <div className="col-span-2 flex flex-col font-mono text-[11px] truncate mb-1 lg:mb-0">
+                        {/* 2. Código / SKU (2 Columns) */}
+                        <div className="col-span-2 flex flex-col font-mono text-[10px] truncate mb-1 lg:mb-0">
                           <span className="truncate font-bold text-purple-900" title={it.barcode || it.sku}>{it.barcode || it.sku || (it.id ? `PRD-${it.id}` : '—')}</span>
                           {((it as any).supplierCode || match?.supplierCode) && (
                             <button
@@ -3260,18 +3276,18 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                   showToast(`✓ SKU Proveedor (${supplierCode}) copiado`);
                                 }
                               }}
-                              className="inline-flex items-center gap-0.5 text-[9px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1 py-0.2 rounded font-semibold cursor-pointer w-max transition"
+                              className="inline-flex items-center gap-0.5 text-[8.5px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-1 py-0.2 rounded font-semibold cursor-pointer w-max transition"
                               title="Copiar SKU Proveedor al portapapeles"
                             >
-                              <span className="truncate max-w-[65px]">Prov: {(it as any).supplierCode || match?.supplierCode}</span>
-                              <Copy className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                              <span className="truncate max-w-[55px]">P:{(it as any).supplierCode || match?.supplierCode}</span>
+                              <Copy className="w-2 h-2 text-indigo-500 shrink-0" />
                             </button>
                           )}
                         </div>
 
-                        {/* 3. Nombre del producto */}
+                        {/* 3. Nombre del Producto (3 Columns) */}
                         <div className="col-span-3 flex items-center gap-1.5 min-w-0 mb-1 lg:mb-0">
-                          <div className="w-6 h-6 rounded-md bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
                             {it.imageUrl ? (
                               <img src={it.imageUrl} alt={it.name} className="w-full h-full object-cover" />
                             ) : (
@@ -3279,18 +3295,23 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold text-slate-900 truncate text-[11px]" title={it.name}>{it.name}</p>
+                            <p className="font-bold text-slate-900 truncate text-[10px] sm:text-[10.5px]" title={it.name}>{it.name}</p>
                             {avail < it.quantity && (
-                              <span className="text-[9px] font-bold text-rose-700 bg-rose-50 px-1 rounded block truncate">
+                              <span className="text-[8.5px] font-bold text-rose-700 bg-rose-50 px-0.5 rounded block truncate">
                                 Faltan {it.quantity - avail} un.
+                              </span>
+                            )}
+                            {isCardPaymentMethod && (
+                              <span className="text-[8px] font-mono font-extrabold text-amber-800 bg-amber-100/80 px-1 rounded inline-block truncate" title={`Precio ajustado con recargo por tarjeta (${cardCommissionPercent}%)`}>
+                                +{cardCommissionPercent}% Tarjeta
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* 4. Cantidad */}
-                        <div className="col-span-2 flex justify-center mb-1 lg:mb-0">
-                          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-slate-50 h-6.5">
+                        {/* 4. Cantidad (1 Column) */}
+                        <div className="col-span-1 flex justify-center mb-1 lg:mb-0">
+                          <div className="flex items-center border border-slate-200 rounded bg-slate-50 h-6">
                             <button
                               type="button"
                               onClick={() => {
@@ -3304,33 +3325,33 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                   setItems((prev) => prev.filter((_, i) => i !== idx));
                                 }
                               }}
-                              className="w-4.5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
+                              className="w-3.5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
                             >
-                              <Minus className="w-2.5 h-2.5" />
+                              <Minus className="w-2 h-2" />
                             </button>
-                            <span className="w-4.5 text-center text-[11px] font-mono font-bold text-slate-900">{it.quantity}</span>
+                            <span className="w-4 text-center text-[10px] font-mono font-bold text-slate-900">{it.quantity}</span>
                             <button
                               type="button"
                               onClick={() => {
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, quantity: item.quantity + 1 } : item)));
                               }}
-                              className="w-4.5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
+                              className="w-3.5 h-full hover:bg-slate-200 text-slate-600 transition flex items-center justify-center cursor-pointer"
                             >
-                              <Plus className="w-2.5 h-2.5" />
+                              <Plus className="w-2 h-2" />
                             </button>
                           </div>
                         </div>
 
-                        {/* 5. Precio sin IVA ($) */}
+                        {/* 5. Precio sin IVA ($) (2 Columns) */}
                         <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
-                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Precio sin IVA:</span>
-                          <div className="relative flex items-center" title={`Precio de venta unitario sin IVA: $${Number(it.salePrice || 0).toFixed(2)}`}>
-                            <span className="text-[10px] text-purple-600 font-bold absolute left-1.5 pointer-events-none">$</span>
+                          <span className="text-[9px] text-slate-500 font-bold lg:hidden">Precio sin IVA:</span>
+                          <div className="relative flex items-center w-full" title={`Precio de venta unitario sin IVA: $${Number(it.salePrice || 0).toFixed(2)}${isCardPaymentMethod ? ` (Con recargo tarjeta ${cardCommissionPercent}%: $${calculatedRow.unitPriceWithoutTax.toFixed(2)})` : ''}`}>
+                            <span className={`text-[9px] font-bold absolute left-1 pointer-events-none ${isCardPaymentMethod ? 'text-amber-700' : 'text-purple-600'}`}>$</span>
                             <input
                               type="number"
                               step="0.01"
                               min="0"
-                              value={it.salePrice}
+                              value={isCardPaymentMethod ? calculatedRow.unitPriceWithoutTax : it.salePrice}
                               onChange={(e) => {
                                 const newP = Math.max(0, Number(e.target.value) || 0);
                                 const baseCost = Number(it.costPrice || 0);
@@ -3340,16 +3361,20 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 }
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, salePrice: newP, marginPercent: newMargin } : item)));
                               }}
-                              className="w-16 h-6.5 pl-3.5 pr-1 rounded-lg bg-purple-50/40 border border-purple-200 text-right font-mono font-bold text-purple-950 text-[11px] focus:outline-none focus:bg-white focus:border-purple-600 transition"
+                              className={`w-full h-6 pl-3 pr-1 rounded text-right font-mono font-bold text-[10px] focus:outline-none focus:bg-white transition ${
+                                isCardPaymentMethod
+                                  ? 'bg-amber-50/80 border border-amber-300 text-amber-950 focus:border-amber-600 font-extrabold'
+                                  : 'bg-purple-50/40 border border-purple-200 text-purple-950 focus:border-purple-600'
+                              }`}
                             />
                           </div>
                         </div>
 
-                        {/* 6. Descuento ($) */}
+                        {/* 6. Descuento ($) (1 Column) */}
                         <div className="col-span-1 flex items-center justify-between lg:justify-end gap-1 mb-1 lg:mb-0">
-                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Descuento:</span>
-                          <div className="relative flex items-center" title={`Descuento aplicado: $${Number(it.discount || 0).toFixed(2)}`}>
-                            <span className="text-[10px] text-slate-400 font-bold absolute left-1.5 pointer-events-none">$</span>
+                          <span className="text-[9px] text-slate-500 font-bold lg:hidden">Descuento:</span>
+                          <div className="relative flex items-center w-full" title={`Descuento aplicado: $${Number(it.discount || 0).toFixed(2)}`}>
+                            <span className="text-[9px] text-slate-400 font-bold absolute left-1 pointer-events-none">$</span>
                             <input
                               type="number"
                               step="0.01"
@@ -3359,15 +3384,19 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                                 const newDisc = Math.max(0, Number(e.target.value) || 0);
                                 setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, discount: newDisc } : item)));
                               }}
-                              className="w-12 h-6.5 pl-3 pr-1 rounded-lg bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-[10px] focus:outline-none focus:bg-white focus:border-purple-500 transition"
+                              className="w-full h-6 pl-2.5 pr-1 rounded bg-slate-50 border border-slate-200 text-right font-mono font-bold text-slate-900 text-[9px] focus:outline-none focus:bg-white focus:border-purple-500 transition"
                             />
                           </div>
                         </div>
 
-                        {/* 7. Total ($) */}
-                        <div className="col-span-1 flex items-center justify-between lg:justify-end gap-1">
-                          <span className="text-[10px] text-slate-500 font-bold lg:hidden">Total:</span>
-                          <span className="font-mono font-bold text-[11px] text-purple-950 bg-purple-100 px-1 py-0.5 rounded border border-purple-200 inline-block truncate" title={`Subtotal: $${itemSubtotal.toFixed(2)}`}>
+                        {/* 7. Total ($) y Borrar (2 Columns) */}
+                        <div className="col-span-2 flex items-center justify-between lg:justify-end gap-1">
+                          <span className="text-[9px] text-slate-500 font-bold lg:hidden">Total:</span>
+                          <span className={`font-mono font-extrabold text-[10px] px-1 py-0.5 rounded border inline-block text-right shadow-2xs truncate ${
+                            isCardPaymentMethod
+                              ? 'bg-amber-100 text-amber-950 border-amber-300'
+                              : 'bg-purple-100 text-purple-950 border-purple-200'
+                          }`} title={`Subtotal: $${itemSubtotal.toFixed(2)}`}>
                             ${itemSubtotal.toFixed(2)}
                           </span>
                           <button
@@ -3379,7 +3408,7 @@ export const UnifiedOrderManageModal: React.FC<UnifiedOrderManageModalProps> = (
                               }
                               setItems((prev) => prev.filter((_, i) => i !== idx));
                             }}
-                            className="p-0.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition cursor-pointer"
+                            className="p-0.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition cursor-pointer shrink-0"
                             title="Quitar ítem"
                           >
                             <Trash2 className="w-3 h-3" />
