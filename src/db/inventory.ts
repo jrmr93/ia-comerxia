@@ -3971,12 +3971,10 @@ export async function adjustInventoryStockForItems(items: any[] | string, multip
     let qty = 0;
     if (cartItem.deductQuantity !== undefined) {
       qty = Math.max(0, Number(cartItem.deductQuantity));
-    } else if (cartItem.stockDeducted !== undefined && cartItem.stockDeducted > 0) {
+    } else if (cartItem.stockDeducted !== undefined && Number(cartItem.stockDeducted) > 0) {
       qty = Math.max(0, Number(cartItem.stockDeducted));
     } else if (cartItem.deliveredQuantity !== undefined && Number(cartItem.deliveredQuantity) > 0) {
-      qty = Number(cartItem.deliveredQuantity);
-    } else if (cartItem.stockAvailable !== undefined && multiplier < 0) {
-      qty = Math.min(Math.max(0, Number(cartItem.quantity || 1)), Math.max(0, Number(cartItem.stockAvailable)));
+      qty = Math.max(0, Number(cartItem.deliveredQuantity));
     } else {
       qty = Math.max(0, Number(cartItem.quantity) || 1);
     }
@@ -4684,16 +4682,15 @@ export async function updateCustomerOrderStatus(
     const rawItems = safeParseOrderItems(existingOrder.items);
     const itemsToDeduct: any[] = [];
     const updatedItems = rawItems.map((it: any) => {
+      const isShippingLine =
+        it.sku === 'ENVIO-DOMICILIO' ||
+        it.id === -999 ||
+        (it.name && String(it.name).trim().toLowerCase() === 'servicios de entrega');
       const qty = Number(it.quantity || 1);
-      // Determine how many units came from warehouse inventory (excluding supplier deficit)
-      const inStock = it.deficitQuantity !== undefined
-        ? Math.max(0, qty - Number(it.deficitQuantity))
-        : (it.stockAvailable !== undefined ? Number(it.stockAvailable) : qty);
-      const targetDeduct = Math.min(qty, Math.max(0, inStock));
       const prevDeducted = Number(it.stockDeducted || 0);
-      const netDeduct = Math.max(0, targetDeduct - prevDeducted);
+      const netDeduct = Math.max(0, qty - prevDeducted);
 
-      if (netDeduct > 0) {
+      if (!isShippingLine && netDeduct > 0) {
         totalDeductedUnits += netDeduct;
         itemsToDeduct.push({
           id: it.inventoryItemId || it.id,
@@ -4875,13 +4872,15 @@ export async function updateCustomerOrderStatus(
 
     // Actualización de comprobación de ítems para entrega
     if (rawItems.length > 0) {
-      const deliveredItems = rawItems.map((it: any) => {
+      const currentItems = updatePayload.items ? safeParseOrderItems(updatePayload.items) : rawItems;
+      const deliveredItems = currentItems.map((it: any) => {
         const qty = Number(it.quantity || 1);
         return {
           ...it,
           deliveredQuantity: qty,
           pendingQuantity: 0,
           deficitQuantity: 0,
+          stockDeducted: it.stockDeducted !== undefined ? Number(it.stockDeducted) : qty,
         };
       });
       updatePayload.items = JSON.stringify(deliveredItems);
@@ -5332,24 +5331,71 @@ export async function updateCustomerOrder(
     const wasFinalized = isFinalizedSaleStatus(prevStatus);
     const isNowFinalized = isFinalizedSaleStatus(newStatus);
 
-    let wasSuppliedByReservedPurchase = false;
-    try {
-      const allPurchases = await getPurchases(existingOrder.userId);
-      const linkedP = existingOrder.linkedPurchaseId ? allPurchases.find((p) => p.id === existingOrder.linkedPurchaseId) : null;
-      wasSuppliedByReservedPurchase = Boolean(linkedP && linkedP.status === 'received');
-    } catch { }
-
     if (!wasFinalized && isNowFinalized) {
-      // Transitioning to finalized sale
-      if (!wasSuppliedByReservedPurchase) {
-        const itemsToDeduct = data.items !== undefined ? data.items : existingOrder.items;
-        await adjustInventoryStockForItems(itemsToDeduct, -1);
+      // Transitioning to finalized sale (shipped or delivered)
+      const rawItems = safeParseOrderItems(data.items !== undefined ? data.items : existingOrder.items);
+      const itemsToDeduct: any[] = [];
+      const updatedItems = rawItems.map((it: any) => {
+        const isShippingLine =
+          it.sku === 'ENVIO-DOMICILIO' ||
+          it.id === -999 ||
+          (it.name && String(it.name).trim().toLowerCase() === 'servicios de entrega');
+        const qty = Number(it.quantity || 1);
+        const prevDeducted = Number(it.stockDeducted || 0);
+        const netDeduct = Math.max(0, qty - prevDeducted);
+
+        if (!isShippingLine && netDeduct > 0) {
+          itemsToDeduct.push({
+            id: it.inventoryItemId || it.id,
+            sku: it.sku,
+            name: it.name,
+            quantity: netDeduct,
+            deductQuantity: netDeduct,
+            salePrice: it.salePrice,
+          });
+        }
+        return {
+          ...it,
+          stockDeducted: prevDeducted + netDeduct,
+          deliveredQuantity: newStatus === 'delivered' ? qty : Number(it.deliveredQuantity || 0),
+          pendingQuantity: newStatus === 'delivered' ? 0 : Math.max(0, qty - (newStatus === 'delivered' ? qty : Number(it.deliveredQuantity || 0))),
+        };
+      });
+
+      if (itemsToDeduct.length > 0) {
+        await adjustInventoryStockForItems(itemsToDeduct, -1, existingOrder.userId);
       }
+      updatePayload.items = JSON.stringify(updatedItems);
     } else if (newStatus === 'cancelled' || (wasFinalized && !isNowFinalized)) {
-      // Transitioning away from finalized sale or cancelling sale order
-      if (!wasSuppliedByReservedPurchase) {
-        await adjustInventoryStockForItems(existingOrder.items, 1, existingOrder.userId);
+      // Transitioning away from finalized sale or cancelling sale order -> restore stock
+      const rawItems = safeParseOrderItems(existingOrder.items);
+      const itemsToRestore: any[] = [];
+      const updatedItems = rawItems.map((it: any) => {
+        const isShippingLine =
+          it.sku === 'ENVIO-DOMICILIO' ||
+          it.id === -999 ||
+          (it.name && String(it.name).trim().toLowerCase() === 'servicios de entrega');
+        const prevDeducted = Number(it.stockDeducted || 0);
+        const qtyToRestore = prevDeducted > 0 ? prevDeducted : Number(it.quantity || 1);
+        if (!isShippingLine && qtyToRestore > 0) {
+          itemsToRestore.push({
+            id: it.inventoryItemId || it.id,
+            sku: it.sku,
+            name: it.name,
+            quantity: qtyToRestore,
+            deductQuantity: qtyToRestore,
+            salePrice: it.salePrice,
+          });
+        }
+        return {
+          ...it,
+          stockDeducted: 0,
+        };
+      });
+      if (itemsToRestore.length > 0) {
+        await adjustInventoryStockForItems(itemsToRestore, 1, existingOrder.userId);
       }
+      updatePayload.items = JSON.stringify(updatedItems);
     }
 
     if (newStatus === 'shipped' && prevStatus !== 'shipped') {
@@ -6060,15 +6106,28 @@ export async function deleteCustomerOrder(id: number, purchaseAction?: 'cancel' 
   }
 
   if (existingOrder && isFinalizedSaleStatus(existingOrder.status)) {
-    let wasSuppliedByReservedPurchase = false;
-    try {
-      const allPurchases = await getPurchases(existingOrder.userId);
-      const linkedP = existingOrder.linkedPurchaseId ? allPurchases.find((p) => p.id === existingOrder.linkedPurchaseId) : null;
-      wasSuppliedByReservedPurchase = Boolean(linkedP && linkedP.status === 'received');
-    } catch { }
-
-    if (!wasSuppliedByReservedPurchase) {
-      await adjustInventoryStockForItems(existingOrder.items, 1);
+    const rawItems = safeParseOrderItems(existingOrder.items);
+    const itemsToRestore: any[] = [];
+    for (const it of rawItems) {
+      const isShippingLine =
+        it.sku === 'ENVIO-DOMICILIO' ||
+        it.id === -999 ||
+        (it.name && String(it.name).trim().toLowerCase() === 'servicios de entrega');
+      const prevDeducted = Number(it.stockDeducted || 0);
+      const qtyToRestore = prevDeducted > 0 ? prevDeducted : Number(it.quantity || 1);
+      if (!isShippingLine && qtyToRestore > 0) {
+        itemsToRestore.push({
+          id: it.inventoryItemId || it.id,
+          sku: it.sku,
+          name: it.name,
+          quantity: qtyToRestore,
+          deductQuantity: qtyToRestore,
+          salePrice: it.salePrice,
+        });
+      }
+    }
+    if (itemsToRestore.length > 0) {
+      await adjustInventoryStockForItems(itemsToRestore, 1, existingOrder.userId);
     }
   }
 
@@ -8664,14 +8723,8 @@ export async function updatePurchase(
 
   if (!wasReceived && isNowReceived) {
     // Goods arrived
-    const isLinkedOrderPurchase = Boolean(existingPurchase.linkedCustomerOrderId);
     const itemsToAdd = data.items !== undefined ? data.items : existingPurchase.items;
-
-    if (isLinkedOrderPurchase) {
-      console.log(`[Purchases] Compra #${existingPurchase.purchaseNumber} vinculada al Pedido #${existingPurchase.linkedCustomerOrderNumber || existingPurchase.linkedCustomerOrderId}. Stock RESERVADO para el cliente.`);
-    } else {
-      await adjustInventoryStockForItems(itemsToAdd, 1);
-    }
+    await adjustInventoryStockForItems(itemsToAdd, 1, existingPurchase.userId);
 
     if (!updatePayload.receivedDate) {
       updatePayload.receivedDate = new Date().toISOString();
@@ -8681,9 +8734,7 @@ export async function updatePurchase(
     // 1. If purchase was received in warehouse, deduct stock back out of inventory (-1)
     if (wasReceived) {
       const itemsToDeduct = data.items !== undefined ? data.items : existingPurchase.items;
-      if (!existingPurchase.linkedCustomerOrderId) {
-        await adjustInventoryStockForItems(itemsToDeduct, -1);
-      }
+      await adjustInventoryStockForItems(itemsToDeduct, -1, existingPurchase.userId);
     }
     // 2. Void payments and generate accounting seat reversals
     try {
@@ -9137,11 +9188,8 @@ export async function recordPurchasePartialReception(
 
   const nextStatus = isFullyReceived ? 'received' : 'partially_received';
 
-  // Increment stock in warehouse ONLY for the items received in this batch
-  const isLinkedOrderPurchase = Boolean(purchase.linkedCustomerOrderId);
-  if (!isLinkedOrderPurchase) {
-    await adjustInventoryStockForItems(receptionBatchItems, 1, userId);
-  }
+  // Increment stock in warehouse for the items received in this batch
+  await adjustInventoryStockForItems(receptionBatchItems, 1, userId);
 
   // If updateProductCost !== false, update inventory catalog item cost prices
   if (data.updateProductCost !== false) {
@@ -9785,12 +9833,8 @@ export async function recordPartialDelivery(
     newlyDeliveredCount += actualAddDelivery;
 
     // Warehouse stock discount logic:
-    // Only deduct newly delivered units that originated from warehouse stock
-    const inWarehouse = item.deficitQuantity !== undefined
-      ? Math.max(0, rawTotalQty - Number(item.deficitQuantity))
-      : (item.stockAvailable !== undefined ? Number(item.stockAvailable) : rawTotalQty);
-    const targetWarehouseDeduct = Math.min(newDelivered, Math.max(0, inWarehouse));
-    const netExtraToDeduct = Math.max(0, targetWarehouseDeduct - prevStockDeducted);
+    // Deduct newly delivered units from physical warehouse stock
+    const netExtraToDeduct = Math.max(0, newDelivered - prevStockDeducted);
 
     let newStockDeducted = prevStockDeducted;
     if (data.deductStock !== false && netExtraToDeduct > 0) {
@@ -9901,12 +9945,8 @@ export async function completeOrderRemainingDelivery(orderId: number, userId?: n
       remainingDeliveredCount += pendingToDeliver;
     }
 
-    // Units that originated from warehouse inventory
-    const inWarehouse = item.deficitQuantity !== undefined
-      ? Math.max(0, rawTotalQty - Number(item.deficitQuantity))
-      : (item.stockAvailable !== undefined ? Number(item.stockAvailable) : rawTotalQty);
-    const targetWarehouseDeduct = Math.min(rawTotalQty, Math.max(0, inWarehouse));
-    const netExtraToDeduct = Math.max(0, targetWarehouseDeduct - prevStockDeducted);
+    // Deduct remaining undeducted units from physical warehouse stock
+    const netExtraToDeduct = Math.max(0, rawTotalQty - prevStockDeducted);
 
     if (netExtraToDeduct > 0) {
       itemsToDeductInInventory.push({
