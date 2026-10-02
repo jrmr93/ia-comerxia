@@ -2856,12 +2856,8 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               ))}
             </div>
 
-            {/* Right Side: Vender en Lotengoo & Sort Selector */}
+            {/* Right Side: Sort Selector */}
             <div className="flex items-center space-x-3 flex-shrink-0">
-              <span className="text-slate-600 hover:text-slate-900 cursor-pointer font-bold flex items-center gap-1">
-                <span>🤝 Vender en Lotengoo</span>
-              </span>
-
               {/* Sort Selector */}
               <div className="relative">
                 <select
