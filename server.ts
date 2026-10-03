@@ -68,6 +68,7 @@ import {
   getSriInvoiceByOrderId,
   autoRegisterCustomerFromEcuadorApi,
   updateInventoryItem,
+  syncAndNormalizeAllPostgresInventoryItems,
   saveProductMarketingCopy,
   updateTelegramConfig,
   appendImagesToInventoryItem,
@@ -209,8 +210,11 @@ import multer from 'multer';
 import fs from 'fs';
 
 async function startServer() {
-  // Ensure all database tables exist
+  // Ensure all database tables exist and sync Postgres inventory normalization
   await ensureTablesCreated();
+  await syncAndNormalizeAllPostgresInventoryItems().catch((err) => {
+    console.warn('Postgres inventory background sync notice:', err);
+  });
 
   // Ensure uploads directory exists
   const uploadsDir = ensureUploadsDirExists();
@@ -2049,6 +2053,16 @@ async function startServer() {
   });
 
   // 3. Inventory List & CRUD
+  app.post('/api/inventory/sync-postgres', optionalAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await syncAndNormalizeAllPostgresInventoryItems();
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('Failed to sync postgres inventory:', error);
+      res.status(500).json({ error: error.message || 'Failed to sync postgres inventory' });
+    }
+  });
+
   app.get('/api/inventory', optionalAuth, async (req: AuthRequest, res: Response) => {
     try {
       const search = req.query.search as string;

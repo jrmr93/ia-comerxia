@@ -305,9 +305,31 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const { authFetch } = useAuth();
   const [reparsingId, setReparsingId] = useState<number | null>(null);
   const [reparseToast, setReparseToast] = useState<string | null>(null);
+  const [isSyncingPostgres, setIsSyncingPostgres] = useState(false);
+
   const showToast = (msg: string) => {
     setReparseToast(msg);
     setTimeout(() => setReparseToast(null), 3500);
+  };
+
+  const handleSyncPostgresDb = async () => {
+    setIsSyncingPostgres(true);
+    try {
+      const res = await authFetch('/api/inventory/sync-postgres', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`✅ PostgreSQL Sincronizado: ${data.updated} de ${data.total} productos actualizados físicamente en la DB`);
+        if (onManualSync) {
+          onManualSync();
+        }
+      } else {
+        showToast(`⚠️ Error al sincronizar Postgres: ${data.error || 'Desconocido'}`);
+      }
+    } catch (err: any) {
+      showToast(`⚠️ Error de red al sincronizar PostgreSQL: ${err.message || err}`);
+    } finally {
+      setIsSyncingPostgres(false);
+    }
   };
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -828,6 +850,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           {/* Si está seleccionado Catálogo: Nuevo Producto y Compartir Categoría */}
           {subTab === 'products' && (
             <>
+              <button
+                type="button"
+                id="btn-sync-postgres-db"
+                onClick={handleSyncPostgresDb}
+                disabled={isSyncingPostgres}
+                className="w-full sm:w-auto inline-flex items-center justify-center px-3.5 py-2 rounded-xl bg-white hover:bg-indigo-50 text-indigo-700 font-extrabold text-xs border border-indigo-300 shadow-2xs transition cursor-pointer active:scale-95 disabled:opacity-50 whitespace-nowrap"
+                title="Sincronizar y reconciliar todos los productos directamente en la base de datos PostgreSQL"
+              >
+                <RefreshCw className={`w-4 h-4 mr-1.5 text-indigo-600 stroke-[2.5] ${isSyncingPostgres ? 'animate-spin' : ''}`} />
+                <span>{isSyncingPostgres ? 'Sincronizando DB...' : 'Sincronizar DB'}</span>
+              </button>
+
               <button
                 type="button"
                 id="btn-inventory-share-store-header"

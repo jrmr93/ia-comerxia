@@ -453,6 +453,12 @@ export async function getInventoryItems(
     const rows = await query;
     const processed = rows.map((item) => formatItemWithAllImages(item));
 
+    // Non-blocking auto-heal: if any row has missing SQL columns or attributes, normalize and persist in Postgres
+    const hasUnnormalized = rows.some((r) => r.costWithoutTax === null || r.costWithTax === null || r.taxRate === null);
+    if (hasUnnormalized) {
+      syncAndNormalizeAllPostgresInventoryItems().catch(() => {});
+    }
+
     const state = storage.getState();
     return attachErpStockMetricsToItems(processed, state.customerOrders, state.purchases);
   } catch (error) {
@@ -462,6 +468,102 @@ export async function getInventoryItems(
       .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))
       .map((item) => formatItemWithAllImages(item));
     return attachErpStockMetricsToItems(processed, state.customerOrders, state.purchases);
+  }
+}
+
+export async function syncAndNormalizeAllPostgresInventoryItems(): Promise<{ total: number; updated: number }> {
+  if (!isPostgresConfigured()) return { total: 0, updated: 0 };
+
+  try {
+    const rows = await db.select().from(inventoryItems);
+    let updatedCount = 0;
+
+    for (const row of rows) {
+      if (!row || !row.id) continue;
+
+      try {
+        const normalized = formatItemWithAllImages(row);
+
+        const targetCostPrice = normalized.costPrice ? String(normalized.costPrice) : '0.00';
+        const targetCostWithout = normalized.costWithoutTax !== undefined && normalized.costWithoutTax !== null ? String(normalized.costWithoutTax) : '0.00';
+        const targetCostWith = normalized.costWithTax !== undefined && normalized.costWithTax !== null ? String(normalized.costWithTax) : '0.00';
+        const targetTaxRate = normalized.taxRate !== undefined && normalized.taxRate !== null ? String(normalized.taxRate) : '15.00';
+        const targetSalePrice = normalized.salePrice ? String(normalized.salePrice) : '0.00';
+        const targetCardSalePrice = normalized.cardSalePrice ? String(normalized.cardSalePrice) : null;
+        const targetDiscountPercent = Number(normalized.discountPercent) || 0;
+        const targetImageUrl = normalized.imageUrl ? String(normalized.imageUrl) : null;
+        const targetVideoUrl = normalized.videoUrl ? String(normalized.videoUrl) : null;
+        const targetSupplierCode = normalized.supplierCode ? String(normalized.supplierCode) : null;
+        const targetIsGift = Boolean(normalized.isSupplierGift);
+        const targetExtractedStr = normalized.extractedAttributes ? String(normalized.extractedAttributes) : null;
+
+        const currentCostWithout = row.costWithoutTax !== null && row.costWithoutTax !== undefined ? String(row.costWithoutTax) : null;
+        const currentCostWith = row.costWithTax !== null && row.costWithTax !== undefined ? String(row.costWithTax) : null;
+        const currentTaxRate = row.taxRate !== null && row.taxRate !== undefined ? String(row.taxRate) : null;
+        const currentExtracted = row.extractedAttributes ? String(row.extractedAttributes) : null;
+
+        const needsUpdate =
+          currentCostWithout === null ||
+          currentCostWith === null ||
+          currentTaxRate === null ||
+          currentCostWithout !== targetCostWithout ||
+          currentCostWith !== targetCostWith ||
+          currentTaxRate !== targetTaxRate ||
+          String(row.costPrice || '0.00') !== targetCostPrice ||
+          Boolean(row.isSupplierGift) !== targetIsGift ||
+          currentExtracted !== targetExtractedStr ||
+          (row.cardSalePrice ? String(row.cardSalePrice) : null) !== targetCardSalePrice ||
+          (Number(row.discountPercent) || 0) !== targetDiscountPercent ||
+          (row.imageUrl || null) !== targetImageUrl ||
+          (row.videoUrl || null) !== targetVideoUrl ||
+          (row.supplierCode || null) !== targetSupplierCode;
+
+        if (needsUpdate) {
+          await db
+            .update(inventoryItems)
+            .set({
+              costPrice: targetCostPrice,
+              costWithoutTax: targetCostWithout,
+              costWithTax: targetCostWith,
+              taxRate: targetTaxRate,
+              salePrice: targetSalePrice,
+              cardSalePrice: targetCardSalePrice,
+              discountPercent: targetDiscountPercent,
+              imageUrl: targetImageUrl,
+              videoUrl: targetVideoUrl,
+              supplierCode: targetSupplierCode,
+              isSupplierGift: targetIsGift,
+              extractedAttributes: targetExtractedStr,
+              updatedAt: new Date(),
+            })
+            .where(eq(inventoryItems.id, row.id));
+
+          updatedCount++;
+        }
+      } catch (rowErr) {
+        console.warn(`Error normalizando producto ID ${row.id} en Postgres:`, rowErr);
+      }
+    }
+
+    // Always synchronize in-memory storage.getState().inventoryItems
+    const state = storage.getState();
+    const freshRows = await db.select().from(inventoryItems);
+    freshRows.forEach((r) => {
+      const formatted = formatItemWithAllImages(r);
+      const idx = state.inventoryItems.findIndex((it) => it.id === r.id);
+      if (idx !== -1) {
+        state.inventoryItems[idx] = formatted as any;
+      } else {
+        state.inventoryItems.push(formatted as any);
+      }
+    });
+    storage.save();
+
+    console.log(`✅ Base de datos Postgres sincronizada: ${updatedCount} de ${rows.length} productos fueron normalizados y actualizados en PostgreSQL.`);
+    return { total: rows.length, updated: updatedCount };
+  } catch (error) {
+    console.error('⚠️ Error durante la sincronización masiva de inventario en Postgres:', error);
+    return { total: 0, updated: 0 };
   }
 }
 
