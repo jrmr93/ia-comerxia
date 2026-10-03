@@ -813,24 +813,54 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
     let parsedAttr: Record<string, any> = {};
     if (item.extractedAttributes) {
       try {
-        parsedAttr = JSON.parse(item.extractedAttributes);
+        parsedAttr = typeof item.extractedAttributes === 'string'
+          ? JSON.parse(item.extractedAttributes)
+          : item.extractedAttributes;
       } catch { }
     }
 
-    let currentImages: string[] = Array.isArray(parsedAttr.images)
-      ? [...parsedAttr.images]
-      : item.imageUrl
-        ? [item.imageUrl]
-        : [];
+    const norm = (u: string) => {
+      if (!u) return '';
+      try {
+        const decoded = decodeURIComponent(String(u).trim());
+        return decoded.replace(/^https?:\/\/[^\/]+/, '');
+      } catch {
+        return String(u).trim().replace(/^https?:\/\/[^\/]+/, '');
+      }
+    };
 
-    if (!currentImages.includes(effectiveCoverUrl)) {
-      currentImages.unshift(effectiveCoverUrl);
-    } else {
-      currentImages = [effectiveCoverUrl, ...currentImages.filter((i) => i !== effectiveCoverUrl)];
+    // Safely collect ALL existing photos from parsed attributes, item.images and primary item.imageUrl
+    const currentImages: string[] = [];
+    const addImageIfUnique = (imgUrl: string | null | undefined) => {
+      const clean = imgUrl?.trim();
+      if (clean && clean !== 'null' && !currentImages.some((existing) => norm(existing) === norm(clean))) {
+        currentImages.push(clean);
+      }
+    };
+
+    if (Array.isArray(parsedAttr.images)) {
+      parsedAttr.images.forEach(addImageIfUnique);
+    }
+    if (Array.isArray((item as any).images)) {
+      (item as any).images.forEach(addImageIfUnique);
+    }
+    if (item.imageUrl) {
+      addImageIfUnique(item.imageUrl);
     }
 
-    parsedAttr.images = currentImages;
-    parsedAttr.totalPhotos = currentImages.length;
+    const coverNorm = norm(effectiveCoverUrl);
+    const rawCoverNorm = norm(coverImageUrl);
+    const existingMatch = currentImages.find(
+      (img) => norm(img) === coverNorm || norm(img) === rawCoverNorm
+    );
+    const coverToUse = existingMatch || effectiveCoverUrl;
+
+    // Filter out the cover photo from the list and place it at index 0
+    const remainingImages = currentImages.filter((img) => norm(img) !== norm(coverToUse));
+    const updatedImages = [coverToUse, ...remainingImages];
+
+    parsedAttr.images = updatedImages;
+    parsedAttr.totalPhotos = updatedImages.length;
 
     let updatedRow: any = null;
 
@@ -839,7 +869,7 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
         const result = await db
           .update(inventoryItems)
           .set({
-            imageUrl: effectiveCoverUrl,
+            imageUrl: coverToUse,
             extractedAttributes: JSON.stringify(parsedAttr),
             updatedAt: new Date(),
           })
@@ -857,7 +887,7 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
     const state = storage.getState();
     const idx = state.inventoryItems.findIndex((it) => it.id === id);
     if (idx !== -1) {
-      state.inventoryItems[idx].imageUrl = effectiveCoverUrl;
+      state.inventoryItems[idx].imageUrl = coverToUse;
       state.inventoryItems[idx].extractedAttributes = JSON.stringify(parsedAttr);
       state.inventoryItems[idx].updatedAt = new Date().toISOString();
       storage.save();
@@ -868,9 +898,9 @@ export async function setCoverImageForInventoryItem(id: number, coverImageUrl: s
 
     return {
       ...(updatedRow || item),
-      imageUrl: coverImageUrl,
+      imageUrl: coverToUse,
       extractedAttributes: JSON.stringify(parsedAttr),
-      images: currentImages,
+      images: updatedImages,
     };
   } catch (error) {
     console.error('Error setting cover image:', error);

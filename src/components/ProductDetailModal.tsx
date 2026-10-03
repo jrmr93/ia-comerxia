@@ -1494,9 +1494,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 body: JSON.stringify({ imageUrl: coverUrl }),
               });
               if (res.ok) {
-                const updated = await res.json();
-                setCurrentItem(updated);
-                onItemUpdated?.(updated);
+                const data = await res.json();
+                const updatedItem = data.item || data;
+                setCurrentItem(updatedItem);
+                onItemUpdated?.(updatedItem);
               }
             } catch (err) {
               console.error('Failed to set cover photo:', err);

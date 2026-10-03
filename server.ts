@@ -4109,7 +4109,7 @@ async function startServer() {
   app.post('/api/inventory/:id/delete-images', optionalAuth, handleRemoveImage);
 
   // 8j. Set Cover / Primary Image for a Product
-  app.put('/api/inventory/:id/set-cover-image', optionalAuth, async (req: AuthRequest, res: Response) => {
+  const handleSetCoverImage = async (req: AuthRequest, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ error: 'ID de producto inválido' });
@@ -4129,7 +4129,10 @@ async function startServer() {
       console.error('Error setting cover image:', error);
       res.status(500).json({ error: error.message || 'Error al establecer la imagen principal' });
     }
-  });
+  };
+
+  app.put('/api/inventory/:id/set-cover-image', optionalAuth, handleSetCoverImage);
+  app.post('/api/inventory/:id/set-cover-image', optionalAuth, handleSetCoverImage);
 
   // 9. Live Telegram Webhook Endpoint (alternative to Long Polling)
   app.post('/api/telegram/webhook', async (req: Request, res: Response) => {

@@ -238,25 +238,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   };
 
   const handleSetAsCover = (photoUrl: string) => {
+    // Preserve ALL existing photos (current cover + extra images)
+    const existing = Array.from(new Set([imageUrl, ...extraImages].filter(Boolean)));
     setImageUrl(photoUrl);
-    setExtraImages((prev) => {
-      const without = prev.filter((p) => p !== photoUrl);
-      return [photoUrl, ...without];
-    });
+    setExtraImages(existing.filter((p) => p !== photoUrl));
   };
 
   const handleRemovePhoto = (photoToRemove: string) => {
-    setExtraImages((prev) => {
-      const remaining = prev.filter((p) => p !== photoToRemove);
-      return remaining;
-    });
-    setImageUrl((currentCover) => {
-      if (currentCover === photoToRemove) {
-        const remaining = extraImages.filter((p) => p !== photoToRemove);
-        return remaining[0] || '';
-      }
-      return currentCover;
-    });
+    const existing = Array.from(new Set([imageUrl, ...extraImages].filter(Boolean)));
+    const remaining = existing.filter((p) => p !== photoToRemove);
+    if (imageUrl === photoToRemove) {
+      const newCover = remaining[0] || '';
+      setImageUrl(newCover);
+      setExtraImages(remaining.filter((p) => p !== newCover));
+    } else {
+      setExtraImages(remaining.filter((p) => p !== imageUrl));
+    }
   };
 
   const handleAddDirectUrl = () => {
@@ -2480,6 +2477,28 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               setExtraImages(candidateImages);
             }
           }}
+        />
+      )}
+
+      {/* Lightbox photo viewer overlay */}
+      {isLightboxOpen && allAvailablePhotos.length > 0 && (
+        <ImageLightboxModal
+          isOpen={isLightboxOpen}
+          images={allAvailablePhotos}
+          currentIndex={lightboxIndex}
+          onClose={() => setIsLightboxOpen(false)}
+          onNavigate={(newIdx) => setLightboxIndex(newIdx)}
+          onSetAsCover={(coverUrl) => {
+            handleSetAsCover(coverUrl);
+          }}
+          onDeletePhoto={() => {
+            if (allAvailablePhotos[lightboxIndex]) {
+              handleRemovePhoto(allAvailablePhotos[lightboxIndex]);
+            }
+          }}
+          productName={name || 'Producto'}
+          productSku={sku || ''}
+          isCover={allAvailablePhotos[lightboxIndex] === imageUrl}
         />
       )}
 
