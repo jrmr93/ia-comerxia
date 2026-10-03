@@ -488,6 +488,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
       setCostOptions(costOpts);
 
+      const initDiscount =
+        editingItem.discountPercent !== undefined && editingItem.discountPercent !== null
+          ? Number(editingItem.discountPercent)
+          : parsedAttr.discountPercent !== undefined && !isNaN(Number(parsedAttr.discountPercent))
+          ? Number(parsedAttr.discountPercent)
+          : 0;
+      setDiscountPercent(initDiscount);
+      const discountRate = Math.max(0, Math.min(0.99, initDiscount / 100));
+
       // Calculate initial margin & profit based on net cost without IVA
       const costWithoutNum = isGift ? 0 : (parseFloat(initialCostWithout) || 0);
       let initMargin = 30;
@@ -497,8 +506,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         const itemApplyTax = unifiedHasTax;
         const itemTaxPct = unifiedTaxPercent;
         const baseSale = saleNum > 0 ? (itemApplyTax && itemTaxPct > 0 ? saleNum / (1 + itemTaxPct / 100) : saleNum) : 0;
-        initProfit = baseSale;
-        initMargin = 100;
+        const netSalePriceSinIVA = baseSale * (1 - discountRate);
+
+        if (parsedAttr.profitAmount !== undefined && !isNaN(Number(parsedAttr.profitAmount)) && Math.abs(Number(parsedAttr.profitAmount) - netSalePriceSinIVA) < 0.05) {
+          initProfit = Number(parsedAttr.profitAmount);
+        } else {
+          initProfit = netSalePriceSinIVA;
+        }
+        initMargin = initProfit > 0 ? 100 : 0;
       } else if (parsedAttr.profitAmount !== undefined && !isNaN(Number(parsedAttr.profitAmount))) {
         initProfit = Number(parsedAttr.profitAmount);
         initMargin = costWithoutNum > 0 ? Math.round((initProfit / costWithoutNum) * 100) : (parsedAttr.profitMarginPercent ? Number(parsedAttr.profitMarginPercent) : 30);
@@ -509,25 +524,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         const itemApplyTax = unifiedHasTax;
         const itemTaxPct = unifiedTaxPercent;
         const baseSale = itemApplyTax && itemTaxPct > 0 ? saleNum / (1 + itemTaxPct / 100) : saleNum;
-        initProfit = baseSale - costWithoutNum;
+        const netSalePriceSinIVA = baseSale * (1 - discountRate);
+        initProfit = netSalePriceSinIVA - costWithoutNum;
         initMargin = Math.round((initProfit / costWithoutNum) * 100);
       } else {
         initMargin = 30;
         initProfit = costWithoutNum * 0.3;
       }
+
       setMarginPercent(initMargin);
       setProfitAmount(initProfit.toFixed(2));
 
-      const initDiscount =
-        editingItem.discountPercent !== undefined && editingItem.discountPercent !== null
-          ? Number(editingItem.discountPercent)
-          : parsedAttr.discountPercent !== undefined && !isNaN(Number(parsedAttr.discountPercent))
-          ? Number(parsedAttr.discountPercent)
-          : 0;
-      setDiscountPercent(initDiscount);
-
       // Compute published PVP using initial cost options and target profit so financial breakdown is 100% synchronized from start
-      const computedInitialPvp = computePublishedPvp(costWithoutNum, initProfit, initDiscount, unifiedHasTax, unifiedTaxPercent);
+      const computedInitialPvp = saleNum > 0 && Math.abs(computePublishedPvp(costWithoutNum, initProfit, initDiscount, unifiedHasTax, unifiedTaxPercent) - saleNum) < 0.05
+        ? saleNum
+        : computePublishedPvp(costWithoutNum, initProfit, initDiscount, unifiedHasTax, unifiedTaxPercent);
+
       setSalePrice(computedInitialPvp.toFixed(2));
       setStock(editingItem.stock ?? 0);
 
