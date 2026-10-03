@@ -1871,17 +1871,29 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     setSearchQuery('');
     setInStockOnly(false);
     setShowOffersOnly(false);
-    setSortBy('featured');
+    setSortBy(storeConfig?.defaultProductSort || 'date_desc');
+    setStoreTab('catalog');
+    if (onSubTabChange) {
+      onSubTabChange('catalog');
+    }
 
     if (quickViewProduct) {
       handleBackToCatalog();
       setTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (typeof document !== 'undefined') {
+          document.documentElement?.scrollTo({ top: 0, behavior: 'smooth' });
+          document.body?.scrollTo({ top: 0, behavior: 'smooth' });
+        }
       }, 60);
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (typeof document !== 'undefined') {
+        document.documentElement?.scrollTo({ top: 0, behavior: 'smooth' });
+        document.body?.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
-  }, [quickViewProduct, handleBackToCatalog]);
+  }, [quickViewProduct, handleBackToCatalog, storeConfig?.defaultProductSort, onSubTabChange]);
 
   // Logo Click handler: Trigger bounce animation & return to home catalog
   const handleLogoClick = useCallback(() => {

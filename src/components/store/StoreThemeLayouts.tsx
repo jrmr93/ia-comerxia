@@ -476,7 +476,7 @@ export const StoreHeader: React.FC<{
                   HAUTE SÉLECTION • ATELIER
                 </span>
               </div>
-              <h1 className={`text-base sm:text-2xl lg:text-3xl font-black tracking-tight truncate ${themeStyles.headerText}`}>
+              <h1 onClick={onLogoClick} className={`text-base sm:text-2xl lg:text-3xl font-black tracking-tight truncate cursor-pointer hover:opacity-90 ${themeStyles.headerText}`}>
                 {storeConfig.storeName || 'Comerxia Boutique'}
               </h1>
               <div className="flex items-center space-x-2 mt-0.5 flex-wrap gap-y-1">
@@ -609,7 +609,7 @@ export const StoreHeader: React.FC<{
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center space-x-1.5 sm:space-x-2 flex-wrap gap-1">
-                <h1 className="text-base sm:text-2xl lg:text-3xl font-black uppercase tracking-tight text-black truncate">
+                <h1 onClick={onLogoClick} className="text-base sm:text-2xl lg:text-3xl font-black uppercase tracking-tight text-black truncate cursor-pointer hover:opacity-90">
                   {storeConfig.storeName || 'TIENDA POP'}
                 </h1>
                 <span className="px-1.5 sm:px-2 py-0.5 border border-black sm:border-2 bg-emerald-300 text-black text-[9px] sm:text-[10px] font-black uppercase shadow-[1px_1px_0px_#000] sm:shadow-[2px_2px_0px_#000]">
@@ -741,7 +741,7 @@ export const StoreHeader: React.FC<{
                   ONLINE
                 </span>
               </div>
-              <h1 className="text-base sm:text-xl lg:text-2xl font-black font-mono tracking-wider text-cyan-200 uppercase truncate">
+              <h1 onClick={onLogoClick} className="text-base sm:text-xl lg:text-2xl font-black font-mono tracking-wider text-cyan-200 uppercase truncate cursor-pointer hover:opacity-90">
                 {storeConfig.storeName || 'CYBER_CORE'}
               </h1>
               <p className="text-[11px] sm:text-xs font-mono text-cyan-400/70 mt-0.5 line-clamp-1">
@@ -859,7 +859,7 @@ export const StoreHeader: React.FC<{
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center space-x-2 flex-wrap gap-y-0.5">
-                <h1 className="text-base sm:text-xl lg:text-2xl font-medium tracking-tight text-stone-900 font-serif truncate">
+                <h1 onClick={onLogoClick} className="text-base sm:text-xl lg:text-2xl font-medium tracking-tight text-stone-900 font-serif truncate cursor-pointer hover:opacity-90">
                   {storeConfig.storeName || 'Nordic Store'}
                 </h1>
                 <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium bg-stone-100 text-stone-700">
@@ -983,7 +983,7 @@ export const StoreHeader: React.FC<{
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center space-x-1.5 sm:space-x-2 flex-wrap gap-y-0.5">
-              <h1 className={`text-base sm:text-xl lg:text-2xl font-black tracking-tight truncate ${themeStyles.headerText}`}>
+              <h1 onClick={onLogoClick} className={`text-base sm:text-xl lg:text-2xl font-black tracking-tight truncate cursor-pointer hover:opacity-90 ${themeStyles.headerText}`}>
                 {storeConfig.storeName || 'Comerxia Store'}
               </h1>
               <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black ${themeStyles.officialBadgeBg}`}>
