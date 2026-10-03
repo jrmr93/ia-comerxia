@@ -44,6 +44,8 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  Printer,
+  FileText,
   Truck,
   X,
 } from 'lucide-react';
@@ -53,6 +55,7 @@ import { TelegramMessagesFeed } from './TelegramMessagesFeed.tsx';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
 import { ProductMarketingCopyModal } from './ProductMarketingCopyModal.tsx';
 import { ProductBarcodeModal } from './ProductBarcodeModal.tsx';
+import { InventoryReportPrintModal } from './InventoryReportPrintModal.tsx';
 import { ProductMediaDisplay } from './ProductMediaDisplay.tsx';
 import { parseVideoUrl } from '../utils/video-helper.ts';
 import { checkProductTransactionLink } from '../utils/productIntegrity.ts';
@@ -501,6 +504,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [isProcessingStatus, setIsProcessingStatus] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [shareInitialCategory, setShareInitialCategory] = useState<string>('');
+
+  // Print Inventory Report Modal State
+  const [showPrintReportModal, setShowPrintReportModal] = useState<boolean>(false);
 
   // Bulk Promotional Flyer Generator State & Logic
   const [showBulkFlyerModal, setShowBulkFlyerModal] = useState<boolean>(false);
@@ -1362,6 +1368,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 >
                   <Palette className="w-3.5 h-3.5 text-slate-950" />
                   <span>Generar Flyers ({selectedIds.length})</span>
+                </button>
+                <button
+                  onClick={() => setShowPrintReportModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer border border-blue-400/30 active:scale-95"
+                  title="Imprimir reporte en hoja A4 de todos los productos seleccionados con desglose financiero de costos, impuestos, PVP y ganancias"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir Reporte A4 ({selectedIds.length})</span>
                 </button>
                 <button
                   onClick={() => {
@@ -2308,6 +2322,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showPrintReportModal && (
+        <InventoryReportPrintModal
+          items={items.filter((it) => selectedIds.includes(it.id))}
+          storeConfig={storeConfig}
+          currency={currency}
+          onClose={() => setShowPrintReportModal(false)}
+        />
       )}
 
       {reparseToast && (
