@@ -30,6 +30,7 @@ import {
 } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { getAllUsers } from '../db/users.ts';
+import { DEFAULT_GEMINI_MODEL, normalizeModelName } from '../services/gemini-models.ts';
 import {
   getInventoryItems,
   getTelegramMessages,
@@ -270,7 +271,7 @@ export async function getFullSystemData(userId?: number): Promise<FullSystemData
       id: 1,
       userId: targetId,
       apiKey: process.env.GEMINI_API_KEY.trim(),
-      modelName: 'gemini-3.6-flash',
+      modelName: DEFAULT_GEMINI_MODEL,
       temperature: '0.20',
       isActive: true,
       provider: 'google',
@@ -773,7 +774,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   sql += `  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL,\n`;
   sql += `  api_key TEXT,\n`;
   sql += `  account_email TEXT,\n`;
-  sql += `  model_name TEXT DEFAULT 'gemini-3.6-flash',\n`;
+  sql += `  model_name TEXT DEFAULT '${DEFAULT_GEMINI_MODEL}',\n`;
   sql += `  temperature NUMERIC(3, 2) DEFAULT 0.20,\n`;
   sql += `  is_active BOOLEAN DEFAULT TRUE,\n`;
   sql += `  provider TEXT DEFAULT 'google',\n`;
@@ -1084,7 +1085,7 @@ export async function generateCompleteSqlDump(userId?: number): Promise<string> 
   if (data.aiConfigs.length > 0) {
     sql += `-- Datos: ai_configs\n`;
     for (const aic of data.aiConfigs) {
-      sql += `INSERT INTO ai_configs (id, user_id, api_key, account_email, model_name, temperature, is_active, provider, local_endpoint, local_model_name) VALUES (${aic.id || 1}, ${aic.userId || 1}, ${escapeSqlString(aic.apiKey)}, ${escapeSqlString(aic.accountEmail)}, ${escapeSqlString(aic.modelName || 'gemini-3.6-flash')}, ${aic.temperature || 0.20}, ${aic.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(aic.provider || 'google')}, ${escapeSqlString(aic.localEndpoint || 'http://localhost:1234/v1')}, ${escapeSqlString(aic.localModelName || 'qwen2.5-coder-7b-instruct')}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, account_email = EXCLUDED.account_email, model_name = EXCLUDED.model_name, temperature = EXCLUDED.temperature, is_active = EXCLUDED.is_active, provider = EXCLUDED.provider, local_endpoint = EXCLUDED.local_endpoint, local_model_name = EXCLUDED.local_model_name;\n`;
+      sql += `INSERT INTO ai_configs (id, user_id, api_key, account_email, model_name, temperature, is_active, provider, local_endpoint, local_model_name) VALUES (${aic.id || 1}, ${aic.userId || 1}, ${escapeSqlString(aic.apiKey)}, ${escapeSqlString(aic.accountEmail)}, ${escapeSqlString(normalizeModelName(aic.modelName) ?? DEFAULT_GEMINI_MODEL)}, ${aic.temperature || 0.20}, ${aic.isActive !== false ? 'TRUE' : 'FALSE'}, ${escapeSqlString(aic.provider || 'google')}, ${escapeSqlString(aic.localEndpoint || 'http://localhost:1234/v1')}, ${escapeSqlString(aic.localModelName || 'qwen2.5-coder-7b-instruct')}) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, api_key = EXCLUDED.api_key, account_email = EXCLUDED.account_email, model_name = EXCLUDED.model_name, temperature = EXCLUDED.temperature, is_active = EXCLUDED.is_active, provider = EXCLUDED.provider, local_endpoint = EXCLUDED.local_endpoint, local_model_name = EXCLUDED.local_model_name;\n`;
     }
     sql += `\n`;
   }
@@ -2055,7 +2056,7 @@ export async function restoreCompleteJsonDump(
             userId: validUserId,
             apiKey: aic.apiKey || null,
             accountEmail: aic.accountEmail || null,
-            modelName: aic.modelName || 'gemini-3.6-flash',
+            modelName: normalizeModelName(aic.modelName) ?? DEFAULT_GEMINI_MODEL,
             temperature: String(aic.temperature || '0.20'),
             isActive: aic.isActive !== false,
             provider: aic.provider || 'google',

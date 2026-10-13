@@ -2,6 +2,7 @@ import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db, pool, isPostgresConfigured } from './index.ts';
 import { aiConfigs, customerOrders, customers, ecuadorApiConfigs, payphoneConfigs, inventoryItems, payments, purchases, serverDomainConfigs, sriConfigs, sriInvoices, storeConfigs, suppliers, telegramConfigs, telegramMessages, users } from './schema.ts';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
+import { DEFAULT_GEMINI_MODEL, normalizeModelName } from '../services/gemini-models.ts';
 import { validateEcuadorId } from '../utils/ecuadorIdValidator.ts';
 import {
   isOrderPartiallyDelivered,
@@ -2679,7 +2680,7 @@ export async function getAiConfig(userId: number = 1) {
       userId,
       apiKey: null,
       accountEmail: null,
-      modelName: 'gemini-3.6-flash',
+      modelName: DEFAULT_GEMINI_MODEL,
       temperature: 0.2,
       isActive: true,
       provider: 'google' as ('google' | 'lmstudio'),
@@ -2723,7 +2724,7 @@ export async function getAiConfig(userId: number = 1) {
         .values({
           userId: targetUserId,
           apiKey: null,
-          modelName: 'gemini-3.6-flash',
+          modelName: DEFAULT_GEMINI_MODEL,
           temperature: '0.20',
           isActive: true,
         })
@@ -2745,7 +2746,7 @@ export async function getAiConfig(userId: number = 1) {
       userId: 1,
       apiKey: null,
       accountEmail: null,
-      modelName: 'gemini-3.6-flash',
+      modelName: DEFAULT_GEMINI_MODEL,
       temperature: 0.2,
       isActive: true,
       provider: 'google' as ('google' | 'lmstudio'),
@@ -2774,15 +2775,9 @@ export async function updateAiConfig(
   const state = storage.getState();
   if (!state.aiConfigs) state.aiConfigs = [];
 
-  let modelToUse = data.modelName || 'gemini-3.6-flash';
-  if (
-    modelToUse.includes('gemini-2.5') ||
-    modelToUse.includes('gemini-2.0') ||
-    modelToUse.includes('gemini-1.5') ||
-    modelToUse.includes('gemini-3.7')
-  ) {
-    modelToUse = 'gemini-3.6-flash';
-  }
+  // Normaliza nombres de modelos deprecados o ficticios al modelo real más cercano.
+  // Importante: NO sobreescribir modelos reales como gemini-2.0-flash con nombres ficticios.
+  let modelToUse = normalizeModelName(data.modelName) ?? DEFAULT_GEMINI_MODEL;
 
   const effectiveIsActive =
     data.isActive !== undefined

@@ -1,5 +1,6 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { getAiClient, hasValidAiApiKey } from './gemini-parser.ts';
+import { GEMINI_CANDIDATE_MODELS, DEFAULT_GEMINI_MODEL, buildCandidateModelList, normalizeModelName } from './gemini-models.ts';
 
 export interface MarketQuoteSource {
   title: string;
@@ -186,11 +187,7 @@ export async function quoteProductInEcuadorMarket(params: QuoteMarketParams): Pr
     return fallback;
   }
 
-  const candidateModels = [
-    'gemini-3.6-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-flash-latest',
-  ];
+  const candidateModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
   const prompt = `Eres un experto cotizador de precios de mercado para comercio electrónico y retail en ECUADOR (moneda: Dólares Americanos USD).
 Tu tarea es buscar y analizar el precio real actual de este producto en el mercado ecuatoriano (ej. Mercado Libre Ecuador, marketplaces locales, importadoras de Guayaquil/Quito, tiendas online de tecnología/hogar).
@@ -245,7 +242,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
   try {
     const searchResponse = await withTimeout(
       ai.models.generateContent({
-        model: 'gemini-3.6-flash',
+        model: DEFAULT_GEMINI_MODEL,
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],
@@ -288,7 +285,7 @@ IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido con los campos exact
   // 2. Second attempt: If search grounding did not produce a parsed quote (e.g. 429 search quota),
   // consult Gemini without search grounding using models with high rate availability
   if (!parsedQuote) {
-    const directModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
+    const directModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
     for (const model of directModels) {
       try {
         const directResponse = await withTimeout(

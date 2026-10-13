@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { normalizeEcuadorPhone } from '../utils/phone.ts';
+import { DEFAULT_GEMINI_MODEL } from '../services/gemini-models.ts';
 
 export interface LocalUser {
   id: number;
@@ -395,7 +396,7 @@ class StorageManager {
           id: 1,
           userId: 1,
           apiKey: null,
-          modelName: 'gemini-3.6-flash',
+          modelName: DEFAULT_GEMINI_MODEL,
           temperature: 0.2,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

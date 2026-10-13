@@ -1,5 +1,6 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { getAiClient, hasValidAiApiKey } from './gemini-parser.ts';
+import { GEMINI_CANDIDATE_MODELS, buildCandidateModelList } from './gemini-models.ts';
 import { parseVideoUrl, ParsedVideoInfo } from '../utils/video-helper.ts';
 
 export interface VideoSearchResult {
@@ -224,7 +225,7 @@ export async function searchProductVideos(params: {
   if (hasValidAiApiKey()) {
     try {
       const ai = getAiClient();
-      const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
+      const candidateModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
       const prompt = `Analiza este producto y extrae la Marca exacta y el Modelo exacto para búsqueda de videos:
 Producto: ${cleanName}
 Categoría: ${cat}
