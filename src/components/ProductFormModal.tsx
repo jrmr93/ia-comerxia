@@ -928,8 +928,40 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       }
 
       // Collect all photos and ensure cover is first if set
-      const allPhotos = Array.from(new Set([imageUrl, ...extraImages].filter(Boolean)));
-      const effectiveCover = imageUrl || allPhotos[0] || null;
+      const rawPhotos = Array.from(new Set([imageUrl, ...extraImages].filter(Boolean)));
+
+      // Pre-persist any external or proxy URLs to local /uploads/ before saving
+      const persistUrl = async (url: string): Promise<string> => {
+        if (!url) return url;
+        const needsPersist =
+          url.startsWith('http://') ||
+          url.startsWith('https://') ||
+          url.includes('/api/proxy-image') ||
+          url.startsWith('data:image/');
+        if (!needsPersist) return url;
+        try {
+          const r = await authFetch('/api/media/persist-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+          });
+          if (r.ok) {
+            const d = await r.json();
+            if (d.localUrl && (d.localUrl.startsWith('/uploads/') || d.localUrl.startsWith('/api/media/'))) {
+              return d.localUrl;
+            }
+          }
+        } catch { /* keep original URL if persist fails */ }
+        return url;
+      };
+
+      const allPhotos = await Promise.all(rawPhotos.map(persistUrl));
+      const effectiveCover = allPhotos[0] || null;
+
+      // Sync state with persisted URLs so they're visible immediately
+      if (allPhotos[0] && allPhotos[0] !== imageUrl) setImageUrl(allPhotos[0]);
+      if (allPhotos.slice(1).join('|') !== extraImages.join('|')) setExtraImages(allPhotos.slice(1));
+
 
       const effectiveHasTax = (hasPurchaseTax || applySaleTax) && (purchaseTaxPercent > 0 || saleTaxPercent > 0);
       const effectiveTaxRate = effectiveHasTax ? Math.max(purchaseTaxPercent, saleTaxPercent) : 0;

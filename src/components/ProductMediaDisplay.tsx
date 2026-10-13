@@ -162,14 +162,19 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
   };
 
   const handleImageError = () => {
-    // 1. If it was /uploads/xxx and failed, try /api/media/xxx once
+    // 1. /uploads/ failed → try /api/media/ (alternate local path)
     if (currentImgSrc.startsWith('/uploads/') && !hasTriedApiFallback) {
       setHasTriedApiFallback(true);
       setCurrentImgSrc(currentImgSrc.replace('/uploads/', '/api/media/'));
       return;
     }
 
-    // 2. If it's an external http/https URL and failed (likely CORS or hotlink block), proxy it through /api/proxy-image!
+    // 2. /api/media/ also failed → try proxy to re-download from external if URL is stored somewhere
+    if (currentImgSrc.startsWith('/api/media/') && hasTriedApiFallback) {
+      // Fallthrough to try next candidate
+    }
+
+    // 3. External http/https URL failed (CORS / hotlink block) → proxy it
     if (
       (currentImgSrc.startsWith('http://') || currentImgSrc.startsWith('https://')) &&
       !currentImgSrc.includes('/api/proxy-image')
@@ -178,7 +183,28 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
       return;
     }
 
-    // 3. Try next candidate in list
+    // 4. Proxy URL failed (the proxy couldn't download the external image either) → skip to next candidate
+    if (currentImgSrc.includes('/api/proxy-image')) {
+      // Extract inner URL and try it directly as last-resort
+      const urlMatch = currentImgSrc.match(/[?&]url=([^&]+)/);
+      if (urlMatch) {
+        const innerUrl = decodeURIComponent(urlMatch[1]);
+        if (innerUrl && !candidates.includes(innerUrl)) {
+          // Don't loop — only try direct URL if not already in list
+          const nextIdx = candidateIdx + 1;
+          if (nextIdx < candidates.length) {
+            setCandidateIdx(nextIdx);
+            setHasTriedApiFallback(false);
+            setCurrentImgSrc(candidates[nextIdx]);
+            return;
+          }
+          setImageError(true);
+          return;
+        }
+      }
+    }
+
+    // 5. Try next candidate in list
     const nextIdx = candidateIdx + 1;
     if (nextIdx < candidates.length) {
       setCandidateIdx(nextIdx);
@@ -187,9 +213,10 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
       return;
     }
 
-    // 4. All image candidates failed
+    // 6. All image candidates exhausted
     setImageError(true);
   };
+
 
   const handleVideoError = () => {
     if (videoSrc.startsWith('/uploads/') && !hasTriedVideoFallback) {
