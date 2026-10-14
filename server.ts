@@ -3907,6 +3907,17 @@ async function startServer() {
         return res.status(400).send('Invalid image url');
       }
 
+      // 1. Check if we already have this image cached locally — redirect to local copy
+      const urlHash = crypto.createHash('md5').update(targetUrl).digest('hex');
+      const extensions = ['jpg', 'png', 'webp', 'gif', 'avif'];
+      for (const ext of extensions) {
+        const cachedFile = path.join(uploadsDir, `img_${urlHash}.${ext}`);
+        if (fs.existsSync(cachedFile)) {
+          // Redirect to self-hosted file — browser and DB will see the /uploads/ URL
+          return res.redirect(301, `/uploads/img_${urlHash}.${ext}`);
+        }
+      }
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
 
@@ -3939,18 +3950,20 @@ async function startServer() {
       const arrayBuffer = await imgRes.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // Cache locally to uploadsDir if valid
+      // 2. Save locally and redirect to permanent /uploads/ URL
       if (buffer.length > 300) {
         try {
-          const urlHash = crypto.createHash('md5').update(targetUrl).digest('hex');
-          const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+          const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : contentType.includes('gif') ? 'gif' : 'jpg';
           const cachedFile = path.join(uploadsDir, `img_${urlHash}.${ext}`);
           if (!fs.existsSync(cachedFile)) {
             fs.writeFileSync(cachedFile, buffer);
           }
+          // Redirect to the self-hosted permanent URL — next time this proxy is called it returns 301 instantly
+          return res.redirect(301, `/uploads/img_${urlHash}.${ext}`);
         } catch { }
       }
 
+      // Fallback: serve the buffer directly if local save failed
       res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
       return res.send(buffer);
@@ -3962,6 +3975,7 @@ async function startServer() {
       return res.status(500).send('Failed to proxy image');
     }
   });
+
 
   // 8j. Self-Hosted Media serving and management endpoints
   app.get('/api/media/:filename', (req: Request, res: Response, next: express.NextFunction) => {

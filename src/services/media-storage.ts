@@ -146,7 +146,11 @@ export async function persistImageLocally(
   // If already a self-hosted local upload, return clean path
   const uploadsIdx = input.indexOf('/uploads/');
   if (uploadsIdx !== -1) {
-    return input.slice(uploadsIdx);
+    const localPath = input.slice(uploadsIdx);
+    // Verify the file actually exists; if not, keep processing
+    const filePath = path.join(UPLOADS_DIR, path.basename(localPath));
+    if (fs.existsSync(filePath)) return localPath;
+    // File missing — fall through so we can try re-downloading
   }
   const apiMediaIdx = input.indexOf('/api/media/');
   if (apiMediaIdx !== -1) {
@@ -157,6 +161,19 @@ export async function persistImageLocally(
   }
   if (input.startsWith('api/media/')) {
     return '/' + input;
+  }
+
+  // Handle /api/proxy-image?url=... — extract inner URL and persist it directly
+  if (input.includes('/api/proxy-image')) {
+    try {
+      const urlMatch = input.match(/[?&]url=([^&]+)/);
+      if (urlMatch) {
+        const innerUrl = decodeURIComponent(urlMatch[1]);
+        const result = await persistImageLocally(innerUrl, fallbackUrl);
+        if (result) return result;
+      }
+    } catch { }
+    return input; // Keep proxy URL as last resort
   }
 
   // Handle Base64 Data URLs

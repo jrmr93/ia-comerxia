@@ -3,6 +3,16 @@ import path from 'path';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { getAiConfig } from '../db/inventory.ts';
 import {
+  GEMINI_CANDIDATE_MODELS,
+  DEFAULT_GEMINI_MODEL,
+  normalizeModelName,
+  buildCandidateModelList,
+  fetchAvailableGeminiModels,
+  invalidateModelsCache,
+  withModelFallback,
+  withTimeout,
+} from './gemini-models.ts';
+import {
   detectTaxStatus,
   calculateTaxAdjustment,
   adjustCostOptionsForTax,
@@ -18,12 +28,16 @@ const descCache = new Map<string, { text: string; timestamp: number }>();
 const CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes
 
 export function setCustomAiApiKey(key: string | null) {
+  const oldKey = activeCustomApiKey;
   activeCustomApiKey = key && key.trim().length > 0 ? key.trim() : null;
   aiInstance = null;
+  // Invalida caché de modelos disponibles para la nueva clave
+  if (oldKey) invalidateModelsCache(oldKey);
 }
 
 export function resetAiClient() {
   aiInstance = null;
+  invalidateModelsCache();
 }
 
 export function isValidGeminiApiKey(key?: string | null): boolean {
@@ -65,7 +79,7 @@ export function getAiClient(customKey?: string): GoogleGenAI {
  */
 export async function testGeminiApiKey(
   apiKey?: string,
-  modelName: string = 'gemini-3.6-flash'
+  modelName: string = DEFAULT_GEMINI_MODEL
 ): Promise<{
   success: boolean;
   model: string;
@@ -79,22 +93,18 @@ export async function testGeminiApiKey(
   if (!keyToTest) {
     return {
       success: false,
-      model: modelName || 'gemini-3.6-flash',
+      model: modelName || DEFAULT_GEMINI_MODEL,
       message: 'No se ingresó ninguna API Key para validar.',
       latencyMs: 0,
     };
   }
 
-  const activeModel = modelName?.trim() || 'gemini-3.6-flash';
+  // Normaliza el modelo pedido (por si viene un nombre deprecado guardado en BD)
+  const activeModel = normalizeModelName(modelName) ?? DEFAULT_GEMINI_MODEL;
 
-  const modelsToTry = Array.from(
-    new Set([
-      activeModel,
-      'gemini-3.6-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-    ].filter(Boolean))
-  );
+  // Obtiene lista de modelos disponibles para esta key (con caché 1h) y construye candidatos
+  const available = await fetchAvailableGeminiModels(keyToTest);
+  const modelsToTry = buildCandidateModelList(activeModel, available);
 
   let lastError: any = null;
 
@@ -1072,11 +1082,7 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
 
     contents.push(prompt);
 
-    const candidateModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-3.6-flash',
-      'gemini-flash-latest',
-    ];
+    const candidateModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
   for (const modelName of candidateModels) {
     try {
@@ -1779,11 +1785,7 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura.`;
 
     const ai = getAiClient();
 
-    const candidateModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-3.6-flash',
-      'gemini-flash-latest',
-    ];
+    const candidateModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
     for (const modelName of candidateModels) {
       try {
@@ -2027,11 +2029,7 @@ REGLAS OBLIGATORIAS DE FORMATO Y EXTENSIÓN:
 
     contents.push(prompt);
 
-    const candidateModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-3.6-flash',
-      'gemini-flash-latest',
-    ];
+    const candidateModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
     for (const modelName of candidateModels) {
       try {
@@ -2115,12 +2113,7 @@ export async function transcribeAudioWithGemini(
     const base64Audio = audioBuffer.toString('base64');
     const activeMime = mimeType || 'audio/ogg';
 
-    const modelsToTry = [
-      'gemini-2.5-flash',
-      'gemini-3.6-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-    ];
+    const modelsToTry = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
     for (const modelName of modelsToTry) {
       try {

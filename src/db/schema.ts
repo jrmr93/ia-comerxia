@@ -264,7 +264,7 @@ export const aiConfigs = pgTable('ai_configs', {
     .notNull(),
   apiKey: text('api_key'),
   accountEmail: text('account_email'),
-  modelName: text('model_name').default('gemini-3.6-flash'),
+  modelName: text('model_name').default('gemini-2.0-flash'),
   temperature: numeric('temperature', { precision: 3, scale: 2 }).default('0.20'),
   isActive: boolean('is_active').default(true),
   provider: text('provider').default('google'),

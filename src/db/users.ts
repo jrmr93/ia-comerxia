@@ -3,6 +3,7 @@ import { and, eq, or } from 'drizzle-orm';
 import { db, ensureTablesCreated } from './index.ts';
 import { users, telegramConfigs, storeConfigs, aiConfigs, serverDomainConfigs, emailConfigs } from './schema.ts';
 import { sendActivationEmail, sendPasswordResetEmail, getEmailConfig } from '../services/email.ts';
+import { DEFAULT_GEMINI_MODEL } from '../services/gemini-models.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.APP_SECRET || 'comerxia-sql-auth-secret-key-2026';
 
@@ -200,7 +201,7 @@ export async function createInitialAdmin(data: {
       await db.insert(aiConfigs).values({
         userId: createdUser.id,
         apiKey: null,
-        modelName: 'gemini-3.6-flash',
+        modelName: DEFAULT_GEMINI_MODEL,
         temperature: '0.20',
       }).catch(() => {});
     }

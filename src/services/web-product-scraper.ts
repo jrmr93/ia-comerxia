@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { getAiClient, hasValidAiApiKey } from './gemini-parser.ts';
+import { GEMINI_CANDIDATE_MODELS, buildCandidateModelList } from './gemini-models.ts';
 import { persistImageListLocally, persistImageLocally } from './media-storage.ts';
 import { CostOption, ParsedProductResult } from '../types.ts';
 import { Type, ThinkingLevel } from '@google/genai';
@@ -649,7 +650,7 @@ INSTRUCCIONES CRÍTICAS:
 
   try {
     const ai = getAiClient();
-    const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
+    const candidateModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
     for (const modelName of candidateModels) {
       try {

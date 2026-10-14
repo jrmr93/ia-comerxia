@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { getAiClient, hasValidAiApiKey } from './gemini-parser.ts';
 import { persistImageLocally } from './media-storage.ts';
+import { GEMINI_CANDIDATE_MODELS, buildCandidateModelList } from './gemini-models.ts';
 
 export interface WebImageResult {
   url: string;
@@ -155,12 +156,8 @@ Devuelve JSON:
     return fallbackProfile;
   }
 
-  // Candidate models (prefer modern Gemini 3.5 Flash Lite for fast low-cost JSON refinement)
-  const candidateModels = [
-    'gemini-3.5-flash-lite',
-    'gemini-3.6-flash',
-    'gemini-flash-latest',
-  ];
+  // Candidate models (prefer fast & cheap models for JSON refinement)
+  const candidateModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
   for (const model of candidateModels) {
     try {
@@ -746,7 +743,7 @@ export async function generateProductStudioPhotoWithAI(product: {
   if (hasValidAiApiKey()) {
     try {
       const ai = getAiClient();
-      const candidateImageModels = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest'];
+      const candidateImageModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
       for (const model of candidateImageModels) {
         try {
@@ -1171,11 +1168,7 @@ Responde SOLO un objeto JSON con este formato exacto:
   "webQueries": ["query1", "query2", "query3"]
 }`;
 
-    const candidateCopyModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-3.6-flash',
-      'gemini-flash-latest',
-    ];
+    const candidateCopyModels = buildCandidateModelList(null, [...GEMINI_CANDIDATE_MODELS]);
 
     let copyParsedSuccessfully = false;
     for (const model of candidateCopyModels) {
