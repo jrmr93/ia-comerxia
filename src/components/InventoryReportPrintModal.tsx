@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, X, FileText, DollarSign, Package, Layers, TrendingUp, ArrowUpDown, Tag, Type } from 'lucide-react';
+import { Printer, X, FileText, DollarSign, Package, Layers, TrendingUp, ArrowUpDown, Tag, Type, List } from 'lucide-react';
 import { InventoryItem, StoreConfig } from '../types.ts';
 import { calculateItemFinancials } from './InventoryView.tsx';
 
@@ -389,7 +389,123 @@ export function printInventoryReportDocument(options: {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Price List print: only Code, Product, PVP c/IVA
+// ─────────────────────────────────────────────────────────────────────────────
+export function printPriceListDocument(options: {
+  sortedItems: any[];
+  storeConfig?: Partial<StoreConfig> | null;
+  currency: string;
+  orientation: 'landscape' | 'portrait';
+  sortBy: InventoryReportSortOption;
+}) {
+  const { sortedItems, storeConfig, currency, orientation, sortBy } = options;
+
+  const fmtMoney = (val: number) =>
+    `${currency}${val.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const storeName = storeConfig?.storeName || 'MI TIENDA';
+  const storePhone = storeConfig?.whatsappNumber || '';
+  const storeAddress = storeConfig?.address || '';
+  const storeLogo = storeConfig?.logoDesktopUrl || storeConfig?.logoUrl || null;
+  const currentDateStr = new Date().toLocaleString('es-EC', { dateStyle: 'long', timeStyle: 'short' });
+  const cols = orientation === 'landscape' ? 3 : 2;
+  const fontSize = orientation === 'portrait' ? '8px' : '9px';
+  const nameFontSize = orientation === 'portrait' ? '8px' : '9px';
+  const pvpFontSize = orientation === 'portrait' ? '11px' : '13px';
+  const codeFontSize = orientation === 'portrait' ? '7px' : '7.5px';
+
+  const cellsHtml = sortedItems.map((pi: any) => {
+    const { item, fin } = pi;
+    const code = item.sku || item.barcode || item.supplierCode || `ID-${item.id}`;
+    return `<div class="price-card">
+      <div class="price-code">${code}</div>
+      <div class="price-name" title="${item.name.replace(/"/g, '&quot;')}">${item.name}</div>
+      <div class="price-pvp">${fmtMoney(fin.salePriceWithTax)}</div>
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Lista de Precios - ${storeName}</title>
+  <style>
+    @page { size: A4 ${orientation}; margin: 6mm 8mm; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; background: #fff; color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: ${fontSize}; line-height: 1.2;
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+    }
+    .header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      border-bottom: 2px solid #0f172a; padding-bottom: 3px; margin-bottom: 5px;
+    }
+    .store-info { display: flex; align-items: center; gap: 8px; }
+    .store-logo { height: 26px; max-width: 100px; object-fit: contain; }
+    .store-title { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin: 0; }
+    .store-sub { font-size: 7.5px; color: #475569; margin: 0; }
+    .doc-meta { text-align: right; }
+    .doc-badge { display: inline-block; padding: 2px 7px; background: #0369a1; color: #fef08a; font-size: 8.5px; font-weight: 800; text-transform: uppercase; border-radius: 3px; margin-bottom: 2px; }
+    .meta-text { font-size: 7.5px; color: #64748b; margin: 0; }
+    .price-grid { display: grid; grid-template-columns: repeat(${cols}, 1fr); gap: 3px; }
+    .price-card {
+      border: 1px solid #cbd5e1; border-radius: 3px; padding: 3px 5px; background: #f8fafc;
+      page-break-inside: avoid; break-inside: avoid; overflow: hidden;
+    }
+    .price-card:nth-child(even) { background: #f1f5f9; }
+    .price-code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: ${codeFontSize}; font-weight: 700; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .price-name { font-size: ${nameFontSize}; font-weight: 700; color: #0f172a; margin: 1px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .price-pvp { font-size: ${pvpFontSize}; font-weight: 900; color: #0369a1; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .footer { margin-top: 5px; padding-top: 2px; border-top: 1px solid #cbd5e1; display: flex; justify-content: space-between; font-size: 7px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="store-info">
+      ${storeLogo
+        ? `<img src="${storeLogo}" class="store-logo" />`
+        : `<div style="width:24px;height:24px;background:#0f172a;color:#fff;font-weight:900;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px">${storeName.charAt(0)}</div>`}
+      <div>
+        <div class="store-title">${storeName}</div>
+        ${storeAddress ? `<div class="store-sub">${storeAddress}</div>` : ''}
+        ${storePhone ? `<div class="store-sub">Telf/WhatsApp: ${storePhone}</div>` : ''}
+      </div>
+    </div>
+    <div class="doc-meta">
+      <div class="doc-badge">LISTA DE PRECIOS c/IVA</div>
+      <div class="meta-text">Emisión: ${currentDateStr}</div>
+      <div class="meta-text">Orden: ${sortBy === 'name' ? 'Nombre A-Z' : sortBy === 'category' ? 'Categoría' : 'Selección'} | ${sortedItems.length} productos</div>
+    </div>
+  </div>
+  <div class="price-grid">${cellsHtml}</div>
+  <div class="footer">
+    <div>Comerxia ERP — Lista de Precios con IVA incluido</div>
+    <div>${orientation === 'landscape' ? 'A4 Horizontal' : 'A4 Vertical'} · ${sortedItems.length} ítems</div>
+  </div>
+</body>
+</html>`;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(iframe);
+  const frameDoc = iframe.contentWindow?.document;
+  if (frameDoc) {
+    frameDoc.open();
+    frameDoc.write(html);
+    frameDoc.close();
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 2000);
+    }, 250);
+  }
+}
+
 export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps> = ({
+
   items,
   storeConfig,
   currency = '$',
@@ -397,6 +513,8 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
 }) => {
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [sortBy, setSortBy] = useState<InventoryReportSortOption>('original');
+  const [printMode, setPrintMode] = useState<'full' | 'pricelist'>('full');
+  const [showPhotoInPriceList, setShowPhotoInPriceList] = useState(false);
 
   // Format money helper
   const fmtMoney = (val: number) => {
@@ -480,15 +598,11 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
   });
 
   const handlePrint = () => {
-    printInventoryReportDocument({
-      sortedItems,
-      grandTotals,
-      avgMargin,
-      storeConfig,
-      currency,
-      orientation,
-      sortBy,
-    });
+    if (printMode === 'pricelist') {
+      printPriceListDocument({ sortedItems, storeConfig, currency, orientation, sortBy, showPhoto: showPhotoInPriceList });
+    } else {
+      printInventoryReportDocument({ sortedItems, grandTotals, avgMargin, storeConfig, currency, orientation, sortBy });
+    }
   };
 
   if (typeof document === 'undefined') return null;
@@ -516,8 +630,37 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
             </div>
           </div>
 
-          {/* Controls Bar: Sort + Orientation + Print */}
+          {/* Controls Bar: Mode + Sort + Orientation + Print */}
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+            {/* Print Mode Selector */}
+            <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700 text-xs text-slate-300 font-medium">
+              <span className="text-[10px] uppercase font-bold text-slate-400 px-2 flex items-center gap-1">
+                <Printer className="w-3 h-3 text-sky-400" />
+                Modo:
+              </span>
+              <button
+                type="button"
+                onClick={() => setPrintMode('full')}
+                className={`px-2 py-0.5 rounded-lg transition text-[11px] flex items-center gap-1 ${
+                  printMode === 'full' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'hover:text-white hover:bg-slate-700'
+                }`}
+                title="Reporte completo con costos, márgenes y totales"
+              >
+                <FileText className="w-3 h-3" />
+                Reporte Completo
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintMode('pricelist')}
+                className={`px-2 py-0.5 rounded-lg transition text-[11px] flex items-center gap-1 ${
+                  printMode === 'pricelist' ? 'bg-blue-600 text-white font-bold shadow-xs' : 'hover:text-white hover:bg-slate-700'
+                }`}
+                title="Lista simple: código, producto y PVP c/IVA"
+              >
+                <List className="w-3 h-3" />
+                Lista de Precios
+              </button>
+            </div>
             {/* Sort Order Selector */}
             <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700 text-xs text-slate-300 font-medium">
               <span className="text-[10px] uppercase font-bold text-slate-400 px-2 flex items-center gap-1">
@@ -592,10 +735,14 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
 
             <button
               onClick={handlePrint}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5 cursor-pointer active:scale-95"
+              className={`px-3.5 py-1.5 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5 cursor-pointer active:scale-95 bg-gradient-to-r ${
+                printMode === 'pricelist'
+                  ? 'from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700'
+                  : 'from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700'
+              }`}
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir</span>
+              <span>{printMode === 'pricelist' ? 'Imprimir Lista' : 'Imprimir Reporte'}</span>
             </button>
             <button
               onClick={onClose}
@@ -708,7 +855,40 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
               </div>
             </div>
 
-            {/* Products Table */}
+            {/* Products Section — switchable between full report table and price list cards */}
+            {printMode === 'pricelist' ? (
+              /* ── PRICE LIST PREVIEW ── */
+              <>
+                <div className="mb-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-[10px] text-blue-700 font-semibold flex items-center gap-2">
+                  <List className="w-3.5 h-3.5 shrink-0" />
+                  <span>Vista previa: <strong>Lista de Precios</strong> — Código · Producto · PVP c/IVA (formato {orientation === 'landscape' ? '3' : '2'} columnas por página A4)</span>
+                </div>
+                <div
+                  className="grid gap-1.5"
+                  style={{ gridTemplateColumns: orientation === 'landscape' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}
+                >
+                  {sortedItems.map((pi, idx) => {
+                    const { item, fin } = pi;
+                    const code = item.sku || item.barcode || item.supplierCode || `ID-${item.id}`;
+                    return (
+                      <div
+                        key={item.id}
+                        className={`border border-slate-200 rounded-lg px-2.5 py-1.5 ${idx % 2 === 0 ? 'bg-slate-50' : 'bg-slate-100/70'}`}
+                      >
+                        <div className="font-mono text-[9px] font-bold text-slate-400 truncate">{code}</div>
+                        <div className="font-bold text-[10px] sm:text-[11px] text-slate-900 truncate leading-tight" title={item.name}>
+                          {item.name}
+                        </div>
+                        <div className="font-black text-sm text-blue-700 font-mono leading-tight mt-0.5">
+                          {fmtMoney(fin.salePriceWithTax)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+            /* ── FULL REPORT TABLE ── */
             <div className="w-full overflow-hidden">
               <table
                 className="w-full border-collapse text-slate-900 font-sans leading-tight table-fixed"
@@ -853,15 +1033,18 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                 </tfoot>
               </table>
             </div>
+            )}{/* end full report */}
 
             {/* Document Footer */}
             <div className="mt-4 pt-2 border-t border-slate-300 flex items-center justify-between text-[9px] text-slate-500">
               <div>
-                <p className="font-semibold text-slate-700">Comerxia ERP — Sistema de Gestión Comercial</p>
-                <p>Reporte oficial de inventario valorado para control físico y financiero.</p>
+                <p className="font-semibold text-slate-700">
+                  Comerxia ERP — {printMode === 'pricelist' ? 'Lista de Precios c/IVA' : 'Sistema de Gestión Comercial'}
+                </p>
+                <p>{printMode === 'pricelist' ? 'Precios vigentes con IVA incluido.' : 'Reporte oficial de inventario valorado para control físico y financiero.'}</p>
               </div>
               <div className="text-right font-mono">
-                Documento A4 ({orientation === 'landscape' ? 'Horizontal' : 'Vertical'})
+                {printMode === 'pricelist' ? 'Lista de Precios' : 'Reporte'} A4 ({orientation === 'landscape' ? 'Horizontal' : 'Vertical'})
               </div>
             </div>
           </div>
@@ -881,10 +1064,12 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
             </button>
             <button
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+              className={`px-4 py-1.5 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center space-x-1.5 cursor-pointer ${
+                printMode === 'pricelist' ? 'bg-blue-600 hover:bg-blue-500' : 'bg-sky-600 hover:bg-sky-500'
+              }`}
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir Reporte (A4)</span>
+              <span>{printMode === 'pricelist' ? 'Imprimir Lista de Precios (A4)' : 'Imprimir Reporte (A4)'}</span>
             </button>
           </div>
         </div>
