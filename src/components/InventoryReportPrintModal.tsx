@@ -3,6 +3,38 @@ import { createPortal } from 'react-dom';
 import { Printer, X, FileText, DollarSign, Package, Layers, TrendingUp, ArrowUpDown, Tag, Type, List } from 'lucide-react';
 import { InventoryItem, StoreConfig } from '../types.ts';
 import { calculateItemFinancials } from './InventoryView.tsx';
+import { normalizeMediaUrl } from '../utils/media-helper.ts';
+
+function getProductCoverPhoto(item: InventoryItem | any): string {
+  if (!item) return '';
+  let url = '';
+  if (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim()) {
+    url = item.imageUrl.trim();
+  } else if (Array.isArray(item.images) && item.images.length > 0) {
+    const first = item.images.find((img: any) => typeof img === 'string' && img.trim());
+    if (first) url = first.trim();
+  } else if (typeof item.images === 'string' && item.images.trim()) {
+    try {
+      const parsed = JSON.parse(item.images);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const first = parsed.find((img: any) => typeof img === 'string' && img.trim());
+        if (first) url = first.trim();
+      }
+    } catch {
+      // not JSON
+    }
+  }
+  return normalizeMediaUrl(url);
+}
+
+function escapeHtml(str: string): string {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 export interface InventoryReportPrintModalProps {
   items: InventoryItem[];
@@ -390,16 +422,17 @@ export function printInventoryReportDocument(options: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Price List print: only Code, Product, PVP c/IVA
+// Price List print: Single continuous table row per product with cover thumbnail
 // ─────────────────────────────────────────────────────────────────────────────
 export function printPriceListDocument(options: {
   sortedItems: any[];
+  grandTotals?: any;
   storeConfig?: Partial<StoreConfig> | null;
   currency: string;
   orientation: 'landscape' | 'portrait';
   sortBy: InventoryReportSortOption;
 }) {
-  const { sortedItems, storeConfig, currency, orientation, sortBy } = options;
+  const { sortedItems, grandTotals, storeConfig, currency, orientation, sortBy } = options;
 
   const fmtMoney = (val: number) =>
     `${currency}${val.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -409,81 +442,330 @@ export function printPriceListDocument(options: {
   const storeAddress = storeConfig?.address || '';
   const storeLogo = storeConfig?.logoDesktopUrl || storeConfig?.logoUrl || null;
   const currentDateStr = new Date().toLocaleString('es-EC', { dateStyle: 'long', timeStyle: 'short' });
-  const cols = orientation === 'landscape' ? 3 : 2;
-  const fontSize = orientation === 'portrait' ? '8px' : '9px';
-  const nameFontSize = orientation === 'portrait' ? '8px' : '9px';
-  const pvpFontSize = orientation === 'portrait' ? '11px' : '13px';
-  const codeFontSize = orientation === 'portrait' ? '7px' : '7.5px';
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
-  const cellsHtml = sortedItems.map((pi: any) => {
-    const { item, fin } = pi;
-    const code = item.sku || item.barcode || item.supplierCode || `ID-${item.id}`;
-    return `<div class="price-card">
-      <div class="price-code">${code}</div>
-      <div class="price-name" title="${item.name.replace(/"/g, '&quot;')}">${item.name}</div>
-      <div class="price-pvp">${fmtMoney(fin.salePriceWithTax)}</div>
-    </div>`;
-  }).join('');
+  const fontSize = orientation === 'portrait' ? '8px' : '9px';
+  const thFontSize = orientation === 'portrait' ? '7.5px' : '8.5px';
+  const pvpFontSize = orientation === 'portrait' ? '10px' : '11.5px';
+
+  const rowsHtml = sortedItems
+    .map((pi: any, idx: number) => {
+      const { item, fin } = pi;
+      const code = item.sku || item.barcode || item.supplierCode || `ID-${item.id}`;
+      const cleanCover = getProductCoverPhoto(item);
+      const coverUrl = cleanCover ? (cleanCover.startsWith('/') ? `${origin}${cleanCover}` : cleanCover) : '';
+      const escapedName = escapeHtml(item.name || '');
+      const category = escapeHtml(item.category || 'Sin cat.');
+
+      return `
+        <tr>
+          <td class="center row-idx">${idx + 1}</td>
+          <td class="center photo-col">
+            ${
+              coverUrl
+                ? `
+              <div class="thumb-box">
+                <img src="${coverUrl}" class="thumb-img" alt="${escapedName}" loading="eager" decoding="sync" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="thumb-placeholder" style="display:none;"><span>Sin foto</span></div>
+              </div>`
+                : `
+              <div class="thumb-box">
+                <div class="thumb-placeholder"><span>Sin foto</span></div>
+              </div>`
+            }
+          </td>
+          <td class="mono code-cell">
+            <div class="code-primary">${escapeHtml(code)}</div>
+            ${item.barcode && item.barcode !== code ? `<div class="code-sub">${escapeHtml(item.barcode)}</div>` : ''}
+          </td>
+          <td class="name-cell">
+            <div class="name-text" title="${escapedName}">${escapedName}</div>
+          </td>
+          <td class="cat-cell">${category}</td>
+          <td class="right pvp-cell">${fmtMoney(fin.salePriceWithTax)}</td>
+        </tr>`;
+    })
+    .join('');
 
   const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <base href="${origin}/">
   <title>Lista de Precios - ${storeName}</title>
   <style>
-    @page { size: A4 ${orientation}; margin: 6mm 8mm; }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0; background: #fff; color: #0f172a;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: ${fontSize}; line-height: 1.2;
-      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+    @page {
+      size: A4 ${orientation};
+      margin: 5mm 6mm;
     }
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: ${fontSize};
+      line-height: 1.2;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    .report-container {
+      width: 100%;
+      background: #ffffff;
+    }
+
     .header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      border-bottom: 2px solid #0f172a; padding-bottom: 3px; margin-bottom: 5px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 4px;
+      margin-bottom: 5px;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .store-info { display: flex; align-items: center; gap: 8px; }
-    .store-logo { height: 26px; max-width: 100px; object-fit: contain; }
-    .store-title { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin: 0; }
-    .store-sub { font-size: 7.5px; color: #475569; margin: 0; }
+    .store-logo { height: 28px; max-width: 110px; object-fit: contain; }
+    .store-title { font-size: 11.5px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin: 0; line-height: 1.1; }
+    .store-sub { font-size: 7.5px; color: #475569; margin: 0; line-height: 1.1; }
     .doc-meta { text-align: right; }
-    .doc-badge { display: inline-block; padding: 2px 7px; background: #0369a1; color: #fef08a; font-size: 8.5px; font-weight: 800; text-transform: uppercase; border-radius: 3px; margin-bottom: 2px; }
-    .meta-text { font-size: 7.5px; color: #64748b; margin: 0; }
-    .price-grid { display: grid; grid-template-columns: repeat(${cols}, 1fr); gap: 3px; }
-    .price-card {
-      border: 1px solid #cbd5e1; border-radius: 3px; padding: 3px 5px; background: #f8fafc;
-      page-break-inside: avoid; break-inside: avoid; overflow: hidden;
+    .doc-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      background: #0369a1;
+      color: #fef08a;
+      font-size: 8.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      border-radius: 3px;
+      margin-bottom: 2px;
     }
-    .price-card:nth-child(even) { background: #f1f5f9; }
-    .price-code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: ${codeFontSize}; font-weight: 700; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .price-name { font-size: ${nameFontSize}; font-weight: 700; color: #0f172a; margin: 1px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .price-pvp { font-size: ${pvpFontSize}; font-weight: 900; color: #0369a1; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
-    .footer { margin-top: 5px; padding-top: 2px; border-top: 1px solid #cbd5e1; display: flex; justify-content: space-between; font-size: 7px; color: #94a3b8; }
+    .meta-text { font-size: 7.5px; color: #64748b; margin: 0; line-height: 1.1; }
+
+    table.pricelist-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: ${fontSize};
+    }
+    thead {
+      display: table-header-group;
+    }
+    tfoot {
+      display: table-row-group;
+    }
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    th {
+      background: #0f172a;
+      color: #ffffff;
+      font-size: ${thFontSize};
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 3.5px 3px;
+      border: 1px solid #0f172a;
+      text-align: left;
+      line-height: 1.1;
+    }
+    th.center { text-align: center; }
+    th.right { text-align: right; }
+    th.pvp-th {
+      background: #0369a1 !important;
+      color: #fef08a !important;
+      font-weight: 900 !important;
+    }
+
+    td {
+      padding: 2.5px 3px;
+      border-bottom: 1px solid #cbd5e1;
+      border-right: 1px solid #e2e8f0;
+      color: #1e293b;
+      vertical-align: middle;
+      line-height: 1.15;
+    }
+    td.center { text-align: center; }
+    td.right { text-align: right; }
+    td.mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+
+    tr:nth-child(even) {
+      background-color: #f8fafc !important;
+    }
+
+    .row-idx {
+      font-weight: 800;
+      color: #64748b;
+      font-size: 7.5px;
+    }
+    .photo-col {
+      padding: 3px 2px;
+      width: ${orientation === 'landscape' ? '76px' : '72px'};
+    }
+    .thumb-box {
+      width: ${orientation === 'landscape' ? '68px' : '64px'};
+      height: ${orientation === 'landscape' ? '68px' : '64px'};
+      margin: 0 auto;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+    }
+    .thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .thumb-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      text-align: center;
+      line-height: 1;
+      padding: 2px;
+    }
+    .code-cell {
+      font-weight: 800;
+      color: #1e293b;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .code-primary {
+      font-size: ${orientation === 'portrait' ? '7.5px' : '8.5px'};
+    }
+    .code-sub {
+      font-size: 6.5px;
+      color: #64748b;
+      font-weight: normal;
+    }
+    .name-cell {
+      font-weight: 700;
+      color: #0f172a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .name-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: ${orientation === 'portrait' ? '8px' : '9px'};
+    }
+    .cat-cell {
+      color: #475569;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: ${orientation === 'portrait' ? '7.5px' : '8.5px'};
+    }
+    td.pvp-cell {
+      background-color: #f0f9ff !important;
+      color: #0369a1 !important;
+      font-weight: 900 !important;
+      font-size: ${pvpFontSize};
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      border-left: 1px solid #93c5fd !important;
+      border-right: 1px solid #93c5fd !important;
+      white-space: nowrap;
+    }
+
+    tfoot tr {
+      background: #0f172a !important;
+      color: #ffffff !important;
+      font-weight: 800;
+    }
+    tfoot td {
+      border: 1px solid #0f172a !important;
+      padding: 3px 4px !important;
+      color: #ffffff !important;
+    }
+    tfoot td.pvp-foot {
+      background-color: #0369a1 !important;
+      color: #fef08a !important;
+      font-weight: 900 !important;
+      text-align: right;
+    }
+
+    .footer {
+      margin-top: 5px;
+      padding-top: 2px;
+      border-top: 1px solid #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      font-size: 7px;
+      color: #94a3b8;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="store-info">
-      ${storeLogo
-        ? `<img src="${storeLogo}" class="store-logo" />`
-        : `<div style="width:24px;height:24px;background:#0f172a;color:#fff;font-weight:900;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px">${storeName.charAt(0)}</div>`}
-      <div>
-        <div class="store-title">${storeName}</div>
-        ${storeAddress ? `<div class="store-sub">${storeAddress}</div>` : ''}
-        ${storePhone ? `<div class="store-sub">Telf/WhatsApp: ${storePhone}</div>` : ''}
+  <div class="report-container">
+    <div class="header">
+      <div class="store-info">
+        ${
+          storeLogo
+            ? `<img src="${storeLogo}" class="store-logo" />`
+            : `<div style="width:24px;height:24px;background:#0f172a;color:#fff;font-weight:900;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px">${storeName.charAt(0)}</div>`
+        }
+        <div>
+          <div class="store-title">${storeName}</div>
+          ${storeAddress ? `<div class="store-sub">${storeAddress}</div>` : ''}
+          ${storePhone ? `<div class="store-sub">Telf/WhatsApp: ${storePhone}</div>` : ''}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <div class="doc-badge">LISTA DE PRECIOS c/IVA</div>
+        <div class="meta-text">Emisión: ${currentDateStr}</div>
+        <div class="meta-text">Orden: ${sortBy === 'name' ? 'Nombre A-Z' : sortBy === 'category' ? 'Categoría' : 'Selección'} | ${sortedItems.length} productos</div>
       </div>
     </div>
-    <div class="doc-meta">
-      <div class="doc-badge">LISTA DE PRECIOS c/IVA</div>
-      <div class="meta-text">Emisión: ${currentDateStr}</div>
-      <div class="meta-text">Orden: ${sortBy === 'name' ? 'Nombre A-Z' : sortBy === 'category' ? 'Categoría' : 'Selección'} | ${sortedItems.length} productos</div>
+
+    <table class="pricelist-table">
+      <thead>
+        <tr>
+          <th style="width:${orientation === 'landscape' ? '3%' : '3%'};" class="center">#</th>
+          <th style="width:${orientation === 'landscape' ? '9.5%' : '14%'};" class="center">Foto</th>
+          <th style="width:${orientation === 'landscape' ? '14%' : '15%'};">Código / SKU</th>
+          <th style="width:${orientation === 'landscape' ? '48.5%' : '41%'};">Producto</th>
+          <th style="width:${orientation === 'landscape' ? '12%' : '13%'};">Categoría</th>
+          <th style="width:${orientation === 'landscape' ? '13%' : '14%'};" class="right pvp-th">PVP c/IVA ⭐</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5" style="text-align:right;text-transform:uppercase;font-size:${orientation === 'portrait' ? '7.5px' : '8.5px'}">
+            TOTAL DE PRODUCTOS EN LISTA (${sortedItems.length} ITEMS):
+          </td>
+          <td class="right pvp-foot">
+            ${grandTotals ? fmtMoney(grandTotals.totalPvpConIva) : `${sortedItems.length} ítems`}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="footer">
+      <div>Comerxia ERP — Lista de Precios con IVA incluido</div>
+      <div>${orientation === 'landscape' ? 'A4 Horizontal' : 'A4 Vertical'} · ${sortedItems.length} ítems</div>
     </div>
-  </div>
-  <div class="price-grid">${cellsHtml}</div>
-  <div class="footer">
-    <div>Comerxia ERP — Lista de Precios con IVA incluido</div>
-    <div>${orientation === 'landscape' ? 'A4 Horizontal' : 'A4 Vertical'} · ${sortedItems.length} ítems</div>
   </div>
 </body>
 </html>`;
@@ -496,11 +778,51 @@ export function printPriceListDocument(options: {
     frameDoc.open();
     frameDoc.write(html);
     frameDoc.close();
-    setTimeout(() => {
+
+    const doPrint = () => {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
-      setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 2000);
-    }, 250);
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 2000);
+    };
+
+    // Ensure all images are loaded before triggering print dialog
+    const imgs = Array.from(frameDoc.images);
+    if (imgs.length === 0) {
+      setTimeout(doPrint, 250);
+    } else {
+      let loaded = 0;
+      let finished = false;
+      const total = imgs.length;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        setTimeout(doPrint, 100);
+      };
+
+      const timer = setTimeout(finish, 1500); // 1.5s fallback limit
+
+      imgs.forEach((img) => {
+        if (img.complete) {
+          loaded++;
+          if (loaded >= total) {
+            clearTimeout(timer);
+            finish();
+          }
+        } else {
+          img.onload = img.onerror = () => {
+            loaded++;
+            if (loaded >= total) {
+              clearTimeout(timer);
+              finish();
+            }
+          };
+        }
+      });
+    }
   }
 }
 
@@ -514,7 +836,6 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [sortBy, setSortBy] = useState<InventoryReportSortOption>('original');
   const [printMode, setPrintMode] = useState<'full' | 'pricelist'>('full');
-  const [showPhotoInPriceList, setShowPhotoInPriceList] = useState(false);
 
   // Format money helper
   const fmtMoney = (val: number) => {
@@ -599,7 +920,7 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
 
   const handlePrint = () => {
     if (printMode === 'pricelist') {
-      printPriceListDocument({ sortedItems, storeConfig, currency, orientation, sortBy, showPhoto: showPhotoInPriceList });
+      printPriceListDocument({ sortedItems, grandTotals, storeConfig, currency, orientation, sortBy });
     } else {
       printInventoryReportDocument({ sortedItems, grandTotals, avgMargin, storeConfig, currency, orientation, sortBy });
     }
@@ -791,8 +1112,12 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
               </div>
 
               <div className="text-right">
-                <div className="inline-block px-2 py-0.5 bg-slate-900 text-white rounded font-bold text-[10px] uppercase tracking-wider mb-0.5">
-                  REPORTE DE INVENTARIO VALORADO
+                <div
+                  className={`inline-block px-2 py-0.5 text-white rounded font-bold text-[10px] uppercase tracking-wider mb-0.5 ${
+                    printMode === 'pricelist' ? 'bg-blue-700' : 'bg-slate-900'
+                  }`}
+                >
+                  {printMode === 'pricelist' ? 'LISTA DE PRECIOS c/IVA' : 'REPORTE DE INVENTARIO VALORADO'}
                 </div>
                 <p className="text-[10px] text-slate-500 font-semibold">
                   Emisión: <span className="text-slate-800">{currentDateStr}</span>
@@ -803,90 +1128,196 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
               </div>
             </div>
 
-            {/* Financial Summary Top Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-              <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase mb-0.5">
-                  <span>Stock Total</span>
-                  <Package className="w-3.5 h-3.5 text-sky-600" />
-                </div>
-                <div className="text-sm font-extrabold text-slate-900">
-                  {grandTotals.totalStock.toLocaleString('es-EC')} <span className="text-[11px] font-normal text-slate-500">uds</span>
-                </div>
-              </div>
-
-              <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
-                <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase mb-0.5">
-                  <span>Costo Total + IVA</span>
-                  <DollarSign className="w-3.5 h-3.5 text-amber-600" />
-                </div>
-                <div className="text-sm font-extrabold text-amber-900">
-                  {fmtMoney(grandTotals.totalCostConIva)}
-                </div>
-                <div className="text-[9px] text-slate-500">
-                  Sin IVA: {fmtMoney(grandTotals.totalCostSinIva)}
-                </div>
-              </div>
-
-              <div className="p-2 bg-amber-50 border border-amber-300 rounded-xl shadow-2xs">
-                <div className="flex items-center justify-between text-amber-900 text-[10px] font-extrabold uppercase mb-0.5">
-                  <span>PVP Total + IVA ⭐</span>
-                  <Layers className="w-3.5 h-3.5 text-amber-700" />
-                </div>
-                <div className="text-sm font-black text-amber-950">
-                  {fmtMoney(grandTotals.totalPvpConIva)}
-                </div>
-                <div className="text-[9px] font-bold text-amber-800">
-                  Sin IVA: {fmtMoney(grandTotals.totalPvpSinIva)}
-                </div>
-              </div>
-
-              <div className="p-2 bg-emerald-50/80 border border-emerald-200 rounded-xl">
-                <div className="flex items-center justify-between text-emerald-800 text-[10px] font-bold uppercase mb-0.5">
-                  <span>Ganancia Proyectada</span>
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                </div>
-                <div className="text-sm font-extrabold text-emerald-950">
-                  {fmtMoney(grandTotals.totalProfit)}
-                </div>
-                <div className="text-[9px] font-bold text-emerald-700">
-                  Margen prom: {avgMargin}%
-                </div>
-              </div>
-            </div>
-
-            {/* Products Section — switchable between full report table and price list cards */}
+            {/* Financial / Metric Summary Top Cards */}
             {printMode === 'pricelist' ? (
-              /* ── PRICE LIST PREVIEW ── */
-              <>
-                <div className="mb-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-[10px] text-blue-700 font-semibold flex items-center gap-2">
-                  <List className="w-3.5 h-3.5 shrink-0" />
-                  <span>Vista previa: <strong>Lista de Precios</strong> — Código · Producto · PVP c/IVA (formato {orientation === 'landscape' ? '3' : '2'} columnas por página A4)</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase mb-0.5">
+                    <span>Total Productos</span>
+                    <Package className="w-3.5 h-3.5 text-blue-600" />
+                  </div>
+                  <div className="text-sm font-extrabold text-slate-900">
+                    {sortedItems.length} <span className="text-[11px] font-normal text-slate-500">ítems</span>
+                  </div>
                 </div>
-                <div
-                  className="grid gap-1.5"
-                  style={{ gridTemplateColumns: orientation === 'landscape' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)' }}
+
+                <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase mb-0.5">
+                    <span>Stock Total</span>
+                    <Layers className="w-3.5 h-3.5 text-sky-600" />
+                  </div>
+                  <div className="text-sm font-extrabold text-slate-900">
+                    {grandTotals.totalStock.toLocaleString('es-EC')} <span className="text-[11px] font-normal text-slate-500">uds</span>
+                  </div>
+                </div>
+
+                <div className="p-2 bg-blue-50/70 border border-blue-200 rounded-xl">
+                  <div className="flex items-center justify-between text-blue-800 text-[10px] font-bold uppercase mb-0.5">
+                    <span>PVP Promedio c/IVA</span>
+                    <DollarSign className="w-3.5 h-3.5 text-blue-600" />
+                  </div>
+                  <div className="text-sm font-extrabold text-blue-950 font-mono">
+                    {fmtMoney(sortedItems.length > 0 ? grandTotals.totalPvpConIva / sortedItems.length : 0)}
+                  </div>
+                  <div className="text-[9px] text-blue-700">Sin IVA: {fmtMoney(sortedItems.length > 0 ? grandTotals.totalPvpSinIva / sortedItems.length : 0)}</div>
+                </div>
+
+                <div className="p-2 bg-amber-50/80 border border-amber-300 rounded-xl shadow-2xs">
+                  <div className="flex items-center justify-between text-amber-900 text-[10px] font-extrabold uppercase mb-0.5">
+                    <span>PVP Total Catálogo ⭐</span>
+                    <DollarSign className="w-3.5 h-3.5 text-amber-700" />
+                  </div>
+                  <div className="text-sm font-black text-amber-950 font-mono">
+                    {fmtMoney(grandTotals.totalPvpConIva)}
+                  </div>
+                  <div className="text-[9px] font-bold text-amber-800">
+                    Total catálogo c/IVA
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase mb-0.5">
+                    <span>Stock Total</span>
+                    <Package className="w-3.5 h-3.5 text-sky-600" />
+                  </div>
+                  <div className="text-sm font-extrabold text-slate-900">
+                    {grandTotals.totalStock.toLocaleString('es-EC')} <span className="text-[11px] font-normal text-slate-500">uds</span>
+                  </div>
+                </div>
+
+                <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase mb-0.5">
+                    <span>Costo Total + IVA</span>
+                    <DollarSign className="w-3.5 h-3.5 text-amber-600" />
+                  </div>
+                  <div className="text-sm font-extrabold text-amber-900">
+                    {fmtMoney(grandTotals.totalCostConIva)}
+                  </div>
+                  <div className="text-[9px] text-slate-500">
+                    Sin IVA: {fmtMoney(grandTotals.totalCostSinIva)}
+                  </div>
+                </div>
+
+                <div className="p-2 bg-amber-50 border border-amber-300 rounded-xl shadow-2xs">
+                  <div className="flex items-center justify-between text-amber-900 text-[10px] font-extrabold uppercase mb-0.5">
+                    <span>PVP Total + IVA ⭐</span>
+                    <Layers className="w-3.5 h-3.5 text-amber-700" />
+                  </div>
+                  <div className="text-sm font-black text-amber-950">
+                    {fmtMoney(grandTotals.totalPvpConIva)}
+                  </div>
+                  <div className="text-[9px] font-bold text-amber-800">
+                    Sin IVA: {fmtMoney(grandTotals.totalPvpSinIva)}
+                  </div>
+                </div>
+
+                <div className="p-2 bg-emerald-50/80 border border-emerald-200 rounded-xl">
+                  <div className="flex items-center justify-between text-emerald-800 text-[10px] font-bold uppercase mb-0.5">
+                    <span>Ganancia Proyectada</span>
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                  </div>
+                  <div className="text-sm font-extrabold text-emerald-950">
+                    {fmtMoney(grandTotals.totalProfit)}
+                  </div>
+                  <div className="text-[9px] font-bold text-emerald-700">
+                    Margen prom: {avgMargin}%
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Products Section — switchable between full report table and price list single-row table */}
+            {printMode === 'pricelist' ? (
+              /* ── PRICE LIST PREVIEW (Single row per product with thumbnail cover) ── */
+              <div className="w-full overflow-hidden">
+                <div className="mb-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-[10px] text-blue-800 font-semibold flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <List className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Vista previa: <strong>Lista de Precios</strong> — Una sola fila por producto con miniatura de portada</span>
+                  </div>
+                  <span className="text-blue-600 font-bold">{sortedItems.length} {sortedItems.length === 1 ? 'producto' : 'productos'}</span>
+                </div>
+                <table
+                  className="w-full border-collapse text-slate-900 font-sans leading-tight table-fixed border border-slate-300 rounded-lg overflow-hidden"
+                  style={{
+                    fontSize: orientation === 'portrait' ? '8.5px' : '9.5px',
+                  }}
                 >
-                  {sortedItems.map((pi, idx) => {
-                    const { item, fin } = pi;
-                    const code = item.sku || item.barcode || item.supplierCode || `ID-${item.id}`;
-                    return (
-                      <div
-                        key={item.id}
-                        className={`border border-slate-200 rounded-lg px-2.5 py-1.5 ${idx % 2 === 0 ? 'bg-slate-50' : 'bg-slate-100/70'}`}
-                      >
-                        <div className="font-mono text-[9px] font-bold text-slate-400 truncate">{code}</div>
-                        <div className="font-bold text-[10px] sm:text-[11px] text-slate-900 truncate leading-tight" title={item.name}>
-                          {item.name}
-                        </div>
-                        <div className="font-black text-sm text-blue-700 font-mono leading-tight mt-0.5">
-                          {fmtMoney(fin.salePriceWithTax)}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
+                  <thead>
+                    <tr className="bg-slate-900 text-white text-[8px] sm:text-[9px] uppercase tracking-tighter font-extrabold border border-slate-900">
+                      <th style={{ width: orientation === 'landscape' ? '3%' : '3%' }} className="py-2 px-1 text-center border-r border-slate-700">#</th>
+                      <th style={{ width: orientation === 'landscape' ? '9.5%' : '14%' }} className="py-2 px-1 text-center border-r border-slate-700">Foto</th>
+                      <th style={{ width: orientation === 'landscape' ? '14%' : '15%' }} className="py-2 px-2 text-left border-r border-slate-700 truncate">Código / SKU</th>
+                      <th style={{ width: orientation === 'landscape' ? '48.5%' : '41%' }} className="py-2 px-2 text-left border-r border-slate-700 truncate">Producto</th>
+                      <th style={{ width: orientation === 'landscape' ? '12%' : '13%' }} className="py-2 px-2 text-left border-r border-slate-700 truncate">Categoría</th>
+                      <th style={{ width: orientation === 'landscape' ? '13%' : '14%' }} className="py-2 px-2 text-right bg-blue-700 text-yellow-300 font-black truncate">PVP c/IVA ⭐</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 border-x border-b border-slate-300">
+                    {sortedItems.map((pi, index) => {
+                      const { item, fin } = pi;
+                      const code = item.sku || item.barcode || item.supplierCode || `ID-${item.id}`;
+                      const coverPhoto = getProductCoverPhoto(item);
+                      const isEven = index % 2 === 0;
+
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`${isEven ? 'bg-white' : 'bg-slate-50'} hover:bg-blue-50/70 transition-colors`}
+                        >
+                          <td className="py-1 px-1 text-center font-bold text-slate-500 border-r border-slate-200">
+                            {index + 1}
+                          </td>
+                          <td className="py-2 px-1 text-center border-r border-slate-200">
+                            <div className="w-16 h-16 sm:w-[66px] sm:h-[66px] mx-auto rounded-xl overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0 shadow-2xs">
+                              {coverPhoto ? (
+                                <img
+                                  src={coverPhoto}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <span className="text-[9px] font-bold text-slate-400 uppercase text-center leading-none px-1">Sin foto</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-1 px-2 font-mono font-bold text-slate-800 border-r border-slate-200 truncate" title={code}>
+                            <div className="truncate">{code}</div>
+                            {item.barcode && item.barcode !== code && (
+                              <div className="text-[7.5px] font-mono text-slate-500 truncate">{item.barcode}</div>
+                            )}
+                          </td>
+                          <td className="py-1 px-2 font-bold text-slate-900 border-r border-slate-200 truncate" title={item.name}>
+                            {item.name}
+                          </td>
+                          <td className="py-1 px-2 text-slate-600 border-r border-slate-200 truncate" title={item.category || 'Sin categoría'}>
+                            {item.category || 'Sin cat.'}
+                          </td>
+                          <td className="py-1 px-2 text-right font-mono font-black text-blue-700 bg-blue-50/70 border-r border-blue-200 whitespace-nowrap">
+                            {fmtMoney(fin.salePriceWithTax)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white font-bold text-[8px] sm:text-[9.5px] border-t-2 border-slate-900">
+                      <td colSpan={5} className="py-2 px-2 text-right uppercase tracking-wider">
+                        TOTAL DE PRODUCTOS EN LISTA ({sortedItems.length} ITEMS):
+                      </td>
+                      <td className="py-2 px-2 text-right font-mono font-black text-yellow-300 bg-blue-900 truncate">
+                        {fmtMoney(grandTotals.totalPvpConIva)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             ) : (
             /* ── FULL REPORT TABLE ── */
             <div className="w-full overflow-hidden">
