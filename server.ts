@@ -2869,7 +2869,7 @@ async function startServer() {
           supplierName: effectiveSupplier,
           tags: parsed.tags.join(', '),
           extractedAttributes: JSON.stringify(attributesWithGallery),
-          status: 'available',
+          status: config.defaultProductActive === false ? 'archived' : 'available',
           rawTelegramMessage: caption,
         });
       }
@@ -4262,6 +4262,14 @@ async function startServer() {
   };
 
   app.get('/api/store/logo', async (req: Request, res: Response) => {
+    return serveStoreLogoHandler(req, res, false);
+  });
+
+  app.get('/api/store/logo.png', async (req: Request, res: Response) => {
+    return serveStoreLogoHandler(req, res, false);
+  });
+
+  app.get('/api/store/og-image', async (req: Request, res: Response) => {
     return serveStoreLogoHandler(req, res, false);
   });
 
@@ -6498,6 +6506,78 @@ async function startServer() {
     });
   });
 
+  // Dynamic Open Graph HTML renderer for WhatsApp, Telegram, Facebook & Social Sharing
+  const renderStoreHtmlWithOpenGraph = async (rawHtml: string, req: Request): Promise<string> => {
+    try {
+      const config = await getStoreConfig(1).catch(() => null);
+      const storeName = (config?.storeName || 'LOTENGOO').trim();
+      const slogan = (config?.description || 'Catálogo digital con envíos y pedidos directos por WhatsApp').trim();
+      const bannerText = (config?.bannerText || '').trim();
+
+      // Formar la descripción combinando slogan del catálogo y cinta de anuncios/promociones
+      let finalDescription = slogan;
+      if (bannerText && bannerText !== slogan) {
+        finalDescription = slogan ? `${slogan} • ${bannerText}` : bannerText;
+      }
+      if (!finalDescription) {
+        finalDescription = 'Catálogo digital oficial con pedidos directos';
+      }
+
+      const host = req.get('x-forwarded-host') || req.get('host') || 'www.lotengoo.com';
+      const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+      const baseUrl = `${proto}://${host}`;
+      const pageUrl = `${baseUrl}${req.originalUrl || '/'}`;
+      const logoUrl = `${baseUrl}/api/store/logo.png`;
+
+      const escapeHtml = (str: string) =>
+        str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const safeStoreName = escapeHtml(storeName);
+      const safeTitle = escapeHtml(storeName);
+      const safeDesc = escapeHtml(finalDescription);
+      const safeLogo = escapeHtml(logoUrl);
+      const safeUrl = escapeHtml(pageUrl);
+
+      let html = rawHtml;
+
+      // Actualizar <title>
+      html = html.replace(/<title>.*?<\/title>/gi, `<title>${safeTitle}</title>`);
+
+      // Eliminar meta tags antiguos para evitar duplicados
+      html = html.replace(/<meta\s+name=["']description["'][^>]*>/gi, '');
+      html = html.replace(/<meta\s+property=["']og:[^"']+["'][^>]*>/gi, '');
+      html = html.replace(/<meta\s+name=["']twitter:[^"']+["'][^>]*>/gi, '');
+
+      // Generar nuevas etiquetas Open Graph y Twitter Cards enriquecidas con la imagen de la tienda
+      const metaTags = `
+    <title>${safeTitle}</title>
+    <meta name="description" content="${safeDesc}" />
+    <meta property="og:site_name" content="${safeStoreName}" />
+    <meta property="og:title" content="${safeStoreName}" />
+    <meta property="og:description" content="${safeDesc}" />
+    <meta property="og:image" content="${safeLogo}" />
+    <meta property="og:image:secure_url" content="${safeLogo}" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="600" />
+    <meta property="og:image:height" content="600" />
+    <meta property="og:image:alt" content="${safeStoreName}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="${safeUrl}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${safeStoreName}" />
+    <meta name="twitter:description" content="${safeDesc}" />
+    <meta name="twitter:image" content="${safeLogo}" />`;
+
+      // Insertar antes del cierre de </head>
+      html = html.replace('</head>', `${metaTags}\n  </head>`);
+
+      return html;
+    } catch (err) {
+      console.warn('Error al inyectar Open Graph tags:', err);
+      return rawHtml;
+    }
+  };
+
   // Vite middleware setup
   const server = http.createServer(app);
 
@@ -6508,6 +6588,25 @@ async function startServer() {
       },
       appType: 'spa',
     });
+
+    // Intercept crawler requests in dev mode to return rich Open Graph metadata
+    app.use(async (req, res, next) => {
+      const isCrawler = /whatsapp|facebookexternalhit|facebot|twitterbot|telegrambot|slackbot|linkedinbot/i.test(
+        req.headers['user-agent'] || ''
+      );
+      if (isCrawler && !req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {
+        const rootHtmlPath = path.join(process.cwd(), 'index.html');
+        if (fs.existsSync(rootHtmlPath)) {
+          let template = fs.readFileSync(rootHtmlPath, 'utf8');
+          template = await vite.transformIndexHtml(req.originalUrl, template);
+          const finalHtml = await renderStoreHtmlWithOpenGraph(template, req);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(finalHtml);
+        }
+      }
+      next();
+    });
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
@@ -6522,9 +6621,19 @@ async function startServer() {
       app.use(express.static(path.join(distPath, 'client')));
     }
 
-    app.get('*', (req, res) => {
+    app.get('*', async (req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+        return next();
+      }
       if (indexHtmlPath && fs.existsSync(indexHtmlPath)) {
-        res.sendFile(indexHtmlPath);
+        try {
+          const rawHtml = fs.readFileSync(indexHtmlPath, 'utf8');
+          const finalHtml = await renderStoreHtmlWithOpenGraph(rawHtml, req);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.send(finalHtml);
+        } catch (e) {
+          res.sendFile(indexHtmlPath);
+        }
       } else {
         res.status(404).send('Servidor ejecutándose. Ejecuta npm run build si falta la interfaz.');
       }

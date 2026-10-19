@@ -13,6 +13,7 @@ import {
   Layers,
   Link,
   Loader2,
+  PackageCheck,
   Power,
   Radio,
   RefreshCw,
@@ -54,6 +55,12 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
   const [togglingActive, setTogglingActive] = useState(false);
   const [toggleFeedback, setToggleFeedback] = useState<string | null>(null);
 
+  const [defaultProductActive, setDefaultProductActive] = useState<boolean>(
+    config?.defaultProductActive ?? true
+  );
+  const [togglingProductActive, setTogglingProductActive] = useState(false);
+  const [productActiveFeedback, setProductActiveFeedback] = useState<string | null>(null);
+
   const prevIsOpenRef = useRef(false);
 
   const [testingBot, setTestingBot] = useState(false);
@@ -83,10 +90,12 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
       setTaxPercent(config?.taxPercent ?? 15);
       setCurrency(config?.currency || 'USD');
       setIsActive(config?.isActive ?? true);
+      setDefaultProductActive(config?.defaultProductActive ?? true);
       setError(null);
       setSyncMessage(null);
       setSavedSuccess(false);
       setToggleFeedback(null);
+      setProductActiveFeedback(null);
 
       // If token already exists, perform silent connection check
       if (initialToken.trim()) {
@@ -159,6 +168,7 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
           defaultStockEnabled: true,
           defaultStockQuantity: 0,
           isActive: false,
+          defaultProductActive: Boolean(defaultProductActive),
         }),
       });
       setIsActive(false);
@@ -270,6 +280,42 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
     }
   };
 
+  const handleToggleProductActive = async () => {
+    const nextStatus = !defaultProductActive;
+    setDefaultProductActive(nextStatus);
+    setTogglingProductActive(true);
+    setProductActiveFeedback(null);
+    setError(null);
+
+    try {
+      const res = await authFetch('/api/telegram/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          defaultProductActive: nextStatus,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setDefaultProductActive(!nextStatus);
+        throw new Error(data.error || 'Error al cambiar estado inicial del producto');
+      }
+
+      setProductActiveFeedback(
+        nextStatus
+          ? '¡Productos configurados como ACTIVADOS (Disponibles) por defecto!'
+          : '¡Productos configurados como DESACTIVADOS (Inactivos) por defecto!'
+      );
+      if (onConfigSaved) onConfigSaved();
+      setTimeout(() => setProductActiveFeedback(null), 3500);
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar estado del producto');
+    } finally {
+      setTogglingProductActive(false);
+    }
+  };
+
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -297,6 +343,7 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
           defaultStockEnabled: true,
           defaultStockQuantity: 0,
           isActive: Boolean(isActive),
+          defaultProductActive: Boolean(defaultProductActive),
         }),
       });
 
@@ -614,6 +661,84 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Switch: Estado de Productos Ingresados por Telegram (Activado vs Desactivado) */}
+          <div className={`p-4 rounded-2xl border transition-all ${
+            defaultProductActive
+              ? 'bg-sky-50/70 border-sky-200'
+              : 'bg-amber-50/60 border-amber-200'
+          }`}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-colors shrink-0 ${
+                  defaultProductActive ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  <PackageCheck className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900">
+                      Estado de Productos Ingresados
+                    </span>
+                    <span className={`inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                      defaultProductActive
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full mr-1 ${defaultProductActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                      {defaultProductActive ? 'PRODUCTO ACTIVADO' : 'PRODUCTO DESACTIVADO'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {defaultProductActive
+                      ? 'Los nuevos productos recibidos por Telegram se registrarán en estado Activado (Disponibles para venta y catálogo).'
+                      : 'Los nuevos productos recibidos por Telegram se registrarán en estado Desactivado (Inactivos hasta su activación manual).'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Switch button */}
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={defaultProductActive}
+                  disabled={togglingProductActive}
+                  onClick={handleToggleProductActive}
+                  className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50 ${
+                    defaultProductActive ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                  title={defaultProductActive ? 'Clic para configurar como Desactivados' : 'Clic para configurar como Activados'}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      defaultProductActive ? 'translate-x-7' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                {togglingProductActive && (
+                  <span className="text-[10px] text-slate-400 font-medium animate-pulse flex items-center gap-1">
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> Guardando...
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Instant feedback notification */}
+            {productActiveFeedback && (
+              <div className={`mt-3 pt-2.5 border-t flex items-center justify-between text-xs font-semibold animate-fadeIn ${
+                defaultProductActive ? 'border-sky-200 text-sky-800' : 'border-amber-200 text-amber-800'
+              }`}>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{productActiveFeedback}</span>
+                </div>
+                <span className="text-[10px] text-emerald-700 uppercase tracking-wider font-bold bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                  Auto-guardado
+                </span>
+              </div>
+            )}
           </div>
 
           {savedSuccess && (
@@ -986,6 +1111,84 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
                   placeholder="Ej. Proveedor Principal"
                 />
               </div>
+            </div>
+
+            {/* Switch: Estado de Productos Ingresados por Telegram (Activado vs Desactivado) */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              defaultProductActive
+                ? 'bg-sky-50/70 border-sky-200'
+                : 'bg-amber-50/60 border-amber-200'
+            }`}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-colors shrink-0 ${
+                    defaultProductActive ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    <PackageCheck className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        Estado de Productos Ingresados
+                      </span>
+                      <span className={`inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        defaultProductActive
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1 ${defaultProductActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                        {defaultProductActive ? 'PRODUCTO ACTIVADO' : 'PRODUCTO DESACTIVADO'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      {defaultProductActive
+                        ? 'Los nuevos productos recibidos por Telegram se registrarán en estado Activado (Disponibles para venta y catálogo).'
+                        : 'Los nuevos productos recibidos por Telegram se registrarán en estado Desactivado (Inactivos hasta su activación manual).'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Switch button */}
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={defaultProductActive}
+                    disabled={togglingProductActive}
+                    onClick={handleToggleProductActive}
+                    className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50 ${
+                      defaultProductActive ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
+                    title={defaultProductActive ? 'Clic para configurar como Desactivados' : 'Clic para configurar como Activados'}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        defaultProductActive ? 'translate-x-7' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                  {togglingProductActive && (
+                    <span className="text-[10px] text-slate-400 font-medium animate-pulse flex items-center gap-1">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" /> Guardando...
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Instant feedback notification */}
+              {productActiveFeedback && (
+                <div className={`mt-3 pt-2.5 border-t flex items-center justify-between text-xs font-semibold animate-fadeIn ${
+                  defaultProductActive ? 'border-sky-200 text-sky-800' : 'border-amber-200 text-amber-800'
+                }`}>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{productActiveFeedback}</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 uppercase tracking-wider font-bold bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                    Auto-guardado
+                  </span>
+                </div>
+              )}
             </div>
 
             {savedSuccess && (

@@ -110,6 +110,7 @@ export interface TelegramConfig {
   taxPercent?: number;
   useAi?: boolean;
   isActive?: boolean;
+  defaultProductActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -79,6 +79,7 @@ export interface LocalTelegramConfig {
   taxPercent?: number | null;
   useAi?: boolean | null;
   isActive?: boolean | null;
+  defaultProductActive?: boolean | null;
   createdAt: string;
   updatedAt: string;
 }

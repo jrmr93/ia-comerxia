@@ -255,6 +255,7 @@ export async function ensureTablesCreated() {
         ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS tax_percent INTEGER DEFAULT 15;
         ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS use_ai BOOLEAN DEFAULT TRUE;
         ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+        ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS default_product_active BOOLEAN DEFAULT TRUE;
         ALTER TABLE telegram_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
       `);
 
