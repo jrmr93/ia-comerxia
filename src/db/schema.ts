@@ -40,6 +40,7 @@ export const telegramConfigs = pgTable('telegram_configs', {
   taxPercent: integer('tax_percent').default(15),
   useAi: boolean('use_ai').default(true),
   isActive: boolean('is_active').default(true),
+  defaultProductActive: boolean('default_product_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

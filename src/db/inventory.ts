@@ -2426,6 +2426,7 @@ export async function getTelegramConfig(userId: number = 1) {
       taxPercent: 15,
       useAi: true,
       isActive: true,
+      defaultProductActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -2484,6 +2485,7 @@ export async function getTelegramConfig(userId: number = 1) {
         taxPercent: 15,
         useAi: true,
         isActive: true,
+        defaultProductActive: true,
       })
       .returning();
 
@@ -2508,6 +2510,7 @@ export async function getTelegramConfig(userId: number = 1) {
       taxPercent: 15,
       useAi: true,
       isActive: true,
+      defaultProductActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -2524,6 +2527,8 @@ export async function updateTelegramConfig(
     useAi?: boolean;
     is_active?: boolean;
     isActive?: boolean;
+    default_product_active?: boolean;
+    defaultProductActive?: boolean;
   }
 ) {
   // Normalize fields if passed with snake_case
@@ -2552,6 +2557,12 @@ export async function updateTelegramConfig(
   if (data.isActive !== undefined) {
     normalizedData.isActive = Boolean(data.isActive);
   }
+  if (data.default_product_active !== undefined && data.defaultProductActive === undefined) {
+    normalizedData.defaultProductActive = Boolean(data.default_product_active);
+  }
+  if (data.defaultProductActive !== undefined) {
+    normalizedData.defaultProductActive = Boolean(data.defaultProductActive);
+  }
 
   // Always update local fallback memory state too
   const state = storage.getState();
@@ -2572,6 +2583,7 @@ export async function updateTelegramConfig(
       taxPercent: 15,
       useAi: true,
       isActive: true,
+      defaultProductActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -2604,6 +2616,7 @@ export async function updateTelegramConfig(
     if (normalizedData.taxPercent !== undefined) sqlPayload.taxPercent = Number(normalizedData.taxPercent);
     if (normalizedData.useAi !== undefined) sqlPayload.useAi = Boolean(normalizedData.useAi);
     if (normalizedData.isActive !== undefined) sqlPayload.isActive = Boolean(normalizedData.isActive);
+    if (normalizedData.defaultProductActive !== undefined) sqlPayload.defaultProductActive = Boolean(normalizedData.defaultProductActive);
 
     if (existing && existing.id) {
       const updated = await db
@@ -2643,6 +2656,7 @@ export async function updateTelegramConfig(
         taxPercent: normalizedData.taxPercent !== undefined ? Number(normalizedData.taxPercent) : 15,
         useAi: normalizedData.useAi !== undefined ? Boolean(normalizedData.useAi) : true,
         isActive: normalizedData.isActive !== undefined ? Boolean(normalizedData.isActive) : true,
+        defaultProductActive: normalizedData.defaultProductActive !== undefined ? Boolean(normalizedData.defaultProductActive) : true,
       })
       .returning();
 

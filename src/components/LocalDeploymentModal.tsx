@@ -715,6 +715,7 @@ CREATE TABLE IF NOT EXISTS telegram_configs (
   default_stock_enabled BOOLEAN DEFAULT FALSE,
   default_stock_quantity INTEGER DEFAULT 10,
   is_active BOOLEAN DEFAULT TRUE,
+  default_product_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

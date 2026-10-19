@@ -885,7 +885,7 @@ async function processCompleteProduct(
     supplierName: senderName,
     tags: parsed.tags.join(', '),
     extractedAttributes: JSON.stringify(attributesToStore),
-    status: 'available',
+    status: config.defaultProductActive === false ? 'archived' : 'available',
     rawTelegramMessage: caption,
   });
 
@@ -966,9 +966,17 @@ async function processCompleteProduct(
     const safeUsername = senderUsername ? escapeTelegramMarkdown(senderUsername) : '';
     const safeCategory = escapeTelegramMarkdown(parsed.category);
 
+    const statusNote = config.defaultProductActive === false
+      ? `⏸️ *Estado:* Desactivado (Inactivo)\n`
+      : `🟢 *Estado:* Activado (Disponible)\n`;
+    const footerNote = config.defaultProductActive === false
+      ? `⚡ _El producto se registró como Desactivado. Puedes activarlo cuando desees desde tu panel de inventario._`
+      : `⚡ _Ya puedes verlo con todas sus opciones de costo, video y fotos en tu panel de inventario._`;
+
     const responseText =
       `✅ *¡Producto Registrado con Éxito en PostgreSQL!*\n\n` +
       `📦 *${safeName}*\n` +
+      statusNote +
       `👤 *Proveedor:* ${safeSender}${safeUsername ? ` (${safeUsername})` : ''}\n` +
       photoCountNote +
       videoNote +
@@ -979,7 +987,7 @@ async function processCompleteProduct(
       discountNote +
       `📈 *Margen Estimado:* +${currencySym}${profit}${profitDetail}\n` +
       stockMsg +
-      `⚡ _Ya puedes verlo con todas sus opciones de costo, video y fotos en tu panel de inventario._`;
+      footerNote;
 
     await sendTelegramChatMessage(token, chatId, responseText);
   }
@@ -1181,7 +1189,7 @@ async function processWebProductUrlMessage(
     supplierName: effectiveSupplier,
     tags: scraped.tags.join(', '),
     extractedAttributes: JSON.stringify(attributesWithGallery),
-    status: 'available',
+    status: config.defaultProductActive === false ? 'archived' : 'available',
     rawTelegramMessage: text,
   });
 
@@ -1222,9 +1230,17 @@ async function processWebProductUrlMessage(
     const safeWebProdCat = escapeTelegramMarkdown(inventoryItem.category);
     const safeWebDomain = escapeTelegramMarkdown(scraped.domain);
 
+    const webStatusNote = config.defaultProductActive === false
+      ? `⏸️ *Estado Inicial:* Desactivado (Inactivo)\n`
+      : `🟢 *Estado Inicial:* Activado (Disponible)\n`;
+    const webFooterNote = config.defaultProductActive === false
+      ? `⚡ _El producto se registró como Desactivado. Puedes activarlo cuando desees desde tu panel de inventario._`
+      : `⚡ _El producto ya está disponible en tu inventario y listo para la venta en tu tienda online._`;
+
     const responseText =
       `✅ *¡Producto Importado desde la Web!* 🌐\n\n` +
       `📦 *${safeWebProdName}*\n` +
+      webStatusNote +
       `🏷️ *Código SKU:* \`${finalSku}\`\n` +
       `📂 *Categoría:* ${safeWebProdCat}\n` +
       `💵 *Costo sin IVA:* ${currencySym}${effectiveCostWithout}\n` +
@@ -1235,7 +1251,7 @@ async function processWebProductUrlMessage(
       photoCountNote +
       methodNote +
       `🌐 *Página de Origen:* ${safeWebDomain}\n\n` +
-      `⚡ _El producto ya está disponible en tu inventario y listo para la venta en tu tienda online._`;
+      webFooterNote;
 
     if (statusMessageId) {
       const editRes = await editTelegramMessageText(token, chatId, statusMessageId, responseText);

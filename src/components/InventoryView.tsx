@@ -767,9 +767,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const getStatusBadge = (status: string, stock: number) => {
-    if (status === 'archived') {
+    if (status === 'archived' || status === 'inactive' || status === 'desactivado') {
       return (
-        <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs">
+        <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-red-200 text-red-900 border-2 border-red-400 shadow-2xs">
           ⏸️ Inactivo
         </span>
       );
@@ -1508,6 +1508,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 const profit = sale - cost;
                 const margin = cost > 0 ? Math.round((profit / cost) * 100) : 0;
                 const isSelected = selectedIds.includes(item.id);
+                const isInactive =
+                  item.status === 'archived' ||
+                  (item as any).status === 'inactive' ||
+                  (item as any).status === 'desactivado' ||
+                  (item as any).isActive === false;
                 const isUnseen = Boolean(
                   unseenProductIds && unseenProductIds.has(item.id) && item.rawTelegramMessage
                 );
@@ -1527,18 +1532,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         onMarkProductAsSeen(item.id);
                       }
                     }}
-                    className={`bg-white border rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between group relative ${isSelected
-                        ? 'border-sky-500 ring-2 ring-sky-500/30 shadow-md'
+                    className={`rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between group relative ${isSelected
+                        ? isInactive
+                          ? 'bg-red-100 border-2 border-red-500 ring-2 ring-red-400/50 shadow-md'
+                          : 'bg-white border border-sky-500 ring-2 ring-sky-500/30 shadow-md'
                         : isUnseen
-                          ? 'border-amber-400 ring-2 ring-amber-400 bg-gradient-to-b from-amber-100/40 via-amber-50/20 to-white shadow-xl shadow-amber-500/20 scale-[1.015]'
-                          : 'border-slate-300 hover:border-slate-400 hover:shadow-md shadow-sm'
+                          ? 'border border-amber-400 ring-2 ring-amber-400 bg-gradient-to-b from-amber-100/40 via-amber-50/20 to-white shadow-xl shadow-amber-500/20 scale-[1.015]'
+                          : isInactive
+                            ? 'bg-red-100/90 border-2 border-red-400 hover:border-red-500 hover:bg-red-100 shadow-sm'
+                            : 'bg-white border border-slate-300 hover:border-slate-400 hover:shadow-md shadow-sm'
                       }`}
                   >
                     {/* Top Image Preview & Badges */}
                     <div>
                       <div
                         onClick={handleItemClick}
-                        className="relative aspect-video w-full bg-slate-100 cursor-pointer overflow-hidden border-b border-slate-200"
+                        className={`relative aspect-video w-full cursor-pointer overflow-hidden border-b ${isInactive ? 'bg-red-200/50 border-red-300' : 'bg-slate-100 border-slate-200'}`}
                         title="Haz clic para ver detalles"
                       >
                         <ProductMediaDisplay
@@ -1694,7 +1703,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           return (
                             <div className="pt-2.5 border-t border-slate-200 space-y-2 text-xs">
                               {/* 1. Fila de Precio PVP & Descuento */}
-                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                              <div className={`p-2.5 rounded-xl flex items-center justify-between gap-2 ${isInactive ? 'bg-red-200/60 border-2 border-red-300' : 'bg-slate-50 border border-slate-200'}`}>
                                 <div>
                                   <span className="text-[10px] text-slate-500 block font-black uppercase tracking-wider">
                                     {fin.hasDiscount ? 'Precio Oferta PVP' : 'Precio PVP'}
@@ -1709,7 +1718,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                       </span>
                                     </div>
                                   ) : (
-                                    <span className="font-black text-emerald-700 text-base font-mono mt-0.5 block">
+                                    <span className={`font-black text-base font-mono mt-0.5 block ${isInactive ? 'text-red-950 font-black' : 'text-emerald-700'}`}>
                                       ${fin.pvpNum.toFixed(2)} {currency}
                                     </span>
                                   )}
@@ -1718,6 +1727,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 {fin.hasDiscount ? (
                                   <span className="px-2 py-1 rounded-lg text-[10px] font-black bg-rose-600 text-white shadow-2xs animate-pulse">
                                     🔥 -{fin.discountPercent}%
+                                  </span>
+                                ) : isInactive ? (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-red-300 text-red-950 border-2 border-red-400 shadow-2xs">
+                                    Inactivo
                                   </span>
                                 ) : (
                                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -1783,7 +1796,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
 
                     {/* Footer Controls: Stock Status & Actions */}
-                    <div className="p-2.5 sm:p-3 bg-slate-100/90 border-t border-slate-200 flex flex-col xs:flex-row xs:items-center justify-between gap-2">
+                    <div className={`p-2.5 sm:p-3 flex flex-col xs:flex-row xs:items-center justify-between gap-2 ${isInactive ? 'bg-red-200/50 border-t-2 border-red-300' : 'bg-slate-100/90 border-t border-slate-200'}`}>
                       {/* Stock indicator badges (Requirement #3) */}
                       <div
                         className="flex items-center space-x-1.5 flex-wrap gap-y-1"
@@ -1848,9 +1861,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </button>
                         <button
                           onClick={() => handleRequestToggleStatus(item)}
-                          title={item.status === 'archived' ? 'Activar producto (Disponible)' : 'Desactivar producto (Inactivo)'}
-                          className={`p-1.5 rounded-lg transition cursor-pointer ${item.status === 'archived'
-                              ? 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
+                          title={isInactive ? 'Activar producto (Disponible)' : 'Desactivar producto (Inactivo)'}
+                          className={`p-1.5 rounded-lg transition cursor-pointer ${isInactive
+                              ? 'text-red-700 hover:text-emerald-700 hover:bg-emerald-50 bg-red-100/80 border border-red-300'
                               : 'text-emerald-600 hover:text-amber-700 hover:bg-amber-50'
                             }`}
                         >
@@ -1916,6 +1929,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     {filteredItems.map((item) => {
                       const sale = parseFloat(item.salePrice) || 0;
                       const isSelected = selectedIds.includes(item.id);
+                      const isInactive =
+                        item.status === 'archived' ||
+                        (item as any).status === 'inactive' ||
+                        (item as any).status === 'desactivado' ||
+                        (item as any).isActive === false;
                       const isUnseen = Boolean(
                         unseenProductIds && unseenProductIds.has(item.id) && item.rawTelegramMessage
                       );
@@ -1936,10 +1954,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             }
                           }}
                           className={`transition duration-150 ${isSelected
-                              ? 'bg-sky-50/60'
+                              ? isInactive
+                                ? 'bg-red-200/90 hover:bg-red-200 border-l-[6px] border-l-red-600'
+                                : 'bg-sky-50/60'
                               : isUnseen
                                 ? 'bg-amber-50/90 hover:bg-amber-100/90 border-l-4 border-l-amber-500'
-                                : 'hover:bg-slate-50/80'
+                                : isInactive
+                                  ? 'bg-red-100/90 hover:bg-red-200/80 border-l-[6px] border-l-red-500'
+                                  : 'hover:bg-slate-50/80'
                             }`}
                         >
                           <td className="px-2 py-1.5">
@@ -2106,9 +2128,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                               </button>
                               <button
                                 onClick={() => handleRequestToggleStatus(item)}
-                                title={item.status === 'archived' ? 'Activar' : 'Desactivar'}
-                                className={`p-1 rounded transition cursor-pointer ${item.status === 'archived'
-                                    ? 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
+                                title={isInactive ? 'Activar' : 'Desactivar'}
+                                className={`p-1 rounded transition cursor-pointer ${isInactive
+                                    ? 'text-red-700 hover:text-emerald-700 hover:bg-emerald-50 bg-red-100/80 border border-red-300'
                                     : 'text-emerald-600 hover:text-amber-700 hover:bg-amber-50'
                                   }`}
                               >

@@ -499,6 +499,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <span className="text-xs px-2 py-0.5 rounded-md font-medium bg-slate-100 text-slate-700 border border-slate-200">
                   {currentItem.category}
                 </span>
+                {(currentItem.status === 'archived' || (currentItem as any).status === 'inactive' || (currentItem as any).status === 'desactivado' || (currentItem as any).isActive === false) && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-md font-bold bg-red-100 text-red-800 border border-red-300 flex items-center space-x-1">
+                    <span>⏸️</span>
+                    <span>Desactivado (Inactivo)</span>
+                  </span>
+                )}
                 <span className="text-xs px-2.5 py-0.5 rounded-md font-bold bg-amber-50 text-amber-900 border border-amber-300 flex items-center space-x-1" title={`Proveedor: ${currentItem.supplierName || 'Proveedor Telegram'}`}>
                   <span>👤</span>
                   <span className="font-semibold text-slate-600">Proveedor:</span>

@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS telegram_configs (
   tax_percent INTEGER DEFAULT 15,
   use_ai BOOLEAN DEFAULT TRUE,
   is_active BOOLEAN DEFAULT TRUE,
+  default_product_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
