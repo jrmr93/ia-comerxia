@@ -3,7 +3,7 @@
  * across Telegram bot, web scraping, message simulations, and inventory entry.
  */
 
-export type TaxStatus = 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED';
+export type TaxStatus = 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED' | 'ZERO_TAX';
 
 export interface TaxAdjustmentResult {
   taxStatus: TaxStatus;
@@ -16,6 +16,7 @@ export interface TaxAdjustmentResult {
 
 /**
  * Detects whether text indicates:
+ * - "ZERO_TAX" (e.g., "iva 0%", "0% iva", "tarifa 0", "exento de iva")
  * - "PLUS_TAX" (e.g., "más iva", "+ iva", "+iva", "sin iva", "no incluye iva", "neto + iva", "antes de iva")
  * - "INCLUDED" (e.g., "incluye iva", "iva incluido", "con iva", "iva inc.", "ya incluye iva")
  * - "NOT_SPECIFIED"
@@ -28,6 +29,21 @@ export function detectTaxStatus(text: string): TaxStatus {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
+
+  // Patterns for 0% IVA / Exento
+  const zeroTaxPatterns = [
+    /\biva\s*[:=-]?\s*0\s*%/i,
+    /\b0\s*%\s*(?:de\s*)?iva\b/i,
+    /\biva\s*[:=-]?\s*0\b/i,
+    /\btarifa\s*0\s*%/i,
+    /\btarifa\s*0\b/i,
+    /\bexento\s*(?:de\s*)?iva\b/i,
+    /\biva\s+exento\b/i,
+  ];
+
+  if (zeroTaxPatterns.some((pattern) => pattern.test(normalized))) {
+    return 'ZERO_TAX';
+  }
 
   // Patterns for "+ IVA" / "más IVA" / tax not included
   const plusTaxPatterns = [
@@ -108,7 +124,13 @@ export function calculateTaxAdjustment(params: {
   let finalCost = rawCost;
   let taxAmount = 0;
 
-  if (taxStatus === 'PLUS_TAX') {
+  if (taxStatus === 'ZERO_TAX' || effectiveTax === 0) {
+    // ZERO_TAX / 0% IVA / Exento: No tax applied, cost is exact
+    effectiveTax = 0;
+    finalCost = Math.round(rawCost * 100) / 100;
+    baseCostPrice = finalCost;
+    taxAmount = 0;
+  } else if (taxStatus === 'PLUS_TAX') {
     // Content specifies WITHOUT tax (+ IVA / más IVA / sin IVA)
     baseCostPrice = Math.round(rawCost * 100) / 100;
     taxAmount = Math.round(rawCost * (effectiveTax / 100) * 100) / 100;
@@ -142,7 +164,8 @@ export function calculateTaxAdjustment(params: {
 
 /**
  * Adjusts an array of cost options to compute both costWithoutTax and costWithTax accurately.
- * If taxStatus is NOT_SPECIFIED, generates 2 options per price:
+ * If taxStatus is ZERO_TAX or taxPercent is 0, outputs 1 clean option without tax variants.
+ * If taxStatus is NOT_SPECIFIED and taxPercent > 0, generates 2 options per price:
  * 1) Option 1: "Ya incluye IVA" (Base: price / (1 + effTax%), Con IVA: price) -> Default selected.
  * 2) Option 2: "Sin IVA / Más IVA" (Base: price, Con IVA: price * (1 + effTax%)).
  */
@@ -152,14 +175,47 @@ export function buildCostOptionsWithTaxVariants(
   taxPercent: number
 ): Array<{ label: string; price: number; costWithoutTax?: number; costWithTax?: number; taxStatus?: TaxStatus }> {
   if (!Array.isArray(costOptions) || costOptions.length === 0) return [];
-  const effTax = taxPercent >= 0 ? taxPercent : 15;
+  const effTax = typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15;
 
   const result: Array<{ label: string; price: number; costWithoutTax?: number; costWithTax?: number; taxStatus?: TaxStatus }> = [];
 
+  // If tax is 0% or ZERO_TAX, do not create duplicate tax variants
+  if (effTax === 0 || taxStatus === 'ZERO_TAX') {
+    for (const opt of costOptions) {
+      const p = Math.round(opt.price * 100) / 100;
+      let cleanLabel = opt.label;
+      // Clean previous trailing tags if any
+      cleanLabel = cleanLabel.split(' (Ya incluye IVA')[0].split(' (Sin IVA')[0].trim();
+      result.push({
+        ...opt,
+        label: cleanLabel,
+        price: p,
+        costWithoutTax: p,
+        costWithTax: p,
+        taxStatus: 'INCLUDED',
+      });
+    }
+    return result;
+  }
+
   for (const opt of costOptions) {
     if (taxStatus === 'PLUS_TAX') {
-      const optWithout = Math.round(opt.price * 100) / 100;
-      const optWith = Math.round(opt.price * (1 + effTax / 100) * 100) / 100;
+      let optWithout = typeof opt.costWithoutTax === 'number' && opt.costWithoutTax > 0
+        ? opt.costWithoutTax
+        : Math.round(opt.price * 100) / 100;
+      let optWith = typeof opt.costWithTax === 'number' && opt.costWithTax > 0
+        ? opt.costWithTax
+        : Math.round(optWithout * (1 + effTax / 100) * 100) / 100;
+
+      // If optWithout was accidentally passed as the with-tax amount (optWithout >= optWith):
+      if (optWithout > optWith && optWith > 0) {
+        const tmp = optWithout;
+        optWithout = optWith;
+        optWith = tmp;
+      } else if (optWithout === optWith && effTax > 0) {
+        optWith = Math.round(optWithout * (1 + effTax / 100) * 100) / 100;
+      }
+
       let cleanLabel = opt.label;
       if (!cleanLabel.toLowerCase().includes('iva')) {
         cleanLabel = `${cleanLabel} (+${effTax}% IVA)`;
@@ -173,8 +229,17 @@ export function buildCostOptionsWithTaxVariants(
         taxStatus: 'PLUS_TAX',
       });
     } else if (taxStatus === 'INCLUDED') {
-      const optWith = Math.round(opt.price * 100) / 100;
-      const optWithout = Math.round((opt.price / (1 + effTax / 100)) * 100) / 100;
+      let optWith = typeof opt.costWithTax === 'number' && opt.costWithTax > 0
+        ? opt.costWithTax
+        : Math.round(opt.price * 100) / 100;
+      let optWithout = typeof opt.costWithoutTax === 'number' && opt.costWithoutTax > 0
+        ? opt.costWithoutTax
+        : Math.round((optWith / (1 + effTax / 100)) * 100) / 100;
+
+      if (optWith === optWithout && effTax > 0) {
+        optWithout = Math.round((optWith / (1 + effTax / 100)) * 100) / 100;
+      }
+
       let cleanLabel = opt.label;
       if (!cleanLabel.toLowerCase().includes('iva')) {
         cleanLabel = `${cleanLabel} (Incluye IVA)`;
@@ -221,6 +286,100 @@ export function buildCostOptionsWithTaxVariants(
   }
 
   return result;
+}
+
+export interface FinancialDirectives {
+  explicitTaxRate?: number;
+  explicitProfitAmount?: number;
+  explicitProfitMargin?: number;
+  preferredCostType?: 'affiliate' | 'non_affiliate' | 'wholesale' | 'retail';
+}
+
+/**
+ * Checks if a line in a Telegram supplier message is a system directive header
+ * rather than part of the product title or description.
+ */
+export function isDirectiveLine(line: string): boolean {
+  if (!line || typeof line !== 'string') return false;
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (/^iva\s*[:=-]?\s*\d{1,2}%?$/i.test(trimmed)) return true;
+  if (/^\d{1,2}%\s*(?:de\s*)?iva$/i.test(trimmed)) return true;
+  if (/^(?:sin\s+iva|con\s+iva|exento\s*(?:de\s*)?iva|tarifa\s*0%?)$/i.test(trimmed)) return true;
+  if (/^(?:utilidad|ganancia|margen)\s*[:=-]?\s*\$?\s*\d+(?:[.,]\d+)?%?(?:\$|usd|d[oó]lares)?$/i.test(trimmed)) return true;
+  if (/^(?:costo|precio|usar\s+costo)\s+(?:afiliado|no\s+afiliado|mayorista|por\s+menor|detalle)$/i.test(trimmed)) return true;
+  if (/^(?:afiliado|no\s+afiliado|mayorista)$/i.test(trimmed)) return true;
+  return false;
+}
+
+/**
+ * Extracts explicit financial directives embedded in supplier messages
+ * (e.g., "IVA 0%", "utilidad 5$", "costo afiliado")
+ */
+export function extractFinancialDirectives(text: string): FinancialDirectives {
+  if (!text || typeof text !== 'string') return {};
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  let explicitTaxRate: number | undefined;
+  let explicitProfitAmount: number | undefined;
+  let explicitProfitMargin: number | undefined;
+  let preferredCostType: 'affiliate' | 'non_affiliate' | 'wholesale' | 'retail' | undefined;
+
+  for (const line of lines) {
+    // 1. Check tax rate
+    const taxMatch = line.match(/\biva\s*[:=-]?\s*(\d{1,2})\s*%/i) ||
+                     line.match(/(\d{1,2})\s*%\s*(?:de\s*)?iva\b/i) ||
+                     line.match(/\biva\s*[:=-]?\s*0\b/i);
+    if (taxMatch && taxMatch[1] !== undefined) {
+      explicitTaxRate = parseInt(taxMatch[1], 10);
+    } else if (/\bexento\s*(?:de\s*)?iva\b/i.test(line) || /\btarifa\s*0%?\b/i.test(line)) {
+      explicitTaxRate = 0;
+    }
+
+    // 2. Check profit
+    const pctMatch = line.match(/(?:utilidad|ganancia|margen)\s*(?:de\s*|del\s*|:\s*)?(\d+(?:[.,]\d{1,2})?)\s*%/i) ||
+                     line.match(/(\d+(?:[.,]\d{1,2})?)\s*%\s*(?:de\s*)?(?:utilidad|ganancia|margen)/i);
+    if (pctMatch && pctMatch[1]) {
+      const val = parseFloat(pctMatch[1].replace(',', '.'));
+      if (!isNaN(val) && val > 0 && val <= 1000) {
+        explicitProfitMargin = val;
+      }
+    }
+
+    const dollarMatch = line.match(/(?:utilidad|ganancia)\s*(?:de\s*|del\s*|:\s*)?\$?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:\$|usd|d[oó]lares)?(?=[\s\n\r,;]|$)/i);
+    if (dollarMatch && dollarMatch[1]) {
+      const val = parseFloat(dollarMatch[1].replace(',', '.'));
+      if (!isNaN(val) && val > 0 && val < 50000) {
+        explicitProfitAmount = Math.round(val * 100) / 100;
+      }
+    }
+
+    // 3. Check preferred cost selection (only on lines WITHOUT price figures to avoid matching "No afiliado $6.00")
+    const hasPriceInLine = /\$\s*\d+|\b\d+(?:[.,]\d{2})?\s*\$|\b\d+\s*(?:usd|d[oó]lares)\b/i.test(line);
+    if (!hasPriceInLine) {
+      if (/\b(?:costo|precio|usar)?\s*afiliad/i.test(line) && !/\bno\s+afiliad/i.test(line)) {
+        preferredCostType = 'affiliate';
+      } else if (/\b(?:costo|precio|usar)?\s*no\s+afiliad/i.test(line)) {
+        preferredCostType = 'non_affiliate';
+      } else if (/\b(?:costo|precio|usar)?\s*mayorista/i.test(line)) {
+        preferredCostType = 'wholesale';
+      } else if (/\b(?:costo|precio|usar)?\s*(?:por\s*menor|unitario|detalle)/i.test(line)) {
+        preferredCostType = 'retail';
+      }
+    }
+  }
+
+  // Global text fallback if directives weren't on their own lines
+  if (explicitTaxRate === undefined) {
+    const tm = text.match(/\biva\s*[:=-]?\s*(\d{1,2})\s*%/i) || text.match(/(\d{1,2})\s*%\s*(?:de\s*)?iva\b/i);
+    if (tm) explicitTaxRate = parseInt(tm[1], 10);
+  }
+
+  if (explicitProfitAmount === undefined && explicitProfitMargin === undefined) {
+    const dm = text.match(/(?:utilidad|ganancia)\s*(?:de\s*|del\s*|:\s*)?\$?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:\$|usd|d[oó]lares)?(?=[\s\n\r,;]|$)/i);
+    if (dm) explicitProfitAmount = Math.round(parseFloat(dm[1].replace(',', '.')) * 100) / 100;
+  }
+
+  return { explicitTaxRate, explicitProfitAmount, explicitProfitMargin, preferredCostType };
 }
 
 export function adjustCostOptionsForTax(

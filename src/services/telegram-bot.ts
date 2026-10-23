@@ -932,19 +932,22 @@ async function processCompleteProduct(
       effectiveTaxRate > 0
         ? `💵 *Costo sin IVA:* ${currencySym}${effectiveWithout}\n` +
           `🧾 *Costo con IVA:* ${currencySym}${effectiveWith} _(IVA ${effectiveTaxRate}%)_`
-        : `💵 *Costo de Compra:* ${currencySym}${effectiveWith} _(0% IVA / Sin IVA)_`;
+        : `💵 *Costo de Compra:* ${currencySym}${effectiveWith} _(IVA 0% / Tarifa 0%)_`;
 
     if (parsed.costOptions && parsed.costOptions.length > 1) {
-      const hasAffiliate = parsed.costOptions.some((o) => /afiliad/i.test(o.label));
-      const modeNote = hasAffiliate ? 'Precio afiliado por 1 unidad por defecto' : 'Mayor por defecto';
+      const hasAffiliate = parsed.costOptions.some((o) => /afiliad/i.test(o.label) && !/\b(?:no|sin)\s+afiliad/i.test(o.label));
+      const modeNote = hasAffiliate ? 'Precio afiliado por 1 unidad' : 'Mayor por defecto';
       costSection =
-        `💵 *Costo Seleccionado sin IVA:* ${currencySym}${effectiveWithout}\n` +
-        `🧾 *Costo Seleccionado con IVA:* ${currencySym}${effectiveWith} _(${modeNote})_\n` +
+        effectiveTaxRate > 0
+          ? `💵 *Costo Seleccionado sin IVA:* ${currencySym}${effectiveWithout}\n` +
+            `🧾 *Costo Seleccionado con IVA:* ${currencySym}${effectiveWith} _(${modeNote})_\n`
+          : `💵 *Costo Seleccionado:* ${currencySym}${effectiveWith} _(${modeNote} | IVA 0%)_\n`;
+      costSection +=
         `📋 *Opciones de Costo Detectadas:*\n` +
         parsed.costOptions
           .map((o) => {
             const optWithout =
-              typeof o.costWithoutTax === 'number'
+              typeof o.costWithoutTax === 'number' && effectiveTaxRate > 0
                 ? ` _(sin IVA: ${currencySym}${o.costWithoutTax.toFixed(2)})_`
                 : '';
             return `   • ${o.label}: ${currencySym}${Number(o.price).toFixed(2)}${optWithout}`;

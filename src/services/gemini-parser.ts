@@ -17,6 +17,9 @@ import {
   calculateTaxAdjustment,
   adjustCostOptionsForTax,
   buildCostOptionsWithTaxVariants,
+  extractFinancialDirectives,
+  isDirectiveLine,
+  TaxStatus,
 } from '../utils/tax-calculator.ts';
 
 let activeCustomApiKey: string | null = null;
@@ -438,6 +441,7 @@ export interface CostOption {
   taxRate?: number;
   unitCost?: number;
   isAffiliate?: boolean;
+  taxStatus?: 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED' | 'ZERO_TAX';
 }
 
 export interface ParsedProductResult {
@@ -449,7 +453,7 @@ export interface ParsedProductResult {
   costWithoutTax: number;
   costWithTax: number;
   baseCostPrice?: number;
-  taxStatus?: 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED';
+  taxStatus?: TaxStatus;
   taxPercent?: number;
   costOptions: CostOption[];
   profitMarginPercent: number;
@@ -574,42 +578,71 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 export function selectDefaultAffiliateCostPrice(
   costOptions: CostOption[],
-  fallbackParsedCost: number
-): { selectedCost: number; isAffiliate: boolean; isSingleUnitAffiliate: boolean; optionLabel?: string } {
+  fallbackParsedCost: number,
+  preferredType?: 'affiliate' | 'non_affiliate' | 'wholesale' | 'retail'
+): { selectedCost: number; matchedOpt?: CostOption; isAffiliate: boolean; isSingleUnitAffiliate: boolean; optionLabel?: string } {
   if (!Array.isArray(costOptions) || costOptions.length === 0) {
     const cost = Math.max(0, fallbackParsedCost) || 10.0;
-    return { selectedCost: cost, isAffiliate: false, isSingleUnitAffiliate: false };
+    return { selectedCost: cost, matchedOpt: undefined, isAffiliate: false, isSingleUnitAffiliate: false };
   }
 
-  // Look for options whose label mentions 'afiliad' (afiliado, afiliados, precio afiliado, costo afiliado, etc.)
+  // Identify non-affiliate options vs true affiliate options
+  const isNonAffiliateLabel = (l: string) => /\b(?:no|sin)\s+afiliad/i.test(l);
+  const isAffiliateLabel = (l: string) => /afiliad/i.test(l) && !isNonAffiliateLabel(l);
+  const isBulkLabel = (l: string) =>
+    /\b\d+\s*(?:o\s*m[aá]s|unidades|unds|piezas|pares|pcs)\b/i.test(l) ||
+    /\b(?:por\s*(?:caja|cajon|cajón|docena|bulto|mayor)|mayorista|a\s*partir\s*de)\b/i.test(l);
+  const isOneUnitLabel = (l: string) =>
+    (isAffiliateLabel(l) && !isBulkLabel(l)) ||
+    /(?:x\s*1\b|1\s*(?:u\b|und|unidad|pieza|pza)|unidad\b|unitario|detal|menor)/i.test(l);
+
+  // If user explicitly requested non-affiliate cost
+  if (preferredType === 'non_affiliate') {
+    const nonAffiliateOptions = costOptions.filter(
+      (opt) => opt && typeof opt.label === 'string' && isNonAffiliateLabel(opt.label) && Number(opt.price) > 0
+    );
+    if (nonAffiliateOptions.length > 0) {
+      return {
+        selectedCost: Number(nonAffiliateOptions[0].price),
+        matchedOpt: nonAffiliateOptions[0],
+        isAffiliate: false,
+        isSingleUnitAffiliate: false,
+        optionLabel: nonAffiliateOptions[0].label,
+      };
+    }
+  }
+
+  // True affiliate options (strictly excluding 'No afiliado')
   const affiliateOptions = costOptions.filter(
     (opt) =>
       opt &&
       typeof opt.label === 'string' &&
-      /afiliad/i.test(opt.label) &&
+      isAffiliateLabel(opt.label) &&
       Number(opt.price) > 0
   );
 
   if (affiliateOptions.length > 0) {
-    // 1. Look for explicit 1-unit affiliate indicator (e.g. "x 1 unidad", "1 unidad", "1 u", "1 und", "por unidad", "1 pza", "unidad")
-    const oneUnitOption = affiliateOptions.find((opt) =>
-      /(?:x\s*1\b|1\s*(?:u\b|und|unidad|pieza|pza)|unidad\b|unitario|detal|menor)/i.test(opt.label)
-    );
+    // 1. Look for explicit 1-unit affiliate indicator or non-bulk affiliate option
+    const oneUnitOption = affiliateOptions.find((opt) => isOneUnitLabel(opt.label));
 
     if (oneUnitOption && Number(oneUnitOption.price) > 0) {
       return {
         selectedCost: Number(oneUnitOption.price),
+        matchedOpt: oneUnitOption,
         isAffiliate: true,
         isSingleUnitAffiliate: true,
         optionLabel: oneUnitOption.label,
       };
     }
 
-    // 2. If multiple affiliate options exist without explicit '1 unidad', the single-unit price is typically the highest affiliate price
-    const maxAffiliatePrice = Math.max(...affiliateOptions.map((o) => Number(o.price)));
-    const matchedOpt = affiliateOptions.find((o) => Number(o.price) === maxAffiliatePrice);
+    // 2. If multiple affiliate options exist, single-unit price is typically the highest affiliate price (volume drops price)
+    const nonBulkOptions = affiliateOptions.filter((opt) => !isBulkLabel(opt.label));
+    const targetPool = nonBulkOptions.length > 0 ? nonBulkOptions : affiliateOptions;
+    const maxAffiliatePrice = Math.max(...targetPool.map((o) => Number(o.price)));
+    const matchedOpt = targetPool.find((o) => Number(o.price) === maxAffiliatePrice);
     return {
       selectedCost: maxAffiliatePrice > 0 ? maxAffiliatePrice : fallbackParsedCost || 10.0,
+      matchedOpt,
       isAffiliate: true,
       isSingleUnitAffiliate: true,
       optionLabel: matchedOpt?.label,
@@ -623,7 +656,8 @@ export function selectDefaultAffiliateCostPrice(
       ? Math.max(...optionPrices, fallbackParsedCost || 0)
       : fallbackParsedCost || 10.0;
 
-  return { selectedCost: maxGeneralCost, isAffiliate: false, isSingleUnitAffiliate: false };
+  const matchedOpt = costOptions.find((o) => Number(o.price) === maxGeneralCost);
+  return { selectedCost: maxGeneralCost, matchedOpt, isAffiliate: false, isSingleUnitAffiliate: false, optionLabel: matchedOpt?.label };
 }
 
 /**
@@ -638,13 +672,28 @@ function extractFallbackFromText(
   const text = caption.trim();
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
 
-  // 1. Detect title
-  let name = lines[0] || 'Producto de Proveedor';
-  // If first line starts with emoji or looks like "Llegaron ...", clean it up
-  name = name.replace(/^(📦|⚡|🔥|✨|✅|🚨|NUEVO|LOTE:?)\s*/i, '').slice(0, 60);
+  // 0. Extract financial directives (e.g. IVA 0%, utilidad 5$, costo afiliado)
+  const directives = extractFinancialDirectives(caption);
+
+  // 1. Detect title (skipping directive lines like IVA 0%, utilidad 5$, costo afiliado, dimensions, etc.)
+  let name = 'Producto de Proveedor';
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (isDirectiveLine(line)) continue;
+    if (/^\d+\s*x\s*\d+\s*(?:cm|m|mm)?$/i.test(line)) continue;
+    if (/^(?:afiliad|no\s+afiliad|mayorista|precio|costo|pvp|ref|sku)\b.*\$?\d+/i.test(line)) continue;
+    if (/^\$?\s*\d+(?:[.,]\d+)?\b/.test(line)) continue;
+
+    let clean = line.replace(/^[•\-*👉*#📦⚡🔥✨✅🚨]+\s*/, '').trim();
+    clean = clean.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+    if (clean.length >= 3) {
+      name = clean.slice(0, 70);
+      break;
+    }
+  }
 
   // Clean text from phone numbers, shoe sizes, and lot counts to avoid false price matches
-  // E.g. 0991234567, +593991234567, Tallas 38 a 44, Lote de 50
   const textWithoutPhones = text
     .replace(/(?:\+?593|09)\d{7,8}/g, ' ')
     .replace(/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g, ' ')
@@ -660,78 +709,59 @@ function extractFallbackFromText(
     if (pvpVal > 0 && pvpVal < 50000) detectedSalePrice = pvpVal;
   }
 
-  // 3. Detect prices and affiliate prices specifically
-  const affiliateOptionsFound: { label: string; price: number; isOneUnit: boolean }[] = [];
-  
+  // 3. Detect prices and cost options specifically
+  const detectedCostOptions: CostOption[] = [];
+
   for (const line of lines) {
-    if (/afiliad/i.test(line)) {
-      const numMatch = line.match(/\$?\s*(\d+(?:[.,]\d{1,2})?)/i);
-      if (numMatch) {
-        const priceVal = parseFloat(numMatch[1].replace(',', '.'));
-        if (priceVal > 0 && priceVal < 50000) {
-          const isOneUnit = /(?:x\s*1\b|1\s*(?:u\b|und|unidad|pieza|pza)|unidad\b|unitario|detal|menor)/i.test(line);
-          let cleanLabel = line.replace(/^[•\-*👉*#]+\s*/, '').replace(/\s*c\/u\s*/i, '').trim();
-          if (cleanLabel.length > 55) cleanLabel = cleanLabel.slice(0, 55);
-          affiliateOptionsFound.push({
-            label: cleanLabel || `Precio Afiliado (${currency} ${priceVal.toFixed(2)})`,
+    if (isDirectiveLine(line)) continue;
+
+    const priceMatch = line.match(/\$\s*(\d+(?:[.,]\d{1,2})?)/) ||
+                       line.match(/(\d+(?:[.,]\d{1,2})?)\s*\$/) ||
+                       line.match(/(?:costo|precio|afiliad|mayorista|unitario|c\/u)\s*[:=-]?\s*\$?\s*(\d+(?:[.,]\d{1,2})?)/i);
+
+    if (priceMatch && priceMatch[1]) {
+      const priceVal = parseFloat(priceMatch[1].replace(',', '.'));
+      if (priceVal > 0 && priceVal < 50000) {
+        let cleanLabel = line.replace(/^[•\-*👉*#]+\s*/, '').replace(/\s*c\/u\s*/i, '').trim();
+        cleanLabel = cleanLabel.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+        if (cleanLabel.length > 55) cleanLabel = cleanLabel.slice(0, 55).trim();
+
+        if (!detectedCostOptions.some((o) => o.price === priceVal && o.label === cleanLabel)) {
+          detectedCostOptions.push({
+            label: cleanLabel || `Opción $${priceVal.toFixed(2)}`,
             price: priceVal,
-            isOneUnit,
           });
         }
       }
     }
   }
 
-  // Also extract explicit cost matches (costo $X, precio $X, mayorista $X)
-  const explicitCostMatches = textWithoutPhones.match(/(?:costo|por\s*mayor|mayorista|unitario|c\/u)\s*[:=-]?\s*\$?\s*(\d+(?:[.,]\d{1,2})?)/gi);
-  const rawCostNumbers: number[] = [];
-  if (explicitCostMatches) {
-    for (const m of explicitCostMatches) {
-      const numMatch = m.match(/\d+(?:[.,]\d{1,2})?/);
-      if (numMatch) {
-        const val = parseFloat(numMatch[0].replace(',', '.'));
-        if (val > 0 && val < 50000 && !rawCostNumbers.includes(val)) rawCostNumbers.push(val);
-      }
-    }
-  }
-
-  // Fallback to dollar signs if no explicit cost matched
-  if (rawCostNumbers.length === 0 && affiliateOptionsFound.length === 0) {
+  // Fallback to dollar signs if no explicit line matched
+  if (detectedCostOptions.length === 0) {
     const dollarMatches = textWithoutPhones.match(/\$\s*(\d+(?:[.,]\d{1,2})?)/g);
     if (dollarMatches) {
       for (const m of dollarMatches) {
         const numMatch = m.match(/\d+(?:[.,]\d{1,2})?/);
         if (numMatch) {
           const val = parseFloat(numMatch[0].replace(',', '.'));
-          if (val > 0 && val < 50000 && val !== detectedSalePrice && !rawCostNumbers.includes(val)) {
-            rawCostNumbers.push(val);
+          if (val > 0 && val < 50000 && val !== detectedSalePrice && !detectedCostOptions.some((o) => o.price === val)) {
+            detectedCostOptions.push({
+              label: `Costo Principal (${currency} ${val.toFixed(2)})`,
+              price: val,
+            });
           }
         }
       }
     }
   }
 
-  let costPrice = 15.0;
-  let costOptions: CostOption[] = [];
-
-  if (affiliateOptionsFound.length > 0) {
-    const oneUnit = affiliateOptionsFound.find((o) => o.isOneUnit);
-    costPrice = oneUnit ? oneUnit.price : Math.max(...affiliateOptionsFound.map((o) => o.price));
-    costOptions = affiliateOptionsFound.map((o) => ({
-      label: o.label,
-      price: o.price,
-    }));
-  } else if (rawCostNumbers.length > 0) {
-    // If multiple cost numbers exist, lowest or middle is often cost, highest might be PVP if not tagged
-    costPrice = rawCostNumbers[0];
-    costOptions = rawCostNumbers.map((p, idx) => ({
-      label: idx === 0 ? `Costo Principal (${currency} ${p.toFixed(2)})` : `Opción ${idx + 1} (${currency} ${p.toFixed(2)})`,
-      price: p,
-    }));
-  } else {
-    costPrice = 15.0;
-    costOptions = [{ label: `Costo Principal (${currency} ${costPrice.toFixed(2)})`, price: costPrice }];
-  }
+  // Select primary cost according to directives and affiliate rules
+  const { selectedCost } = selectDefaultAffiliateCostPrice(
+    detectedCostOptions,
+    detectedCostOptions[0]?.price || 15.0,
+    directives.preferredCostType
+  );
+  const costPrice = selectedCost;
 
   // 4. Detect Stock
   let stock = 1;
@@ -748,7 +778,7 @@ function extractFallbackFromText(
   else if (/polo|camisa|vestido|pantalon|casaca|buzo|ropa|algodon|poleron/.test(lower)) category = 'Ropa y Moda';
   else if (/celular|iphone|samsung|xiaomi|cargador|funda|auricular|smartwatch|airpods/.test(lower)) category = 'Electrónica y Celulares';
   else if (/laptop|mouse|teclado|monitor|disco|computador|ram/.test(lower)) category = 'Computación y Accesorios';
-  else if (/cocina|olla|termo|sarten|sabana|lampara|almohada|hogar/.test(lower)) category = 'Hogar y Cocina';
+  else if (/cocina|olla|termo|sarten|sabana|lampara|almohada|hogar|cortina/.test(lower)) category = 'Hogar y Cocina';
   else if (/perfume|crema|maquillaje|labial|shampoo|skincare/.test(lower)) category = 'Belleza y Cuidado Personal';
   else if (/pesa|mancuerna|balon|guante|proteina|fitness|gym/.test(lower)) category = 'Deportes y Fitness';
   else if (/taladro|herramienta|tornillo|foco|cable|pintura/.test(lower)) category = 'Ferretería y Herramientas';
@@ -763,23 +793,20 @@ function extractFallbackFromText(
   }
 
   // 7. IVA / Tax detection & calculation
-  const detectedTaxStatus = detectTaxStatus(text);
-  let explicitTaxRate: number | undefined = undefined;
-  const taxRateMatch = text.match(/(?:iva|impuesto[s]?|igv|vat)\s*(?:de\s*|del\s*)?(\d{1,2})\s*%/i) ||
-                       text.match(/(\d{1,2})\s*%\s*(?:de\s*)?iva/i);
-  if (taxRateMatch && taxRateMatch[1]) {
-    const parsedRate = parseInt(taxRateMatch[1], 10);
-    if (!isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 50) {
-      explicitTaxRate = parsedRate;
-    }
+  let taxRate = directives.explicitTaxRate !== undefined
+    ? directives.explicitTaxRate
+    : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
+
+  let detectedTaxStatus: TaxStatus = 'NOT_SPECIFIED';
+  if (directives.explicitTaxRate === 0) {
+    detectedTaxStatus = 'ZERO_TAX';
+  } else {
+    detectedTaxStatus = detectTaxStatus(text);
   }
+  if (taxRate === 0) detectedTaxStatus = 'ZERO_TAX';
 
-  const effTaxRate = explicitTaxRate ?? (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
-  const taxRate = effTaxRate;
-  const fallbackMargin = defaultMarginPercent || 30;
-
-  // When NOT_SPECIFIED, default option is INCLUDED (ya lleva IVA por defecto):
   const effectiveTaxStatusForDefault = detectedTaxStatus === 'NOT_SPECIFIED' ? 'INCLUDED' : detectedTaxStatus;
+  const fallbackMargin = defaultMarginPercent || 30;
 
   const taxAdjustment = calculateTaxAdjustment({
     costPrice,
@@ -796,23 +823,33 @@ function extractFallbackFromText(
   let finalProfitAmount = Math.round(costWithoutTax * (fallbackMargin / 100) * 100) / 100;
   let hasExplicitProfit = false;
 
-  const profitPctMatch = textWithoutPhones.match(/(?:utilidad|ganancia|margen)\s*(?:de\s*|del\s*)?(\d+(?:[.,]\d{1,2})?)\s*%/i) ||
-                         textWithoutPhones.match(/(\d+(?:[.,]\d{1,2})?)\s*%\s*(?:de\s*)?(?:utilidad|ganancia|margen)/i);
-  const profitDollarMatch = textWithoutPhones.match(/(?:utilidad|ganancia)\s*(?:de\s*)?\$?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:\$|usd|d[oó]lares)?\b/i);
+  if (directives.explicitProfitAmount !== undefined) {
+    finalProfitAmount = directives.explicitProfitAmount;
+    finalProfitMarginPercent = costWithoutTax > 0 ? Math.round((finalProfitAmount / costWithoutTax) * 100) : fallbackMargin;
+    hasExplicitProfit = true;
+  } else if (directives.explicitProfitMargin !== undefined) {
+    finalProfitMarginPercent = directives.explicitProfitMargin;
+    finalProfitAmount = Math.round(costWithoutTax * (finalProfitMarginPercent / 100) * 100) / 100;
+    hasExplicitProfit = true;
+  } else {
+    const profitPctMatch = textWithoutPhones.match(/(?:utilidad|ganancia|margen)\s*(?:de\s*|del\s*)?(\d+(?:[.,]\d{1,2})?)\s*%/i) ||
+                           textWithoutPhones.match(/(\d+(?:[.,]\d{1,2})?)\s*%\s*(?:de\s*)?(?:utilidad|ganancia|margen)/i);
+    const profitDollarMatch = textWithoutPhones.match(/(?:utilidad|ganancia)\s*(?:de\s*|del\s*|:\s*)?\$?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:\$|usd|d[oó]lares)?(?=[\s\n\r,;]|$)/i);
 
-  if (profitPctMatch && profitPctMatch[1]) {
-    const parsedPct = parseFloat(profitPctMatch[1].replace(',', '.'));
-    if (!isNaN(parsedPct) && parsedPct > 0 && parsedPct < 1000) {
-      finalProfitMarginPercent = parsedPct;
-      finalProfitAmount = Math.round(costWithoutTax * (finalProfitMarginPercent / 100) * 100) / 100;
-      hasExplicitProfit = true;
-    }
-  } else if (profitDollarMatch && profitDollarMatch[1]) {
-    const parsedDollar = parseFloat(profitDollarMatch[1].replace(',', '.'));
-    if (!isNaN(parsedDollar) && parsedDollar > 0 && parsedDollar < 50000) {
-      finalProfitAmount = Math.round(parsedDollar * 100) / 100;
-      finalProfitMarginPercent = costWithoutTax > 0 ? Math.round((finalProfitAmount / costWithoutTax) * 100) : fallbackMargin;
-      hasExplicitProfit = true;
+    if (profitPctMatch && profitPctMatch[1]) {
+      const parsedPct = parseFloat(profitPctMatch[1].replace(',', '.'));
+      if (!isNaN(parsedPct) && parsedPct > 0 && parsedPct < 1000) {
+        finalProfitMarginPercent = parsedPct;
+        finalProfitAmount = Math.round(costWithoutTax * (finalProfitMarginPercent / 100) * 100) / 100;
+        hasExplicitProfit = true;
+      }
+    } else if (profitDollarMatch && profitDollarMatch[1]) {
+      const parsedDollar = parseFloat(profitDollarMatch[1].replace(',', '.'));
+      if (!isNaN(parsedDollar) && parsedDollar > 0 && parsedDollar < 50000) {
+        finalProfitAmount = Math.round(parsedDollar * 100) / 100;
+        finalProfitMarginPercent = costWithoutTax > 0 ? Math.round((finalProfitAmount / costWithoutTax) * 100) : fallbackMargin;
+        hasExplicitProfit = true;
+      }
     }
   }
 
@@ -835,14 +872,19 @@ function extractFallbackFromText(
     }
   }
 
-  // 10. Cost options adjustment with tax variants (NOT_SPECIFIED generates 2 options)
-  const adjustedCostOptions = buildCostOptionsWithTaxVariants(costOptions, detectedTaxStatus, taxRate);
+  // 10. Cost options adjustment with tax variants (ZERO_TAX will output clean options without variants)
+  const adjustedCostOptions = buildCostOptionsWithTaxVariants(
+    detectedCostOptions.length > 0 ? detectedCostOptions : [{ label: `Costo Principal (${currency} ${costPrice.toFixed(2)})`, price: costPrice }],
+    detectedTaxStatus,
+    taxRate
+  );
 
   // 11. Tags
   const tags = [category.toLowerCase(), 'telegram', 'proveedor'];
   if (lower.includes('nike')) tags.push('nike');
   if (lower.includes('adidas')) tags.push('adidas');
-  if (lower.includes('original')) tags.push('original');
+  if (lower.includes('cortina')) tags.push('cortina');
+  if (lower.includes('baño')) tags.push('baño');
 
   // 12. Calculate Published Sale Price (PVP) with discount protection formula
   let finalSale = 0;
@@ -888,12 +930,16 @@ function extractFallbackFromText(
       profitMarginPercent: finalProfitMarginPercent,
       profitAmount: finalProfitAmount,
       discountPercent: finalDiscountPercent,
+      hasPurchaseTax: taxRate > 0,
+      purchaseTaxPercent: taxRate,
+      applySaleTax: taxRate > 0,
+      saleTaxPercent: taxRate,
       iva:
-        detectedTaxStatus === 'PLUS_TAX'
+        taxRate === 0
+          ? '0% Exento de IVA'
+          : detectedTaxStatus === 'PLUS_TAX'
           ? `+${taxRate}% aplicado (Base: $${costWithoutTax.toFixed(2)} ➔ Con IVA: $${costWithTax.toFixed(2)})`
-          : detectedTaxStatus === 'INCLUDED'
-          ? `Incluido en el costo ($${costWithoutTax.toFixed(2)} sin IVA)`
-          : `Asumido con IVA ($${costWithoutTax.toFixed(2)} sin IVA)`,
+          : `Incluido en el costo ($${costWithoutTax.toFixed(2)} sin IVA)`,
     },
     supplierNotes: lines.slice(1).join(' ').slice(0, 120),
     confidenceScore: 75,
@@ -932,6 +978,12 @@ Tu tarea es analizar un mensaje enviado por un proveedor en Telegram (que incluy
     }) y extraer de forma exacta todos los datos necesarios para registrar el producto en la base de datos de inventario SQL.
 
 REGLAS CRÍTICAS DE RECONOCIMIENTO Y PREVENCIÓN DE ERRORES DE PRECIOS:
+0. DIRECTIVAS O PARÁMETROS FINANCIEROS EXPLÍCITOS EN EL MENSAJE (MÁXIMA PRIORIDAD):
+   - Si el mensaje incluye líneas de configuración o directivas iniciales como:
+     * "IVA 0%", "IVA 0", "0% IVA", "tarifa 0", "sin iva": Establece OBLIGATORIAMENTE taxPercent = 0 y taxStatus = "ZERO_TAX" (o "INCLUDED"). El IVA a aplicar es 0%, por lo que costWithoutTax = costWithTax = costPrice.
+     * "utilidad 5$", "utilidad 5", "ganancia $5", "utilidad de 5": Establece OBLIGATORIAMENTE profitAmount = 5.0 (o el monto indicado en dólares).
+     * "costo afiliado", "precio afiliado": Selecciona OBLIGATORIAMENTE como costPrice el precio asignado a "Afiliado" (por 1 unidad), IGNORANDO precios de "No afiliado" y precios por mayor/escala (como "3 o más", "docena").
+   - IMPORTANTE: Las líneas de directivas (como "IVA 0%", "utilidad 5$", "costo afiliado") NUNCA forman parte del nombre ni de la descripción del producto. El nombre del producto es el título real (ej. "CORTINA DE BAÑO TELA IMPERMEABLE 🚿🛀").
 1. PREVENCIÓN DE CONFUSIONES:
    - NUNCA confundas números de teléfono o WhatsApp (ej. 09..., +593..., etc.) con precios.
    - NUNCA confundas cantidades de lote o stock (ej. "lote de 50", "30 pares", "caja de 24 piezas") con precios.
@@ -1003,58 +1055,190 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         if (localText && localText.trim().length > 10) {
           const parsed = parseJsonFromModelResponse(localText);
           if (parsed && typeof parsed === 'object' && (parsed.name || parsed.costPrice || parsed.category)) {
-            // Process cost and tax math for local AI response
-            let finalTaxStatus: 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED' = 'NOT_SPECIFIED';
-            if (parsed.taxStatus === 'PLUS_TAX' || parsed.taxStatus === 'INCLUDED' || parsed.taxStatus === 'NOT_SPECIFIED') {
-              finalTaxStatus = parsed.taxStatus;
-            } else {
-              finalTaxStatus = detectTaxStatus(caption);
+            // Process directives from caption
+            const directives = extractFinancialDirectives(caption);
+
+            // Clean title if directives were extracted into name
+            let cleanName = (parsed.name || 'Producto Nuevo (LM Studio Local)').trim();
+            const nameLines = cleanName.split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+            const nonDirectiveLines = nameLines.filter((l: string) => !isDirectiveLine(l));
+            if (nonDirectiveLines.length > 0) {
+              cleanName = nonDirectiveLines.join(' ');
+            }
+            cleanName = cleanName
+              .replace(/^\s*(?:iva\s*0%?|utilidad\s*\$?\d+(?:\.\d+)?\$?|costo\s*afiliado)[\s,:-]*/i, '')
+              .trim();
+            if (!cleanName) cleanName = 'Producto Nuevo (LM Studio Local)';
+
+            let finalTaxStatus: TaxStatus = directives.explicitTaxRate === 0
+              ? 'ZERO_TAX'
+              : (parsed.taxStatus === 'PLUS_TAX' || parsed.taxStatus === 'INCLUDED' || parsed.taxStatus === 'ZERO_TAX')
+              ? parsed.taxStatus
+              : detectTaxStatus(caption);
+
+            const taxRate = directives.explicitTaxRate !== undefined
+              ? directives.explicitTaxRate
+              : (typeof parsed.taxPercent === 'number' && parsed.taxPercent >= 0)
+              ? parsed.taxPercent
+              : (finalTaxStatus === 'ZERO_TAX' || finalTaxStatus === 'NOT_SPECIFIED')
+              ? 0
+              : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
+
+            if (taxRate === 0) {
+              finalTaxStatus = 'ZERO_TAX';
             }
 
-            const taxRate = finalTaxStatus === 'NOT_SPECIFIED' ? 0 : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15);
-            let margin = Math.max(1, Number(parsed.profitMarginPercent) || defaultMarginPercent || 30);
+            let costOptions: CostOption[] = [];
+            if (Array.isArray(parsed.costOptions) && parsed.costOptions.length > 0) {
+              costOptions = parsed.costOptions
+                .map((opt: any) => ({
+                  label: String(opt.label || 'Opción de Costo'),
+                  price: Math.max(0, Number(opt.price) || 0),
+                  costWithoutTax: typeof opt.costWithoutTax === 'number' && opt.costWithoutTax > 0 ? Number(opt.costWithoutTax) : undefined,
+                  costWithTax: typeof opt.costWithTax === 'number' && opt.costWithTax > 0 ? Number(opt.costWithTax) : undefined,
+                }))
+                .filter((opt: CostOption) => opt.price > 0);
+            }
+
             const rawCostVal = Math.max(0.01, Number(parsed.costPrice || parsed.costWithTax || parsed.costWithoutTax) || 15.0);
+            const { selectedCost: finalHighestCost, matchedOpt } = selectDefaultAffiliateCostPrice(
+              costOptions,
+              rawCostVal,
+              directives.preferredCostType
+            );
 
-            const costAdj = calculateTaxAdjustment({
-              costPrice: rawCostVal,
-              taxStatus: finalTaxStatus,
-              taxPercent: taxRate,
-              profitMarginPercent: margin,
-            });
-
-            const parsedProfitAmt = typeof parsed.profitAmount === 'number' && parsed.profitAmount > 0 ? parsed.profitAmount : undefined;
-            if (parsedProfitAmt && costAdj.baseCostPrice > 0) {
-              margin = Math.round((parsedProfitAmt / costAdj.baseCostPrice) * 100);
+            if (costOptions.length === 0) {
+              costOptions = [{ label: `Costo Principal ($${finalHighestCost.toFixed(2)})`, price: finalHighestCost }];
             }
-            const profitAmt = parsedProfitAmt ?? Math.round(costAdj.baseCostPrice * (margin / 100) * 100) / 100;
+
+            let margin = Math.max(1, directives.explicitProfitMargin ?? (Number(parsed.profitMarginPercent) || defaultMarginPercent || 30));
+
+            let finalCostWithoutTax: number;
+            let finalCostWithTax: number;
+
+            if (taxRate === 0 || finalTaxStatus === 'ZERO_TAX') {
+              const raw = matchedOpt?.costWithoutTax ?? matchedOpt?.price ?? parsed.costWithoutTax ?? parsed.costPrice ?? finalHighestCost;
+              finalCostWithoutTax = Math.round(Number(raw) * 100) / 100;
+              finalCostWithTax = finalCostWithoutTax;
+            } else if (finalTaxStatus === 'PLUS_TAX') {
+              let baseWithout: number;
+              if (typeof matchedOpt?.costWithoutTax === 'number' && matchedOpt.costWithoutTax > 0) {
+                baseWithout = matchedOpt.costWithoutTax;
+              } else if (typeof parsed.costWithoutTax === 'number' && parsed.costWithoutTax > 0) {
+                baseWithout = parsed.costWithoutTax;
+              } else if (matchedOpt && typeof matchedOpt.price === 'number' && matchedOpt.price > 0) {
+                if (typeof matchedOpt.costWithTax === 'number' && Math.abs(matchedOpt.price - matchedOpt.costWithTax) < 0.01) {
+                  baseWithout = Math.round((matchedOpt.price / (1 + taxRate / 100)) * 100) / 100;
+                } else {
+                  baseWithout = matchedOpt.price;
+                }
+              } else if (typeof parsed.costWithTax === 'number' && parsed.costWithTax > 0) {
+                baseWithout = Math.round((parsed.costWithTax / (1 + taxRate / 100)) * 100) / 100;
+              } else {
+                baseWithout = finalHighestCost;
+              }
+
+              if (
+                typeof parsed.costWithTax === 'number' &&
+                typeof parsed.costWithoutTax === 'number' &&
+                parsed.costWithoutTax > 0 &&
+                parsed.costWithoutTax < parsed.costWithTax &&
+                Math.abs(baseWithout - parsed.costWithTax) < 0.02
+              ) {
+                baseWithout = parsed.costWithoutTax;
+              }
+
+              finalCostWithoutTax = Math.round(baseWithout * 100) / 100;
+              finalCostWithTax =
+                typeof parsed.costWithTax === 'number' && parsed.costWithTax > finalCostWithoutTax
+                  ? Math.round(parsed.costWithTax * 100) / 100
+                  : Math.round(finalCostWithoutTax * (1 + taxRate / 100) * 100) / 100;
+            } else {
+              // INCLUDED or NOT_SPECIFIED
+              let totalWith: number;
+              if (typeof matchedOpt?.costWithTax === 'number' && matchedOpt.costWithTax > 0) {
+                totalWith = matchedOpt.costWithTax;
+              } else if (typeof parsed.costWithTax === 'number' && parsed.costWithTax > 0) {
+                totalWith = parsed.costWithTax;
+              } else if (matchedOpt && typeof matchedOpt.price === 'number' && matchedOpt.price > 0) {
+                totalWith = matchedOpt.price;
+              } else {
+                totalWith = finalHighestCost;
+              }
+
+              finalCostWithTax = Math.round(totalWith * 100) / 100;
+              finalCostWithoutTax =
+                typeof parsed.costWithoutTax === 'number' && parsed.costWithoutTax < finalCostWithTax && parsed.costWithoutTax > 0
+                  ? Math.round(parsed.costWithoutTax * 100) / 100
+                  : Math.round((finalCostWithTax / (1 + taxRate / 100)) * 100) / 100;
+            }
+
+            if (taxRate > 0 && finalCostWithoutTax > finalCostWithTax) {
+              const temp = finalCostWithoutTax;
+              finalCostWithoutTax = finalCostWithTax;
+              finalCostWithTax = temp;
+            }
+
+            const parsedProfitAmt = directives.explicitProfitAmount ?? (typeof parsed.profitAmount === 'number' && parsed.profitAmount > 0 ? parsed.profitAmount : undefined);
+            if (parsedProfitAmt && finalCostWithoutTax > 0) {
+              margin = Math.round((parsedProfitAmt / finalCostWithoutTax) * 100);
+            }
+            const profitAmt = parsedProfitAmt ?? Math.round(finalCostWithoutTax * (margin / 100) * 100) / 100;
             const discountPct = Math.max(0, Number(parsed.discountPercent) || 0);
 
             // Compute Published PVP
-            const targetBaseSinIVA = costAdj.baseCostPrice + profitAmt;
+            const targetBaseSinIVA = finalCostWithoutTax + profitAmt;
             const discRate = Math.max(0, Math.min(0.99, discountPct / 100));
             const publishedSinIVA = discRate < 1 ? targetBaseSinIVA / (1 - discRate) : targetBaseSinIVA;
             const calculatedSale = Math.round((taxRate > 0 ? publishedSinIVA * (1 + taxRate / 100) : publishedSinIVA) * 100) / 100;
 
+            let finalSale = calculatedSale;
+            if (!parsedProfitAmt && parsed.salePrice) {
+              const pSale = Number(parsed.salePrice);
+              if (!isNaN(pSale) && pSale > finalCostWithTax) {
+                finalSale = pSale;
+              }
+            }
+
+            const adjustedCostOptions: CostOption[] = buildCostOptionsWithTaxVariants(costOptions, finalTaxStatus, taxRate);
+
             return {
-              name: parsed.name || 'Producto Nuevo (LM Studio Local)',
+              name: cleanName,
               sku: parsed.sku || `PROD-${Date.now().toString().slice(-6)}`,
               barcode: typeof parsed.barcode === 'string' && parsed.barcode.trim() ? parsed.barcode.trim() : undefined,
               category: parsed.category || 'General',
-              costPrice: costAdj.costPrice,
-              costWithoutTax: costAdj.baseCostPrice,
-              costWithTax: costAdj.costPrice,
-              baseCostPrice: costAdj.baseCostPrice,
+              costPrice: finalCostWithTax,
+              costWithoutTax: finalCostWithoutTax,
+              costWithTax: finalCostWithTax,
+              baseCostPrice: finalCostWithoutTax,
               taxStatus: finalTaxStatus,
               taxPercent: taxRate,
-              costOptions: Array.isArray(parsed.costOptions) && parsed.costOptions.length > 0 ? parsed.costOptions : [{ label: `Costo Principal ($${costAdj.costPrice.toFixed(2)})`, price: costAdj.costPrice }],
+              costOptions: adjustedCostOptions,
               profitMarginPercent: margin,
               profitAmount: profitAmt,
               discountPercent: discountPct,
-              salePrice: Number(parsed.salePrice) && Number(parsed.salePrice) > costAdj.costPrice ? Number(parsed.salePrice) : calculatedSale,
+              salePrice: finalSale,
               stock: Math.max(1, Number(parsed.stock) || 1),
               description: parsed.description || caption || 'Sin descripción',
               tags: Array.isArray(parsed.tags) ? parsed.tags : ['local-ia'],
-              attributes: { ...(parsed.attributes || {}), proveedorIA: 'LM Studio Local', profitAmount: profitAmt, discountPercent: discountPct },
+              attributes: {
+                ...(parsed.attributes || {}),
+                proveedorIA: 'LM Studio Local',
+                taxStatus: finalTaxStatus,
+                taxPercent: taxRate,
+                hasPurchaseTax: taxRate > 0,
+                purchaseTaxPercent: taxRate,
+                applySaleTax: taxRate > 0,
+                saleTaxPercent: taxRate,
+                baseCostPrice: finalCostWithoutTax,
+                costPriceWithTax: finalCostWithTax,
+                costWithoutTax: finalCostWithoutTax,
+                costWithTax: finalCostWithTax,
+                taxAmount: Math.round((finalCostWithTax - finalCostWithoutTax) * 100) / 100,
+                profitMarginPercent: margin,
+                profitAmount: profitAmt,
+                discountPercent: discountPct,
+              },
               supplierNotes: parsed.supplierNotes || 'Procesado con IA Local (LM Studio)',
               confidenceScore: Number(parsed.confidenceScore) || 95,
             };
@@ -1115,7 +1299,11 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
               },
               taxStatus: {
                 type: Type.STRING,
-                description: 'INCLUDED si incluye iva, PLUS_TAX si es mas iva / no incluye iva, NOT_SPECIFIED si no menciona',
+                description: 'INCLUDED si incluye iva, PLUS_TAX si es mas iva / no incluye iva, ZERO_TAX si el iva es 0%, NOT_SPECIFIED si no menciona',
+              },
+              taxPercent: {
+                type: Type.NUMBER,
+                description: 'Porcentaje de IVA aplicable (0 si indica IVA 0%, o el porcentaje especificado)',
               },
               costOptions: {
                 type: Type.ARRAY,
@@ -1180,6 +1368,9 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
 
       const parsed = JSON.parse(text) as any;
 
+      // Extract directives from caption
+      const directives = extractFinancialDirectives(caption);
+
       // Extract & normalize cost options
       let costOptions: CostOption[] = [];
       if (Array.isArray(parsed.costOptions) && parsed.costOptions.length > 0) {
@@ -1193,53 +1384,108 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
           .filter((opt: CostOption) => opt.price > 0);
       }
 
-      // Determine default cost price: prioritizes the HIGHEST price among options labeled as 'afiliad'
-      const parsedCost = Math.max(0, Number(parsed.costPrice) || 0);
-      const { selectedCost: finalHighestCost } = selectDefaultAffiliateCostPrice(
+      // Determine default cost price: prioritizes the SINGLE UNIT price among options labeled as 'afiliad' (excluding 'No afiliado')
+      const parsedCost = Math.max(0, Number(parsed.costPrice || parsed.costWithTax || parsed.costWithoutTax) || 0);
+      const { selectedCost: finalHighestCost, matchedOpt } = selectDefaultAffiliateCostPrice(
         costOptions,
-        parsedCost
+        parsedCost,
+        directives.preferredCostType
       );
 
       if (costOptions.length === 0) {
         costOptions = [{ label: `Costo Principal (${currency} ${finalHighestCost.toFixed(2)})`, price: finalHighestCost }];
       }
 
-      // Calculate IVA adjustments using unified tax calculator
+      // Calculate IVA adjustments using unified tax calculator & explicit directives
       const contextTax = detectTaxStatus(`${caption || ''} ${parsed.description || ''}`);
-      const modelTaxStatus = parsed.taxStatus === 'PLUS_TAX' || parsed.taxStatus === 'INCLUDED' ? parsed.taxStatus : 'NOT_SPECIFIED';
-      const finalTaxStatus = contextTax !== 'NOT_SPECIFIED' ? contextTax : modelTaxStatus;
+      const modelTaxStatus = parsed.taxStatus === 'PLUS_TAX' || parsed.taxStatus === 'INCLUDED' || parsed.taxStatus === 'ZERO_TAX' ? parsed.taxStatus : 'NOT_SPECIFIED';
+      let finalTaxStatus: TaxStatus = directives.explicitTaxRate === 0
+        ? 'ZERO_TAX'
+        : (contextTax !== 'NOT_SPECIFIED' ? contextTax : modelTaxStatus);
 
-      const taxRate = typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15;
-      let margin = Math.max(1, Number(parsed.profitMarginPercent) || defaultMarginPercent || 30);
+      let taxRate = directives.explicitTaxRate !== undefined
+        ? directives.explicitTaxRate
+        : (typeof parsed.taxPercent === 'number' && parsed.taxPercent >= 0)
+        ? parsed.taxPercent
+        : (finalTaxStatus === 'ZERO_TAX' ? 0 : (typeof taxPercent === 'number' && taxPercent >= 0 ? taxPercent : 15));
 
-      // When NOT_SPECIFIED: default option is INCLUDED (ya lleva IVA por defecto)
-      const effectiveTaxStatusForDefault = finalTaxStatus === 'NOT_SPECIFIED' ? 'INCLUDED' : finalTaxStatus;
+      if (taxRate === 0) {
+        finalTaxStatus = 'ZERO_TAX';
+      }
 
-      const taxAdjustment = calculateTaxAdjustment({
-        costPrice: finalHighestCost,
-        taxStatus: effectiveTaxStatusForDefault,
-        taxPercent: taxRate,
-        profitMarginPercent: margin,
-      });
+      let margin = Math.max(1, directives.explicitProfitMargin ?? (Number(parsed.profitMarginPercent) || defaultMarginPercent || 30));
 
-      // Synchronize costWithoutTax and costWithTax with mathematical precision
-      let finalCostWithoutTax = taxAdjustment.baseCostPrice;
-      let finalCostWithTax = taxAdjustment.costPrice;
+      let finalCostWithoutTax: number;
+      let finalCostWithTax: number;
 
-      if (finalTaxStatus === 'PLUS_TAX') {
-        finalCostWithoutTax = Math.round(finalHighestCost * 100) / 100;
-        finalCostWithTax = Math.round(finalCostWithoutTax * (1 + taxRate / 100) * 100) / 100;
+      if (taxRate === 0 || finalTaxStatus === 'ZERO_TAX') {
+        const raw = matchedOpt?.costWithoutTax ?? matchedOpt?.price ?? parsed.costWithoutTax ?? parsed.costPrice ?? finalHighestCost;
+        finalCostWithoutTax = Math.round(Number(raw) * 100) / 100;
+        finalCostWithTax = finalCostWithoutTax;
+      } else if (finalTaxStatus === 'PLUS_TAX') {
+        let baseWithout: number;
+        if (typeof matchedOpt?.costWithoutTax === 'number' && matchedOpt.costWithoutTax > 0) {
+          baseWithout = matchedOpt.costWithoutTax;
+        } else if (typeof parsed.costWithoutTax === 'number' && parsed.costWithoutTax > 0) {
+          baseWithout = parsed.costWithoutTax;
+        } else if (matchedOpt && typeof matchedOpt.price === 'number' && matchedOpt.price > 0) {
+          if (typeof matchedOpt.costWithTax === 'number' && Math.abs(matchedOpt.price - matchedOpt.costWithTax) < 0.01) {
+            baseWithout = Math.round((matchedOpt.price / (1 + taxRate / 100)) * 100) / 100;
+          } else {
+            baseWithout = matchedOpt.price;
+          }
+        } else if (typeof parsed.costWithTax === 'number' && parsed.costWithTax > 0) {
+          baseWithout = Math.round((parsed.costWithTax / (1 + taxRate / 100)) * 100) / 100;
+        } else {
+          baseWithout = finalHighestCost;
+        }
+
+        if (
+          typeof parsed.costWithTax === 'number' &&
+          typeof parsed.costWithoutTax === 'number' &&
+          parsed.costWithoutTax > 0 &&
+          parsed.costWithoutTax < parsed.costWithTax &&
+          Math.abs(baseWithout - parsed.costWithTax) < 0.02
+        ) {
+          baseWithout = parsed.costWithoutTax;
+        }
+
+        finalCostWithoutTax = Math.round(baseWithout * 100) / 100;
+        finalCostWithTax =
+          typeof parsed.costWithTax === 'number' && parsed.costWithTax > finalCostWithoutTax
+            ? Math.round(parsed.costWithTax * 100) / 100
+            : Math.round(finalCostWithoutTax * (1 + taxRate / 100) * 100) / 100;
       } else {
         // INCLUDED or NOT_SPECIFIED (defaults to INCLUDED selected)
-        finalCostWithTax = Math.round(finalHighestCost * 100) / 100;
-        finalCostWithoutTax = Math.round((finalCostWithTax / (1 + taxRate / 100)) * 100) / 100;
+        let totalWith: number;
+        if (typeof matchedOpt?.costWithTax === 'number' && matchedOpt.costWithTax > 0) {
+          totalWith = matchedOpt.costWithTax;
+        } else if (typeof parsed.costWithTax === 'number' && parsed.costWithTax > 0) {
+          totalWith = parsed.costWithTax;
+        } else if (matchedOpt && typeof matchedOpt.price === 'number' && matchedOpt.price > 0) {
+          totalWith = matchedOpt.price;
+        } else {
+          totalWith = finalHighestCost;
+        }
+
+        finalCostWithTax = Math.round(totalWith * 100) / 100;
+        finalCostWithoutTax =
+          typeof parsed.costWithoutTax === 'number' && parsed.costWithoutTax < finalCostWithTax && parsed.costWithoutTax > 0
+            ? Math.round(parsed.costWithoutTax * 100) / 100
+            : Math.round((finalCostWithTax / (1 + taxRate / 100)) * 100) / 100;
+      }
+
+      if (taxRate > 0 && finalCostWithoutTax > finalCostWithTax) {
+        const temp = finalCostWithoutTax;
+        finalCostWithoutTax = finalCostWithTax;
+        finalCostWithTax = temp;
       }
 
       // Build cost options with variants for NOT_SPECIFIED (INCLUDED default, PLUS_TAX option)
       const adjustedCostOptions: CostOption[] = buildCostOptionsWithTaxVariants(costOptions, finalTaxStatus, taxRate);
 
       // Profit amount & Discount calculations
-      const parsedProfitAmt = typeof parsed.profitAmount === 'number' && parsed.profitAmount > 0 ? parsed.profitAmount : undefined;
+      const parsedProfitAmt = directives.explicitProfitAmount ?? (typeof parsed.profitAmount === 'number' && parsed.profitAmount > 0 ? parsed.profitAmount : undefined);
       const profitAmt = parsedProfitAmt ?? Math.round(finalCostWithoutTax * (margin / 100) * 100) / 100;
       if (parsedProfitAmt && finalCostWithoutTax > 0) {
         margin = Math.round((parsedProfitAmt / finalCostWithoutTax) * 100);
@@ -1260,8 +1506,22 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         }
       }
 
+      // Sanitize product name: ensure directives like "IVA 0%", "utilidad 5$", "costo afiliado" are stripped if model included them
+      let cleanName = (parsed.name || 'Producto Nuevo Telegram').trim();
+      const nameLines = cleanName.split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+      const nonDirectiveNameLines = nameLines.filter((l: string) => !isDirectiveLine(l));
+      if (nonDirectiveNameLines.length > 0) {
+        cleanName = nonDirectiveNameLines.join(' ');
+      }
+      cleanName = cleanName
+        .replace(/^\s*(?:iva\s*0%?|utilidad\s*\$?\d+(?:\.\d+)?\$?|costo\s*afiliado)[\s,:-]*/i, '')
+        .trim();
+      if (!cleanName) {
+        cleanName = 'Producto Nuevo Telegram';
+      }
+
       return {
-        name: parsed.name || 'Producto Nuevo Telegram',
+        name: cleanName,
         sku: parsed.sku || `PROD-${Date.now().toString().slice(-6)}`,
         barcode: typeof parsed.barcode === 'string' && parsed.barcode.trim() ? parsed.barcode.trim() : undefined,
         category: parsed.category || 'General',
@@ -1283,9 +1543,9 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
           ...(parsed.attributes || {}),
           taxStatus: finalTaxStatus,
           taxPercent: taxRate,
-          hasPurchaseTax: true,
+          hasPurchaseTax: taxRate > 0,
           purchaseTaxPercent: taxRate,
-          applySaleTax: true,
+          applySaleTax: taxRate > 0,
           saleTaxPercent: taxRate,
           baseCostPrice: finalCostWithoutTax,
           costPriceWithTax: finalCostWithTax,
@@ -1296,7 +1556,9 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
           profitAmount: profitAmt,
           discountPercent: discountPct,
           iva:
-            finalTaxStatus === 'PLUS_TAX'
+            taxRate === 0 || finalTaxStatus === 'ZERO_TAX'
+              ? `IVA 0% (Tarifa 0% / Exento)`
+              : finalTaxStatus === 'PLUS_TAX'
               ? `+${taxRate}% aplicado (Base: $${finalCostWithoutTax.toFixed(2)} ➔ Con IVA: $${finalCostWithTax.toFixed(2)})`
               : finalTaxStatus === 'INCLUDED'
               ? `Incluido en el costo ($${finalCostWithoutTax.toFixed(2)} sin IVA)`

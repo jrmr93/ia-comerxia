@@ -2844,12 +2844,29 @@ async function startServer() {
       parsed.stock = 0;
 
       if (config.autoApprove !== false) {
-        const itemTax = parsed.taxPercent || config.taxPercent || 15;
+        const itemTax = typeof parsed.taxPercent === 'number' ? parsed.taxPercent : (config.taxPercent ?? 15);
         const itemWith = parsed.costWithTax ?? parsed.costPrice;
         const itemWithout =
           parsed.costWithoutTax !== undefined && parsed.costWithoutTax !== null
             ? parsed.costWithoutTax
-            : itemWith / (1 + itemTax / 100);
+            : itemTax > 0
+            ? itemWith / (1 + itemTax / 100)
+            : itemWith;
+
+        const attributesToStore = {
+          ...attributesWithGallery,
+          hasPurchaseTax: itemTax > 0,
+          purchaseTaxPercent: itemTax,
+          applySaleTax: itemTax > 0,
+          saleTaxPercent: itemTax,
+          taxRate: itemTax,
+          discountPercent: parsed.discountPercent || 0,
+          profitMarginPercent: parsed.profitMarginPercent,
+          profitAmount: parsed.profitAmount,
+          costOptions: parsed.costOptions || [],
+          costWithoutTax: Number(itemWithout).toFixed(2),
+          costWithTax: itemWith.toFixed(2),
+        };
 
         inventoryItem = await createInventoryItem({
           userId,
@@ -2863,12 +2880,13 @@ async function startServer() {
           costWithTax: String(itemWith.toFixed(2)),
           taxRate: String(itemTax),
           salePrice: String(parsed.salePrice.toFixed(2)),
+          discountPercent: parsed.discountPercent || 0,
           stock: effectiveStock,
           imageUrl: primaryPhoto,
           videoUrl: videoUrl || null,
           supplierName: effectiveSupplier,
           tags: parsed.tags.join(', '),
-          extractedAttributes: JSON.stringify(attributesWithGallery),
+          extractedAttributes: JSON.stringify(attributesToStore),
           status: config.defaultProductActive === false ? 'archived' : 'available',
           rawTelegramMessage: caption,
         });

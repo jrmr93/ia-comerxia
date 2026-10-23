@@ -284,8 +284,21 @@ export function normalizeItemTaxesAndPrices<T extends Record<string, any>>(item:
     const rawCostWith = costWithTaxInput ? parseFloat(costWithTaxInput) : 0;
 
     if (rawCostWithout > 0 && rawCostWith > 0) {
-      costWithoutNum = rawCostWithout;
-      costWithNum = rawCostWith;
+      if (finalTaxRate > 0 && rawCostWithout === rawCostWith) {
+        if (parsedExtracted.pricingMode === 'EXCLUDING_TAX' || parsedExtracted.costTaxMode === 'WITHOUT_TAX' || parsedExtracted.taxStatus === 'PLUS_TAX') {
+          costWithoutNum = rawCostWithout;
+          costWithNum = Math.round(costWithoutNum * (1 + finalTaxRate / 100) * 100) / 100;
+        } else {
+          costWithNum = rawCostWith;
+          costWithoutNum = Math.round((costWithNum / (1 + finalTaxRate / 100)) * 100) / 100;
+        }
+      } else if (finalTaxRate > 0 && rawCostWithout > rawCostWith) {
+        costWithoutNum = rawCostWith;
+        costWithNum = rawCostWithout;
+      } else {
+        costWithoutNum = rawCostWithout;
+        costWithNum = rawCostWith;
+      }
     } else if (rawCostWithout > 0) {
       costWithoutNum = rawCostWithout;
       costWithNum = finalTaxRate > 0 ? Math.round(costWithoutNum * (1 + finalTaxRate / 100) * 100) / 100 : costWithoutNum;
@@ -1769,6 +1782,7 @@ export async function reparseInventoryItemWithAi(id: number, userId: number = 1)
     } catch { }
   }
 
+  const effectiveTax = typeof parsed.taxPercent === 'number' ? parsed.taxPercent : 15;
   const mergedAttributes = {
     ...existingAttributes,
     ...(parsed.attributes || {}),
@@ -1777,7 +1791,13 @@ export async function reparseInventoryItemWithAi(id: number, userId: number = 1)
     videoUrl: item.videoUrl || null,
     costOptions: parsed.costOptions || [],
     profitMarginPercent: parsed.profitMarginPercent || defaultMargin,
+    profitAmount: parsed.profitAmount,
     selectedCostPrice: parsed.costPrice,
+    hasPurchaseTax: effectiveTax > 0,
+    purchaseTaxPercent: effectiveTax,
+    applySaleTax: effectiveTax > 0,
+    saleTaxPercent: effectiveTax,
+    taxRate: effectiveTax,
   };
 
   const updatePayload: any = {
@@ -1788,6 +1808,7 @@ export async function reparseInventoryItemWithAi(id: number, userId: number = 1)
     costWithTax: parsed.costWithTax,
     taxStatus: parsed.taxStatus,
     taxPercent: parsed.taxPercent,
+    taxRate: String(effectiveTax),
     salePrice: parsed.salePrice,
     profitMarginPercent: parsed.profitMarginPercent,
     description: parsed.description || item.description,

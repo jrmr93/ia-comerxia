@@ -23,7 +23,7 @@ export interface WebProductScrapeResult {
   costWithoutTax?: number;
   costWithTax?: number;
   baseCostPrice?: number;
-  taxStatus?: 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED';
+  taxStatus?: TaxStatus;
   taxPercent?: number;
   costOptions: CostOption[];
   profitMarginPercent: number;
