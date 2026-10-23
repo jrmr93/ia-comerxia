@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CostOption, InventoryItem, Supplier } from '../types.ts';
 import { calculateCardSalePrice } from '../utils/ecuadorTaxCalculator.ts';
+import { detectTaxStatus } from '../utils/tax-calculator.ts';
 import {
   AlertTriangle,
   BadgePercent,
@@ -428,6 +429,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setSaleTaxPercent(unifiedTaxPercent);
       setTaxRate(effectiveUnifiedTaxRate);
 
+      const isItemPlusTax =
+        parsedAttr?.taxStatus === 'PLUS_TAX' ||
+        (editingItem as any)?.taxStatus === 'PLUS_TAX' ||
+        detectTaxStatus(rawTelegramMessage) === 'PLUS_TAX';
+
       let initialCostWithout =
         editingItem.costWithoutTax !== undefined && editingItem.costWithoutTax !== null && String(editingItem.costWithoutTax).trim() !== ''
           ? String(editingItem.costWithoutTax)
@@ -453,9 +459,24 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
       if (!isGift && costOpts.length > 0) {
         const activeOpt = costOpts.find((o) => Math.abs((o.costWithTax ?? o.price) - parseFloat(initialCostWith)) < 0.02) || (!hasExplicitSavedCost ? costOpts[0] : undefined);
-        if (activeOpt && typeof activeOpt.costWithoutTax === 'number' && typeof activeOpt.costWithTax === 'number') {
-          initialCostWithout = String(activeOpt.costWithoutTax.toFixed(2));
-          initialCostWith = String(activeOpt.costWithTax.toFixed(2));
+        if (activeOpt) {
+          if (typeof activeOpt.costWithoutTax === 'number' && typeof activeOpt.costWithTax === 'number') {
+            initialCostWithout = String(activeOpt.costWithoutTax.toFixed(2));
+            initialCostWith = String(activeOpt.costWithTax.toFixed(2));
+          } else if (typeof activeOpt.costWithoutTax === 'number') {
+            initialCostWithout = String(activeOpt.costWithoutTax.toFixed(2));
+            initialCostWith = unifiedHasTax && unifiedTaxPercent > 0
+              ? String((activeOpt.costWithoutTax * (1 + unifiedTaxPercent / 100)).toFixed(2))
+              : String(activeOpt.costWithoutTax.toFixed(2));
+          } else if (typeof activeOpt.price === 'number' && activeOpt.price > 0 && !hasExplicitSavedCost) {
+            const optIsPlusTax = isItemPlusTax || activeOpt.taxStatus === 'PLUS_TAX' || /\b(?:m[aá]s\s*iva|\+\s*iva|sin\s*iva)\b/i.test(activeOpt.label);
+            if (optIsPlusTax) {
+              initialCostWithout = String(activeOpt.price.toFixed(2));
+              initialCostWith = unifiedHasTax && unifiedTaxPercent > 0
+                ? String((activeOpt.price * (1 + unifiedTaxPercent / 100)).toFixed(2))
+                : String(activeOpt.price.toFixed(2));
+            }
+          }
         }
       }
 
@@ -473,17 +494,37 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCostWithTax(effCost);
         setCostPrice(effCost);
       } else {
-        const withNum = parseFloat(initialCostWith) || costNum;
-        const withoutNum = parseFloat(initialCostWithout) || 0;
-        if (!withoutNum) {
-          initialCostWithout = (withNum / (1 + unifiedTaxPercent / 100)).toFixed(2);
+        let withNum = parseFloat(initialCostWith) || costNum;
+        let withoutNum = parseFloat(initialCostWithout) || 0;
+
+        if (withoutNum === 0 && withNum > 0) {
+          if (isItemPlusTax) {
+            withoutNum = withNum;
+            withNum = Math.round(withoutNum * (1 + unifiedTaxPercent / 100) * 100) / 100;
+          } else {
+            withoutNum = Math.round((withNum / (1 + unifiedTaxPercent / 100)) * 100) / 100;
+          }
+        } else if (withNum === 0 && withoutNum > 0) {
+          withNum = Math.round(withoutNum * (1 + unifiedTaxPercent / 100) * 100) / 100;
+        } else if (withoutNum > 0 && withNum > 0) {
+          if (withoutNum === withNum && unifiedTaxPercent > 0) {
+            if (isItemPlusTax) {
+              withNum = Math.round(withoutNum * (1 + unifiedTaxPercent / 100) * 100) / 100;
+            } else {
+              withoutNum = Math.round((withNum / (1 + unifiedTaxPercent / 100)) * 100) / 100;
+            }
+          } else if (withoutNum > withNum && unifiedTaxPercent > 0) {
+            const tmp = withoutNum;
+            withoutNum = withNum;
+            withNum = tmp;
+          }
         }
-        if (!initialCostWith || parseFloat(initialCostWith) === 0) {
-          initialCostWith = (parseFloat(initialCostWithout) * (1 + unifiedTaxPercent / 100)).toFixed(2);
-        }
-        setCostWithoutTax(initialCostWithout || '0.00');
-        setCostWithTax(initialCostWith || editingItem.costPrice || '0.00');
-        setCostPrice(initialCostWith || editingItem.costPrice || '0.00');
+
+        initialCostWithout = withoutNum.toFixed(2);
+        initialCostWith = withNum.toFixed(2);
+        setCostWithoutTax(initialCostWithout);
+        setCostWithTax(initialCostWith);
+        setCostPrice(initialCostWith);
       }
 
       setCostOptions(costOpts);
@@ -776,6 +817,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     let optWithout: number;
     let optWith: number;
 
+    let editingAttr: Record<string, any> = {};
+    if (editingItem?.extractedAttributes) {
+      try {
+        editingAttr =
+          typeof editingItem.extractedAttributes === 'string'
+            ? JSON.parse(editingItem.extractedAttributes)
+            : editingItem.extractedAttributes;
+      } catch {}
+    }
+
+    const isOptionPlusTax =
+      opt.taxStatus === 'PLUS_TAX' ||
+      /\b(?:m[aá]s\s*iva|\+\s*iva|sin\s*iva)\b/i.test(opt.label) ||
+      (editingAttr.taxStatus === 'PLUS_TAX' && opt.taxStatus !== 'INCLUDED') ||
+      (detectTaxStatus(rawTelegramMessage) === 'PLUS_TAX' && opt.taxStatus !== 'INCLUDED');
+
     if (typeof opt.costWithoutTax === 'number' && typeof opt.costWithTax === 'number') {
       optWithout = opt.costWithoutTax;
       optWith = opt.costWithTax;
@@ -785,9 +842,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     } else if (typeof opt.costWithTax === 'number') {
       optWith = opt.costWithTax;
       optWithout = activeTax > 0 ? optWith / (1 + activeTax / 100) : optWith;
+    } else if (isOptionPlusTax) {
+      optWithout = opt.price;
+      optWith = activeTax > 0 ? opt.price * (1 + activeTax / 100) : opt.price;
     } else {
       optWith = opt.price;
       optWithout = activeTax > 0 ? opt.price / (1 + activeTax / 100) : opt.price;
+    }
+
+    if (activeTax > 0 && optWithout > optWith) {
+      const temp = optWithout;
+      optWithout = optWith;
+      optWith = temp;
     }
 
     setCostWithoutTax(optWithout.toFixed(2));
@@ -1269,7 +1335,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     const optWithout =
                       typeof opt.costWithoutTax === 'number'
                         ? opt.costWithoutTax
-                        : optWith / (1 + (taxRate > 0 ? taxRate : 15) / 100);
+                        : taxRate > 0
+                        ? optWith / (1 + taxRate / 100)
+                        : optWith;
 
                     const isSelected =
                       Math.abs(parseFloat(costWithTax || costPrice) - optWith) < 0.02 &&

@@ -152,6 +152,7 @@ export interface CostOption {
   taxRate?: number;
   unitCost?: number;
   isAffiliate?: boolean;
+  taxStatus?: 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED' | 'ZERO_TAX';
 }
 
 export interface CartItem {
@@ -687,10 +688,12 @@ export interface ParsedProductResult {
   costWithoutTax: number;
   costWithTax: number;
   baseCostPrice?: number;
-  taxStatus?: 'INCLUDED' | 'PLUS_TAX' | 'NOT_SPECIFIED';
+  taxStatus?: 'INCLUDED' | 'PLUS_TAX' | 'ZERO_TAX' | 'NOT_SPECIFIED';
   taxPercent?: number;
   costOptions?: CostOption[];
   profitMarginPercent?: number;
+  profitAmount?: number;
+  discountPercent?: number;
   salePrice: number;
   stock: number;
   description: string;
