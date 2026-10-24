@@ -2404,6 +2404,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
   );
 
   const handleClearAllFilters = () => {
+    setCurrentPage(1);
     setSearchQuery('');
     setSelectedCategory('all');
     setShowOffersOnly(false);
@@ -2483,7 +2484,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     if (selectedCategory !== 'all' && !searchQuery.trim()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [searchQuery, selectedCategory, showOffersOnly, inStockOnly, sortBy]);
+  }, [searchQuery, selectedCategory, showOffersOnly, inStockOnly, sortBy, isSharedSelection]);
 
   // When a search returns matching products, smoothly scroll to bring the first matched product / search results grid into view under the sticky header
   const prevSearchQueryRef = React.useRef('');

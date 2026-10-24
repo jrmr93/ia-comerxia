@@ -2257,7 +2257,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         }
         return 0; // featured default
       });
-  }, [products, searchQuery, selectedCategory, inStockOnly, showOffersOnly, sortBy, storeConfig?.showOutOfStock, storeConfig?.defaultInitialCategory, storeConfig?.prioritizeOffersFirst, randomOrderSeedMap]);
+  }, [products, searchQuery, selectedCategory, inStockOnly, showOffersOnly, sortBy, storeConfig?.showOutOfStock, storeConfig?.defaultInitialCategory, storeConfig?.prioritizeOffersFirst, randomOrderSeedMap, urlSelectedProductIds]);
 
   // Active payment methods configured in store settings
   const activeConfiguredPayments = useMemo(() => {
