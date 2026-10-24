@@ -98,6 +98,9 @@ export interface StoreLayoutProps {
   onOpenShareModal?: () => void;
   isFilterSheetOpen?: boolean;
   onToggleFilterSheet?: (open: boolean) => void;
+  isSharedSelection?: boolean;
+  urlSelectedProductIds?: number[] | null;
+  onClearSharedSelection?: () => void;
 }
 
 // Helper to extract photos
@@ -2391,7 +2394,26 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     onLogoClick,
     themeStyles,
     currency = 'USD',
+    isSharedSelection: propIsSharedSelection,
+    urlSelectedProductIds,
+    onClearSharedSelection,
   } = props;
+
+  const isSharedSelection = Boolean(
+    propIsSharedSelection ?? (urlSelectedProductIds && urlSelectedProductIds.length > 0)
+  );
+
+  const handleClearAllFilters = () => {
+    setCurrentPage(1);
+    setSearchQuery('');
+    setSelectedCategory('all');
+    setShowOffersOnly(false);
+    setInStockOnly(false);
+    setSortBy(storeConfig?.defaultProductSort || 'featured');
+    if (onClearSharedSelection) {
+      onClearSharedSelection();
+    }
+  };
 
   // Calculate real-time cart subtotal
   const cartSubtotal = cart.reduce((sum, ci) => {
@@ -2462,7 +2484,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     if (selectedCategory !== 'all' && !searchQuery.trim()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [searchQuery, selectedCategory, showOffersOnly, inStockOnly, sortBy]);
+  }, [searchQuery, selectedCategory, showOffersOnly, inStockOnly, sortBy, isSharedSelection]);
 
   // When a search returns matching products, smoothly scroll to bring the first matched product / search results grid into view under the sticky header
   const prevSearchQueryRef = React.useRef('');
@@ -2554,7 +2576,8 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
     (showOffersOnly ? 1 : 0) +
     (inStockOnly ? 1 : 0) +
     (sortBy !== 'featured' ? 1 : 0) +
-    (searchQuery.trim().length > 0 ? 1 : 0);
+    (searchQuery.trim().length > 0 ? 1 : 0) +
+    (isSharedSelection ? 1 : 0);
 
   return (
     <div className="space-y-4 pb-12 w-full">
@@ -3052,11 +3075,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedCategory('all');
-                  setShowOffersOnly(false);
-                  setInStockOnly(false);
-                  setSortBy('featured');
-                  setSearchQuery('');
+                  handleClearAllFilters();
                 }}
                 className="py-2.5 px-4 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold transition cursor-pointer text-xs active:scale-95"
               >
@@ -3077,12 +3096,17 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       {/* Main Catalog Body Container */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-6 pt-2">
         {/* Active Filter Feedback Pill */}
-      {(searchQuery || selectedCategory !== 'all' || showOffersOnly || inStockOnly || sortBy !== 'featured') && (
+      {(searchQuery || selectedCategory !== 'all' || showOffersOnly || inStockOnly || sortBy !== 'featured' || isSharedSelection) && (
         <div className="flex items-center justify-between bg-slate-100 border border-slate-200 rounded-xl px-3 sm:px-4 py-2 text-xs text-slate-700 shadow-2xs">
           <div className="flex items-center space-x-1.5 sm:space-x-2 flex-wrap gap-y-1">
             <span className="font-bold text-slate-900">
               {filteredProducts.length} {filteredProducts.length === 1 ? 'producto encontrado' : 'productos encontrados'}
             </span>
+            {isSharedSelection && (
+              <span className="bg-amber-100 text-amber-950 border border-amber-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1 text-[11px]">
+                <Package className="w-2.5 h-2.5 text-amber-700" /> Selección compartida
+              </span>
+            )}
             {searchQuery && (
               <span className="bg-white border border-slate-300 rounded-md px-1.5 py-0.5 text-slate-800 font-mono text-[11px]">
                 "{searchQuery}"
@@ -3110,16 +3134,44 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             )}
           </div>
           <button
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedCategory('all');
-              setShowOffersOnly(false);
-              setInStockOnly(false);
-              setSortBy('featured');
-            }}
+            onClick={handleClearAllFilters}
             className="text-amber-700 hover:text-amber-800 font-bold underline cursor-pointer ml-2 whitespace-nowrap text-[11px]"
+            title="Limpiar filtros y ver catálogo completo"
           >
-            Limpiar todo
+            Limpiar filtros
+          </button>
+        </div>
+      )}
+
+      {/* Shared Selection Info Banner */}
+      {isSharedSelection && (
+        <div className="bg-gradient-to-r from-amber-50 via-amber-100/60 to-amber-50 border border-amber-300/80 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-[#FFD000] text-slate-950 flex items-center justify-center font-bold shadow-xs shrink-0 border border-amber-400">
+              <Package className="w-5 h-5 text-slate-950" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+                  Productos Seleccionados ({filteredProducts.length})
+                </h4>
+                <span className="text-[10px] font-bold bg-amber-200/90 text-amber-950 px-2 py-0.5 rounded-full border border-amber-300">
+                  Selección compartida
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-600 font-medium truncate mt-0.5">
+                Estás visualizando los productos seleccionados y compartidos desde el inventario.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearAllFilters}
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-amber-50 border border-amber-300 text-slate-950 font-bold text-xs shadow-xs transition cursor-pointer flex items-center justify-center space-x-1.5 active:scale-95 shrink-0"
+            title="Limpiar filtros y ver todo el catálogo"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+            <span>Limpiar filtros</span>
           </button>
         </div>
       )}
@@ -3152,7 +3204,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
       )}
 
       {/* Inline Commercial Poster (Replaces Hero Grid & Trust Badges when active, renders NOTHING when inactive) */}
-      {selectedCategory === 'all' && !searchQuery && (
+      {selectedCategory === 'all' && !searchQuery && !isSharedSelection && (
         <div className="space-y-6 mb-6">
           <InlineCommercialPoster
             storeConfig={storeConfig}
@@ -3174,7 +3226,10 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
                 <h3 className="text-lg font-black text-slate-900 tracking-tight">Categorías Populares</h3>
               </div>
               <button
-                onClick={() => setSelectedCategory('all')}
+                onClick={() => {
+                  setSelectedCategory('all');
+                  if (onClearSharedSelection) onClearSharedSelection();
+                }}
                 className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
               >
                 <span>Ver todo el catálogo</span>
@@ -3221,12 +3276,7 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
             Revisa la ortografía o intenta buscar con palabras clave más generales.
           </p>
           <button
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedCategory('all');
-              setShowOffersOnly(false);
-              setInStockOnly(false);
-            }}
+            onClick={handleClearAllFilters}
             className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs font-bold transition shadow-xs cursor-pointer inline-flex items-center space-x-1.5 mt-2"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -3237,7 +3287,14 @@ export const ClassicStoreLayout: React.FC<{ props: StoreLayoutProps }> = ({ prop
         <>
           <div id="store-products-anchor" className="scroll-mt-32" />
 
-          {selectedCategory !== 'all' ? (
+          {/* When shared selection is active: show ALL shared products together without categorization or category header banners! */}
+          {isSharedSelection ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3.5 md:gap-4">
+              {paginatedProducts.map((item) => (
+                <ProductCardItem key={item.id} item={item} props={props} />
+              ))}
+            </div>
+          ) : selectedCategory !== 'all' ? (
             <div className="space-y-6">
               {(() => {
                 const catCfg = getCustomCategoryHeaderConfig(selectedCategory);

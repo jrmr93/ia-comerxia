@@ -917,6 +917,75 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }
   }, [storeConfig?.defaultProductSort]);
 
+  // Helper to extract selected products IDs from URL query (?productos=1,2,3 or ?items=1,2,3 or ?ids=1,2,3)
+  const getSelectedProductIdsFromUrl = (): number[] | null => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const raw =
+      params.get('productos') ||
+      params.get('items') ||
+      params.get('ids') ||
+      params.get('seleccion') ||
+      params.get('p_ids');
+    if (raw && raw.trim()) {
+      const parsed = raw
+        .split(',')
+        .map((id) => parseInt(id.trim(), 10))
+        .filter((n) => !isNaN(n) && n > 0);
+      return parsed.length > 0 ? parsed : null;
+    }
+    return null;
+  };
+
+  const [urlSelectedProductIds, setUrlSelectedProductIds] = useState<number[] | null>(() =>
+    getSelectedProductIdsFromUrl()
+  );
+
+  // Listen for browser back/forward or URL state changes
+  useEffect(() => {
+    const handleUrlUpdate = () => {
+      setUrlSelectedProductIds(getSelectedProductIdsFromUrl());
+    };
+    window.addEventListener('popstate', handleUrlUpdate);
+    return () => window.removeEventListener('popstate', handleUrlUpdate);
+  }, []);
+
+  // When shared selection is present, ensure default category is 'all' so all selected items are visible
+  useEffect(() => {
+    if (urlSelectedProductIds && urlSelectedProductIds.length > 0) {
+      setSelectedCategory('all');
+    }
+  }, [urlSelectedProductIds]);
+
+  // Handler to clear shared selection filter and explore the full catalog
+  const handleClearSharedSelection = useCallback(() => {
+    setUrlSelectedProductIds(null);
+    setSelectedCategory('all');
+    setSearchQuery('');
+    setInStockOnly(false);
+    setShowOffersOnly(false);
+    setSortBy(storeConfig?.defaultProductSort || 'featured');
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('productos');
+        url.searchParams.delete('items');
+        url.searchParams.delete('ids');
+        url.searchParams.delete('seleccion');
+        url.searchParams.delete('p_ids');
+        url.searchParams.delete('categoria');
+        url.searchParams.delete('category');
+        url.searchParams.delete('cat');
+        url.searchParams.delete('q');
+        url.searchParams.delete('buscar');
+        if (isCustomerView && !url.searchParams.has('view')) {
+          url.searchParams.set('view', 'store');
+        }
+        window.history.replaceState({}, '', url.toString());
+      } catch {}
+    }
+  }, [storeConfig?.defaultProductSort, isCustomerView]);
+
   // Scroll to top of store view when category changes (do not jump scroll while customer is typing search query)
   useEffect(() => {
     if (isCustomerView && selectedCategory !== 'all' && !searchQuery.trim()) {
@@ -1876,6 +1945,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     if (onSubTabChange) {
       onSubTabChange('catalog');
     }
+    handleClearSharedSelection();
 
     if (quickViewProduct) {
       handleBackToCatalog();
@@ -1893,7 +1963,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         document.body?.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
-  }, [quickViewProduct, handleBackToCatalog, storeConfig?.defaultProductSort, onSubTabChange]);
+  }, [quickViewProduct, handleBackToCatalog, storeConfig?.defaultProductSort, onSubTabChange, handleClearSharedSelection]);
 
   // Logo Click handler: Trigger bounce animation & return to home catalog
   const handleLogoClick = useCallback(() => {
@@ -2043,61 +2113,6 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }
   }, [quickViewProduct]);
 
-  // Helper to extract selected products IDs from URL query (?productos=1,2,3 or ?items=1,2,3 or ?ids=1,2,3)
-  const getSelectedProductIdsFromUrl = (): number[] | null => {
-    if (typeof window === 'undefined') return null;
-    const params = new URLSearchParams(window.location.search);
-    const raw =
-      params.get('productos') ||
-      params.get('items') ||
-      params.get('ids') ||
-      params.get('seleccion') ||
-      params.get('p_ids');
-    if (raw && raw.trim()) {
-      const parsed = raw
-        .split(',')
-        .map((id) => parseInt(id.trim(), 10))
-        .filter((n) => !isNaN(n) && n > 0);
-      return parsed.length > 0 ? parsed : null;
-    }
-    return null;
-  };
-
-  const [urlSelectedProductIds, setUrlSelectedProductIds] = useState<number[] | null>(() =>
-    getSelectedProductIdsFromUrl()
-  );
-
-  // Listen for browser back/forward or URL state changes
-  useEffect(() => {
-    const handleUrlUpdate = () => {
-      setUrlSelectedProductIds(getSelectedProductIdsFromUrl());
-    };
-    window.addEventListener('popstate', handleUrlUpdate);
-    return () => window.removeEventListener('popstate', handleUrlUpdate);
-  }, []);
-
-  // When shared selection is present, ensure default category is 'all' so all selected items are visible
-  useEffect(() => {
-    if (urlSelectedProductIds && urlSelectedProductIds.length > 0) {
-      setSelectedCategory('all');
-    }
-  }, [urlSelectedProductIds]);
-
-  // Handler to clear shared selection filter and explore the full catalog
-  const handleClearSharedSelection = () => {
-    setUrlSelectedProductIds(null);
-    if (typeof window !== 'undefined') {
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.delete('productos');
-        url.searchParams.delete('items');
-        url.searchParams.delete('ids');
-        url.searchParams.delete('seleccion');
-        url.searchParams.delete('p_ids');
-        window.history.replaceState({}, '', url.toString());
-      } catch {}
-    }
-  };
 
   // Categories list derived from products (respecting shared selection if active)
   const categories = useMemo(() => {
@@ -2242,7 +2257,7 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         }
         return 0; // featured default
       });
-  }, [products, searchQuery, selectedCategory, inStockOnly, showOffersOnly, sortBy, storeConfig?.showOutOfStock, storeConfig?.defaultInitialCategory, storeConfig?.prioritizeOffersFirst, randomOrderSeedMap]);
+  }, [products, searchQuery, selectedCategory, inStockOnly, showOffersOnly, sortBy, storeConfig?.showOutOfStock, storeConfig?.defaultInitialCategory, storeConfig?.prioritizeOffersFirst, randomOrderSeedMap, urlSelectedProductIds]);
 
   // Active payment methods configured in store settings
   const activeConfiguredPayments = useMemo(() => {
@@ -4201,6 +4216,9 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
                 onOpenShareModal: () => setIsShareModalOpen(true),
                 isFilterSheetOpen,
                 onToggleFilterSheet: setIsFilterSheetOpen,
+                isSharedSelection: Boolean(urlSelectedProductIds && urlSelectedProductIds.length > 0),
+                urlSelectedProductIds,
+                onClearSharedSelection: handleClearSharedSelection,
               }}
             />
           )}
