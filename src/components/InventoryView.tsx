@@ -504,6 +504,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [isProcessingStatus, setIsProcessingStatus] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [shareInitialCategory, setShareInitialCategory] = useState<string>('');
+  const [shareSelectedProducts, setShareSelectedProducts] = useState<InventoryItem[]>([]);
+
+  const handleOpenShareSelected = () => {
+    const selected = items.filter((it) => selectedIds.includes(it.id));
+    setShareSelectedProducts(selected);
+    setShareInitialCategory('');
+    setIsShareModalOpen(true);
+  };
 
   // Print Inventory Report Modal State
   const [showPrintReportModal, setShowPrintReportModal] = useState<boolean>(false);
@@ -872,14 +880,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 type="button"
                 id="btn-inventory-share-store-header"
                 onClick={() => {
-                  setShareInitialCategory(selectedCategory !== 'all' ? selectedCategory : '');
-                  setIsShareModalOpen(true);
+                  if (selectedIds.length > 0) {
+                    handleOpenShareSelected();
+                  } else {
+                    setShareSelectedProducts([]);
+                    setShareInitialCategory(selectedCategory !== 'all' ? selectedCategory : '');
+                    setIsShareModalOpen(true);
+                  }
                 }}
-                className="w-full sm:w-auto inline-flex items-center justify-center px-3.5 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 hover:text-emerald-900 font-extrabold text-xs border border-emerald-300 shadow-2xs transition cursor-pointer active:scale-95 whitespace-nowrap"
-                title="Compartir catálogo completo o filtrado por categoría"
+                className={`w-full sm:w-auto inline-flex items-center justify-center px-3.5 py-2 rounded-xl font-extrabold text-xs border shadow-2xs transition cursor-pointer active:scale-95 whitespace-nowrap ${
+                  selectedIds.length > 0
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 shadow-emerald-500/20'
+                    : 'bg-white hover:bg-emerald-50 text-emerald-700 hover:text-emerald-900 border-emerald-300'
+                }`}
+                title={selectedIds.length > 0 ? 'Compartir productos seleccionados en vista cliente' : 'Compartir catálogo completo o filtrado por categoría'}
               >
-                <Share2 className="w-4 h-4 mr-1.5 text-emerald-600 stroke-[2.5]" />
-                <span>{selectedCategory !== 'all' ? `Compartir "${selectedCategory}"` : 'Compartir Categoría'}</span>
+                <Share2 className="w-4 h-4 mr-1.5 stroke-[2.5]" />
+                <span>
+                  {selectedIds.length > 0
+                    ? `Compartir Selección (${selectedIds.length})`
+                    : selectedCategory !== 'all'
+                    ? `Compartir "${selectedCategory}"`
+                    : 'Compartir Catálogo'}
+                </span>
               </button>
 
               <button
@@ -1362,6 +1385,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
               <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                 <button
+                  type="button"
+                  id="btn-inventory-share-selected"
+                  onClick={handleOpenShareSelected}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-xs transition flex items-center space-x-1.5 cursor-pointer border border-emerald-400/40 active:scale-95"
+                  title="Compartir enlace de vista cliente con únicamente los productos seleccionados"
+                >
+                  <Share2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Compartir ({selectedIds.length})</span>
+                </button>
+                <button
                   onClick={() => setShowBulkFlyerModal(true)}
                   className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs shadow-xs transition flex items-center space-x-1.5 cursor-pointer border border-amber-300 active:scale-95"
                   title="Generar imágenes promocionales (flyers HD 1080x1080) para todos los productos seleccionados y descargar archivo ZIP"
@@ -1832,6 +1865,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       {/* Buttons */}
                       <div className="flex items-center justify-end space-x-1 shrink-0 pt-1 xs:pt-0 border-t xs:border-t-0 border-slate-200">
                         <button
+                          type="button"
+                          onClick={() => {
+                            setShareSelectedProducts([item]);
+                            setShareInitialCategory('');
+                            setIsShareModalOpen(true);
+                          }}
+                          title="Compartir este producto en vista cliente"
+                          className="p-1.5 rounded-lg text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 transition cursor-pointer"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => setBarcodeItems([item])}
                           title="Imprimir etiqueta de código de barras para pegar al producto"
                           className="p-1.5 rounded-lg text-sky-700 hover:text-sky-900 hover:bg-sky-100 transition cursor-pointer"
@@ -2113,6 +2158,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 <Sparkles className="w-3.5 h-3.5" />
                               </button>
                               <button
+                                type="button"
+                                onClick={() => {
+                                  setShareSelectedProducts([item]);
+                                  setShareInitialCategory('');
+                                  setIsShareModalOpen(true);
+                                }}
+                                className="p-1 rounded text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 transition cursor-pointer"
+                                title="Compartir este producto en vista cliente"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
                                 onClick={() => onSelectItem(item)}
                                 className="p-1 rounded text-slate-500 hover:bg-slate-100 transition cursor-pointer"
                                 title="Ver detalle"
@@ -2192,10 +2249,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       {/* Share Store & Category Modal */}
       <ShareStoreModal
         isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
+        onClose={() => {
+          setIsShareModalOpen(false);
+          setShareSelectedProducts([]);
+        }}
         storeConfig={storeConfig}
         categories={categories}
         initialCategory={shareInitialCategory}
+        selectedProducts={shareSelectedProducts}
         onShowToast={(msg) => {
           setReparseToast(msg);
           setTimeout(() => setReparseToast(null), 3500);
