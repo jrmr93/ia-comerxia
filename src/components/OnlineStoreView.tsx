@@ -2043,14 +2043,74 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }
   }, [quickViewProduct]);
 
-  // Categories list derived from products
+  // Helper to extract selected products IDs from URL query (?productos=1,2,3 or ?items=1,2,3 or ?ids=1,2,3)
+  const getSelectedProductIdsFromUrl = (): number[] | null => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const raw =
+      params.get('productos') ||
+      params.get('items') ||
+      params.get('ids') ||
+      params.get('seleccion') ||
+      params.get('p_ids');
+    if (raw && raw.trim()) {
+      const parsed = raw
+        .split(',')
+        .map((id) => parseInt(id.trim(), 10))
+        .filter((n) => !isNaN(n) && n > 0);
+      return parsed.length > 0 ? parsed : null;
+    }
+    return null;
+  };
+
+  const [urlSelectedProductIds, setUrlSelectedProductIds] = useState<number[] | null>(() =>
+    getSelectedProductIdsFromUrl()
+  );
+
+  // Listen for browser back/forward or URL state changes
+  useEffect(() => {
+    const handleUrlUpdate = () => {
+      setUrlSelectedProductIds(getSelectedProductIdsFromUrl());
+    };
+    window.addEventListener('popstate', handleUrlUpdate);
+    return () => window.removeEventListener('popstate', handleUrlUpdate);
+  }, []);
+
+  // When shared selection is present, ensure default category is 'all' so all selected items are visible
+  useEffect(() => {
+    if (urlSelectedProductIds && urlSelectedProductIds.length > 0) {
+      setSelectedCategory('all');
+    }
+  }, [urlSelectedProductIds]);
+
+  // Handler to clear shared selection filter and explore the full catalog
+  const handleClearSharedSelection = () => {
+    setUrlSelectedProductIds(null);
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('productos');
+        url.searchParams.delete('items');
+        url.searchParams.delete('ids');
+        url.searchParams.delete('seleccion');
+        url.searchParams.delete('p_ids');
+        window.history.replaceState({}, '', url.toString());
+      } catch {}
+    }
+  };
+
+  // Categories list derived from products (respecting shared selection if active)
   const categories = useMemo(() => {
     const set = new Set<string>();
-    products.forEach((p) => {
+    const sourceProducts =
+      urlSelectedProductIds && urlSelectedProductIds.length > 0
+        ? products.filter((p) => urlSelectedProductIds.includes(p.id))
+        : products;
+    sourceProducts.forEach((p) => {
       if (p.category) set.add(p.category);
     });
     return Array.from(set);
-  }, [products]);
+  }, [products, urlSelectedProductIds]);
 
   // Auto-detect and filter by category from URL param (?categoria=... or ?category=... or ?cat=...)
   React.useEffect(() => {
@@ -2066,14 +2126,20 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
 
   // Product counts per category for rich sidebar panels
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: products.filter((p) => p.status !== 'archived').length };
-    products.forEach((p) => {
-      if (p.status !== 'archived' && p.category) {
+    const sourceProducts =
+      urlSelectedProductIds && urlSelectedProductIds.length > 0
+        ? products.filter((p) => urlSelectedProductIds.includes(p.id))
+        : products;
+    const counts: Record<string, number> = {
+      all: sourceProducts.filter((p) => urlSelectedProductIds || p.status !== 'archived').length,
+    };
+    sourceProducts.forEach((p) => {
+      if ((urlSelectedProductIds || p.status !== 'archived') && p.category) {
         counts[p.category] = (counts[p.category] || 0) + 1;
       }
     });
     return counts;
-  }, [products]);
+  }, [products, urlSelectedProductIds]);
 
   // Filtered and sorted products (Ofertas / Descuentos first)
   const filteredProducts = useMemo(() => {
@@ -2086,8 +2152,13 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     const hideOutOfStock = storeConfig && storeConfig.showOutOfStock === false;
 
     const baseFiltered = products.filter((p) => {
-      // Exclude archived products - buyer only sees products marked as Active
-      if (p.status === 'archived') return false;
+      // Shared selection filter: when arriving with specific product IDs, show ONLY those products!
+      if (urlSelectedProductIds && urlSelectedProductIds.length > 0) {
+        if (!urlSelectedProductIds.includes(p.id)) return false;
+      } else {
+        // Exclude archived products - buyer only sees products marked as Active
+        if (p.status === 'archived') return false;
+      }
 
       // In customer view, the buyer does not know about stock or backorder; all active products are visible.
       // In admin view, respect the stock filter if configured.
@@ -2109,6 +2180,16 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     if (searchQuery.trim()) {
       const fuzzyRes = searchProductsFuzzy(baseFiltered, searchQuery);
       matchedProducts = fuzzyRes.matches;
+    }
+
+    // If shared selection and default sorting, maintain the order of the selected IDs
+    if (urlSelectedProductIds && urlSelectedProductIds.length > 0 && (!sortBy || sortBy === 'featured')) {
+      return matchedProducts.sort((a, b) => {
+        const idxA = urlSelectedProductIds.indexOf(a.id);
+        const idxB = urlSelectedProductIds.indexOf(b.id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        return 0;
+      });
     }
 
     return matchedProducts.sort((a, b) => {

@@ -470,7 +470,11 @@ function InventoryApp() {
         params.has('sku') ||
         params.has('categoria') ||
         params.has('category') ||
-        params.has('cat')
+        params.has('cat') ||
+        params.has('productos') ||
+        params.has('items') ||
+        params.has('ids') ||
+        params.has('seleccion')
       ) {
         return true;
       }
@@ -749,7 +753,14 @@ function InventoryApp() {
             params.has('producto') ||
             params.has('product') ||
             params.has('p') ||
-            params.has('sku');
+            params.has('sku') ||
+            params.has('categoria') ||
+            params.has('category') ||
+            params.has('cat') ||
+            params.has('productos') ||
+            params.has('items') ||
+            params.has('ids') ||
+            params.has('seleccion');
 
           const isManualCustomer =
             manualCustomerModeRef.current ||

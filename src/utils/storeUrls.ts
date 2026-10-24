@@ -113,3 +113,31 @@ export function getPublicProductUrl(productId: number | string, customStoreDomai
   const cleanOrigin = origin.replace(/:\/\/(admin\.)/i, '://www.');
   return `${cleanOrigin}/?view=store&producto=${encodedId}`;
 }
+
+/**
+ * Returns the public URL for a selection of products to share with customers in client view
+ */
+export function getPublicProductsSelectionUrl(productIds: (number | string)[], customStoreDomain?: string): string {
+  if (typeof window === 'undefined') return '';
+
+  const validIds = productIds
+    .map((id) => String(id).trim())
+    .filter(Boolean);
+
+  if (validIds.length === 0) {
+    return getPublicStoreUrl(customStoreDomain);
+  }
+
+  const idsParam = validIds.join(',');
+  const storeDomain = getPreferredCustomerStoreDomain(customStoreDomain);
+
+  if (storeDomain) {
+    return `https://${storeDomain}/?productos=${idsParam}`;
+  }
+
+  // Fallback for cloud preview / development containers
+  const origin = window.location.origin;
+  const cleanOrigin = origin.replace(/:\/\/(admin\.)/i, '://www.');
+  return `${cleanOrigin}/?view=store&productos=${idsParam}`;
+}
+
