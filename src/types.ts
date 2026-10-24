@@ -682,6 +682,7 @@ export interface ServerDomainConfig {
 export interface ParsedProductResult {
   name: string;
   sku: string;
+  supplierCode?: string | null;
   barcode?: string;
   category: string;
   costPrice: number;

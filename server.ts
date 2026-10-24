@@ -131,6 +131,7 @@ import {
   parseSupplierTelegramMessage,
   generateProductMarketingCopy,
   generateProductCommercialDescription,
+  extractSupplierCodeFromText,
   testGeminiApiKey,
   testLmStudioConnection,
   setCustomAiApiKey,
@@ -2145,6 +2146,7 @@ async function startServer() {
         userId: req.dbUserId || 1,
         name,
         sku: finalSku,
+        supplierCode: req.body.supplierCode?.trim() || req.body.supplier_code?.trim() || req.body.sku_proveedor?.trim() || null,
         barcode: barcode?.trim() || null,
         description,
         category: category || 'General',
@@ -2785,6 +2787,15 @@ async function startServer() {
         (config as any).useAi !== false
       );
 
+      // Detect and extract optional supplier product code (SKU de proveedor)
+      const supplierPrefix = getSupplierSkuPrefix(effectiveSupplier);
+      const detectedSupplierCode =
+        (parsed.supplierCode && parsed.supplierCode.trim() && parsed.supplierCode.trim().toUpperCase() !== 'AUTO' ? parsed.supplierCode.trim() : null) ||
+        (parsed.sku && parsed.sku.trim() && parsed.sku.trim().toUpperCase() !== 'AUTO' && !parsed.sku.toUpperCase().startsWith('PROD-') && !parsed.sku.toUpperCase().startsWith(supplierPrefix) ? parsed.sku.trim() : null) ||
+        extractSupplierCodeFromText(caption);
+      const finalSupplierCode = detectedSupplierCode ? String(detectedSupplierCode).trim() : null;
+      parsed.supplierCode = finalSupplierCode;
+
       const primaryPhoto = photosList[0] || null;
       const attributesWithGallery = {
         ...parsed.attributes,
@@ -2794,12 +2805,15 @@ async function startServer() {
         costOptions: parsed.costOptions || [],
         profitMarginPercent: parsed.profitMarginPercent || effectiveMargin,
         selectedCostPrice: parsed.costPrice,
+        supplierCode: finalSupplierCode,
+        sku_proveedor: finalSupplierCode,
       };
 
       // 2. Check for duplicate product
       const existingItem = await findExistingInventoryItem({
         name: parsed.name,
         sku: parsed.sku !== 'AUTO' ? parsed.sku : undefined,
+        supplierCode: finalSupplierCode || undefined,
         rawTelegramMessage: caption,
         supplierName: effectiveSupplier,
       });
@@ -2813,7 +2827,7 @@ async function startServer() {
           caption: caption || `(Intento duplicado - Lote de ${photosList.length} fotos)`,
           photoUrl: primaryPhoto,
           processedStatus: 'duplicate',
-          extractedData: JSON.stringify({ ...parsed, duplicateOfSku: existingItem.sku, imagesCount: photosList.length }),
+          extractedData: JSON.stringify({ ...parsed, duplicateOfSku: existingItem.sku, supplierCode: finalSupplierCode, imagesCount: photosList.length }),
           inventoryItemId: existingItem.id,
         });
 
@@ -2830,9 +2844,8 @@ async function startServer() {
       }
 
       // 3. Generate sequential SKU if needed (up to 3 letters of supplier)
-      const supplierPrefix = getSupplierSkuPrefix(effectiveSupplier);
       let finalSku = parsed.sku;
-      if (!finalSku || finalSku === 'AUTO' || !finalSku.toUpperCase().startsWith(supplierPrefix)) {
+      if (!finalSku || finalSku === 'AUTO' || !finalSku.toUpperCase().startsWith(supplierPrefix) || finalSku === finalSupplierCode) {
         finalSku = await generateNextSku(effectiveSupplier);
         parsed.sku = finalSku;
       }
@@ -2855,6 +2868,8 @@ async function startServer() {
 
         const attributesToStore = {
           ...attributesWithGallery,
+          supplierCode: finalSupplierCode,
+          sku_proveedor: finalSupplierCode,
           hasPurchaseTax: itemTax > 0,
           purchaseTaxPercent: itemTax,
           applySaleTax: itemTax > 0,
@@ -2872,6 +2887,7 @@ async function startServer() {
           userId,
           name: parsed.name,
           sku: finalSku,
+          supplierCode: finalSupplierCode,
           barcode: parsed.barcode || undefined,
           description: parsed.description,
           category: parsed.category,
@@ -2901,7 +2917,7 @@ async function startServer() {
         caption: caption || `(Lote de ${photosList.length} fotos)`,
         photoUrl: primaryPhoto,
         processedStatus: 'processed',
-        extractedData: JSON.stringify({ ...parsed, sku: finalSku, imagesCount: photosList.length }),
+        extractedData: JSON.stringify({ ...parsed, sku: finalSku, supplierCode: finalSupplierCode, imagesCount: photosList.length }),
         inventoryItemId: inventoryItem?.id,
       });
 

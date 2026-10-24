@@ -32,6 +32,16 @@ interface TelegramSimulatorModalProps {
 
 const PRESET_MESSAGES = [
   {
+    title: '🔢 Producto con Código de Proveedor (Ref: PROV-9982)',
+    sender: 'Importadora Mayorista del Valle',
+    username: '@mayorista_valle',
+    photos: [
+      'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=600&auto=format&fit=crop&q=80',
+    ],
+    caption:
+      '🔥 Smartwatch Deportivo Titanio Serie X con GPS y pantalla AMOLED.\nCódigo de producto: PROV-9982\nCosto: $28.50 sin IVA.\nPVP recomendado: $55.00.\nStock disponible: 25 unidades.',
+  },
+  {
     title: '🤝 Oferta Afiliados - Smartwatch Serie 9 Pro (Precios Afiliado)',
     sender: 'Grupo Proveedores Dropshipping',
     username: '@proveedor_dropship_vip',
@@ -540,6 +550,20 @@ export const TelegramSimulatorModal: React.FC<TelegramSimulatorModalProps> = ({
                     {result.sku || result.inventoryItem?.sku || result.extracted.sku}
                   </span>
                 </div>
+                {(result.inventoryItem?.supplierCode || result.extracted?.supplierCode) && (
+                  <div
+                    className={`p-2.5 rounded-xl border ${
+                      result.isDuplicate
+                        ? 'bg-white border-amber-200'
+                        : 'bg-white border-sky-200'
+                    }`}
+                  >
+                    <span className="text-[10px] text-slate-500 font-medium block">SKU Proveedor</span>
+                    <span className="font-mono font-bold text-sky-700 block truncate">
+                      {result.inventoryItem?.supplierCode || result.extracted?.supplierCode}
+                    </span>
+                  </div>
+                )}
                 <div
                   className={`p-2.5 rounded-xl border ${
                     result.isDuplicate

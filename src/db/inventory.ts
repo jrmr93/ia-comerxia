@@ -1185,6 +1185,7 @@ export async function generateNextSku(supplierNameOrPrefix: string = 'PF'): Prom
 export async function findExistingInventoryItem(data: {
   name?: string;
   sku?: string;
+  supplierCode?: string;
   rawTelegramMessage?: string;
   supplierName?: string;
 }) {
@@ -1202,6 +1203,14 @@ export async function findExistingInventoryItem(data: {
 
   if (!isPostgresConfigured()) {
     const state = storage.getState();
+    if (data.supplierCode && data.supplierCode.trim()) {
+      const targetCode = data.supplierCode.trim().toLowerCase();
+      const match = state.inventoryItems.find((it) => {
+        const c = (it.supplierCode || it.supplier_code || '').trim().toLowerCase();
+        return c && c === targetCode;
+      });
+      if (match) return match;
+    }
     if (data.sku && data.sku.trim()) {
       const match = state.inventoryItems.find((it) => it.sku?.toLowerCase() === data.sku!.trim().toLowerCase());
       if (match) return match;
@@ -1230,6 +1239,15 @@ export async function findExistingInventoryItem(data: {
   }
 
   try {
+    if (data.supplierCode && data.supplierCode.trim()) {
+      const bySupp = await db
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.supplierCode, data.supplierCode.trim()))
+        .limit(1);
+      if (bySupp[0]) return bySupp[0];
+    }
+
     if (data.sku && data.sku.trim()) {
       const bySku = await db
         .select()
@@ -1289,6 +1307,7 @@ export async function createInventoryItem(data: {
   userId?: number;
   name: string;
   sku?: string;
+  supplierCode?: string | null;
   barcode?: string;
   description?: string;
   category: string;
@@ -1315,6 +1334,14 @@ export async function createInventoryItem(data: {
   }
 
   const safeDiscount = Math.max(0, Math.min(100, Number(data.discountPercent) || 0));
+
+  const cleanSupplierCode = data.supplierCode !== undefined && data.supplierCode !== null && String(data.supplierCode).trim() !== ''
+    ? String(data.supplierCode).trim()
+    : (data as any).supplier_code !== undefined && (data as any).supplier_code !== null && String((data as any).supplier_code).trim() !== ''
+    ? String((data as any).supplier_code).trim()
+    : (data as any).sku_proveedor !== undefined && (data as any).sku_proveedor !== null && String((data as any).sku_proveedor).trim() !== ''
+    ? String((data as any).sku_proveedor).trim()
+    : null;
 
   const cleanCost = cleanNumericString(data.costPrice, '0.00');
   const cleanSale = cleanNumericString(data.salePrice, '0.00');
@@ -1397,6 +1424,10 @@ export async function createInventoryItem(data: {
       if ((data as any).purchaseTaxPercent !== undefined) {
         parsed.purchaseTaxPercent = Number((data as any).purchaseTaxPercent);
       }
+      if (cleanSupplierCode) {
+        parsed.supplierCode = cleanSupplierCode;
+        parsed.sku_proveedor = cleanSupplierCode;
+      }
       effectiveExtractedAttributes = JSON.stringify(parsed);
     } catch { }
   } else {
@@ -1418,6 +1449,7 @@ export async function createInventoryItem(data: {
       isSupplierGift: isGift,
       costWithoutTax: isGift ? 0 : undefined,
       costWithTax: isGift ? 0 : undefined,
+      ...(cleanSupplierCode ? { supplierCode: cleanSupplierCode, sku_proveedor: cleanSupplierCode } : {}),
     });
   }
 
@@ -1431,6 +1463,8 @@ export async function createInventoryItem(data: {
       userId: data.userId || 1,
       name: data.name,
       sku: finalSku,
+      supplierCode: cleanSupplierCode,
+      supplier_code: cleanSupplierCode,
       barcode: data.barcode?.trim() || null,
       description: data.description || '',
       category: data.category || 'General',
@@ -1467,6 +1501,7 @@ export async function createInventoryItem(data: {
         userId: targetUserId,
         name: data.name,
         sku: finalSku,
+        supplierCode: cleanSupplierCode,
         barcode: data.barcode?.trim() || null,
         description: data.description || '',
         category: data.category || 'General',
@@ -1510,6 +1545,8 @@ export async function createInventoryItem(data: {
       userId: data.userId || 1,
       name: data.name,
       sku: finalSku,
+      supplierCode: cleanSupplierCode,
+      supplier_code: cleanSupplierCode,
       barcode: data.barcode?.trim() || null,
       description: data.description || '',
       category: data.category || 'General',
@@ -1821,6 +1858,13 @@ export async function reparseInventoryItemWithAi(id: number, userId: number = 1)
 
   if (parsed.sku && parsed.sku !== 'AUTO' && (!item.sku || item.sku.startsWith('AUTO'))) {
     updatePayload.sku = parsed.sku;
+  }
+
+  const newSuppCode = parsed.supplierCode || (parsed.sku && parsed.sku !== 'AUTO' ? parsed.sku : null);
+  if (newSuppCode && !item.supplierCode) {
+    updatePayload.supplierCode = newSuppCode;
+    mergedAttributes.supplierCode = newSuppCode;
+    mergedAttributes.sku_proveedor = newSuppCode;
   }
 
   const updatedItem = await updateInventoryItem(id, updatePayload);

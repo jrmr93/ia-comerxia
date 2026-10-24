@@ -11,7 +11,7 @@ import {
   generateNextSku,
   getSupplierSkuPrefix,
 } from '../db/inventory.ts';
-import { parseSupplierTelegramMessage, transcribeAudioWithGemini } from './gemini-parser.ts';
+import { parseSupplierTelegramMessage, transcribeAudioWithGemini, extractSupplierCodeFromText } from './gemini-parser.ts';
 import { saveVideoBufferLocally, saveImageBufferLocally, persistImageListLocally } from './media-storage.ts';
 import {
   extractProductUrlFromText,
@@ -694,7 +694,16 @@ async function processCompleteProduct(
     aiConfig?.apiKey || undefined
   );
 
-  // Include photos array, video, cost options and profit margin inside extractedAttributes (all using disk /uploads/ URLs)
+  // 5. Detect and extract optional supplier product code (SKU de proveedor)
+  const supplierPrefix = getSupplierSkuPrefix(senderName);
+  const detectedSupplierCode =
+    (parsed.supplierCode && parsed.supplierCode.trim() && parsed.supplierCode.trim().toUpperCase() !== 'AUTO' ? parsed.supplierCode.trim() : null) ||
+    (parsed.sku && parsed.sku.trim() && parsed.sku.trim().toUpperCase() !== 'AUTO' && !parsed.sku.toUpperCase().startsWith('PROD-') && !parsed.sku.toUpperCase().startsWith(supplierPrefix) ? parsed.sku.trim() : null) ||
+    extractSupplierCodeFromText(caption);
+  const finalSupplierCode = detectedSupplierCode ? String(detectedSupplierCode).trim() : null;
+  parsed.supplierCode = finalSupplierCode;
+
+  // Include photos array, video, cost options, supplierCode, and profit margin inside extractedAttributes (all using disk /uploads/ URLs)
   const attributesWithGallery: Record<string, any> = {
     ...parsed.attributes,
     images: photosLocalUrls,
@@ -703,12 +712,15 @@ async function processCompleteProduct(
     costOptions: parsed.costOptions || [],
     profitMarginPercent: parsed.profitMarginPercent || config.defaultMarginPercent || 30,
     selectedCostPrice: parsed.costPrice,
+    supplierCode: finalSupplierCode,
+    sku_proveedor: finalSupplierCode,
   };
 
-  // 5. Duplicate Check after AI extraction: verify if product already exists by name or SKU
+  // 5b. Duplicate Check after AI extraction: verify if product already exists by supplierCode, name or SKU
   const existingItem = await findExistingInventoryItem({
     name: parsed.name,
     sku: parsed.sku !== 'AUTO' ? parsed.sku : undefined,
+    supplierCode: finalSupplierCode || undefined,
     rawTelegramMessage: caption,
     supplierName: senderName,
   });
@@ -776,10 +788,9 @@ async function processCompleteProduct(
     };
   }
 
-  // 6. Generate sequential SKU representing up to 3 letters of supplier (e.g. JUA00001)
+  // 6. Generate sequential internal SKU representing up to 3 letters of supplier (e.g. JUA00001)
   let finalSku = parsed.sku;
-  const supplierPrefix = getSupplierSkuPrefix(senderName);
-  if (!finalSku || finalSku === 'AUTO' || !finalSku.toUpperCase().startsWith(supplierPrefix)) {
+  if (!finalSku || finalSku === 'AUTO' || !finalSku.toUpperCase().startsWith(supplierPrefix) || finalSku === finalSupplierCode) {
     finalSku = await generateNextSku(senderName);
     parsed.sku = finalSku;
   }
@@ -854,6 +865,8 @@ async function processCompleteProduct(
   // 7. Create product in PostgreSQL
   const attributesToStore = {
     ...attributesWithGallery,
+    supplierCode: finalSupplierCode,
+    sku_proveedor: finalSupplierCode,
     hasPurchaseTax: effectiveTaxRate > 0,
     purchaseTaxPercent: effectiveTaxRate,
     applySaleTax: effectiveTaxRate > 0,
@@ -871,6 +884,7 @@ async function processCompleteProduct(
     userId,
     name: parsed.name,
     sku: finalSku,
+    supplierCode: finalSupplierCode,
     description: parsed.description,
     category: parsed.category,
     costPrice: String(effectiveCostWith.toFixed(2)),
@@ -901,6 +915,7 @@ async function processCompleteProduct(
     extractedData: JSON.stringify({
       ...parsed,
       sku: finalSku,
+      supplierCode: finalSupplierCode,
       stock: effectiveStock,
       imagesCount: photos.length,
       videoUrl: videoUrl || null,
@@ -976,6 +991,10 @@ async function processCompleteProduct(
       ? `⚡ _El producto se registró como Desactivado. Puedes activarlo cuando desees desde tu panel de inventario._`
       : `⚡ _Ya puedes verlo con todas sus opciones de costo, video y fotos en tu panel de inventario._`;
 
+    const supplierCodeNote = finalSupplierCode
+      ? `🔢 *SKU Proveedor:* \`${escapeTelegramMarkdown(finalSupplierCode)}\`\n`
+      : '';
+
     const responseText =
       `✅ *¡Producto Registrado con Éxito en PostgreSQL!*\n\n` +
       `📦 *${safeName}*\n` +
@@ -984,6 +1003,7 @@ async function processCompleteProduct(
       photoCountNote +
       videoNote +
       `🏷️ *SKU:* \`${finalSku}\`\n` +
+      supplierCodeNote +
       `📂 *Categoría:* ${safeCategory}\n` +
       `${costSection}\n` +
       `🏷️ *PVP Sugerido (${parsed.profitMarginPercent || config.defaultMarginPercent || 30}% margen):* ${currencySym}${parsed.salePrice.toFixed(2)}\n` +
@@ -1143,10 +1163,16 @@ async function processWebProductUrlMessage(
     };
   }
 
-  // 4. Generate sequential SKU if needed
+  // 4. Resolve supplier code and generate sequential SKU if needed
+  const rawWebSupplierCode =
+    ((scraped as any).supplierCode && (scraped as any).supplierCode.trim() ? (scraped as any).supplierCode.trim() : null) ||
+    (scraped.sku && scraped.sku !== 'AUTO' && !scraped.sku.toUpperCase().startsWith(supplierPrefix) ? scraped.sku.trim() : null) ||
+    extractSupplierCodeFromText(text);
+  const finalWebSupplierCode = rawWebSupplierCode ? String(rawWebSupplierCode).trim() : null;
+
   let finalSku = scraped.sku;
   const supplierPrefix = getSupplierSkuPrefix(effectiveSupplier);
-  if (!finalSku || finalSku === 'AUTO' || !finalSku.toUpperCase().startsWith(supplierPrefix)) {
+  if (!finalSku || finalSku === 'AUTO' || !finalSku.toUpperCase().startsWith(supplierPrefix) || finalSku === finalWebSupplierCode) {
     finalSku = await generateNextSku(effectiveSupplier);
     scraped.sku = finalSku;
   }
@@ -1163,6 +1189,8 @@ async function processWebProductUrlMessage(
     costOptions: scraped.costOptions || [],
     profitMarginPercent: scraped.profitMarginPercent,
     selectedCostPrice: scraped.costPrice,
+    supplierCode: finalWebSupplierCode,
+    sku_proveedor: finalWebSupplierCode,
   };
 
   const effectiveTaxRate = typeof scraped.taxPercent === 'number' ? scraped.taxPercent : (config.taxPercent ?? 15);
@@ -1178,6 +1206,7 @@ async function processWebProductUrlMessage(
     userId,
     name: scraped.name,
     sku: finalSku,
+    supplierCode: finalWebSupplierCode,
     barcode: scraped.barcode || undefined,
     description: scraped.description,
     category: scraped.category,
@@ -1240,11 +1269,16 @@ async function processWebProductUrlMessage(
       ? `⚡ _El producto se registró como Desactivado. Puedes activarlo cuando desees desde tu panel de inventario._`
       : `⚡ _El producto ya está disponible en tu inventario y listo para la venta en tu tienda online._`;
 
+    const webSupplierCodeNote = finalWebSupplierCode
+      ? `🔢 *SKU Proveedor:* \`${escapeTelegramMarkdown(finalWebSupplierCode)}\`\n`
+      : '';
+
     const responseText =
       `✅ *¡Producto Importado desde la Web!* 🌐\n\n` +
       `📦 *${safeWebProdName}*\n` +
       webStatusNote +
       `🏷️ *Código SKU:* \`${finalSku}\`\n` +
+      webSupplierCodeNote +
       `📂 *Categoría:* ${safeWebProdCat}\n` +
       `💵 *Costo sin IVA:* ${currencySym}${effectiveCostWithout}\n` +
       `🧾 *Costo con IVA:* ${currencySym}${effectiveCostWith} _(IVA ${effectiveTaxRate}%)_\n` +

@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   image_url TEXT,
   video_url TEXT,
   supplier_name TEXT DEFAULT 'Proveedor Telegram Principal',
+  supplier_code TEXT,
   tags TEXT,
   extracted_attributes TEXT,
   status TEXT NOT NULL DEFAULT 'available',
