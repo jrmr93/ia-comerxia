@@ -447,6 +447,7 @@ export interface CostOption {
 export interface ParsedProductResult {
   name: string;
   sku: string;
+  supplierCode?: string | null;
   barcode?: string;
   category: string;
   costPrice: number;
@@ -660,6 +661,53 @@ export function selectDefaultAffiliateCostPrice(
   return { selectedCost: maxGeneralCost, matchedOpt, isAffiliate: false, isSingleUnitAffiliate: false, optionLabel: matchedOpt?.label };
 }
 
+function cleanCodeCandidate(raw: string): string | null {
+  if (!raw) return null;
+  let code = raw.trim().replace(/^[#:\s]+/, '').replace(/[.,;:)\-\s]+$/, '').trim();
+  if (!code || code.length < 2 || code.length > 35) return null;
+
+  // Discard if it looks like pure currency ($15, 15.00, etc.)
+  if (/^\$?\d+(?:[.,]\d{1,2})?\$?$/.test(code) && (code.includes('$') || code.includes('.'))) return null;
+  // Discard common product descriptive or directive words
+  if (/^(?:iva|utilidad|ganancia|afiliado|mayorista|docena|pares|unidades|stock|bulto|caja|nuevo|original)$/i.test(code)) return null;
+  // Discard phone numbers
+  if (/^(?:\+?593|09)\d{7,8}$/.test(code)) return null;
+  // Discard physical dimensions like 180x180cm, 30x40
+  if (/^\d+\s*x\s*\d+(?:cm|mm|m)?$/i.test(code)) return null;
+
+  return code;
+}
+
+/**
+ * Robustly extracts an optional product code / supplier SKU mentioned by the supplier in Telegram
+ * (e.g. "Código de producto: ABC12", "Cód: 9912", "Ref: 8812", "SKU: SP-01", "Art: 4410", "Modelo: M-10")
+ */
+export function extractSupplierCodeFromText(text: string): string | null {
+  if (!text || typeof text !== 'string') return null;
+
+  // 1. Explicit multi-word patterns with "producto" or "proveedor"
+  const explicitPattern =
+    /(?:c[oó]digo\s+(?:del?\s+)?producto|c[oó]digo\s+proveedor|sku\s+(?:del?\s+)?proveedor|ref(?:erencia)?\s+(?:del?\s+)?proveedor)\s*[:=#\-]?\s*([A-Za-z0-9][A-Za-z0-9_\-\.\/]{1,34})/i;
+
+  const explicitMatch = text.match(explicitPattern);
+  if (explicitMatch && explicitMatch[1]) {
+    const code = cleanCodeCandidate(explicitMatch[1]);
+    if (code) return code;
+  }
+
+  // 2. Standard product code / SKU / Ref labels
+  const standardPattern =
+    /(?:^|[\n\r,;|•\-*👉📦⚡])\s*(?:c[oó]d(?:igo)?\.?|ref(?:erencia)?\.?|sku|art(?:[ií]culo)?\.?|[ií]tem|modelo|mod\.)\s*[:=#\-]?\s*([A-Za-z0-9][A-Za-z0-9_\-\.\/]{1,34})/i;
+
+  const standardMatch = text.match(standardPattern);
+  if (standardMatch && standardMatch[1]) {
+    const code = cleanCodeCandidate(standardMatch[1]);
+    if (code) return code;
+  }
+
+  return null;
+}
+
 /**
  * Intelligent regex & heuristic extractor as a failsafe when AI APIs are overloaded
  */
@@ -783,7 +831,8 @@ function extractFallbackFromText(
   else if (/pesa|mancuerna|balon|guante|proteina|fitness|gym/.test(lower)) category = 'Deportes y Fitness';
   else if (/taladro|herramienta|tornillo|foco|cable|pintura/.test(lower)) category = 'Ferretería y Herramientas';
 
-  // 6. SKU & Barcode generation
+  // 6. SKU, Supplier Code & Barcode generation
+  const detectedSupplierCode = extractSupplierCodeFromText(caption);
   const sku = 'AUTO';
   let barcode: string | undefined = undefined;
   const barcodeMatch = text.match(/(?:c[oó]digo\s+de\s+barras|barcode|ean|upc|gtin)\s*[:=-]?\s*([0-9]{8,14})/i) ||
@@ -900,6 +949,7 @@ function extractFallbackFromText(
   return {
     name: name || 'Producto Nuevo Telegram',
     sku,
+    supplierCode: detectedSupplierCode || undefined,
     barcode,
     category,
     costPrice: costWithTax,
@@ -918,6 +968,8 @@ function extractFallbackFromText(
     tags,
     attributes: {
       origen: 'Telegram Bot',
+      supplierCode: detectedSupplierCode || null,
+      sku_proveedor: detectedSupplierCode || null,
       moneda: currency,
       procesamiento: 'Extracción Heurística Automática',
       taxStatus: detectedTaxStatus,
@@ -1014,6 +1066,7 @@ REGLAS CRÍTICAS DE RECONOCIMIENTO Y PREVENCIÓN DE ERRORES DE PRECIOS:
 
 5. "name": Genera un título claro, profesional y comercial para el producto (ej. "Zapatillas Deportivas Nike Air Zoom", "Smartwatch Reloj Inteligente T500").
 6. "sku": Código SKU alfanumérico secuencial sencillo o el código del fabricante si se menciona explícitamente. Si no hay código explícito, coloca "AUTO".
+6b. "supplierCode": Si el mensaje o imagen incluye opcionalmente un código de producto, referencia o SKU del proveedor o fabricante (ejemplos: "Cod: 1234", "Código: A-99", "Ref: 8812", "SKU: XYZ-01", "Artículo: 554", "Modelo: M-10", "Código de producto: 7712", etc.), extrae ESE código de producto exacto aquí. Si no se menciona ningún código de producto en el texto o imagen, coloca null o "".
 7. "barcode": Código de barras físico del producto (EAN-13, UPC, EAN-8 o numérico detectado en fotos/etiquetas o texto). Cadena vacía si no existe.
 8. "category": Clasifica en: "Calzado", "Ropa y Moda", "Electrónica y Celulares", "Computación y Accesorios", "Hogar y Cocina", "Belleza y Cuidado Personal", "Deportes y Fitness", "Juguetes y Niños", "Ferretería y Herramientas", o "General".
 9. "profitMarginPercent" y "profitAmount":
@@ -1202,9 +1255,15 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
 
             const adjustedCostOptions: CostOption[] = buildCostOptionsWithTaxVariants(costOptions, finalTaxStatus, taxRate);
 
+            const extractedSupplierCode =
+              (typeof parsed.supplierCode === 'string' && parsed.supplierCode.trim() && parsed.supplierCode.trim().toUpperCase() !== 'AUTO' ? parsed.supplierCode.trim() : null) ||
+              (typeof parsed.sku === 'string' && parsed.sku.trim() && parsed.sku.trim().toUpperCase() !== 'AUTO' && !parsed.sku.toUpperCase().startsWith('PROD-') ? parsed.sku.trim() : null) ||
+              extractSupplierCodeFromText(caption);
+
             return {
               name: cleanName,
               sku: parsed.sku || `PROD-${Date.now().toString().slice(-6)}`,
+              supplierCode: extractedSupplierCode || undefined,
               barcode: typeof parsed.barcode === 'string' && parsed.barcode.trim() ? parsed.barcode.trim() : undefined,
               category: parsed.category || 'General',
               costPrice: finalCostWithTax,
@@ -1224,6 +1283,8 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
               attributes: {
                 ...(parsed.attributes || {}),
                 proveedorIA: 'LM Studio Local',
+                supplierCode: extractedSupplierCode || null,
+                sku_proveedor: extractedSupplierCode || null,
                 taxStatus: finalTaxStatus,
                 taxPercent: taxRate,
                 hasPurchaseTax: taxRate > 0,
@@ -1280,6 +1341,10 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
             properties: {
               name: { type: Type.STRING },
               sku: { type: Type.STRING },
+              supplierCode: {
+                type: Type.STRING,
+                description: 'Código de producto, referencia o SKU del proveedor o fabricante si se menciona explícitamente en el mensaje o imagen (ej. "Ref: 120", "Cód: 881", "SKU: ABC-9", "Código de producto: 7712"). Cadena vacía si no existe.',
+              },
               barcode: {
                 type: Type.STRING,
                 description: 'Código de barras físico del producto (EAN-13, UPC, EAN-8 o numérico detectado en fotos/etiquetas o texto). Cadena vacía si no existe.',
@@ -1520,9 +1585,15 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         cleanName = 'Producto Nuevo Telegram';
       }
 
+      const extractedSupplierCode =
+        (typeof parsed.supplierCode === 'string' && parsed.supplierCode.trim() && parsed.supplierCode.trim().toUpperCase() !== 'AUTO' ? parsed.supplierCode.trim() : null) ||
+        (typeof parsed.sku === 'string' && parsed.sku.trim() && parsed.sku.trim().toUpperCase() !== 'AUTO' && !parsed.sku.toUpperCase().startsWith('PROD-') ? parsed.sku.trim() : null) ||
+        extractSupplierCodeFromText(caption);
+
       return {
         name: cleanName,
         sku: parsed.sku || `PROD-${Date.now().toString().slice(-6)}`,
+        supplierCode: extractedSupplierCode || undefined,
         barcode: typeof parsed.barcode === 'string' && parsed.barcode.trim() ? parsed.barcode.trim() : undefined,
         category: parsed.category || 'General',
         costPrice: finalCostWithTax,
@@ -1541,6 +1612,8 @@ ${caption || '(Sin texto en el mensaje, analizar las fotos adjuntas del producto
         tags: Array.isArray(parsed.tags) ? parsed.tags : [],
         attributes: {
           ...(parsed.attributes || {}),
+          supplierCode: extractedSupplierCode || null,
+          sku_proveedor: extractedSupplierCode || null,
           taxStatus: finalTaxStatus,
           taxPercent: taxRate,
           hasPurchaseTax: taxRate > 0,

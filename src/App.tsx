@@ -622,19 +622,34 @@ function InventoryApp() {
           return;
         }
 
-        const [itemsRes, messagesRes, statsRes, ordersRes, purchasesRes, configRes, aiRes] = await Promise.all([
-          authFetch('/api/inventory').catch(() => null),
-          authFetch('/api/messages').catch(() => null),
+        // Decouple inventory and messages so UI updates immediately without waiting for slower endpoints
+        const itemsPromise = authFetch('/api/inventory')
+          .then((res) => (res && res.ok ? safeJson(res) : null))
+          .then((data) => {
+            if (data && Array.isArray(data)) setItems(data);
+            return data;
+          })
+          .catch(() => null);
+
+        const messagesPromise = authFetch('/api/messages')
+          .then((res) => (res && res.ok ? safeJson(res) : null))
+          .then((data) => {
+            if (data && Array.isArray(data)) setMessages(data);
+            return data;
+          })
+          .catch(() => null);
+
+        const [statsRes, ordersRes, purchasesRes, configRes, aiRes] = await Promise.all([
           authFetch('/api/stats').catch(() => null),
           authFetch('/api/orders').catch(() => null),
           authFetch('/api/purchases').catch(() => null),
           authFetch('/api/telegram/config').catch(() => null),
           authFetch('/api/ai/config').catch(() => null),
+          itemsPromise,
+          messagesPromise,
         ]);
 
-        const [itemsData, messagesData, statsData, ordersData, purchasesData, configData, aiData] = await Promise.all([
-          itemsRes ? safeJson(itemsRes) : null,
-          messagesRes ? safeJson(messagesRes) : null,
+        const [statsData, ordersData, purchasesData, configData, aiData] = await Promise.all([
           statsRes ? safeJson(statsRes) : null,
           ordersRes ? safeJson(ordersRes) : null,
           purchasesRes ? safeJson(purchasesRes) : null,
@@ -642,8 +657,6 @@ function InventoryApp() {
           aiRes ? safeJson(aiRes) : null,
         ]);
 
-        if (itemsData && Array.isArray(itemsData)) setItems(itemsData);
-        if (messagesData && Array.isArray(messagesData)) setMessages(messagesData);
         if (statsData) setServerStats(statsData);
         if (ordersData && Array.isArray(ordersData)) setOrders(ordersData);
         if (purchasesData && Array.isArray(purchasesData)) setPurchases(purchasesData);
@@ -657,10 +670,26 @@ function InventoryApp() {
         return;
       }
 
-      // Full initial or explicit refresh
-      const [itemsRes, messagesRes, statsRes, configRes, storeRes, ordersRes, domainRes, purchasesRes, customersRes, suppliersRes, aiRes] = await Promise.all([
-        authFetch('/api/inventory').catch(() => null),
-        authFetch('/api/messages').catch(() => null),
+      // Full initial or explicit refresh: decouple items and messages so they populate without waiting for other APIs
+      const itemsPromise = authFetch('/api/inventory')
+        .then(res => (res ? safeJson(res) : null))
+        .then(itemsData => {
+          if (itemsData && Array.isArray(itemsData)) {
+            setItems(itemsData);
+          }
+        })
+        .catch(() => null);
+
+      const messagesPromise = authFetch('/api/messages')
+        .then(res => (res ? safeJson(res) : null))
+        .then(messagesData => {
+          if (messagesData && Array.isArray(messagesData)) {
+            setMessages(messagesData);
+          }
+        })
+        .catch(() => null);
+
+      const [statsRes, configRes, storeRes, ordersRes, domainRes, purchasesRes, customersRes, suppliersRes, aiRes] = await Promise.all([
         authFetch('/api/stats').catch(() => null),
         authFetch('/api/telegram/config').catch(() => null),
         authFetch('/api/store/config').catch(() => null),
@@ -672,9 +701,7 @@ function InventoryApp() {
         authFetch('/api/ai/config').catch(() => null),
       ]);
 
-      const [itemsData, messagesData, statsData, configData, storeData, ordersData, domainData, purchasesData, customersData, suppliersData, aiData] = await Promise.all([
-        itemsRes ? safeJson(itemsRes) : null,
-        messagesRes ? safeJson(messagesRes) : null,
+      const [statsData, configData, storeData, ordersData, domainData, purchasesData, customersData, suppliersData, aiData] = await Promise.all([
         statsRes ? safeJson(statsRes) : null,
         configRes ? safeJson(configRes) : null,
         storeRes ? safeJson(storeRes) : null,
@@ -686,13 +713,7 @@ function InventoryApp() {
         aiRes ? safeJson(aiRes) : null,
       ]);
 
-      if (itemsData && Array.isArray(itemsData)) {
-        setItems(itemsData);
-      }
-
-      if (messagesData && Array.isArray(messagesData)) {
-        setMessages(messagesData);
-      }
+      await Promise.all([itemsPromise, messagesPromise]);
 
       if (statsData) {
         setServerStats(statsData);
@@ -812,13 +833,58 @@ function InventoryApp() {
   useEffect(() => {
     fetchData();
 
-    // Auto-refresh every 10 seconds to capture live updates, pausing when the tab is in background
+    // SSE connection for instant real-time updates (Telegram ingest, live inventory updates, etc.)
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/events');
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'inventory_changed') {
+            if (data.action === 'create' && data.item) {
+              setItems((prev) => [data.item, ...prev.filter((x) => x.id !== data.item.id)]);
+            } else if (data.action === 'update' && data.item) {
+              setItems((prev) => prev.map((x) => (x.id === data.item.id ? data.item : x)));
+            } else if (data.action === 'delete' && data.item?.id) {
+              setItems((prev) => prev.filter((x) => x.id !== data.item.id));
+            }
+            // Trigger a silent background refresh to ensure sync of stats, messages, etc.
+            fetchData(true);
+          }
+        } catch (e) {
+          console.warn('Error handling SSE live event:', e);
+        }
+      };
+      eventSource.onerror = () => {
+        // EventSource will automatically attempt reconnection
+      };
+    } catch (err) {
+      console.warn('Could not initialize EventSource:', err);
+    }
+
+    // Immediate refresh on tab focus / visibility restore
+    const handleVisibilityOrFocus = () => {
+      if (!document.hidden) {
+        fetchData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Auto-refresh every 5 seconds as fallback to capture live updates, pausing when the tab is in background
     const interval = setInterval(() => {
       if (document.hidden) return;
       fetchData(true);
-    }, 10000);
+    }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      clearInterval(interval);
+    };
   }, [user, isCustomerOnly]);
 
   // Store Management Handlers
