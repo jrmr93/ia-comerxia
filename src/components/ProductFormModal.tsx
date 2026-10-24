@@ -360,7 +360,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setName(editingItem.name || '');
       setSku(editingItem.sku || '');
       setBarcode(editingItem.barcode || '');
-      setSupplierCode(editingItem.supplierCode || parsedAttr.supplierCode || '');
+      setSupplierCode(
+        editingItem.supplierCode ||
+        (editingItem as any).supplier_code ||
+        parsedAttr.supplierCode ||
+        parsedAttr.sku_proveedor ||
+        parsedAttr.supplier_code ||
+        ''
+      );
       setCategory(editingItem.category || 'General');
       
       const costNum = parseFloat(editingItem.costPrice) || 0;
@@ -1035,7 +1042,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       const saleNum = parseFloat(salePrice) || 0;
       const subtotalSinIVA = effectiveTaxRate > 0 ? Math.round((saleNum / (1 + effectiveTaxRate / 100)) * 100) / 100 : saleNum;
 
-      const mergedAttributes = {
+      const cleanSupp = supplierCode.trim() || null;
+
+      const mergedAttributes: Record<string, any> = {
         ...existingAttr,
         costOptions,
         costWithoutTax: isSupplierGift ? 0 : (parseFloat(costWithoutTax) || 0),
@@ -1052,8 +1061,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         images: allPhotos,
         totalPhotos: allPhotos.length,
         isSupplierGift,
-        supplierCode: supplierCode.trim() || null,
       };
+
+      if (cleanSupp) {
+        mergedAttributes.supplierCode = cleanSupp;
+        mergedAttributes.sku_proveedor = cleanSupp;
+      } else {
+        delete mergedAttributes.supplierCode;
+        delete mergedAttributes.sku_proveedor;
+        delete mergedAttributes.supplier_code;
+        delete mergedAttributes.providerSku;
+        mergedAttributes.supplierCode = null;
+        mergedAttributes.sku_proveedor = null;
+      }
 
       const url = editingItem ? `/api/inventory/${editingItem.id}` : '/api/inventory';
       const method = editingItem ? 'PUT' : 'POST';
@@ -1065,7 +1085,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           name: name.trim(),
           sku: sku.trim(),
           barcode: barcode.trim() || null,
-          supplierCode: supplierCode.trim() || null,
+          supplierCode: cleanSupp,
+          supplier_code: cleanSupp,
+          sku_proveedor: cleanSupp,
           category,
           costPrice: isSupplierGift ? '0.00' : String(parseFloat(costWithTax || costPrice) || 0),
           costWithoutTax: isSupplierGift ? '0.00' : String(parseFloat(costWithoutTax) || 0),

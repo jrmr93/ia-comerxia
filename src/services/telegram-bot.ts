@@ -19,6 +19,7 @@ import {
   WebProductScrapeResult,
 } from './web-product-scraper.ts';
 import { searchProductImagesWithAI } from './image-search.ts';
+import { broadcastLiveEvent } from './live-events.ts';
 
 let pollingActive = false;
 let pollingAbortController: AbortController | null = null;
@@ -903,6 +904,9 @@ async function processCompleteProduct(
     rawTelegramMessage: caption,
   });
 
+  // Instantly broadcast event to connected web clients (SSE)
+  broadcastLiveEvent({ type: 'inventory_changed', action: 'create', item: inventoryItem });
+
   // 7. Record message log
   const messageLog = await createTelegramMessageRecord({
     userId,
@@ -1164,6 +1168,7 @@ async function processWebProductUrlMessage(
   }
 
   // 4. Resolve supplier code and generate sequential SKU if needed
+  const supplierPrefix = getSupplierSkuPrefix(effectiveSupplier);
   const rawWebSupplierCode =
     ((scraped as any).supplierCode && (scraped as any).supplierCode.trim() ? (scraped as any).supplierCode.trim() : null) ||
     (scraped.sku && scraped.sku !== 'AUTO' && !scraped.sku.toUpperCase().startsWith(supplierPrefix) ? scraped.sku.trim() : null) ||
@@ -1171,7 +1176,6 @@ async function processWebProductUrlMessage(
   const finalWebSupplierCode = rawWebSupplierCode ? String(rawWebSupplierCode).trim() : null;
 
   let finalSku = scraped.sku;
-  const supplierPrefix = getSupplierSkuPrefix(effectiveSupplier);
   if (!finalSku || finalSku === 'AUTO' || !finalSku.toUpperCase().startsWith(supplierPrefix) || finalSku === finalWebSupplierCode) {
     finalSku = await generateNextSku(effectiveSupplier);
     scraped.sku = finalSku;
@@ -1224,6 +1228,9 @@ async function processWebProductUrlMessage(
     status: config.defaultProductActive === false ? 'archived' : 'available',
     rawTelegramMessage: text,
   });
+
+  // Instantly broadcast event to connected web clients (SSE)
+  broadcastLiveEvent({ type: 'inventory_changed', action: 'create', item: inventoryItem });
 
   // 6. Record message log
   const messageLog = await createTelegramMessageRecord({

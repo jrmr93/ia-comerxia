@@ -158,6 +158,7 @@ import {
   searchCommercialPromoBanners,
   CURATED_COMMERCIAL_PRESETS,
 } from './src/services/image-search.ts';
+import { liveEventEmitter } from './src/services/live-events.ts';
 import {
   ensureUploadsDirExists,
   persistImageLocally,
@@ -2040,6 +2041,37 @@ async function startServer() {
 
   app.post('/api/auth/logout', (req: Request, res: Response) => {
     res.json({ success: true, message: 'Sesión cerrada correctamente' });
+  });
+
+  // Real-Time Server-Sent Events (SSE) stream for instant inventory & order sync
+  app.get('/api/events', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    // Send initial handshake
+    res.write(`data: ${JSON.stringify({ type: 'connected', time: Date.now() })}\n\n`);
+
+    const onEvent = (event: any) => {
+      try {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      } catch {}
+    };
+
+    liveEventEmitter.on('event', onEvent);
+
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(': heartbeat\n\n');
+      } catch {}
+    }, 20000);
+
+    req.on('close', () => {
+      liveEventEmitter.off('event', onEvent);
+      clearInterval(heartbeat);
+    });
   });
 
   // 2. Inventory Stats

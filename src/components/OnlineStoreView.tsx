@@ -901,22 +901,6 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     }
   }, [isCustomerView]);
 
-  // Search & Filter state for catalog
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [inStockOnly, setInStockOnly] = useState<boolean>(false);
-  const [showOffersOnly, setShowOffersOnly] = useState<boolean>(false);
-  const [sortBy, setSortBy] = useState<'featured' | 'price_asc' | 'price_desc' | 'name' | 'category' | 'date_desc' | 'random' | string>(() => {
-    return storeConfig?.defaultProductSort || 'date_desc';
-  });
-
-  // Synchronize initial sort option if storeConfig loads asynchronously
-  useEffect(() => {
-    if (storeConfig?.defaultProductSort) {
-      setSortBy(storeConfig.defaultProductSort);
-    }
-  }, [storeConfig?.defaultProductSort]);
-
   // Helper to extract selected products IDs from URL query (?productos=1,2,3 or ?items=1,2,3 or ?ids=1,2,3)
   const getSelectedProductIdsFromUrl = (): number[] | null => {
     if (typeof window === 'undefined') return null;
@@ -937,9 +921,29 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     return null;
   };
 
+  // Search & Filter state for catalog
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [inStockOnly, setInStockOnly] = useState<boolean>(false);
+  const [showOffersOnly, setShowOffersOnly] = useState<boolean>(false);
   const [urlSelectedProductIds, setUrlSelectedProductIds] = useState<number[] | null>(() =>
     getSelectedProductIdsFromUrl()
   );
+
+  const [sortBy, setSortBy] = useState<'featured' | 'price_asc' | 'price_desc' | 'name' | 'category' | 'date_desc' | 'random' | string>(() => {
+    const selectedIds = getSelectedProductIdsFromUrl();
+    if (selectedIds && selectedIds.length > 0) {
+      return 'price_asc';
+    }
+    return storeConfig?.defaultProductSort || 'date_desc';
+  });
+
+  // Synchronize initial sort option if storeConfig loads asynchronously (only if not viewing a shared product selection)
+  useEffect(() => {
+    if (storeConfig?.defaultProductSort && (!urlSelectedProductIds || urlSelectedProductIds.length === 0)) {
+      setSortBy(storeConfig.defaultProductSort);
+    }
+  }, [storeConfig?.defaultProductSort, urlSelectedProductIds]);
 
   // Listen for browser back/forward or URL state changes
   useEffect(() => {
@@ -950,10 +954,11 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
     return () => window.removeEventListener('popstate', handleUrlUpdate);
   }, []);
 
-  // When shared selection is present, ensure default category is 'all' so all selected items are visible
+  // When shared selection is present, ensure default category is 'all' and sort by price ascending (lowest to highest)
   useEffect(() => {
     if (urlSelectedProductIds && urlSelectedProductIds.length > 0) {
       setSelectedCategory('all');
+      setSortBy('price_asc');
     }
   }, [urlSelectedProductIds]);
 
@@ -2197,13 +2202,13 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
       matchedProducts = fuzzyRes.matches;
     }
 
-    // If shared selection and default sorting, maintain the order of the selected IDs
-    if (urlSelectedProductIds && urlSelectedProductIds.length > 0 && (!sortBy || sortBy === 'featured')) {
+    // If shared selection and default sorting (featured or price_asc), sort from lowest to highest price by default
+    if (urlSelectedProductIds && urlSelectedProductIds.length > 0 && (!sortBy || sortBy === 'featured' || sortBy === 'price_asc')) {
       return matchedProducts.sort((a, b) => {
-        const idxA = urlSelectedProductIds.indexOf(a.id);
-        const idxB = urlSelectedProductIds.indexOf(b.id);
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-        return 0;
+        const priceA = getEffectivePrice(a);
+        const priceB = getEffectivePrice(b);
+        if (priceA !== priceB) return priceA - priceB;
+        return a.name.localeCompare(b.name);
       });
     }
 
@@ -2213,9 +2218,9 @@ export const OnlineStoreView: React.FC<OnlineStoreViewProps> = ({
         const hasDiscA = discA > 0;
         const hasDiscB = discB > 0;
 
-        // Prioritize products with active discount percentage (if configured)
+        // Prioritize products with active discount percentage (if configured and not explicitly sorting by price)
         const prioritizeOffers = storeConfig?.prioritizeOffersFirst !== false;
-        if (prioritizeOffers) {
+        if (prioritizeOffers && sortBy !== 'price_asc' && sortBy !== 'price_desc') {
           if (hasDiscA !== hasDiscB) {
             return hasDiscB ? 1 : -1;
           }

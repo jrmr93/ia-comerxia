@@ -102,8 +102,20 @@ export const ShareStoreModal: React.FC<ShareStoreModalProps> = ({
     if (!baseStoreUrl) return '';
 
     if (shareMode === 'selected' && currentSelectedProducts.length > 0) {
+      // Sort products from lowest to highest price by default
+      const sortedByPriceAsc = [...currentSelectedProducts].sort((a, b) => {
+        const getEffective = (p: InventoryItem) => {
+          const regular = Number(p.salePrice) || 0;
+          const disc = Math.max(0, Math.min(100, Number(p.discountPercent) || 0));
+          return disc > 0 ? regular * (1 - disc / 100) : regular;
+        };
+        const pA = getEffective(a);
+        const pB = getEffective(b);
+        if (pA !== pB) return pA - pB;
+        return a.name.localeCompare(b.name);
+      });
       return getPublicProductsSelectionUrl(
-        currentSelectedProducts.map((p) => p.id),
+        sortedByPriceAsc.map((p) => p.id),
         storeConfig?.domain
       );
     }

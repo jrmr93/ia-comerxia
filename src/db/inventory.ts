@@ -32,6 +32,7 @@ import {
 import { parseSupplierTelegramMessage } from '../services/gemini-parser.ts';
 import { getProductPhotosWithFallback, normalizeMediaUrl } from '../utils/media-helper.ts';
 import { getItemUnitNetProfit } from '../utils/tax-calculator.ts';
+import { broadcastLiveEvent } from '../services/live-events.ts';
 
 /**
  * Sanitizes numeric strings to guarantee valid SQL NUMERIC/DECIMAL values (e.g., '12.50')
@@ -369,23 +370,36 @@ export function formatItemWithAllImages<T extends Record<string, any>>(item: T):
   if (!item) return item;
   const images = getProductPhotosWithFallback(item);
   let videoUrl = item.videoUrl || item.video_url || null;
-  let supplierCode = item.supplierCode || item.supplier_code || null;
-  
-  if ((!videoUrl || !supplierCode) && item.extractedAttributes) {
+
+  // Resolve supplierCode:
+  // If supplierCode is explicitly null or empty string, it was deliberately deleted/empty.
+  // Only fall back to extractedAttributes if neither supplierCode nor supplier_code is defined on the item.
+  let rawSupplierCode = item.supplierCode !== undefined ? item.supplierCode : item.supplier_code;
+  let supplierCode: string | null = null;
+  if (rawSupplierCode !== undefined && rawSupplierCode !== null) {
+    const s = String(rawSupplierCode).trim();
+    supplierCode = s !== '' ? s : null;
+  } else if (rawSupplierCode === undefined && item.extractedAttributes) {
     try {
       const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
-      if (!videoUrl) {
-        videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
+      const fallback = parsed?.supplierCode || parsed?.supplier_code || parsed?.sku_proveedor || parsed?.providerSku || null;
+      if (fallback && String(fallback).trim() !== '') {
+        supplierCode = String(fallback).trim();
       }
-      if (!supplierCode) {
-        supplierCode = parsed?.supplierCode || parsed?.supplier_code || parsed?.sku_proveedor || parsed?.providerSku || null;
-      }
+    } catch { }
+  }
+
+  if (!videoUrl && item.extractedAttributes) {
+    try {
+      const parsed = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
+      videoUrl = parsed?.videoUrl || parsed?.video_url || parsed?.video || null;
     } catch { }
   }
   const effectiveImageUrl = normalizeMediaUrl(item.imageUrl || item.image_url) || images[0] || null;
   return normalizeItemTaxesAndPrices({
     ...item,
     supplierCode: supplierCode ? String(supplierCode).trim() : null,
+    supplier_code: supplierCode ? String(supplierCode).trim() : null,
     imageUrl: effectiveImageUrl,
     images,
     videoUrl,
@@ -1524,7 +1538,7 @@ export async function createInventoryItem(data: {
       })
       .returning();
 
-    const created = result[0];
+    const created = formatItemWithAllImages(result[0]);
     const state = storage.getState();
     const existingIdx = state.inventoryItems.findIndex((it) => it.id === created.id);
     if (existingIdx !== -1) {
@@ -1534,6 +1548,7 @@ export async function createInventoryItem(data: {
     }
     storage.save();
 
+    broadcastLiveEvent({ type: 'inventory_changed', action: 'create', item: created });
     return created;
   } catch (error) {
     console.error('Error creating inventory item in SQL, fallback to local storage:', error);
@@ -1569,9 +1584,11 @@ export async function createInventoryItem(data: {
       createdAt: now,
       updatedAt: now,
     };
-    state.inventoryItems.unshift(newItem);
+    const formattedNewItem = formatItemWithAllImages(newItem);
+    state.inventoryItems.unshift(formattedNewItem as any);
     storage.save();
-    return newItem;
+    broadcastLiveEvent({ type: 'inventory_changed', action: 'create', item: formattedNewItem });
+    return formattedNewItem;
   }
 }
 
@@ -1617,6 +1634,30 @@ export async function updateInventoryItem(
   if (data.discountPercent !== undefined) sanitizedPayload.discountPercent = cleanInteger(data.discountPercent, 0);
   if (data.stock !== undefined) sanitizedPayload.stock = cleanInteger(data.stock, 0);
 
+  // Supplier SKU / supplierCode explicit clearing support
+  const hasSuppField =
+    data.supplierCode !== undefined ||
+    (data as any).supplier_code !== undefined ||
+    (data as any).sku_proveedor !== undefined;
+
+  let cleanSupp: string | null = null;
+  if (hasSuppField) {
+    const rawVal =
+      data.supplierCode !== undefined
+        ? data.supplierCode
+        : (data as any).supplier_code !== undefined
+        ? (data as any).supplier_code
+        : (data as any).sku_proveedor;
+
+    cleanSupp =
+      rawVal !== null && rawVal !== undefined && String(rawVal).trim() !== ''
+        ? String(rawVal).trim()
+        : null;
+
+    sanitizedPayload.supplierCode = cleanSupp;
+    sanitizedPayload.supplier_code = cleanSupp;
+  }
+
   // Automatically persist image locally in /uploads/
   if (data.imageUrl !== undefined && data.imageUrl !== null && data.imageUrl !== '') {
     const persisted = await persistImageLocally(data.imageUrl);
@@ -1646,6 +1687,19 @@ export async function updateInventoryItem(
         }
         if (sanitizedPayload.costWithTax !== undefined) {
           parsed.costWithTax = Number(sanitizedPayload.costWithTax);
+        }
+      }
+      if (hasSuppField) {
+        if (cleanSupp) {
+          parsed.supplierCode = cleanSupp;
+          parsed.sku_proveedor = cleanSupp;
+        } else {
+          delete parsed.supplierCode;
+          delete parsed.sku_proveedor;
+          delete parsed.supplier_code;
+          delete parsed.providerSku;
+          parsed.supplierCode = null;
+          parsed.sku_proveedor = null;
         }
       }
       if (Array.isArray(incomingImages) && incomingImages.length > 0) {
@@ -1687,6 +1741,30 @@ export async function updateInventoryItem(
     });
   }
 
+  // If supplierCode was explicitly provided but extractedAttributes was not updated in payload, clean existing extractedAttributes
+  if (hasSuppField && data.extractedAttributes === undefined) {
+    try {
+      const existing = !isPostgresConfigured()
+        ? storage.getState().inventoryItems.find((it) => it.id === id)
+        : await getInventoryItemById(id);
+      if (existing?.extractedAttributes) {
+        const parsed = typeof existing.extractedAttributes === 'string' ? JSON.parse(existing.extractedAttributes) : existing.extractedAttributes;
+        if (cleanSupp) {
+          parsed.supplierCode = cleanSupp;
+          parsed.sku_proveedor = cleanSupp;
+        } else {
+          delete parsed.supplierCode;
+          delete parsed.sku_proveedor;
+          delete parsed.supplier_code;
+          delete parsed.providerSku;
+          parsed.supplierCode = null;
+          parsed.sku_proveedor = null;
+        }
+        sanitizedPayload.extractedAttributes = JSON.stringify(parsed);
+      }
+    } catch {}
+  }
+
   if (!isPostgresConfigured()) {
     const state = storage.getState();
     const idx = state.inventoryItems.findIndex((it) => it.id === id);
@@ -1714,7 +1792,9 @@ export async function updateInventoryItem(
       });
     }
 
-    return formatItemWithAllImages(updated);
+    const formatted = formatItemWithAllImages(updated);
+    broadcastLiveEvent({ type: 'inventory_changed', action: 'update', item: formatted });
+    return formatted;
   }
 
   try {
@@ -1743,6 +1823,7 @@ export async function updateInventoryItem(
       }
     }
 
+    broadcastLiveEvent({ type: 'inventory_changed', action: 'update', item: formatted });
     return formatted;
   } catch (error) {
     console.warn('Error updating inventory item in SQL, fallback to local storage:', error);
@@ -1767,7 +1848,9 @@ export async function updateInventoryItem(
         });
       }
 
-      return formatItemWithAllImages(state.inventoryItems[idx]);
+      const formatted = formatItemWithAllImages(state.inventoryItems[idx]);
+      broadcastLiveEvent({ type: 'inventory_changed', action: 'update', item: formatted });
+      return formatted;
     }
     throw error;
   }
@@ -1820,7 +1903,7 @@ export async function reparseInventoryItemWithAi(id: number, userId: number = 1)
   }
 
   const effectiveTax = typeof parsed.taxPercent === 'number' ? parsed.taxPercent : 15;
-  const mergedAttributes = {
+  const mergedAttributes: Record<string, any> = {
     ...existingAttributes,
     ...(parsed.attributes || {}),
     images: photoList,
@@ -1836,6 +1919,12 @@ export async function reparseInventoryItemWithAi(id: number, userId: number = 1)
     saleTaxPercent: effectiveTax,
     taxRate: effectiveTax,
   };
+
+  const newSuppCode = parsed.supplierCode || (parsed.sku && parsed.sku !== 'AUTO' ? parsed.sku : null);
+  if (newSuppCode && !item.supplierCode) {
+    mergedAttributes.supplierCode = newSuppCode;
+    mergedAttributes.sku_proveedor = newSuppCode;
+  }
 
   const updatePayload: any = {
     name: parsed.name && parsed.name !== 'Producto Nuevo Telegram' ? parsed.name : item.name,
@@ -1860,11 +1949,8 @@ export async function reparseInventoryItemWithAi(id: number, userId: number = 1)
     updatePayload.sku = parsed.sku;
   }
 
-  const newSuppCode = parsed.supplierCode || (parsed.sku && parsed.sku !== 'AUTO' ? parsed.sku : null);
   if (newSuppCode && !item.supplierCode) {
     updatePayload.supplierCode = newSuppCode;
-    mergedAttributes.supplierCode = newSuppCode;
-    mergedAttributes.sku_proveedor = newSuppCode;
   }
 
   const updatedItem = await updateInventoryItem(id, updatePayload);
