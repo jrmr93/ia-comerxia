@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, X, FileText, DollarSign, Package, Layers, TrendingUp, ArrowUpDown, Tag, Type, List } from 'lucide-react';
+import { Printer, X, FileText, DollarSign, Package, Layers, TrendingUp, ArrowUpDown, Tag, Type, List, ArrowUp, ArrowDown } from 'lucide-react';
 import { InventoryItem, StoreConfig } from '../types.ts';
 import { calculateItemFinancials } from './InventoryView.tsx';
 import { normalizeMediaUrl } from '../utils/media-helper.ts';
@@ -40,24 +40,42 @@ export interface InventoryReportPrintModalProps {
   items: InventoryItem[];
   storeConfig?: Partial<StoreConfig> | null;
   currency?: string;
+  initialSortBy?: InventoryReportSortOption;
   onClose: () => void;
 }
 
-export type InventoryReportSortOption = 'original' | 'name' | 'category';
+export type InventoryReportSortOption = 'original' | 'name' | 'category' | 'price_asc' | 'price_desc';
+
+export function getInventoryReportSortLabel(sort: InventoryReportSortOption): string {
+  switch (sort) {
+    case 'name':
+      return 'Nombre A-Z';
+    case 'category':
+      return 'Categoría';
+    case 'price_asc':
+      return 'Precio (Menor a Mayor)';
+    case 'price_desc':
+      return 'Precio (Mayor a Menor)';
+    case 'original':
+    default:
+      return 'Selección';
+  }
+}
 
 export function printInventoryReportDocument(options: {
   sortedItems: any[];
   grandTotals: any;
   avgMargin: string;
+  avgValuationMargin?: string;
   storeConfig?: Partial<StoreConfig> | null;
   currency: string;
   orientation: 'landscape' | 'portrait';
   sortBy: InventoryReportSortOption;
 }) {
-  const { sortedItems, grandTotals, avgMargin, storeConfig, currency, orientation, sortBy } = options;
+  const { sortedItems, grandTotals, avgMargin, avgValuationMargin, storeConfig, currency, orientation, sortBy } = options;
 
   const fmtMoney = (val: number) =>
-    `${currency}${val.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${currency}${(Number(val) || 0).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const storeName = storeConfig?.storeName || 'MI TIENDA';
   const storePhone = storeConfig?.whatsappNumber || '';
@@ -297,7 +315,7 @@ export function printInventoryReportDocument(options: {
       <div class="doc-meta">
         <div class="doc-badge">REPORTE DE INVENTARIO VALORADO</div>
         <div class="meta-text">Emisión: ${currentDateStr}</div>
-        <div class="meta-text">Orden: ${sortBy === 'name' ? 'Nombre A-Z' : sortBy === 'category' ? 'Categoría' : 'Selección'} | Total: ${sortedItems.length} items</div>
+        <div class="meta-text">Orden: ${getInventoryReportSortLabel(sortBy)} | Total: ${sortedItems.length} items</div>
       </div>
     </div>
 
@@ -307,18 +325,18 @@ export function printInventoryReportDocument(options: {
         <div class="card-val">${grandTotals.totalStock.toLocaleString('es-EC')} <span style="font-size:8px;font-weight:normal">uds</span></div>
       </div>
       <div class="card">
-        <div class="card-label">Costo Total + IVA</div>
-        <div class="card-val" style="color:#78350f">${fmtMoney(grandTotals.totalCostConIva)}</div>
-        <div class="card-sub">Sin IVA: ${fmtMoney(grandTotals.totalCostSinIva)}</div>
+        <div class="card-label">${grandTotals.totalStock > 0 ? 'Costo Total Valorado' : 'Sumatoria Costo + IVA'}</div>
+        <div class="card-val" style="color:#78350f">${fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalCostConIva : grandTotals.sumCostConIva)}</div>
+        <div class="card-sub">Sin IVA: ${fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalCostSinIva : grandTotals.sumCostSinIva)}</div>
       </div>
       <div class="card" style="background:#fef3c7;border-color:#f59e0b">
-        <div class="card-label" style="color:#92400e">PVP Total + IVA ⭐</div>
-        <div class="card-val" style="color:#78350f">${fmtMoney(grandTotals.totalPvpConIva)}</div>
-        <div class="card-sub" style="color:#92400e">Sin IVA: ${fmtMoney(grandTotals.totalPvpSinIva)}</div>
+        <div class="card-label" style="color:#92400e">${grandTotals.totalStock > 0 ? 'PVP Total Valorado ⭐' : 'Sumatoria PVP + IVA ⭐'}</div>
+        <div class="card-val" style="color:#78350f">${fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalPvpConIva : grandTotals.sumPvpConIva)}</div>
+        <div class="card-sub" style="color:#92400e">Sin IVA: ${fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalPvpSinIva : grandTotals.sumPvpSinIva)}</div>
       </div>
       <div class="card" style="background:#ecfdf5;border-color:#a7f3d0">
         <div class="card-label" style="color:#065f46">Ganancia Proyectada</div>
-        <div class="card-val" style="color:#064e3b">${fmtMoney(grandTotals.totalProfit)}</div>
+        <div class="card-val" style="color:#064e3b">${fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalProfit : grandTotals.sumProfit)}</div>
         <div class="card-sub" style="color:#047857">Margen prom: ${avgMargin}%</div>
       </div>
     </div>
@@ -372,15 +390,28 @@ export function printInventoryReportDocument(options: {
         <tr>
           <td colspan="5" style="text-align:right;text-transform:uppercase">TOTALES GENERALES (${sortedItems.length} ITEMS):</td>
           <td class="center" style="color:#fde047">${grandTotals.totalStock}</td>
-          <td class="right">${fmtMoney(grandTotals.totalCostSinIva)}</td>
-          <td class="right" style="color:#fde047">${fmtMoney(grandTotals.totalCostConIva)}</td>
+          <td class="right">${fmtMoney(grandTotals.sumCostSinIva)}</td>
+          <td class="right" style="color:#fde047">${fmtMoney(grandTotals.sumCostConIva)}</td>
           <td class="center">-</td>
-          <td class="right">${fmtMoney(grandTotals.totalPvpSinIva)}</td>
-          <td class="right pvp-foot">${fmtMoney(grandTotals.totalPvpConIva)}</td>
+          <td class="right">${fmtMoney(grandTotals.sumPvpSinIva)}</td>
+          <td class="right pvp-foot">${fmtMoney(grandTotals.sumPvpConIva)}</td>
           <td class="center">-</td>
-          <td class="right" style="color:#6ee7b7">${fmtMoney(grandTotals.totalProfit)}</td>
+          <td class="right" style="color:#6ee7b7">${fmtMoney(grandTotals.sumProfit)}</td>
           <td class="right" style="color:#6ee7b7">${avgMargin}%</td>
         </tr>
+        ${grandTotals.totalStock > 0 ? `
+        <tr style="background:#1e293b !important;border-top:1px dashed #64748b;">
+          <td colspan="5" style="text-align:right;text-transform:uppercase;font-size:7px;color:#94a3b8">VALORIZACIÓN EN INVENTARIO (TOTAL × STOCK):</td>
+          <td class="center" style="color:#fde047;font-size:7.5px">${grandTotals.totalStock} uds</td>
+          <td class="right" style="font-size:7.5px;color:#cbd5e1">${fmtMoney(grandTotals.totalCostSinIva)}</td>
+          <td class="right" style="color:#fde047;font-size:7.5px">${fmtMoney(grandTotals.totalCostConIva)}</td>
+          <td class="center" style="font-size:7.5px">-</td>
+          <td class="right" style="font-size:7.5px;color:#cbd5e1">${fmtMoney(grandTotals.totalPvpSinIva)}</td>
+          <td class="right pvp-foot" style="font-size:7.5px">${fmtMoney(grandTotals.totalPvpConIva)}</td>
+          <td class="center" style="font-size:7.5px">-</td>
+          <td class="right" style="color:#6ee7b7;font-size:7.5px">${fmtMoney(grandTotals.totalProfit)}</td>
+          <td class="right" style="color:#6ee7b7;font-size:7.5px">${avgValuationMargin || avgMargin}%</td>
+        </tr>` : ''}
       </tfoot>
     </table>
 
@@ -732,7 +763,7 @@ export function printPriceListDocument(options: {
       <div class="doc-meta">
         <div class="doc-badge">LISTA DE PRECIOS c/IVA</div>
         <div class="meta-text">Emisión: ${currentDateStr}</div>
-        <div class="meta-text">Orden: ${sortBy === 'name' ? 'Nombre A-Z' : sortBy === 'category' ? 'Categoría' : 'Selección'} | ${sortedItems.length} productos</div>
+        <div class="meta-text">Orden: ${getInventoryReportSortLabel(sortBy)} | ${sortedItems.length} productos</div>
       </div>
     </div>
 
@@ -753,10 +784,10 @@ export function printPriceListDocument(options: {
       <tfoot>
         <tr>
           <td colspan="5" style="text-align:right;text-transform:uppercase;font-size:${orientation === 'portrait' ? '7.5px' : '8.5px'}">
-            TOTAL DE PRODUCTOS EN LISTA (${sortedItems.length} ITEMS):
+            TOTAL DE PRODUCTOS EN LISTA (${sortedItems.length} ITEMS${grandTotals?.totalStock > 0 ? ` · ${grandTotals.totalStock} UDS EN STOCK` : ''}):
           </td>
           <td class="right pvp-foot">
-            ${grandTotals ? fmtMoney(grandTotals.totalPvpConIva) : `${sortedItems.length} ítems`}
+            ${fmtMoney(grandTotals?.sumPvpConIva ?? grandTotals?.totalPvpConIva ?? 0)}
           </td>
         </tr>
       </tfoot>
@@ -827,19 +858,19 @@ export function printPriceListDocument(options: {
 }
 
 export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps> = ({
-
   items,
   storeConfig,
   currency = '$',
+  initialSortBy,
   onClose,
 }) => {
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
-  const [sortBy, setSortBy] = useState<InventoryReportSortOption>('original');
+  const [sortBy, setSortBy] = useState<InventoryReportSortOption>(initialSortBy || 'original');
   const [printMode, setPrintMode] = useState<'full' | 'pricelist'>('full');
 
   // Format money helper
   const fmtMoney = (val: number) => {
-    return `${currency}${val.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${currency}${(Number(val) || 0).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   // Precompute metrics & totals for each item
@@ -847,17 +878,28 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
     const fin = calculateItemFinancials(item);
     const qty = Math.max(0, Number(item.stock) || 0);
 
-    const totalCostSinIva = fin.costWithoutTax * qty;
-    const totalCostConIva = fin.costWithTax * qty;
-    const totalPvpSinIva = fin.salePriceWithoutTax * qty;
-    const totalPvpConIva = fin.salePriceWithTax * qty;
-    const totalProfit = fin.unitProfit * qty;
+    const costSinIva = Number(fin.costWithoutTax) || 0;
+    const costConIva = Number(fin.costWithTax) || 0;
+    const pvpSinIva = Number(fin.salePriceWithoutTax) || 0;
+    const pvpConIva = Number(fin.salePriceWithTax) || 0;
+    const unitProfit = Number(fin.unitProfit) || 0;
+
+    const totalCostSinIva = costSinIva * qty;
+    const totalCostConIva = costConIva * qty;
+    const totalPvpSinIva = pvpSinIva * qty;
+    const totalPvpConIva = pvpConIva * qty;
+    const totalProfit = unitProfit * qty;
 
     return {
       originalIdx: idx + 1,
       item,
       fin,
       qty,
+      costSinIva,
+      costConIva,
+      pvpSinIva,
+      pvpConIva,
+      unitProfit,
       totalCostSinIva,
       totalCostConIva,
       totalPvpSinIva,
@@ -879,6 +921,16 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
         if (catComp !== 0) return catComp;
         return (a.item.name || '').localeCompare(b.item.name || '', 'es', { sensitivity: 'base' });
       }
+      if (sortBy === 'price_asc') {
+        const diff = (a.fin.salePriceWithTax ?? 0) - (b.fin.salePriceWithTax ?? 0);
+        if (Math.abs(diff) > 0.0001) return diff;
+        return (a.item.name || '').localeCompare(b.item.name || '', 'es', { sensitivity: 'base' });
+      }
+      if (sortBy === 'price_desc') {
+        const diff = (b.fin.salePriceWithTax ?? 0) - (a.fin.salePriceWithTax ?? 0);
+        if (Math.abs(diff) > 0.0001) return diff;
+        return (a.item.name || '').localeCompare(b.item.name || '', 'es', { sensitivity: 'base' });
+      }
       return 0; // Keep original selection order
     });
   }, [rawProcessedItems, sortBy]);
@@ -886,16 +938,30 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
   // Calculate grand totals across all selected products
   const grandTotals = rawProcessedItems.reduce(
     (acc, curr) => {
+      // 1. Sumatoria directa según cada columna de la tabla
       acc.totalStock += curr.qty;
+      acc.sumCostSinIva += curr.costSinIva;
+      acc.sumCostConIva += curr.costConIva;
+      acc.sumPvpSinIva += curr.pvpSinIva;
+      acc.sumPvpConIva += curr.pvpConIva;
+      acc.sumProfit += curr.unitProfit;
+
+      // 2. Valuación de inventario multiplicada por stock físico
       acc.totalCostSinIva += curr.totalCostSinIva;
       acc.totalCostConIva += curr.totalCostConIva;
       acc.totalPvpSinIva += curr.totalPvpSinIva;
       acc.totalPvpConIva += curr.totalPvpConIva;
       acc.totalProfit += curr.totalProfit;
+
       return acc;
     },
     {
       totalStock: 0,
+      sumCostSinIva: 0,
+      sumCostConIva: 0,
+      sumPvpSinIva: 0,
+      sumPvpConIva: 0,
+      sumProfit: 0,
       totalCostSinIva: 0,
       totalCostConIva: 0,
       totalPvpSinIva: 0,
@@ -905,9 +971,14 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
   );
 
   const avgMargin =
+    grandTotals.sumCostSinIva > 0
+      ? ((grandTotals.sumProfit / grandTotals.sumCostSinIva) * 100).toFixed(1)
+      : '0.0';
+
+  const avgValuationMargin =
     grandTotals.totalCostSinIva > 0
       ? ((grandTotals.totalProfit / grandTotals.totalCostSinIva) * 100).toFixed(1)
-      : '0.0';
+      : avgMargin;
 
   const storeName = storeConfig?.storeName || 'MI TIENDA';
   const storePhone = storeConfig?.whatsappNumber || '';
@@ -922,7 +993,7 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
     if (printMode === 'pricelist') {
       printPriceListDocument({ sortedItems, grandTotals, storeConfig, currency, orientation, sortBy });
     } else {
-      printInventoryReportDocument({ sortedItems, grandTotals, avgMargin, storeConfig, currency, orientation, sortBy });
+      printInventoryReportDocument({ sortedItems, grandTotals, avgMargin, avgValuationMargin, storeConfig, currency, orientation, sortBy });
     }
   };
 
@@ -983,8 +1054,8 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
               </button>
             </div>
             {/* Sort Order Selector */}
-            <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700 text-xs text-slate-300 font-medium">
-              <span className="text-[10px] uppercase font-bold text-slate-400 px-2 flex items-center gap-1">
+            <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700 text-xs text-slate-300 font-medium flex-wrap gap-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400 px-1.5 flex items-center gap-1">
                 <ArrowUpDown className="w-3 h-3 text-sky-400" />
                 Orden:
               </span>
@@ -1011,7 +1082,7 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                 title="Ordenar alfabéticamente por nombre del producto (A-Z)"
               >
                 <Type className="w-3 h-3" />
-                Nombre A-Z
+                <span>Nombre A-Z</span>
               </button>
               <button
                 type="button"
@@ -1024,7 +1095,33 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                 title="Ordenar alfabéticamente por categoría (A-Z)"
               >
                 <Tag className="w-3 h-3" />
-                Categoría
+                <span>Categoría</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortBy('price_asc')}
+                className={`px-2 py-0.5 rounded-lg transition text-[11px] flex items-center gap-1 ${
+                  sortBy === 'price_asc'
+                    ? 'bg-sky-600 text-white font-bold shadow-xs'
+                    : 'hover:text-white hover:bg-slate-700'
+                }`}
+                title="Ordenar por precio de menor a mayor (PVP c/IVA)"
+              >
+                <ArrowUp className="w-3 h-3 text-emerald-400 stroke-[2.5]" />
+                <span>Precio: Menor a Mayor</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortBy('price_desc')}
+                className={`px-2 py-0.5 rounded-lg transition text-[11px] flex items-center gap-1 ${
+                  sortBy === 'price_desc'
+                    ? 'bg-sky-600 text-white font-bold shadow-xs'
+                    : 'hover:text-white hover:bg-slate-700'
+                }`}
+                title="Ordenar por precio de mayor a menor (PVP c/IVA)"
+              >
+                <ArrowDown className="w-3 h-3 text-amber-400 stroke-[2.5]" />
+                <span>Precio: Mayor a Menor</span>
               </button>
             </div>
 
@@ -1123,7 +1220,7 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                   Emisión: <span className="text-slate-800">{currentDateStr}</span>
                 </p>
                 <p className="text-[10px] text-slate-500 font-semibold">
-                  Orden: <span className="text-slate-900 font-bold uppercase">{sortBy === 'name' ? 'Alfabético' : sortBy === 'category' ? 'Categoría' : 'Selección'}</span> | Total: <span className="text-slate-900 font-bold">{items.length} productos</span>
+                  Orden: <span className="text-slate-900 font-bold uppercase">{getInventoryReportSortLabel(sortBy)}</span> | Total: <span className="text-slate-900 font-bold">{items.length} productos</span>
                 </p>
               </div>
             </div>
@@ -1157,9 +1254,9 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                     <DollarSign className="w-3.5 h-3.5 text-blue-600" />
                   </div>
                   <div className="text-sm font-extrabold text-blue-950 font-mono">
-                    {fmtMoney(sortedItems.length > 0 ? grandTotals.totalPvpConIva / sortedItems.length : 0)}
+                    {fmtMoney(sortedItems.length > 0 ? grandTotals.sumPvpConIva / sortedItems.length : 0)}
                   </div>
-                  <div className="text-[9px] text-blue-700">Sin IVA: {fmtMoney(sortedItems.length > 0 ? grandTotals.totalPvpSinIva / sortedItems.length : 0)}</div>
+                  <div className="text-[9px] text-blue-700">Sin IVA: {fmtMoney(sortedItems.length > 0 ? grandTotals.sumPvpSinIva / sortedItems.length : 0)}</div>
                 </div>
 
                 <div className="p-2 bg-amber-50/80 border border-amber-300 rounded-xl shadow-2xs">
@@ -1168,10 +1265,10 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                     <DollarSign className="w-3.5 h-3.5 text-amber-700" />
                   </div>
                   <div className="text-sm font-black text-amber-950 font-mono">
-                    {fmtMoney(grandTotals.totalPvpConIva)}
+                    {fmtMoney(grandTotals.sumPvpConIva)}
                   </div>
                   <div className="text-[9px] font-bold text-amber-800">
-                    Total catálogo c/IVA
+                    Sin IVA: {fmtMoney(grandTotals.sumPvpSinIva)}
                   </div>
                 </div>
               </div>
@@ -1189,27 +1286,27 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
 
                 <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
                   <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase mb-0.5">
-                    <span>Costo Total + IVA</span>
+                    <span>{grandTotals.totalStock > 0 ? 'Costo Total Valorado' : 'Sumatoria Costo + IVA'}</span>
                     <DollarSign className="w-3.5 h-3.5 text-amber-600" />
                   </div>
                   <div className="text-sm font-extrabold text-amber-900">
-                    {fmtMoney(grandTotals.totalCostConIva)}
+                    {fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalCostConIva : grandTotals.sumCostConIva)}
                   </div>
                   <div className="text-[9px] text-slate-500">
-                    Sin IVA: {fmtMoney(grandTotals.totalCostSinIva)}
+                    Sin IVA: {fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalCostSinIva : grandTotals.sumCostSinIva)}
                   </div>
                 </div>
 
                 <div className="p-2 bg-amber-50 border border-amber-300 rounded-xl shadow-2xs">
                   <div className="flex items-center justify-between text-amber-900 text-[10px] font-extrabold uppercase mb-0.5">
-                    <span>PVP Total + IVA ⭐</span>
+                    <span>{grandTotals.totalStock > 0 ? 'PVP Total Valorado ⭐' : 'Sumatoria PVP + IVA ⭐'}</span>
                     <Layers className="w-3.5 h-3.5 text-amber-700" />
                   </div>
                   <div className="text-sm font-black text-amber-950">
-                    {fmtMoney(grandTotals.totalPvpConIva)}
+                    {fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalPvpConIva : grandTotals.sumPvpConIva)}
                   </div>
                   <div className="text-[9px] font-bold text-amber-800">
-                    Sin IVA: {fmtMoney(grandTotals.totalPvpSinIva)}
+                    Sin IVA: {fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalPvpSinIva : grandTotals.sumPvpSinIva)}
                   </div>
                 </div>
 
@@ -1219,7 +1316,7 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                     <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
                   </div>
                   <div className="text-sm font-extrabold text-emerald-950">
-                    {fmtMoney(grandTotals.totalProfit)}
+                    {fmtMoney(grandTotals.totalStock > 0 ? grandTotals.totalProfit : grandTotals.sumProfit)}
                   </div>
                   <div className="text-[9px] font-bold text-emerald-700">
                     Margen prom: {avgMargin}%
@@ -1309,10 +1406,10 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                   <tfoot>
                     <tr className="bg-slate-900 text-white font-bold text-[8px] sm:text-[9.5px] border-t-2 border-slate-900">
                       <td colSpan={5} className="py-2 px-2 text-right uppercase tracking-wider">
-                        TOTAL DE PRODUCTOS EN LISTA ({sortedItems.length} ITEMS):
+                        TOTAL DE PRODUCTOS EN LISTA ({sortedItems.length} ITEMS{grandTotals.totalStock > 0 ? ` · ${grandTotals.totalStock} UDS EN STOCK` : ''}):
                       </td>
                       <td className="py-2 px-2 text-right font-mono font-black text-yellow-300 bg-blue-900 truncate">
-                        {fmtMoney(grandTotals.totalPvpConIva)}
+                        {fmtMoney(grandTotals.sumPvpConIva)}
                       </td>
                     </tr>
                   </tfoot>
@@ -1438,29 +1535,59 @@ export const InventoryReportPrintModal: React.FC<InventoryReportPrintModalProps>
                       {grandTotals.totalStock}
                     </td>
                     <td className="py-2 px-0.5 text-right font-mono truncate">
-                      {fmtMoney(grandTotals.totalCostSinIva)}
+                      {fmtMoney(grandTotals.sumCostSinIva)}
                     </td>
                     <td className="py-2 px-0.5 text-right font-mono font-extrabold text-amber-200 truncate">
-                      {fmtMoney(grandTotals.totalCostConIva)}
+                      {fmtMoney(grandTotals.sumCostConIva)}
                     </td>
                     <td className="py-2 px-0.5 text-center font-mono">-</td>
                     <td className="py-2 px-0.5 text-right font-mono truncate">
-                      {fmtMoney(grandTotals.totalPvpSinIva)}
+                      {fmtMoney(grandTotals.sumPvpSinIva)}
                     </td>
                     
                     {/* HIGHLIGHTED TOTAL PVP c/IVA FOOTER CELL */}
                     <td className="py-2 px-0.5 text-right font-mono font-black text-amber-950 bg-amber-400 truncate">
-                      {fmtMoney(grandTotals.totalPvpConIva)}
+                      {fmtMoney(grandTotals.sumPvpConIva)}
                     </td>
 
                     <td className="py-2 px-0.5 text-center font-mono">-</td>
                     <td className="py-2 px-0.5 text-right font-mono font-extrabold text-emerald-300 truncate">
-                      {fmtMoney(grandTotals.totalProfit)}
+                      {fmtMoney(grandTotals.sumProfit)}
                     </td>
                     <td className="py-2 px-0.5 text-right font-mono font-extrabold text-emerald-300 truncate">
                       {avgMargin}%
                     </td>
                   </tr>
+                  {grandTotals.totalStock > 0 && (
+                    <tr className="bg-slate-950 text-slate-300 font-bold text-[7.5px] sm:text-[8.5px] border-t border-slate-700">
+                      <td colSpan={5} className="py-1.5 px-2 text-right uppercase tracking-wider text-slate-400">
+                        VALORIZACIÓN EN INVENTARIO (TOTAL × STOCK):
+                      </td>
+                      <td className="py-1.5 px-0.5 text-center font-extrabold text-amber-300">
+                        {grandTotals.totalStock} uds
+                      </td>
+                      <td className="py-1.5 px-0.5 text-right font-mono truncate text-slate-300">
+                        {fmtMoney(grandTotals.totalCostSinIva)}
+                      </td>
+                      <td className="py-1.5 px-0.5 text-right font-mono font-extrabold text-amber-300 truncate">
+                        {fmtMoney(grandTotals.totalCostConIva)}
+                      </td>
+                      <td className="py-1.5 px-0.5 text-center font-mono">-</td>
+                      <td className="py-1.5 px-0.5 text-right font-mono truncate text-slate-300">
+                        {fmtMoney(grandTotals.totalPvpSinIva)}
+                      </td>
+                      <td className="py-1.5 px-0.5 text-right font-mono font-black text-amber-950 bg-amber-300 truncate">
+                        {fmtMoney(grandTotals.totalPvpConIva)}
+                      </td>
+                      <td className="py-1.5 px-0.5 text-center font-mono">-</td>
+                      <td className="py-1.5 px-0.5 text-right font-mono font-extrabold text-emerald-400 truncate">
+                        {fmtMoney(grandTotals.totalProfit)}
+                      </td>
+                      <td className="py-1.5 px-0.5 text-right font-mono font-extrabold text-emerald-400 truncate">
+                        {avgValuationMargin}%
+                      </td>
+                    </tr>
+                  )}
                 </tfoot>
               </table>
             </div>

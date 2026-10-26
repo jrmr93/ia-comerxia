@@ -2621,6 +2621,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           items={items.filter((it) => selectedIds.includes(it.id))}
           storeConfig={storeConfig}
           currency={currency}
+          initialSortBy={
+            effectiveSortBy === 'price_asc'
+              ? 'price_asc'
+              : effectiveSortBy === 'price_desc'
+              ? 'price_desc'
+              : effectiveSortBy === 'name_asc' || effectiveSortBy === 'name_desc'
+              ? 'name'
+              : 'original'
+          }
           onClose={() => setShowPrintReportModal(false)}
         />
       )}
