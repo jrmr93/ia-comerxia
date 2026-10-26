@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Barcode,
   Bot,
   Boxes,
@@ -50,7 +53,7 @@ import {
   X,
 } from 'lucide-react';
 import JSZip from 'jszip';
-import { CustomerOrder, InventoryItem, StoreConfig, TelegramMessage, Supplier } from '../types.ts';
+import { CustomerOrder, InventoryItem, StoreConfig, TelegramMessage, Supplier, InventorySortOption } from '../types.ts';
 import { TelegramMessagesFeed } from './TelegramMessagesFeed.tsx';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
 import { ProductMarketingCopyModal } from './ProductMarketingCopyModal.tsx';
@@ -248,6 +251,8 @@ interface InventoryViewProps {
   setStatusFilter: (status: string) => void;
   showOffersOnly?: boolean;
   setShowOffersOnly?: (v: boolean) => void;
+  sortBy?: InventorySortOption;
+  setSortBy?: (sort: InventorySortOption) => void;
   initialSubTab?: 'products' | 'messages';
   unseenProductIds?: Set<number>;
   unseenMessageIds?: Set<number>;
@@ -294,6 +299,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   setStatusFilter,
   showOffersOnly,
   setShowOffersOnly,
+  sortBy: externalSortBy,
+  setSortBy: externalSetSortBy,
   initialSubTab = 'products',
   unseenProductIds,
   unseenMessageIds,
@@ -306,6 +313,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onMarkMessageAsSeen,
 }) => {
   const { authFetch } = useAuth();
+  const [internalSortBy, setInternalSortBy] = useState<InventorySortOption>('date_desc');
+  const sortBy = externalSortBy !== undefined ? externalSortBy : internalSortBy;
+  const setSortBy = externalSetSortBy || setInternalSortBy;
+  const [isUserSortExplicit, setIsUserSortExplicit] = useState<boolean>(false);
+
+  const effectiveSortBy: InventorySortOption = useMemo(() => {
+    if (searchQuery.trim()) {
+      if (isUserSortExplicit && sortBy !== 'relevance') {
+        return sortBy;
+      }
+      return 'relevance';
+    }
+    if (sortBy === 'relevance') {
+      return 'date_desc';
+    }
+    return sortBy;
+  }, [searchQuery, sortBy, isUserSortExplicit]);
+
+  const handleSortChange = (newSort: InventorySortOption) => {
+    setSortBy(newSort);
+    setIsUserSortExplicit(true);
+  };
+
   const [reparsingId, setReparsingId] = useState<number | null>(null);
   const [reparseToast, setReparseToast] = useState<string | null>(null);
   const [isSyncingPostgres, setIsSyncingPostgres] = useState(false);
@@ -658,7 +688,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     return { matchesSet, didYouMean: res.didYouMean, matchOrderMap };
   }, [items, searchQuery]);
 
-  // Filter items
+  // Filter and sort items
   const filteredItems = useMemo(() => {
     const rawFiltered = items.filter((it) => {
       const matchesCategory =
@@ -691,23 +721,93 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       return matchesCategory && matchesSupplier && matchesStatus && matchesOffer && matchesSearch;
     });
 
-    if (searchQuery.trim() && fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.size > 0) {
-      return [...rawFiltered].sort((a, b) => {
-        const orderA = fuzzyResult.matchOrderMap!.has(a.id) ? fuzzyResult.matchOrderMap!.get(a.id)! : 999999;
-        const orderB = fuzzyResult.matchOrderMap!.has(b.id) ? fuzzyResult.matchOrderMap!.get(b.id)! : 999999;
-        return orderA - orderB;
-      });
+    const priceMap = new Map<number, number>();
+    const timeMap = new Map<number, number>();
+    for (const it of rawFiltered) {
+      priceMap.set(it.id, calculateItemFinancials(it).effectivePVP);
+      const t = it.createdAt ? new Date(it.createdAt).getTime() : 0;
+      timeMap.set(it.id, !isNaN(t) && t > 0 ? t : Number(it.id) || 0);
     }
 
-    return rawFiltered;
-  }, [items, selectedCategory, selectedSupplier, statusFilter, activeShowOffersOnly, searchQuery, fuzzyResult]);
+    return [...rawFiltered].sort((a, b) => {
+      // 1. Precio mayor (Mayor precio de venta primero)
+      if (effectiveSortBy === 'price_desc') {
+        const pA = priceMap.get(a.id) ?? 0;
+        const pB = priceMap.get(b.id) ?? 0;
+        if (Math.abs(pB - pA) > 0.0001) return pB - pA;
+        if (fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.has(a.id) && fuzzyResult.matchOrderMap.has(b.id)) {
+          return fuzzyResult.matchOrderMap.get(a.id)! - fuzzyResult.matchOrderMap.get(b.id)!;
+        }
+        return (timeMap.get(b.id) ?? b.id) - (timeMap.get(a.id) ?? a.id);
+      }
+
+      // 2. Precio menor (Menor precio de venta primero)
+      if (effectiveSortBy === 'price_asc') {
+        const pA = priceMap.get(a.id) ?? 0;
+        const pB = priceMap.get(b.id) ?? 0;
+        if (Math.abs(pA - pB) > 0.0001) return pA - pB;
+        if (fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.has(a.id) && fuzzyResult.matchOrderMap.has(b.id)) {
+          return fuzzyResult.matchOrderMap.get(a.id)! - fuzzyResult.matchOrderMap.get(b.id)!;
+        }
+        return (timeMap.get(b.id) ?? b.id) - (timeMap.get(a.id) ?? a.id);
+      }
+
+      // 3. Nombre alfabético (A - Z)
+      if (effectiveSortBy === 'name_asc') {
+        const comp = (a.name || '').localeCompare(b.name || '', 'es', { sensitivity: 'base', numeric: true });
+        if (comp !== 0) return comp;
+        return (timeMap.get(b.id) ?? b.id) - (timeMap.get(a.id) ?? a.id);
+      }
+
+      // 4. Nombre alfabético (Z - A)
+      if (effectiveSortBy === 'name_desc') {
+        const comp = (b.name || '').localeCompare(a.name || '', 'es', { sensitivity: 'base', numeric: true });
+        if (comp !== 0) return comp;
+        return (timeMap.get(b.id) ?? b.id) - (timeMap.get(a.id) ?? a.id);
+      }
+
+      // 5. Fecha de ingreso (Más antiguo primero)
+      if (effectiveSortBy === 'date_asc') {
+        const tA = timeMap.get(a.id) ?? a.id;
+        const tB = timeMap.get(b.id) ?? b.id;
+        if (tA !== tB) return tA - tB;
+        return a.id - b.id;
+      }
+
+      // 6. Relevancia de búsqueda (fuzzy match order)
+      if (effectiveSortBy === 'relevance' && fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.size > 0) {
+        const ordA = fuzzyResult.matchOrderMap.has(a.id) ? fuzzyResult.matchOrderMap.get(a.id)! : 999999;
+        const ordB = fuzzyResult.matchOrderMap.has(b.id) ? fuzzyResult.matchOrderMap.get(b.id)! : 999999;
+        if (ordA !== ordB) return ordA - ordB;
+        const tA = timeMap.get(a.id) ?? a.id;
+        const tB = timeMap.get(b.id) ?? b.id;
+        return tB - tA;
+      }
+
+      // 7. Fecha de ingreso (Más reciente primero - Default)
+      const tA = timeMap.get(a.id) ?? a.id;
+      const tB = timeMap.get(b.id) ?? b.id;
+      if (tB !== tA) return tB - tA;
+      return b.id - a.id;
+    });
+  }, [
+    items,
+    selectedCategory,
+    selectedSupplier,
+    statusFilter,
+    activeShowOffersOnly,
+    searchQuery,
+    fuzzyResult,
+    effectiveSortBy,
+  ]);
 
   const hasActiveFilters =
     selectedCategory !== 'all' ||
     selectedSupplier !== 'all' ||
     statusFilter !== 'all' ||
     activeShowOffersOnly ||
-    Boolean(searchQuery.trim());
+    Boolean(searchQuery.trim()) ||
+    (isUserSortExplicit && sortBy !== 'date_desc');
 
   const handleResetFilters = () => {
     setSelectedCategory('all');
@@ -715,6 +815,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setStatusFilter('all');
     setActiveShowOffersOnly(false);
     setSearchQuery('');
+    setSortBy('date_desc');
+    setIsUserSortExplicit(false);
   };
 
   const toggleSelectOne = (id: number, e?: React.MouseEvent) => {
@@ -1155,6 +1257,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <span>?</span>
                   </div>
                 )}
+                {searchQuery.trim() && filteredItems.length > 0 && (
+                  <div className="text-[10px] text-slate-500 font-medium pt-0.5 px-1 flex items-center space-x-1.5 flex-wrap">
+                    <span className="text-slate-400">Resultados ordenados por:</span>
+                    <span className="font-bold text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200/60 inline-flex items-center gap-1">
+                      <ArrowUpDown className="w-2.5 h-2.5 text-sky-600" />
+                      {effectiveSortBy === 'relevance' && 'Relevancia (Coincidencia)'}
+                      {effectiveSortBy === 'price_desc' && 'Precio Mayor a Menor'}
+                      {effectiveSortBy === 'price_asc' && 'Precio Menor a Mayor'}
+                      {effectiveSortBy === 'date_desc' && 'Fecha (Más reciente)'}
+                      {effectiveSortBy === 'date_asc' && 'Fecha (Más antiguo)'}
+                      {effectiveSortBy === 'name_asc' && 'Nombre (A - Z)'}
+                      {effectiveSortBy === 'name_desc' && 'Nombre (Z - A)'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -1347,6 +1464,38 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </>
               )}
 
+              {/* Separador */}
+              <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
+
+              {/* Selector de Ordenamiento */}
+              <div className="flex items-center shrink-0">
+                <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1.5 shrink-0">
+                  <ArrowUpDown className="w-3 h-3 mr-1 text-amber-600 shrink-0" />
+                  Ordenar:
+                </span>
+                <select
+                  id="inventory-sort-select"
+                  value={effectiveSortBy}
+                  onChange={(e) => handleSortChange(e.target.value as InventorySortOption)}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-bold border shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500 transition ${
+                    effectiveSortBy !== 'date_desc' && effectiveSortBy !== 'relevance'
+                      ? 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-200'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  }`}
+                  title="Ordenar productos en el inventario o resultados de búsqueda"
+                >
+                  {searchQuery.trim() && (
+                    <option value="relevance">🎯 Mayor relevancia (Coincidencia)</option>
+                  )}
+                  <option value="price_desc">💰 Precio: Mayor a menor</option>
+                  <option value="price_asc">🏷️ Precio: Menor a mayor</option>
+                  <option value="date_desc">📅 Fecha de ingreso (Más reciente)</option>
+                  <option value="date_asc">⏳ Fecha de ingreso (Más antiguo)</option>
+                  <option value="name_asc">🔤 Nombre: A - Z</option>
+                  <option value="name_desc">🔡 Nombre: Z - A</option>
+                </select>
+              </div>
+
               {/* Botón Restablecer */}
               {hasActiveFilters && (
                 <>
@@ -1354,7 +1503,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <button
                     onClick={handleResetFilters}
                     className="text-[11px] text-rose-800 hover:text-rose-950 font-bold px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-300 transition cursor-pointer flex items-center space-x-1 shadow-2xs shrink-0 whitespace-nowrap"
-                    title="Restablecer todos los filtros"
+                    title="Restablecer todos los filtros y ordenamiento"
                   >
                     <X className="w-3 h-3 shrink-0" />
                     <span>Restablecer</span>
@@ -1959,12 +2108,38 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           )}
                         </button>
                       </th>
-                      <th className="px-2 py-2">Producto</th>
+                      <th
+                        className="px-2 py-2 cursor-pointer hover:bg-slate-200/80 transition select-none group"
+                        onClick={() => handleSortChange(effectiveSortBy === 'name_asc' ? 'name_desc' : 'name_asc')}
+                        title="Ordenar por nombre alfabético (A-Z / Z-A)"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>Producto</span>
+                          {effectiveSortBy === 'name_asc' && <ArrowUp className="w-3.5 h-3.5 text-sky-600 stroke-[2.5]" />}
+                          {effectiveSortBy === 'name_desc' && <ArrowDown className="w-3.5 h-3.5 text-sky-600 stroke-[2.5]" />}
+                          {effectiveSortBy !== 'name_asc' && effectiveSortBy !== 'name_desc' && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-40 group-hover:opacity-100 transition" />
+                          )}
+                        </div>
+                      </th>
                       <th className="px-2 py-2">Proveedor</th>
                       <th className="px-2 py-2">SKU</th>
                       <th className="px-2 py-2">Categoría</th>
                       <th className="px-2 py-2">Subtotal Venta</th>
-                      <th className="px-2 py-2">Precios & Utilidad</th>
+                      <th
+                        className="px-2 py-2 cursor-pointer hover:bg-slate-200/80 transition select-none group"
+                        onClick={() => handleSortChange(effectiveSortBy === 'price_desc' ? 'price_asc' : 'price_desc')}
+                        title="Ordenar por precio (Mayor a menor / Menor a mayor)"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>Precios & Utilidad</span>
+                          {effectiveSortBy === 'price_desc' && <ArrowDown className="w-3.5 h-3.5 text-sky-600 stroke-[2.5]" />}
+                          {effectiveSortBy === 'price_asc' && <ArrowUp className="w-3.5 h-3.5 text-sky-600 stroke-[2.5]" />}
+                          {effectiveSortBy !== 'price_desc' && effectiveSortBy !== 'price_asc' && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-40 group-hover:opacity-100 transition" />
+                          )}
+                        </div>
+                      </th>
                       <th className="px-2 py-2">Stock</th>
                       <th className="px-2 py-2">Estado</th>
                       <th className="px-2 py-2 text-right">Acciones</th>

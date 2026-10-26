@@ -23,7 +23,7 @@ import { PurchasesView } from './components/PurchasesView.tsx';
 import { PaymentsView } from './components/PaymentsView.tsx';
 import { DigitalSignageView } from './components/DigitalSignageView.tsx';
 import { DisplayPlayer } from './components/DisplayPlayer.tsx';
-import { CustomerOrder, GoogleAiConfig, InventoryItem, InventoryStats, ServerDomainConfig, StoreConfig, StoreTheme, TelegramConfig, TelegramMessage, Supplier } from './types.ts';
+import { CustomerOrder, GoogleAiConfig, InventoryItem, InventoryStats, ServerDomainConfig, StoreConfig, StoreTheme, TelegramConfig, TelegramMessage, Supplier, InventorySortOption } from './types.ts';
 import { parseThemePalettes, getThemeColors } from './utils/themeColors.ts';
 import { safeLocalStorage, safeSessionStorage } from './utils/safeStorage.ts';
 import { getItemUnitNetProfit } from './utils/tax-calculator.ts';
@@ -543,6 +543,7 @@ function InventoryApp() {
   const [selectedSupplier, setSelectedSupplier] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showOffersOnly, setShowOffersOnly] = useState<boolean>(false);
+  const [inventorySortBy, setInventorySortBy] = useState<InventorySortOption>('date_desc');
 
   // Modal States
   const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
@@ -1848,6 +1849,8 @@ function InventoryApp() {
             setStatusFilter={setStatusFilter}
             showOffersOnly={showOffersOnly}
             setShowOffersOnly={setShowOffersOnly}
+            sortBy={inventorySortBy}
+            setSortBy={setInventorySortBy}
           />
         )}
       </main>
