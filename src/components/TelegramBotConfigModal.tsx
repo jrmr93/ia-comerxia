@@ -76,33 +76,42 @@ export const TelegramBotConfigModal: React.FC<TelegramBotConfigModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Sync from config ONLY when modal is opened or on embedded view initial mount
+  const syncFromConfig = (cfg: TelegramConfig | null | undefined) => {
+    if (!cfg) return;
+    const initialToken = cfg.botToken || safeLocalStorage.getItem('cached_tg_bot_token') || '';
+    setBotToken(initialToken);
+    if (cfg.supplierName) setSupplierName(cfg.supplierName);
+    if (cfg.defaultMarginPercent !== undefined) setDefaultMarginPercent(cfg.defaultMarginPercent);
+    if (cfg.taxPercent !== undefined) setTaxPercent(cfg.taxPercent);
+    if (cfg.currency) setCurrency(cfg.currency);
+    if (cfg.isActive !== undefined) setIsActive(cfg.isActive);
+    if (cfg.defaultProductActive !== undefined) setDefaultProductActive(cfg.defaultProductActive);
+
+    if (initialToken.trim()) {
+      handleTestToken(initialToken.trim(), false);
+    }
+  };
+
+  // Sync from config whenever modal opens or when config prop arrives/updates
   useEffect(() => {
     const isNowOpen = Boolean(isOpen || embedded);
-    const becameOpen = isNowOpen && !prevIsOpenRef.current;
-    prevIsOpenRef.current = isNowOpen;
-
-    if (becameOpen) {
-      const initialToken = config?.botToken || safeLocalStorage.getItem('cached_tg_bot_token') || '';
-      setBotToken(initialToken);
-      setSupplierName(config?.supplierName || 'Proveedor Telegram');
-      setDefaultMarginPercent(config?.defaultMarginPercent || 35);
-      setTaxPercent(config?.taxPercent ?? 15);
-      setCurrency(config?.currency || 'USD');
-      setIsActive(config?.isActive ?? true);
-      setDefaultProductActive(config?.defaultProductActive ?? true);
-      setError(null);
-      setSyncMessage(null);
-      setSavedSuccess(false);
-      setToggleFeedback(null);
-      setProductActiveFeedback(null);
-
-      // If token already exists, perform silent connection check
-      if (initialToken.trim()) {
-        handleTestToken(initialToken.trim(), false);
-      }
+    if (!isNowOpen) {
+      prevIsOpenRef.current = false;
+      return;
     }
-  }, [isOpen, embedded]);
+
+    if (config) {
+      syncFromConfig(config);
+    } else {
+      authFetch('/api/telegram/config')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) syncFromConfig(data);
+        })
+        .catch(() => {});
+    }
+    prevIsOpenRef.current = true;
+  }, [isOpen, embedded, config]);
 
   if (!embedded && !isOpen) return null;
 

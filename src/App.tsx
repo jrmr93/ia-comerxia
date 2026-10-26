@@ -639,22 +639,26 @@ function InventoryApp() {
           })
           .catch(() => null);
 
-        const [statsRes, ordersRes, purchasesRes, configRes, aiRes] = await Promise.all([
+        const [statsRes, ordersRes, purchasesRes, configRes, aiRes, storeRes, domainRes] = await Promise.all([
           authFetch('/api/stats').catch(() => null),
           authFetch('/api/orders').catch(() => null),
           authFetch('/api/purchases').catch(() => null),
           authFetch('/api/telegram/config').catch(() => null),
           authFetch('/api/ai/config').catch(() => null),
+          authFetch('/api/store/config').catch(() => null),
+          authFetch('/api/server/domain-config').catch(() => null),
           itemsPromise,
           messagesPromise,
         ]);
 
-        const [statsData, ordersData, purchasesData, configData, aiData] = await Promise.all([
+        const [statsData, ordersData, purchasesData, configData, aiData, storeData, domainData] = await Promise.all([
           statsRes ? safeJson(statsRes) : null,
           ordersRes ? safeJson(ordersRes) : null,
           purchasesRes ? safeJson(purchasesRes) : null,
           configRes ? safeJson(configRes) : null,
           aiRes ? safeJson(aiRes) : null,
+          storeRes ? safeJson(storeRes) : null,
+          domainRes ? safeJson(domainRes) : null,
         ]);
 
         if (statsData) setServerStats(statsData);
@@ -667,6 +671,7 @@ function InventoryApp() {
           }
         }
         if (aiData) setAiConfig(aiData);
+        if (storeData) setStoreConfig(storeData);
         return;
       }
 

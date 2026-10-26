@@ -285,7 +285,7 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
             <span>Video</span>
           </button>
         )}
-        {hasValidVideo && (
+        {hasValidVideo && showPlayBadge && (
           <button
             type="button"
             onClick={(e) => {
@@ -327,7 +327,7 @@ export const ProductMediaDisplay: React.FC<ProductMediaDisplayProps> = ({
         </div>
 
         {/* If product has a video available, show an interactive badge so user can watch it */}
-        {hasValidVideo && (
+        {hasValidVideo && showPlayBadge && (
           <button
             type="button"
             onClick={(e) => {

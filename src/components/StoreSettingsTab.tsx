@@ -333,10 +333,111 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  const applyStoreConfigData = (data: any) => {
+    if (!data) return;
+    if (data.isActive !== undefined) setIsActive(Boolean(data.isActive));
+    if (data.maintenanceTitle !== undefined && data.maintenanceTitle !== null) setMaintenanceTitle(data.maintenanceTitle);
+    if (data.maintenanceMessage !== undefined && data.maintenanceMessage !== null) setMaintenanceMessage(data.maintenanceMessage);
+    if (data.allowCatalogBrowsing !== undefined) setAllowCatalogBrowsing(Boolean(data.allowCatalogBrowsing));
+
+    if (data.storeName) setStoreName(data.storeName);
+    const storePhone = data.whatsappNumber || data.whatsapp_number || data.phone || '';
+    if (storePhone) {
+      setWhatsappNumber(storePhone);
+      safeLocalStorage.setItem('store_whatsapp_number', storePhone);
+    }
+    if (data.description) setDescription(data.description);
+    if (data.bannerText) setBannerText(data.bannerText);
+    if (data.deliveryFee !== undefined) setDeliveryFee(String(data.deliveryFee));
+    if (data.minOrderAmount !== undefined) setMinOrderAmount(String(data.minOrderAmount));
+    if (data.currency) setCurrency(data.currency);
+    if (data.showStock !== undefined) setShowStock(Boolean(data.showStock));
+    if (data.showOutOfStock !== undefined) setShowOutOfStock(Boolean(data.showOutOfStock));
+    if (data.prioritizeOffersFirst !== undefined) setPrioritizeOffersFirst(Boolean(data.prioritizeOffersFirst));
+    else if (data.prioritize_offers_first !== undefined) setPrioritizeOffersFirst(Boolean(data.prioritize_offers_first));
+    if (data.showCategoryHeader !== undefined) setShowCategoryHeader(Boolean(data.showCategoryHeader));
+    else if (data.show_category_header !== undefined) setShowCategoryHeader(Boolean(data.show_category_header));
+    if (data.enablePagination !== undefined) setEnablePagination(Boolean(data.enablePagination));
+    if (data.itemsPerPage !== undefined) setItemsPerPage(Number(data.itemsPerPage) || 12);
+    if (data.defaultProductSort) setDefaultProductSort(data.defaultProductSort);
+    if (data.defaultInitialCategory !== undefined) setDefaultInitialCategory(data.defaultInitialCategory || 'all');
+    if (data.categoryImages) {
+      try {
+        const parsedCatImgs = typeof data.categoryImages === 'string' ? JSON.parse(data.categoryImages) : data.categoryImages;
+        if (parsedCatImgs && typeof parsedCatImgs === 'object') setCategoryImages(parsedCatImgs);
+      } catch (e) {
+        console.error('Error parsing categoryImages:', e);
+      }
+    }
+    if (data.instagramUrl) setInstagramUrl(data.instagramUrl);
+    if (data.websiteUrl) setWebsiteUrl(data.websiteUrl);
+    if (data.address) setAddress(data.address);
+    if (data.logoUrl) setLogoUrl(data.logoUrl);
+    if (data.logoDesktopUrl || data.logo_desktop_url) setLogoDesktopUrl(data.logoDesktopUrl || data.logo_desktop_url);
+    if (data.theme) setTheme(data.theme);
+    if (data.themeColors) setThemePalettes(parseThemePalettes(data.themeColors));
+
+    if (data.promoPopup) {
+      try {
+        const parsedPromo = typeof data.promoPopup === 'string' ? JSON.parse(data.promoPopup) : data.promoPopup;
+        if (parsedPromo && typeof parsedPromo === 'object') {
+          if (parsedPromo.active !== undefined) setPromoActive(Boolean(parsedPromo.active));
+          if (parsedPromo.theme) setPromoTheme(parsedPromo.theme);
+          if (parsedPromo.badge) setPromoBadge(parsedPromo.badge);
+          if (parsedPromo.title) setPromoTitle(parsedPromo.title);
+          if (parsedPromo.description) setPromoDescription(parsedPromo.description);
+          if (parsedPromo.imageUrl !== undefined) setPromoImageUrl(parsedPromo.imageUrl);
+          if (parsedPromo.couponCode !== undefined) setPromoCouponCode(parsedPromo.couponCode);
+          if (parsedPromo.buttonText) setPromoButtonText(parsedPromo.buttonText);
+          if (parsedPromo.actionType) setPromoActionType(parsedPromo.actionType);
+          if (parsedPromo.actionUrl !== undefined) setPromoActionUrl(parsedPromo.actionUrl);
+          if (parsedPromo.featuredProductId !== undefined) setPromoSelectedProductId(parsedPromo.featuredProductId);
+          if (parsedPromo.featuredProductName !== undefined) setPromoFeaturedProductName(parsedPromo.featuredProductName);
+          if (parsedPromo.featuredProductPrice !== undefined) setPromoFeaturedProductPrice(parsedPromo.featuredProductPrice);
+          if (parsedPromo.featuredProductImage !== undefined) setPromoFeaturedProductImage(parsedPromo.featuredProductImage);
+          if (parsedPromo.featuredCategory !== undefined) setPromoCategory(parsedPromo.featuredCategory);
+          if (parsedPromo.campaignBadgeUrl !== undefined) setPromoCampaignBadgeUrl(parsedPromo.campaignBadgeUrl);
+          if (Array.isArray(parsedPromo.campaignBadgeUrls) && parsedPromo.campaignBadgeUrls.length > 0) {
+            setPromoCampaignBadgeUrls(parsedPromo.campaignBadgeUrls.filter(Boolean));
+          }
+          if (parsedPromo.campaignBadgeActive !== undefined) setPromoCampaignBadgeActive(Boolean(parsedPromo.campaignBadgeActive));
+          if (parsedPromo.campaignBadgePosition !== undefined) setPromoCampaignBadgePosition(parsedPromo.campaignBadgePosition);
+          if (parsedPromo.campaignBadgeMode !== undefined) setPromoCampaignBadgeMode(parsedPromo.campaignBadgeMode);
+          if (parsedPromo.featuredProductId) {
+            setPromoFocalType('product');
+          } else if (parsedPromo.featuredCategory) {
+            setPromoFocalType('category');
+          }
+        }
+      } catch {}
+    }
+
+    if (data.courierLogos) {
+      try {
+        const parsedCouriers = typeof data.courierLogos === 'string' ? JSON.parse(data.courierLogos) : data.courierLogos;
+        if (Array.isArray(parsedCouriers) && parsedCouriers.length > 0) {
+          setCouriers(parsedCouriers);
+        }
+      } catch {}
+    }
+
+    if (data.paymentLogos) {
+      try {
+        const parsedPayments = typeof data.paymentLogos === 'string' ? JSON.parse(data.paymentLogos) : data.paymentLogos;
+        if (Array.isArray(parsedPayments) && parsedPayments.length > 0) {
+          setPayments(parsedPayments);
+        }
+      } catch {}
+    }
+  };
+
   useEffect(() => {
+    if (initialConfig) {
+      applyStoreConfigData(initialConfig);
+    }
     fetchStoreConfig();
     fetchStoreProducts();
-  }, []);
+  }, [initialConfig]);
 
   const fetchStoreProducts = async () => {
     try {
@@ -386,100 +487,7 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data) {
-          if (data.isActive !== undefined) setIsActive(Boolean(data.isActive));
-          if (data.maintenanceTitle !== undefined && data.maintenanceTitle !== null) setMaintenanceTitle(data.maintenanceTitle);
-          if (data.maintenanceMessage !== undefined && data.maintenanceMessage !== null) setMaintenanceMessage(data.maintenanceMessage);
-          if (data.allowCatalogBrowsing !== undefined) setAllowCatalogBrowsing(Boolean(data.allowCatalogBrowsing));
-
-          if (data.storeName) setStoreName(data.storeName);
-          const storePhone = data.whatsappNumber || data.whatsapp_number || data.phone || '';
-          if (storePhone) {
-            setWhatsappNumber(storePhone);
-            safeLocalStorage.setItem('store_whatsapp_number', storePhone);
-          }
-          if (data.description) setDescription(data.description);
-          if (data.bannerText) setBannerText(data.bannerText);
-          if (data.deliveryFee !== undefined) setDeliveryFee(String(data.deliveryFee));
-          if (data.minOrderAmount !== undefined) setMinOrderAmount(String(data.minOrderAmount));
-          if (data.currency) setCurrency(data.currency);
-          if (data.showStock !== undefined) setShowStock(Boolean(data.showStock));
-          if (data.showOutOfStock !== undefined) setShowOutOfStock(Boolean(data.showOutOfStock));
-          if (data.prioritizeOffersFirst !== undefined) setPrioritizeOffersFirst(Boolean(data.prioritizeOffersFirst));
-          else if (data.prioritize_offers_first !== undefined) setPrioritizeOffersFirst(Boolean(data.prioritize_offers_first));
-          if (data.showCategoryHeader !== undefined) setShowCategoryHeader(Boolean(data.showCategoryHeader));
-          else if (data.show_category_header !== undefined) setShowCategoryHeader(Boolean(data.show_category_header));
-          if (data.enablePagination !== undefined) setEnablePagination(Boolean(data.enablePagination));
-          if (data.itemsPerPage !== undefined) setItemsPerPage(Number(data.itemsPerPage) || 12);
-          if (data.defaultProductSort) setDefaultProductSort(data.defaultProductSort);
-          if (data.defaultInitialCategory !== undefined) setDefaultInitialCategory(data.defaultInitialCategory || 'all');
-          if (data.categoryImages) {
-            try {
-              const parsedCatImgs = typeof data.categoryImages === 'string' ? JSON.parse(data.categoryImages) : data.categoryImages;
-              if (parsedCatImgs && typeof parsedCatImgs === 'object') setCategoryImages(parsedCatImgs);
-            } catch (e) {
-              console.error('Error parsing categoryImages:', e);
-            }
-          }
-          if (data.instagramUrl) setInstagramUrl(data.instagramUrl);
-          if (data.websiteUrl) setWebsiteUrl(data.websiteUrl);
-          if (data.address) setAddress(data.address);
-          if (data.logoUrl) setLogoUrl(data.logoUrl);
-          if (data.logoDesktopUrl || data.logo_desktop_url) setLogoDesktopUrl(data.logoDesktopUrl || data.logo_desktop_url);
-          if (data.theme) setTheme(data.theme);
-          if (data.themeColors) setThemePalettes(parseThemePalettes(data.themeColors));
-
-          if (data.promoPopup) {
-            try {
-              const parsedPromo = typeof data.promoPopup === 'string' ? JSON.parse(data.promoPopup) : data.promoPopup;
-              if (parsedPromo && typeof parsedPromo === 'object') {
-                if (parsedPromo.active !== undefined) setPromoActive(Boolean(parsedPromo.active));
-                if (parsedPromo.theme) setPromoTheme(parsedPromo.theme);
-                if (parsedPromo.badge) setPromoBadge(parsedPromo.badge);
-                if (parsedPromo.title) setPromoTitle(parsedPromo.title);
-                if (parsedPromo.description) setPromoDescription(parsedPromo.description);
-                if (parsedPromo.imageUrl !== undefined) setPromoImageUrl(parsedPromo.imageUrl);
-                if (parsedPromo.couponCode !== undefined) setPromoCouponCode(parsedPromo.couponCode);
-                if (parsedPromo.buttonText) setPromoButtonText(parsedPromo.buttonText);
-                if (parsedPromo.actionType) setPromoActionType(parsedPromo.actionType);
-                if (parsedPromo.actionUrl !== undefined) setPromoActionUrl(parsedPromo.actionUrl);
-                if (parsedPromo.featuredProductId !== undefined) setPromoSelectedProductId(parsedPromo.featuredProductId);
-                if (parsedPromo.featuredProductName !== undefined) setPromoFeaturedProductName(parsedPromo.featuredProductName);
-                if (parsedPromo.featuredProductPrice !== undefined) setPromoFeaturedProductPrice(parsedPromo.featuredProductPrice);
-                if (parsedPromo.featuredProductImage !== undefined) setPromoFeaturedProductImage(parsedPromo.featuredProductImage);
-                if (parsedPromo.featuredCategory !== undefined) setPromoCategory(parsedPromo.featuredCategory);
-                if (parsedPromo.campaignBadgeUrl !== undefined) setPromoCampaignBadgeUrl(parsedPromo.campaignBadgeUrl);
-                if (Array.isArray(parsedPromo.campaignBadgeUrls) && parsedPromo.campaignBadgeUrls.length > 0) {
-                  setPromoCampaignBadgeUrls(parsedPromo.campaignBadgeUrls.filter(Boolean));
-                }
-                if (parsedPromo.campaignBadgeActive !== undefined) setPromoCampaignBadgeActive(Boolean(parsedPromo.campaignBadgeActive));
-                if (parsedPromo.campaignBadgePosition !== undefined) setPromoCampaignBadgePosition(parsedPromo.campaignBadgePosition);
-                if (parsedPromo.campaignBadgeMode !== undefined) setPromoCampaignBadgeMode(parsedPromo.campaignBadgeMode);
-                if (parsedPromo.featuredProductId) {
-                  setPromoFocalType('product');
-                } else if (parsedPromo.featuredCategory) {
-                  setPromoFocalType('category');
-                }
-              }
-            } catch {}
-          }
-
-          if (data.courierLogos) {
-            try {
-              const parsedCouriers = typeof data.courierLogos === 'string' ? JSON.parse(data.courierLogos) : data.courierLogos;
-              if (Array.isArray(parsedCouriers) && parsedCouriers.length > 0) {
-                setCouriers(parsedCouriers);
-              }
-            } catch {}
-          }
-
-          if (data.paymentLogos) {
-            try {
-              const parsedPayments = typeof data.paymentLogos === 'string' ? JSON.parse(data.paymentLogos) : data.paymentLogos;
-              if (Array.isArray(parsedPayments) && parsedPayments.length > 0) {
-                setPayments(parsedPayments);
-              }
-            } catch {}
-          }
+          applyStoreConfigData(data);
         }
       }
     } catch (e) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Key, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw, Upload, Eye, EyeOff, Building, FileText, Sparkles, Server, Search, Hash, FileCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.tsx';
 import { SriConfig } from '../types';
 
 interface SriConfigTabProps {
@@ -7,6 +8,7 @@ interface SriConfigTabProps {
 }
 
 export const SriConfigTab: React.FC<SriConfigTabProps> = ({ onSaved }) => {
+  const { authFetch } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export const SriConfigTab: React.FC<SriConfigTabProps> = ({ onSaved }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/sri/config');
+      const res = await authFetch('/api/sri/config');
       const data = await res.json();
       if (res.ok && data.config) {
         setRuc(data.config.ruc || '1700000000001');
@@ -116,7 +118,7 @@ export const SriConfigTab: React.FC<SriConfigTabProps> = ({ onSaved }) => {
 
     setEcuadorApiStatus({ loading: true, message: 'Consultando RUC en SRI / EcuadorAPI...' });
     try {
-      const res = await fetch(`/api/ecuador-api/rucs/${cleanRuc}`);
+      const res = await authFetch(`/api/ecuador-api/rucs/${cleanRuc}`);
       const data = await res.json();
       if (res.ok && (data.data || data.business_name || data.razonSocial)) {
         const info = data.data || data;
@@ -279,7 +281,7 @@ export const SriConfigTab: React.FC<SriConfigTabProps> = ({ onSaved }) => {
         payload.p12Password = p12Password;
       }
 
-      const res = await fetch('/api/sri/config', {
+      const res = await authFetch('/api/sri/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

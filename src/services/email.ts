@@ -1,8 +1,8 @@
 import nodemailer from 'nodemailer';
-import { eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { db, isPostgresConfigured } from '../db/index.ts';
 import { emailConfigs, users } from '../db/schema.ts';
-import { getStoreConfig } from '../db/inventory.ts';
+import { getStoreConfig, resolveValidUserId } from '../db/inventory.ts';
 import { GoogleEmailConfig } from '../types.ts';
 
 /**
@@ -22,6 +22,7 @@ export async function getEmailConfig(userId?: number): Promise<GoogleEmailConfig
       .select()
       .from(emailConfigs)
       .where(userId ? eq(emailConfigs.userId, userId) : undefined)
+      .orderBy(desc(emailConfigs.updatedAt), desc(emailConfigs.id))
       .limit(1);
 
     if (rows.length > 0) {
@@ -81,6 +82,7 @@ async function getRawEmailCredentials(userId?: number) {
       .select()
       .from(emailConfigs)
       .where(userId ? eq(emailConfigs.userId, userId) : undefined)
+      .orderBy(desc(emailConfigs.updatedAt), desc(emailConfigs.id))
       .limit(1);
 
     if (rows.length > 0) {
@@ -132,7 +134,12 @@ export async function saveEmailConfig(
   const cleanActivation = data.requireActivation !== undefined ? data.requireActivation : true;
 
   try {
-    const rows = await db.select().from(emailConfigs).where(eq(emailConfigs.userId, userId)).limit(1);
+    const rows = await db
+      .select()
+      .from(emailConfigs)
+      .where(userId ? eq(emailConfigs.userId, userId) : undefined)
+      .orderBy(desc(emailConfigs.updatedAt), desc(emailConfigs.id))
+      .limit(1);
 
     const updatePayload: Partial<typeof emailConfigs.$inferInsert> = {
       senderName: cleanSenderName,
@@ -153,9 +160,11 @@ export async function saveEmailConfig(
 
     if (rows.length > 0) {
       await db.update(emailConfigs).set(updatePayload).where(eq(emailConfigs.id, rows[0].id));
+      await db.delete(emailConfigs).where(sql`${emailConfigs.id} != ${rows[0].id}`).catch(() => {});
     } else {
-      await db.insert(emailConfigs).values({
-        userId,
+      const targetUserId = await resolveValidUserId(userId);
+      const inserted = await db.insert(emailConfigs).values({
+        userId: targetUserId,
         googleEmail: cleanEmail,
         googleAppPassword: cleanPassword && !cleanPassword.startsWith('•••') ? cleanPassword : null,
         senderName: cleanSenderName,
@@ -163,7 +172,11 @@ export async function saveEmailConfig(
         smtpPort: cleanPort,
         smtpSecure: cleanSecure,
         requireActivation: cleanActivation,
-      });
+      }).returning();
+
+      if (inserted && inserted.length > 0) {
+        await db.delete(emailConfigs).where(sql`${emailConfigs.id} != ${inserted[0].id}`).catch(() => {});
+      }
     }
 
     return getEmailConfig(userId);
