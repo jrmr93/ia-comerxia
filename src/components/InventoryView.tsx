@@ -2026,13 +2026,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             <div className="flex items-center space-x-2">
                               <div className="w-8 h-8 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 relative">
                                 <ProductMediaDisplay
-                                  imageUrl={item.imageUrl}
-                                  videoUrl={item.videoUrl}
+                                  imageUrl={item.imageUrl || (item.images && item.images.length > 0 ? item.images[0] : null)}
+                                  candidateImages={item.images}
+                                  videoUrl={null}
                                   name={item.name}
                                   className="w-full h-full relative"
                                   imageClassName="w-full h-full object-cover"
                                   videoClassName="w-full h-full object-cover"
-                                  autoPlayVideo={true}
+                                  autoPlayVideo={false}
                                   showPlayBadge={false}
                                   placeholderText=""
                                 />

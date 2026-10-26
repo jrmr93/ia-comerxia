@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Key, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw, Search, UserCheck, Eye, EyeOff, ExternalLink, Sparkles, Building2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface EcuadorApiConfigTabProps {
   onSaved?: () => void;
 }
 
 export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSaved }) => {
+  const { authFetch } = useAuth();
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [hasKey, setHasKey] = useState(false);
@@ -36,7 +38,7 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/ecuador-api/config');
+      const res = await authFetch('/api/ecuador-api/config');
       const data = await res.json();
       if (res.ok && data.config) {
         setHasKey(data.config.hasApiKey);
@@ -60,7 +62,7 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
     setSuccess(null);
 
     try {
-      const res = await fetch('/api/ecuador-api/config', {
+      const res = await authFetch('/api/ecuador-api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: apiKey.trim(), isActive }),
@@ -99,7 +101,7 @@ export const EcuadorApiConfigTab: React.FC<EcuadorApiConfigTabProps> = ({ onSave
     const endpoint = isRuc ? `/api/ecuador-api/rucs/${encodeURIComponent(clean)}` : `/api/ecuador-api/cedulas/${encodeURIComponent(clean)}`;
 
     try {
-      const res = await fetch(endpoint);
+      const res = await authFetch(endpoint);
       const data = await res.json();
 
       if (res.ok && data.success && data.data) {

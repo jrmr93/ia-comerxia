@@ -2587,30 +2587,14 @@ export async function getTelegramConfig(userId: number = 1) {
   }
 
   try {
-    const configsWithToken = await db
-      .select()
-      .from(telegramConfigs)
-      .where(sql`${telegramConfigs.botToken} IS NOT NULL AND ${telegramConfigs.botToken} != ''`)
-      .limit(1);
-
-    if (configsWithToken.length > 0) {
-      return configsWithToken[0];
-    }
-
     const configs = await db
       .select()
       .from(telegramConfigs)
-      .where(eq(telegramConfigs.userId, userId))
+      .orderBy(desc(telegramConfigs.updatedAt), desc(telegramConfigs.id))
       .limit(1);
 
     if (configs.length > 0) {
       return configs[0];
-    }
-
-    // Check if any telegram_configs row exists at all
-    const anyConfig = await db.select().from(telegramConfigs).limit(1);
-    if (anyConfig.length > 0) {
-      return anyConfig[0];
     }
 
     // Resolve a valid user ID from users table to prevent FK constraint errors
@@ -2776,20 +2760,16 @@ export async function updateTelegramConfig(
         .where(eq(telegramConfigs.id, existing.id))
         .returning();
 
+      // Prune lingering duplicate rows so table always maintains single active configuration
+      await db.delete(telegramConfigs).where(sql`${telegramConfigs.id} != ${existing.id}`).catch(() => {});
+
       if (updated.length > 0) {
         return updated[0];
       }
     }
 
     // If existing not found or not updated, insert directly
-    let targetUserId = userId || 1;
-    const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-    if (userCheck.length === 0) {
-      const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-      if (anyUser.length > 0) {
-        targetUserId = anyUser[0].id;
-      }
-    }
+    const targetUserId = await resolveValidUserId(userId);
 
     const inserted = await db
       .insert(telegramConfigs)
@@ -2811,6 +2791,10 @@ export async function updateTelegramConfig(
       })
       .returning();
 
+    if (inserted && inserted.length > 0) {
+      await db.delete(telegramConfigs).where(sql`${telegramConfigs.id} != ${inserted[0].id}`).catch(() => {});
+      return inserted[0];
+    }
     return inserted[0];
   } catch (error) {
     console.warn('Error updating telegram config in SQL, fallback to local store:', error);
@@ -2864,25 +2848,23 @@ export async function getAiConfig(userId: number = 1) {
       .select()
       .from(aiConfigs)
       .where(eq(aiConfigs.userId, userId))
+      .orderBy(desc(aiConfigs.updatedAt), desc(aiConfigs.id))
       .limit(1);
 
     let sqlRow = configs.length > 0 ? configs[0] : null;
     if (!sqlRow) {
-      const anyConfig = await db.select().from(aiConfigs).limit(1);
+      const anyConfig = await db
+        .select()
+        .from(aiConfigs)
+        .orderBy(desc(aiConfigs.updatedAt), desc(aiConfigs.id))
+        .limit(1);
       if (anyConfig.length > 0) {
         sqlRow = anyConfig[0];
       }
     }
 
     if (!sqlRow) {
-      let targetUserId = userId || 1;
-      const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-      if (userCheck.length === 0) {
-        const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-        if (anyUser.length > 0) {
-          targetUserId = anyUser[0].id;
-        }
-      }
+      const targetUserId = await resolveValidUserId(userId);
 
       const created = await db
         .insert(aiConfigs)
@@ -3006,6 +2988,9 @@ export async function updateAiConfig(
         .where(eq(aiConfigs.id, existing.id))
         .returning();
 
+      // Prune lingering duplicate rows so table always maintains single active configuration
+      await db.delete(aiConfigs).where(sql`${aiConfigs.id} != ${existing.id}`).catch(() => {});
+
       if (updated.length > 0) {
         return {
           ...updated[0],
@@ -3016,14 +3001,7 @@ export async function updateAiConfig(
       }
     }
 
-    let targetUserId = userId || 1;
-    const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-    if (userCheck.length === 0) {
-      const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-      if (anyUser.length > 0) {
-        targetUserId = anyUser[0].id;
-      }
-    }
+    const targetUserId = await resolveValidUserId(userId);
 
     const inserted = await db
       .insert(aiConfigs)
@@ -3037,6 +3015,10 @@ export async function updateAiConfig(
       })
       .returning();
 
+    if (inserted && inserted.length > 0) {
+      await db.delete(aiConfigs).where(sql`${aiConfigs.id} != ${inserted[0].id}`).catch(() => {});
+      return inserted[0];
+    }
     return inserted[0];
   } catch (error) {
     console.warn('Error updating ai config in SQL, fallback to local store:', error);
@@ -3088,25 +3070,23 @@ export async function getEcuadorApiConfig(userId: number = 1) {
       .select()
       .from(ecuadorApiConfigs)
       .where(eq(ecuadorApiConfigs.userId, userId))
+      .orderBy(desc(ecuadorApiConfigs.updatedAt), desc(ecuadorApiConfigs.id))
       .limit(1);
 
     let sqlRow = configs.length > 0 ? configs[0] : null;
     if (!sqlRow) {
-      const anyConfig = await db.select().from(ecuadorApiConfigs).limit(1);
+      const anyConfig = await db
+        .select()
+        .from(ecuadorApiConfigs)
+        .orderBy(desc(ecuadorApiConfigs.updatedAt), desc(ecuadorApiConfigs.id))
+        .limit(1);
       if (anyConfig.length > 0) {
         sqlRow = anyConfig[0];
       }
     }
 
     if (!sqlRow) {
-      let targetUserId = userId || 1;
-      const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-      if (userCheck.length === 0) {
-        const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-        if (anyUser.length > 0) {
-          targetUserId = anyUser[0].id;
-        }
-      }
+      const targetUserId = await resolveValidUserId(userId);
 
       const created = await db
         .insert(ecuadorApiConfigs)
@@ -3190,19 +3170,15 @@ export async function saveEcuadorApiConfig(
         .where(eq(ecuadorApiConfigs.id, existing.id))
         .returning();
 
+      // Prune lingering duplicate rows so table always maintains single active configuration
+      await db.delete(ecuadorApiConfigs).where(sql`${ecuadorApiConfigs.id} != ${existing.id}`).catch(() => {});
+
       if (updated.length > 0) {
         return updated[0];
       }
     }
 
-    let targetUserId = userId || 1;
-    const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-    if (userCheck.length === 0) {
-      const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-      if (anyUser.length > 0) {
-        targetUserId = anyUser[0].id;
-      }
-    }
+    const targetUserId = await resolveValidUserId(userId);
 
     const inserted = await db
       .insert(ecuadorApiConfigs)
@@ -3213,6 +3189,10 @@ export async function saveEcuadorApiConfig(
       })
       .returning();
 
+    if (inserted && inserted.length > 0) {
+      await db.delete(ecuadorApiConfigs).where(sql`${ecuadorApiConfigs.id} != ${inserted[0].id}`).catch(() => {});
+      return inserted[0];
+    }
     return inserted[0];
   } catch (error) {
     console.warn('Error updating ecuador api config in SQL, fallback to local store:', error);
@@ -3234,11 +3214,16 @@ export async function getPayphoneConfig(userId: number = 1) {
       .select()
       .from(payphoneConfigs)
       .where(eq(payphoneConfigs.userId, userId))
+      .orderBy(desc(payphoneConfigs.updatedAt), desc(payphoneConfigs.id))
       .limit(1);
 
     let sqlRow = configs.length > 0 ? configs[0] : null;
     if (!sqlRow) {
-      const anyConfig = await db.select().from(payphoneConfigs).limit(1);
+      const anyConfig = await db
+        .select()
+        .from(payphoneConfigs)
+        .orderBy(desc(payphoneConfigs.updatedAt), desc(payphoneConfigs.id))
+        .limit(1);
       if (anyConfig.length > 0) {
         sqlRow = anyConfig[0];
       }
@@ -3320,19 +3305,15 @@ export async function savePayphoneConfig(
         .where(eq(payphoneConfigs.id, existing.id))
         .returning();
 
+      // Prune lingering duplicate rows so table always maintains single active configuration
+      await db.delete(payphoneConfigs).where(sql`${payphoneConfigs.id} != ${existing.id}`).catch(() => {});
+
       if (updated.length > 0) {
         return updated[0];
       }
     }
 
-    let targetUserId = userId || 1;
-    const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-    if (userCheck.length === 0) {
-      const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-      if (anyUser.length > 0) {
-        targetUserId = anyUser[0].id;
-      }
-    }
+    const targetUserId = await resolveValidUserId(userId);
 
     const inserted = await db
       .insert(payphoneConfigs)
@@ -3345,6 +3326,10 @@ export async function savePayphoneConfig(
       })
       .returning();
 
+    if (inserted && inserted.length > 0) {
+      await db.delete(payphoneConfigs).where(sql`${payphoneConfigs.id} != ${inserted[0].id}`).catch(() => {});
+      return inserted[0];
+    }
     return inserted[0];
   } catch (error) {
     console.warn('Error updating payphone api config in SQL:', error);
@@ -3995,6 +3980,10 @@ export async function updateStoreConfig(
       updatedRow = created[0];
     }
 
+    if (updatedRow && updatedRow.id) {
+      await db.delete(storeConfigs).where(sql`${storeConfigs.id} != ${updatedRow.id}`).catch(() => {});
+    }
+
     const { theme, themeColors } = parseThemeAndColors(updatedRow.theme);
     return { ...updatedRow, theme, themeColors };
   } catch (error) {
@@ -4130,6 +4119,9 @@ export async function updateServerDomainConfig(
         .where(eq(serverDomainConfigs.id, existing.id))
         .returning();
 
+      // Prune lingering duplicate rows so table always maintains single active configuration
+      await db.delete(serverDomainConfigs).where(sql`${serverDomainConfigs.id} != ${existing.id}`).catch(() => {});
+
       return updated[0];
     } else {
       const targetUserId = await resolveValidUserId(userId);
@@ -4145,6 +4137,10 @@ export async function updateServerDomainConfig(
         })
         .returning();
 
+      if (created && created.length > 0) {
+        await db.delete(serverDomainConfigs).where(sql`${serverDomainConfigs.id} != ${created[0].id}`).catch(() => {});
+        return created[0];
+      }
       return created[0];
     }
   } catch (error) {
@@ -13059,25 +13055,23 @@ export async function getSriConfig(userId: number = 1) {
       .select()
       .from(sriConfigs)
       .where(eq(sriConfigs.userId, userId))
+      .orderBy(desc(sriConfigs.updatedAt), desc(sriConfigs.id))
       .limit(1);
 
     let sqlRow = configs.length > 0 ? configs[0] : null;
     if (!sqlRow) {
-      const anyConfig = await db.select().from(sriConfigs).limit(1);
+      const anyConfig = await db
+        .select()
+        .from(sriConfigs)
+        .orderBy(desc(sriConfigs.updatedAt), desc(sriConfigs.id))
+        .limit(1);
       if (anyConfig.length > 0) {
         sqlRow = anyConfig[0];
       }
     }
 
     if (!sqlRow) {
-      let targetUserId = userId || 1;
-      const userCheck = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId)).limit(1);
-      if (userCheck.length === 0) {
-        const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-        if (anyUser.length > 0) {
-          targetUserId = anyUser[0].id;
-        }
-      }
+      const targetUserId = await resolveValidUserId(userId);
 
       const created = await db
         .insert(sriConfigs)
@@ -13238,15 +13232,20 @@ export async function saveSriConfig(userId: number = 1, data: any) {
         .where(eq(sriConfigs.id, existing.id))
         .returning();
 
+      // Prune lingering duplicate rows so table always maintains single active configuration
+      await db.delete(sriConfigs).where(sql`${sriConfigs.id} != ${existing.id}`).catch(() => {});
+
       if (updated.length > 0) {
         return updated[0];
       }
     }
 
+    const targetUserId = await resolveValidUserId(userId);
+
     const inserted = await db
       .insert(sriConfigs)
       .values({
-        userId,
+        userId: targetUserId,
         ruc: data.ruc || '1700000000001',
         estadoRuc: data.estadoRuc || 'ACTIVO',
         razonSocial: data.razonSocial || 'COMERXIA E-COMMERCE S.A.',
@@ -13270,6 +13269,10 @@ export async function saveSriConfig(userId: number = 1, data: any) {
       })
       .returning();
 
+    if (inserted && inserted.length > 0) {
+      await db.delete(sriConfigs).where(sql`${sriConfigs.id} != ${inserted[0].id}`).catch(() => {});
+      return inserted[0];
+    }
     return inserted[0];
   } catch (error) {
     console.error('Error saving SRI config to SQL:', error);

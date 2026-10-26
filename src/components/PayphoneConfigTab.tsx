@@ -13,12 +13,14 @@ import {
   Store,
   Send,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface PayphoneConfigTabProps {
   onSaved?: () => void;
 }
 
 export const PayphoneConfigTab: React.FC<PayphoneConfigTabProps> = ({ onSaved }) => {
+  const { authFetch } = useAuth();
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [hasToken, setHasToken] = useState(false);
@@ -49,7 +51,7 @@ export const PayphoneConfigTab: React.FC<PayphoneConfigTabProps> = ({ onSaved })
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/payphone/config');
+      const res = await authFetch('/api/payphone/config');
       const data = await res.json();
       if (res.ok && data.config) {
         setHasToken(data.config.hasToken);
@@ -75,7 +77,7 @@ export const PayphoneConfigTab: React.FC<PayphoneConfigTabProps> = ({ onSaved })
     setSuccess(null);
 
     try {
-      const res = await fetch('/api/payphone/config', {
+      const res = await authFetch('/api/payphone/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,7 +112,7 @@ export const PayphoneConfigTab: React.FC<PayphoneConfigTabProps> = ({ onSaved })
     setTestResult(null);
 
     try {
-      const res = await fetch('/api/payphone/generate-link', {
+      const res = await authFetch('/api/payphone/generate-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
