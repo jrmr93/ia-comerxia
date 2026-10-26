@@ -77,6 +77,15 @@ export interface InventoryItem {
   updatedAt: string;
 }
 
+export type InventorySortOption =
+  | 'date_desc'
+  | 'date_asc'
+  | 'price_desc'
+  | 'price_asc'
+  | 'name_asc'
+  | 'name_desc'
+  | 'relevance';
+
 export interface TelegramMessage {
   id: number;
   telegramMessageId: string | null;

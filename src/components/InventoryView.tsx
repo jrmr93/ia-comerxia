@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Barcode,
   Bot,
   Boxes,
@@ -50,7 +53,7 @@ import {
   X,
 } from 'lucide-react';
 import JSZip from 'jszip';
-import { CustomerOrder, InventoryItem, StoreConfig, TelegramMessage, Supplier } from '../types.ts';
+import { CustomerOrder, InventoryItem, StoreConfig, TelegramMessage, Supplier, InventorySortOption } from '../types.ts';
 import { TelegramMessagesFeed } from './TelegramMessagesFeed.tsx';
 import { safeLocalStorage } from '../utils/safeStorage.ts';
 import { ProductMarketingCopyModal } from './ProductMarketingCopyModal.tsx';
@@ -64,6 +67,25 @@ import { ShareStoreModal } from './ShareStoreModal.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
 import { generateSocialFlyer, FlyerTemplateStyle } from '../utils/socialFlyerGenerator.ts';
 import { searchProductsFuzzy } from '../utils/fuzzySearch.ts';
+
+export function getProductSupplierCode(item: InventoryItem): string | null {
+  if (item.supplierCode && typeof item.supplierCode === 'string' && item.supplierCode.trim()) {
+    return item.supplierCode.trim();
+  }
+  if ((item as any).supplier_code && typeof (item as any).supplier_code === 'string' && (item as any).supplier_code.trim()) {
+    return (item as any).supplier_code.trim();
+  }
+  if (item.extractedAttributes) {
+    try {
+      const p = typeof item.extractedAttributes === 'string' ? JSON.parse(item.extractedAttributes) : item.extractedAttributes;
+      const code = p?.supplierCode || p?.supplier_code || p?.sku_proveedor;
+      if (code && typeof code === 'string' && code.trim()) {
+        return code.trim();
+      }
+    } catch {}
+  }
+  return null;
+}
 
 function getItemPhotos(item: InventoryItem): string[] {
   const photos: string[] = [];
@@ -248,6 +270,8 @@ interface InventoryViewProps {
   setStatusFilter: (status: string) => void;
   showOffersOnly?: boolean;
   setShowOffersOnly?: (v: boolean) => void;
+  sortBy?: InventorySortOption;
+  setSortBy?: (sort: InventorySortOption) => void;
   initialSubTab?: 'products' | 'messages';
   unseenProductIds?: Set<number>;
   unseenMessageIds?: Set<number>;
@@ -294,6 +318,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   setStatusFilter,
   showOffersOnly,
   setShowOffersOnly,
+  sortBy: externalSortBy,
+  setSortBy: externalSetSortBy,
   initialSubTab = 'products',
   unseenProductIds,
   unseenMessageIds,
@@ -306,6 +332,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onMarkMessageAsSeen,
 }) => {
   const { authFetch } = useAuth();
+  const [internalSortBy, setInternalSortBy] = useState<InventorySortOption>('date_desc');
+  const sortBy = externalSortBy !== undefined ? externalSortBy : internalSortBy;
+  const setSortBy = externalSetSortBy || setInternalSortBy;
+  const [isUserSortExplicit, setIsUserSortExplicit] = useState<boolean>(false);
+
+  const effectiveSortBy: InventorySortOption = useMemo(() => {
+    if (searchQuery.trim()) {
+      if (isUserSortExplicit && sortBy !== 'relevance') {
+        return sortBy;
+      }
+      return 'relevance';
+    }
+    if (sortBy === 'relevance') {
+      return 'date_desc';
+    }
+    return sortBy;
+  }, [searchQuery, sortBy, isUserSortExplicit]);
+
+  const handleSortChange = (newSort: InventorySortOption) => {
+    setSortBy(newSort);
+    setIsUserSortExplicit(true);
+  };
+
   const [reparsingId, setReparsingId] = useState<number | null>(null);
   const [reparseToast, setReparseToast] = useState<string | null>(null);
   const [isSyncingPostgres, setIsSyncingPostgres] = useState(false);
@@ -339,9 +388,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const handleCopySupplierCode = (code: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!code) return;
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2500);
+    try {
+      navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      showToast(`📋 SKU Proveedor copiado: "${code}"`);
+      setTimeout(() => setCopiedCode(null), 2500);
+    } catch {
+      const el = document.createElement('textarea');
+      el.value = code;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopiedCode(code);
+      showToast(`📋 SKU Proveedor copiado: "${code}"`);
+      setTimeout(() => setCopiedCode(null), 2500);
+    }
   };
 
   const handleSupplierClick = (supplierName?: string, e?: React.MouseEvent) => {
@@ -658,7 +722,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     return { matchesSet, didYouMean: res.didYouMean, matchOrderMap };
   }, [items, searchQuery]);
 
-  // Filter items
+  // Filter and sort items
   const filteredItems = useMemo(() => {
     const rawFiltered = items.filter((it) => {
       const matchesCategory =
@@ -691,23 +755,93 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       return matchesCategory && matchesSupplier && matchesStatus && matchesOffer && matchesSearch;
     });
 
-    if (searchQuery.trim() && fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.size > 0) {
-      return [...rawFiltered].sort((a, b) => {
-        const orderA = fuzzyResult.matchOrderMap!.has(a.id) ? fuzzyResult.matchOrderMap!.get(a.id)! : 999999;
-        const orderB = fuzzyResult.matchOrderMap!.has(b.id) ? fuzzyResult.matchOrderMap!.get(b.id)! : 999999;
-        return orderA - orderB;
-      });
+    const priceMap = new Map<number, number>();
+    const timeMap = new Map<number, number>();
+    for (const it of rawFiltered) {
+      priceMap.set(it.id, calculateItemFinancials(it).effectivePVP);
+      const t = it.createdAt ? new Date(it.createdAt).getTime() : 0;
+      timeMap.set(it.id, !isNaN(t) && t > 0 ? t : Number(it.id) || 0);
     }
 
-    return rawFiltered;
-  }, [items, selectedCategory, selectedSupplier, statusFilter, activeShowOffersOnly, searchQuery, fuzzyResult]);
+    return [...rawFiltered].sort((a, b) => {
+      // 1. Precio mayor (Mayor precio de venta primero)
+      if (effectiveSortBy === 'price_desc') {
+        const pA = priceMap.get(a.id) ?? 0;
+        const pB = priceMap.get(b.id) ?? 0;
+        if (Math.abs(pB - pA) > 0.0001) return pB - pA;
+        if (fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.has(a.id) && fuzzyResult.matchOrderMap.has(b.id)) {
+          return fuzzyResult.matchOrderMap.get(a.id)! - fuzzyResult.matchOrderMap.get(b.id)!;
+        }
+        return (timeMap.get(b.id) ?? b.id) - (timeMap.get(a.id) ?? a.id);
+      }
+
+      // 2. Precio menor (Menor precio de venta primero)
+      if (effectiveSortBy === 'price_asc') {
+        const pA = priceMap.get(a.id) ?? 0;
+        const pB = priceMap.get(b.id) ?? 0;
+        if (Math.abs(pA - pB) > 0.0001) return pA - pB;
+        if (fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.has(a.id) && fuzzyResult.matchOrderMap.has(b.id)) {
+          return fuzzyResult.matchOrderMap.get(a.id)! - fuzzyResult.matchOrderMap.get(b.id)!;
+        }
+        return (timeMap.get(b.id) ?? b.id) - (timeMap.get(a.id) ?? a.id);
+      }
+
+      // 3. Nombre alfabético (A - Z)
+      if (effectiveSortBy === 'name_asc') {
+        const comp = (a.name || '').localeCompare(b.name || '', 'es', { sensitivity: 'base', numeric: true });
+        if (comp !== 0) return comp;
+        return (timeMap.get(b.id) ?? b.id) - (timeMap.get(a.id) ?? a.id);
+      }
+
+      // 4. Nombre alfabético (Z - A)
+      if (effectiveSortBy === 'name_desc') {
+        const comp = (b.name || '').localeCompare(a.name || '', 'es', { sensitivity: 'base', numeric: true });
+        if (comp !== 0) return comp;
+        return (timeMap.get(b.id) ?? b.id) - (timeMap.get(a.id) ?? a.id);
+      }
+
+      // 5. Fecha de ingreso (Más antiguo primero)
+      if (effectiveSortBy === 'date_asc') {
+        const tA = timeMap.get(a.id) ?? a.id;
+        const tB = timeMap.get(b.id) ?? b.id;
+        if (tA !== tB) return tA - tB;
+        return a.id - b.id;
+      }
+
+      // 6. Relevancia de búsqueda (fuzzy match order)
+      if (effectiveSortBy === 'relevance' && fuzzyResult.matchOrderMap && fuzzyResult.matchOrderMap.size > 0) {
+        const ordA = fuzzyResult.matchOrderMap.has(a.id) ? fuzzyResult.matchOrderMap.get(a.id)! : 999999;
+        const ordB = fuzzyResult.matchOrderMap.has(b.id) ? fuzzyResult.matchOrderMap.get(b.id)! : 999999;
+        if (ordA !== ordB) return ordA - ordB;
+        const tA = timeMap.get(a.id) ?? a.id;
+        const tB = timeMap.get(b.id) ?? b.id;
+        return tB - tA;
+      }
+
+      // 7. Fecha de ingreso (Más reciente primero - Default)
+      const tA = timeMap.get(a.id) ?? a.id;
+      const tB = timeMap.get(b.id) ?? b.id;
+      if (tB !== tA) return tB - tA;
+      return b.id - a.id;
+    });
+  }, [
+    items,
+    selectedCategory,
+    selectedSupplier,
+    statusFilter,
+    activeShowOffersOnly,
+    searchQuery,
+    fuzzyResult,
+    effectiveSortBy,
+  ]);
 
   const hasActiveFilters =
     selectedCategory !== 'all' ||
     selectedSupplier !== 'all' ||
     statusFilter !== 'all' ||
     activeShowOffersOnly ||
-    Boolean(searchQuery.trim());
+    Boolean(searchQuery.trim()) ||
+    (isUserSortExplicit && sortBy !== 'date_desc');
 
   const handleResetFilters = () => {
     setSelectedCategory('all');
@@ -715,6 +849,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setStatusFilter('all');
     setActiveShowOffersOnly(false);
     setSearchQuery('');
+    setSortBy('date_desc');
+    setIsUserSortExplicit(false);
   };
 
   const toggleSelectOne = (id: number, e?: React.MouseEvent) => {
@@ -1117,7 +1253,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 : scrollDirection === 'up'
                   ? 'top-0 z-30 translate-y-0 opacity-100 shadow-md ring-1 ring-slate-300'
                   : 'top-16 z-20 translate-y-0 opacity-100'
-              } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full`}
+              } bg-white/95 backdrop-blur-md border border-slate-300 rounded-2xl p-2 sm:p-2.5 space-y-1.5 shadow-sm transition-all duration-300 transform max-w-full overflow-x-clip`}
           >
             {/* Barra 1: Búsqueda y Selector de Vista / Selección */}
             <div className="flex items-center gap-1.5 sm:gap-2 w-full">
@@ -1153,6 +1289,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       "{fuzzyResult.didYouMean}"
                     </button>
                     <span>?</span>
+                  </div>
+                )}
+                {searchQuery.trim() && filteredItems.length > 0 && (
+                  <div className="text-[10px] text-slate-500 font-medium pt-0.5 px-1 flex items-center space-x-1.5 flex-wrap">
+                    <span className="text-slate-400">Resultados ordenados por:</span>
+                    <span className="font-bold text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200/60 inline-flex items-center gap-1">
+                      <ArrowUpDown className="w-2.5 h-2.5 text-sky-600" />
+                      {effectiveSortBy === 'relevance' && 'Relevancia (Coincidencia)'}
+                      {effectiveSortBy === 'price_desc' && 'Precio Mayor a Menor'}
+                      {effectiveSortBy === 'price_asc' && 'Precio Menor a Mayor'}
+                      {effectiveSortBy === 'date_desc' && 'Fecha (Más reciente)'}
+                      {effectiveSortBy === 'date_asc' && 'Fecha (Más antiguo)'}
+                      {effectiveSortBy === 'name_asc' && 'Nombre (A - Z)'}
+                      {effectiveSortBy === 'name_desc' && 'Nombre (Z - A)'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1240,13 +1391,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </div>
 
-            {/* Barra 2: Filtro horizontal continuo (deslizable con el dedo o ratón en cualquier pantalla) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar touch-pan-x py-1 w-full scroll-smooth pt-1.5 border-t border-slate-200/80 select-none whitespace-nowrap">
+            {/* Barra 2: Filtros y Ordenamiento (Diseño Responsivo sin Scroll Horizontal) */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full pt-1.5 border-t border-slate-200/80">
               {/* Filtro por Estado con Combobox (Select) */}
-              <div className="flex items-center shrink-0">
-                <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1.5 shrink-0">
-                  <Filter className="w-3 h-3 mr-1 text-emerald-600 shrink-0" />
-                  Estado:
+              <div className="flex items-center min-w-0">
+                <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1 shrink-0" title="Filtrar por Estado de Stock">
+                  <Filter className="w-3 h-3 mr-0.5 text-emerald-600 shrink-0" />
+                  <span className="hidden sm:inline">Estado:</span>
                 </span>
                 <select
                   id="inventory-status-select"
@@ -1260,7 +1411,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       setActiveShowOffersOnly(false);
                     }
                   }}
-                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:bg-slate-50 transition"
+                  className="h-7 px-1.5 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:bg-slate-50 transition max-w-[130px] sm:max-w-[155px] truncate"
                 >
                   {[
                     { id: 'all', label: 'Todos los Estados', count: items.length },
@@ -1277,26 +1428,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </select>
               </div>
 
-              {/* Separador */}
-              <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
-
               {/* Filtro por Categoría con Combobox (Select) */}
-              <div className="flex items-center shrink-0">
-                <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1.5 shrink-0">
-                  <Tag className="w-3 h-3 mr-1 text-sky-600 shrink-0" />
-                  Categoría:
+              <div className="flex items-center min-w-0 gap-1">
+                <span className="text-[11px] text-slate-500 font-bold flex items-center mr-0.5 shrink-0" title="Filtrar por Categoría">
+                  <Tag className="w-3 h-3 mr-0.5 text-sky-600 shrink-0" />
+                  <span className="hidden sm:inline">Cat:</span>
                 </span>
                 <select
                   id="inventory-category-select"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500 hover:bg-slate-50 transition"
+                  className="h-7 px-1.5 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500 hover:bg-slate-50 transition max-w-[115px] sm:max-w-[150px] truncate"
                 >
                   {categories.map((cat) => {
                     const count = cat === 'all' ? items.length : categoriesCount[cat] || 0;
                     return (
                       <option key={cat} value={cat}>
-                        {cat === 'all' ? `Todas las Categorías (${count})` : `${cat} (${count})`}
+                        {cat === 'all' ? `Todas (${count})` : `${cat} (${count})`}
                       </option>
                     );
                   })}
@@ -1308,58 +1456,78 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     setShareInitialCategory(selectedCategory !== 'all' ? selectedCategory : '');
                     setIsShareModalOpen(true);
                   }}
-                  className="ml-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 border border-emerald-300 transition cursor-pointer flex items-center space-x-1 shadow-2xs shrink-0"
-                  title="Compartir catálogo filtrado por esta categoría"
+                  className="h-7 px-1.5 sm:px-2 rounded-xl text-[11px] sm:text-xs font-extrabold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 border border-emerald-300 transition cursor-pointer flex items-center space-x-1 shadow-2xs shrink-0"
+                  title={selectedCategory !== 'all' ? `Compartir categoría "${selectedCategory}"` : 'Compartir catálogo'}
                 >
-                  <Share2 className="w-3 h-3 text-emerald-600 stroke-[2.5] shrink-0" />
-                  <span className="hidden sm:inline">
-                    Compartir {selectedCategory !== 'all' ? `"${selectedCategory}"` : 'Categoría'}
-                  </span>
-                  <span className="sm:hidden">Compartir</span>
+                  <Share2 className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
+                  <span className="hidden lg:inline text-[11px]">Compartir</span>
                 </button>
               </div>
 
               {/* Filtro por Proveedor con Combobox (Select) */}
               {suppliers.length > 1 && (
-                <>
-                  <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
-                  <div className="flex items-center shrink-0">
-                    <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1.5 shrink-0">
-                      <Truck className="w-3 h-3 mr-1 text-purple-600 shrink-0" />
-                      Proveedor:
-                    </span>
-                    <select
-                      id="inventory-supplier-select"
-                      value={selectedSupplier}
-                      onChange={(e) => setSelectedSupplier(e.target.value)}
-                      className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500 hover:bg-slate-50 transition"
-                    >
-                      {suppliers.map((sup) => {
-                        const count = sup === 'all' ? items.length : suppliersCount[sup] || 0;
-                        return (
-                          <option key={sup} value={sup}>
-                            {sup === 'all' ? `Todos los Proveedores (${count})` : `${sup} (${count})`}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                </>
+                <div className="flex items-center min-w-0">
+                  <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1 shrink-0" title="Filtrar por Proveedor">
+                    <Truck className="w-3 h-3 mr-0.5 text-purple-600 shrink-0" />
+                    <span className="hidden sm:inline">Prov:</span>
+                  </span>
+                  <select
+                    id="inventory-supplier-select"
+                    value={selectedSupplier}
+                    onChange={(e) => setSelectedSupplier(e.target.value)}
+                    className="h-7 px-1.5 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500 hover:bg-slate-50 transition max-w-[110px] sm:max-w-[145px] truncate"
+                  >
+                    {suppliers.map((sup) => {
+                      const count = sup === 'all' ? items.length : suppliersCount[sup] || 0;
+                      return (
+                        <option key={sup} value={sup}>
+                          {sup === 'all' ? `Todos (${count})` : `${sup} (${count})`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               )}
+
+              {/* Selector de Ordenamiento */}
+              <div className="flex items-center min-w-0">
+                <span className="text-[11px] text-slate-500 font-bold flex items-center mr-1 shrink-0" title="Criterio de ordenamiento">
+                  <ArrowUpDown className="w-3 h-3 mr-0.5 text-amber-600 shrink-0" />
+                  <span className="hidden sm:inline">Ordenar:</span>
+                </span>
+                <select
+                  id="inventory-sort-select"
+                  value={effectiveSortBy}
+                  onChange={(e) => handleSortChange(e.target.value as InventorySortOption)}
+                  className={`h-7 px-1.5 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold border shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500 transition max-w-[145px] sm:max-w-[180px] truncate ${
+                    effectiveSortBy !== 'date_desc' && effectiveSortBy !== 'relevance'
+                      ? 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-200'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  }`}
+                  title="Ordenar productos en el inventario o resultados de búsqueda"
+                >
+                  {searchQuery.trim() && (
+                    <option value="relevance">🎯 Mayor relevancia</option>
+                  )}
+                  <option value="price_desc">💰 Precio: Mayor a menor</option>
+                  <option value="price_asc">🏷️ Precio: Menor a mayor</option>
+                  <option value="date_desc">📅 Fecha: Más reciente</option>
+                  <option value="date_asc">⏳ Fecha: Más antiguo</option>
+                  <option value="name_asc">🔤 Nombre: A - Z</option>
+                  <option value="name_desc">🔡 Nombre: Z - A</option>
+                </select>
+              </div>
 
               {/* Botón Restablecer */}
               {hasActiveFilters && (
-                <>
-                  <div className="h-4 w-px bg-slate-300 shrink-0 mx-1" />
-                  <button
-                    onClick={handleResetFilters}
-                    className="text-[11px] text-rose-800 hover:text-rose-950 font-bold px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-300 transition cursor-pointer flex items-center space-x-1 shadow-2xs shrink-0 whitespace-nowrap"
-                    title="Restablecer todos los filtros"
-                  >
-                    <X className="w-3 h-3 shrink-0" />
-                    <span>Restablecer</span>
-                  </button>
-                </>
+                <button
+                  onClick={handleResetFilters}
+                  className="h-7 text-[11px] text-rose-800 hover:text-rose-950 font-bold px-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-300 transition cursor-pointer flex items-center space-x-1 shadow-2xs shrink-0 whitespace-nowrap ml-auto"
+                  title="Restablecer todos los filtros y ordenamiento"
+                >
+                  <X className="w-3 h-3 shrink-0 text-rose-600" />
+                  <span className="hidden xs:inline">Restablecer</span>
+                </button>
               )}
             </div>
           </div>
@@ -1663,22 +1831,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                             <span className="font-mono text-[11px] font-black text-sky-800 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-300" title="Código SKU Interno">
                               {item.sku}
                             </span>
-                            {item.supplierCode && (
-                              <button
-                                type="button"
-                                onClick={(e) => handleCopySupplierCode(item.supplierCode!, e)}
-                                className="font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
-                                title="Haz clic para copiar el SKU / Código de Proveedor al portapapeles"
-                              >
-                                <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
-                                <span className="max-w-[95px] truncate">{item.supplierCode}</span>
-                                {copiedCode === item.supplierCode ? (
-                                  <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
-                                ) : (
-                                  <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
-                                )}
-                              </button>
-                            )}
+                            {(() => {
+                              const suppCode = getProductSupplierCode(item);
+                              if (!suppCode) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleCopySupplierCode(suppCode, e)}
+                                  className="font-mono text-[10px] font-black text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 flex items-center space-x-1 transition cursor-pointer active:scale-95 group/copy shadow-2xs"
+                                  title={`Haz clic para copiar el SKU Proveedor (${suppCode}) al portapapeles`}
+                                >
+                                  <span className="text-[9px] text-amber-700 font-bold">Prov:</span>
+                                  <span className="max-w-[95px] truncate">{suppCode}</span>
+                                  {copiedCode === suppCode ? (
+                                    <span className="inline-flex items-center text-emerald-700 text-[9px] font-extrabold gap-0.5">
+                                      <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                                      <span>Copiado</span>
+                                    </span>
+                                  ) : (
+                                    <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                                  )}
+                                </button>
+                              );
+                            })()}
                             {item.barcode && (
                               <span className="font-mono text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-300 flex items-center space-x-1" title={`Código de barras del producto: ${item.barcode}`}>
                                 <Barcode className="w-2.5 h-2.5 text-slate-500" />
@@ -1959,12 +2134,38 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           )}
                         </button>
                       </th>
-                      <th className="px-2 py-2">Producto</th>
+                      <th
+                        className="px-2 py-2 cursor-pointer hover:bg-slate-200/80 transition select-none group"
+                        onClick={() => handleSortChange(effectiveSortBy === 'name_asc' ? 'name_desc' : 'name_asc')}
+                        title="Ordenar por nombre alfabético (A-Z / Z-A)"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>Producto</span>
+                          {effectiveSortBy === 'name_asc' && <ArrowUp className="w-3.5 h-3.5 text-sky-600 stroke-[2.5]" />}
+                          {effectiveSortBy === 'name_desc' && <ArrowDown className="w-3.5 h-3.5 text-sky-600 stroke-[2.5]" />}
+                          {effectiveSortBy !== 'name_asc' && effectiveSortBy !== 'name_desc' && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-40 group-hover:opacity-100 transition" />
+                          )}
+                        </div>
+                      </th>
                       <th className="px-2 py-2">Proveedor</th>
                       <th className="px-2 py-2">SKU</th>
                       <th className="px-2 py-2">Categoría</th>
                       <th className="px-2 py-2">Subtotal Venta</th>
-                      <th className="px-2 py-2">Precios & Utilidad</th>
+                      <th
+                        className="px-2 py-2 cursor-pointer hover:bg-slate-200/80 transition select-none group"
+                        onClick={() => handleSortChange(effectiveSortBy === 'price_desc' ? 'price_asc' : 'price_desc')}
+                        title="Ordenar por precio (Mayor a menor / Menor a mayor)"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>Precios & Utilidad</span>
+                          {effectiveSortBy === 'price_desc' && <ArrowDown className="w-3.5 h-3.5 text-sky-600 stroke-[2.5]" />}
+                          {effectiveSortBy === 'price_asc' && <ArrowUp className="w-3.5 h-3.5 text-sky-600 stroke-[2.5]" />}
+                          {effectiveSortBy !== 'price_desc' && effectiveSortBy !== 'price_asc' && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-40 group-hover:opacity-100 transition" />
+                          )}
+                        </div>
+                      </th>
                       <th className="px-2 py-2">Stock</th>
                       <th className="px-2 py-2">Estado</th>
                       <th className="px-2 py-2 text-right">Acciones</th>
@@ -2070,21 +2271,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           </td>
                           <td className="px-2 py-1.5 font-mono text-xs">
                             <span className="text-sky-700 font-bold block" title="SKU Interno">{item.sku}</span>
-                            {item.supplierCode && (
-                              <button
-                                type="button"
-                                onClick={(e) => handleCopySupplierCode(item.supplierCode!, e)}
-                                className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 hover:border-amber-400 transition cursor-pointer mt-0.5 active:scale-95 group/copy shadow-2xs"
-                                title="Haz clic para copiar el SKU Proveedor al portapapeles"
-                              >
-                                <span>Prov: {item.supplierCode}</span>
-                                {copiedCode === item.supplierCode ? (
-                                  <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
-                                ) : (
-                                  <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
-                                )}
-                              </button>
-                            )}
+                            {(() => {
+                              const suppCode = getProductSupplierCode(item);
+                              if (!suppCode) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleCopySupplierCode(suppCode, e)}
+                                  className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 hover:border-amber-400 transition cursor-pointer mt-0.5 active:scale-95 group/copy shadow-2xs"
+                                  title={`Haz clic para copiar el SKU Proveedor (${suppCode}) al portapapeles`}
+                                >
+                                  <span>Prov: {suppCode}</span>
+                                  {copiedCode === suppCode ? (
+                                    <span className="inline-flex items-center text-emerald-700 text-[9px] font-extrabold gap-0.5">
+                                      <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                                      <span>Copiado</span>
+                                    </span>
+                                  ) : (
+                                    <Copy className="w-2.5 h-2.5 text-amber-700 opacity-70 group-hover/copy:opacity-100" />
+                                  )}
+                                </button>
+                              );
+                            })()}
                             {item.barcode && (
                               <span className="text-[9px] text-slate-500 block truncate max-w-[100px]" title={`Código de barras: ${item.barcode}`}>
                                 {item.barcode}
